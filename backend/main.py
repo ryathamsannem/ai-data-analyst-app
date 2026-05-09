@@ -54,6 +54,10 @@ class ColumnMappingRequest(BaseModel):
     date_column: Optional[str] = None
 
 
+class PreviewRequest(BaseModel):
+    row_limit: Optional[int] = 10
+
+
 @app.get("/")
 def home():
     return {"message": "AI Data Analyst Backend Running"}
@@ -259,53 +263,101 @@ def calculate_kpis():
 
 
 def build_suggested_questions():
-    product_col = get_mapped_or_detected_column("product", ["product", "item", "sku"])
-    sales_col = get_mapped_or_detected_column(
-        "sales", ["sales", "revenue", "amount", "total", "value"]
-    )
-    region_col = get_mapped_or_detected_column(
-        "region", ["region", "state", "city", "location"]
-    )
-    customer_col = get_mapped_or_detected_column(
-        "customer", ["customer", "client", "buyer", "account"]
-    )
-    profit_col = get_mapped_or_detected_column(
-        "profit", ["profit", "margin", "net profit", "earnings"]
-    )
-    date_col = get_mapped_or_detected_column(
-        "date", ["date", "order date", "transaction date", "invoice date", "month"]
-    )
+    global df, dataset_profile
+
+    if df is None:
+        return [
+            "Show key trends in this dataset",
+            "What are the top 5 records by main metric?",
+            "What data quality issues should I fix first?",
+        ]
+
+    profile = dataset_profile or build_profile(df)
+    column_types = profile.get("column_types", {})
+    columns = df.columns.tolist()
+    lower_cols = [c.lower() for c in columns]
+
+    def contains_any(col_name, keywords):
+        c = col_name.lower()
+        return any(k in c for k in keywords)
+
+    numeric_cols = [c for c in columns if column_types.get(c) == "number"]
+    date_cols = [c for c in columns if column_types.get(c) == "date"]
+    category_cols = [c for c in columns if column_types.get(c) in ("category", "text")]
 
     questions = []
 
-    if product_col and sales_col:
-        questions.extend(
-            [
-                "Show sales by product",
-                "Which product has highest sales?",
-            ]
-        )
+    # Domain hinting: employee/workforce datasets
+    workforce_hint = any(
+        any(k in c for k in ["employee", "emp", "department", "attendance", "attrition", "salary"])
+        for c in lower_cols
+    )
+    sales_hint = any(
+        any(k in c for k in ["sales", "revenue", "product", "order", "customer", "region"])
+        for c in lower_cols
+    )
 
-    if region_col and sales_col:
-        questions.append("Show sales by region")
+    if workforce_hint:
+        dept_col = next((c for c in columns if contains_any(c, ["department", "team", "function"])), None)
+        salary_col = next((c for c in columns if contains_any(c, ["salary", "ctc", "compensation", "pay"])), None)
+        attrition_col = next((c for c in columns if contains_any(c, ["attrition", "churn", "exit"])), None)
+        location_col = next((c for c in columns if contains_any(c, ["location", "city", "region", "office"])), None)
+        attendance_col = next((c for c in columns if contains_any(c, ["attendance", "present", "utilization"])), None)
+        employee_name_col = next((c for c in columns if contains_any(c, ["employee", "name", "staff"])), None)
 
-    if customer_col and sales_col:
-        questions.append("Show top customers by sales")
+        if dept_col and salary_col:
+            questions.append(f"Which {dept_col} has highest average {salary_col}?")
+        if dept_col and attrition_col:
+            questions.append(f"Show {attrition_col} risk by {dept_col}")
+        if salary_col and employee_name_col:
+            questions.append(f"Top 5 {employee_name_col} by {salary_col}")
+        if location_col:
+            questions.append(f"{location_col} wise employee distribution")
+        if dept_col and attendance_col:
+            questions.append(f"Which {dept_col} has lowest {attendance_col} percentage?")
 
-    if profit_col and product_col:
-        questions.append("Show profit by product")
+    if sales_hint:
+        sales_col = next((c for c in columns if contains_any(c, ["sales", "revenue", "amount", "total", "value"])), None)
+        product_col = next((c for c in columns if contains_any(c, ["product", "item", "sku", "category"])), None)
+        region_col = next((c for c in columns if contains_any(c, ["region", "state", "city", "location"])), None)
+        if sales_col and product_col:
+            questions.extend(
+                [
+                    f"Show {sales_col} by {product_col}",
+                    f"Which {product_col} has highest {sales_col}?",
+                ]
+            )
+        if date_cols and sales_col:
+            questions.append(f"Monthly {sales_col} trend")
+        if region_col and sales_col:
+            questions.append(f"Show {sales_col} by {region_col}")
 
-    if date_col and sales_col:
-        questions.append("Monthly sales trend")
-
+    # Generic fallbacks by types
     if not questions:
-        questions = [
-            "Show sales by product",
-            "Which product has highest sales?",
-            "Show sales by region",
-        ]
+        if numeric_cols and category_cols:
+            questions.append(f"Show average {numeric_cols[0]} by {category_cols[0]}")
+            questions.append(f"Top 5 {category_cols[0]} by {numeric_cols[0]}")
+        if date_cols and numeric_cols:
+            questions.append(f"{numeric_cols[0]} trend over {date_cols[0]}")
+        if category_cols:
+            questions.append(f"{category_cols[0]} wise record distribution")
+        if numeric_cols:
+            questions.append(f"What are min, max, and average of {numeric_cols[0]}?")
 
-    return questions
+    # keep concise and unique
+    dedup = []
+    seen = set()
+    for q in questions:
+        norm = q.strip().lower()
+        if norm and norm not in seen:
+            seen.add(norm)
+            dedup.append(q.strip())
+
+    return dedup[:6] or [
+        "Show key trends in this dataset",
+        "Which categories contribute most?",
+        "What are the top outliers to investigate?",
+    ]
 
 
 def build_upload_response(sheet_names):
@@ -422,6 +474,30 @@ def select_sheet(data: SheetRequest):
     dataset_profile = build_profile(df)
 
     return build_upload_response(sheet_names)
+
+
+@app.post("/preview")
+def get_preview(data: PreviewRequest):
+    global df
+
+    if df is None:
+        raise HTTPException(status_code=400, detail="Please upload a CSV or Excel file first.")
+
+    limit = data.row_limit
+    if limit is not None and limit <= 0:
+        raise HTTPException(status_code=400, detail="row_limit must be a positive number or null for all rows.")
+
+    if limit is None:
+        view = df
+    else:
+        # Guardrail for accidental huge responses.
+        safe_limit = min(int(limit), 10000)
+        view = df.head(safe_limit)
+
+    return {
+        "rows": int(len(df)),
+        "preview": view.to_dict(orient="records"),
+    }
 
 
 @app.post("/update-column-mapping")
