@@ -6,7 +6,8 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 import os
 from io import BytesIO
-from typing import Optional
+from typing import Optional, List, Dict, Any, Tuple
+import re
 
 load_dotenv()
 
@@ -262,6 +263,202 @@ def calculate_kpis():
     return kpis
 
 
+def _col_lower_list(columns):
+    return [str(c).lower() for c in columns]
+
+
+def _find_first_column(columns, keywords):
+    for c in columns:
+        cl = str(c).lower()
+        if any(k in cl for k in keywords):
+            return c
+    return None
+
+
+def infer_dataset_kind() -> str:
+    """Rough domain: hr | sales | generic (for KPI labels only)."""
+    global df
+    if df is None:
+        return "generic"
+    columns = df.columns.tolist()
+    lower = _col_lower_list(columns)
+
+    def col_has(pat_list):
+        return any(any(k in c for k in pat_list) for c in lower)
+
+    workforce_signals = col_has(
+        ["employee", "emp_", "_emp", "department", "attrition", "salary", "attendance", "staff", "workforce"]
+    )
+    sales_signals = col_has(["sales", "revenue", "product", "order", "sku", "customer", "invoice"])
+
+    product_col = get_mapped_or_detected_column("product", ["product", "item", "sku"])
+    sales_col = get_mapped_or_detected_column("sales", ["sales", "revenue", "amount", "total", "value"])
+    salary_col = _find_first_column(columns, ["salary", "ctc", "compensation", "pay", "wage"])
+    dept_col = _find_first_column(
+        columns, ["department", "dept", "team", "division", "business unit", "business_unit"]
+    )
+
+    clear_sales = bool(sales_col and product_col)
+
+    # Prefer HR when people/org signals exist and we're not clearly a product sales cube.
+    if workforce_signals and (salary_col or dept_col or not clear_sales):
+        if clear_sales and not (salary_col or dept_col):
+            return "sales"
+        return "hr"
+
+    if clear_sales or (sales_signals and sales_col):
+        return "sales"
+    return "generic"
+
+
+def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
+    """UI + PDF KPI cards with human-facing labels."""
+    global df, dataset_profile
+    kind = infer_dataset_kind()
+    if df is None:
+        return [], kind
+
+    profile = dataset_profile or build_profile(df)
+    ct = profile.get("column_types", {})
+    kp = calculate_kpis()
+    cards: List[Dict[str, Any]] = []
+    columns = df.columns.tolist()
+
+    if kind == "hr":
+        emp_id_col = _find_first_column(
+            columns,
+            ["employee_id", "emp_id", "staff_id", "emp id", "employee id"],
+        )
+        if emp_id_col is None:
+            for c in columns:
+                cl = str(c).lower().replace(" ", "_")
+                if "employee" in cl and "id" in cl:
+                    emp_id_col = c
+                    break
+
+        total_employees = int(df[emp_id_col].nunique(dropna=True)) if emp_id_col else int(len(df))
+        cards.append(
+            {"title": "Total Employees", "value": f"{total_employees:,}", "subtitle": None}
+        )
+
+        salary_col = _find_first_column(columns, ["salary", "ctc", "compensation", "pay", "wage"])
+        if salary_col:
+            sv = numeric_series(salary_col)
+            if sv.notna().any():
+                avg = float(sv.mean(skipna=True))
+                cards.append(
+                    {
+                        "title": "Average Salary",
+                        "value": f"{avg:,.0f}",
+                        "subtitle": None,
+                    }
+                )
+                amax_idx = sv.idxmax(skipna=True)
+                hi_val = float(sv.max(skipna=True))
+                name_col = _find_first_column(columns, ["name", "employee name", "full name", "emp_name"]) or emp_id_col
+                hi_name = "—"
+                if amax_idx is not None and name_col is not None and name_col in df.columns:
+                    try:
+                        hi_name = str(df.loc[amax_idx, name_col])
+                    except Exception:
+                        hi_name = "—"
+                cards.append(
+                    {
+                        "title": "Highest Paid Employee",
+                        "value": hi_name[:60] + ("..." if len(str(hi_name)) > 60 else ""),
+                        "subtitle": f"Salary {hi_val:,.0f}",
+                    }
+                )
+            else:
+                cards.append({"title": "Average Salary", "value": "N/A", "subtitle": None})
+                cards.append({"title": "Highest Paid Employee", "value": "N/A", "subtitle": None})
+        else:
+            cards.append({"title": "Average Salary", "value": "N/A", "subtitle": None})
+            cards.append({"title": "Highest Paid Employee", "value": "N/A", "subtitle": None})
+
+        dept_col = _find_first_column(columns, ["department", "dept", "team", "division"])
+        if dept_col:
+            dcount = int(df[dept_col].nunique(dropna=True))
+            cards.append({"title": "Departments", "value": f"{dcount:,}", "subtitle": None})
+        else:
+            cards.append({"title": "Departments", "value": "N/A", "subtitle": None})
+
+        return cards[:4], kind
+
+    if kind == "sales":
+        if kp.get("total_sales") is not None:
+            cards.append(
+                {
+                    "title": "Total Sales",
+                    "value": f'{float(kp["total_sales"]):,.0f}',
+                    "subtitle": None,
+                }
+            )
+        else:
+            cards.append({"title": "Total Sales", "value": "N/A", "subtitle": None})
+
+        if kp.get("top_product"):
+            tp = kp["top_product"]
+            cards.append(
+                {
+                    "title": "Top Product",
+                    "value": str(tp.get("name", "—"))[:60],
+                    "subtitle": f'{float(tp.get("value", 0)):,.0f}',
+                }
+            )
+        else:
+            cards.append({"title": "Top Product", "value": "N/A", "subtitle": None})
+
+        if kp.get("unique_products") is not None:
+            cards.append(
+                {
+                    "title": "Products",
+                    "value": f'{int(kp["unique_products"]):,}',
+                    "subtitle": None,
+                }
+            )
+        else:
+            cards.append({"title": "Products", "value": "N/A", "subtitle": None})
+
+        date_col = get_mapped_or_detected_column(
+            "date",
+            ["date", "order date", "transaction date", "invoice date", "month", "period"],
+        )
+        sales_col = get_mapped_or_detected_column(
+            "sales",
+            ["sales", "revenue", "amount", "total", "value"],
+        )
+        if date_col and sales_col:
+            cards.append(
+                {
+                    "title": "Period Trend",
+                    "value": "Supported",
+                    "subtitle": "Use a monthly / time-based sales question",
+                }
+            )
+
+        return cards[:4], kind
+
+    # generic
+    num_n = sum(1 for c in columns if ct.get(c) == "number")
+    cat_n = sum(1 for c in columns if ct.get(c) in ("category", "text"))
+
+    cards = [
+        {"title": "Total Rows", "value": f"{int(len(df)):,}", "subtitle": None},
+        {"title": "Total Columns", "value": f"{len(columns):,}", "subtitle": None},
+        {"title": "Numeric Columns", "value": f"{num_n:,}", "subtitle": None},
+        {"title": "Category Columns", "value": f"{cat_n:,}", "subtitle": None},
+    ]
+    return cards, kind
+
+
+def _clean_question_sentence(s: str) -> str:
+    s = re.sub(r"\s+", " ", s.strip())
+    # avoid doubled words like "... risk risk"
+    s = re.sub(r"\b(\w+)\s+\1\b", r"\1", s, flags=re.IGNORECASE)
+    return s
+
+
 def build_suggested_questions():
     global df, dataset_profile
 
@@ -297,61 +494,98 @@ def build_suggested_questions():
         for c in lower_cols
     )
 
+    dept_word = "department"
+    salary_word = "salary"
+
+    def pretty_fallback_column(col: str) -> str:
+        raw = str(col).replace("_", " ").strip()
+        return raw[0].lower() + raw[1:] if raw else "this field"
+
     if workforce_hint:
         dept_col = next((c for c in columns if contains_any(c, ["department", "team", "function"])), None)
         salary_col = next((c for c in columns if contains_any(c, ["salary", "ctc", "compensation", "pay"])), None)
         attrition_col = next((c for c in columns if contains_any(c, ["attrition", "churn", "exit"])), None)
         location_col = next((c for c in columns if contains_any(c, ["location", "city", "region", "office"])), None)
         attendance_col = next((c for c in columns if contains_any(c, ["attendance", "present", "utilization"])), None)
-        employee_name_col = next((c for c in columns if contains_any(c, ["employee", "name", "staff"])), None)
 
         if dept_col and salary_col:
-            questions.append(f"Which {dept_col} has highest average {salary_col}?")
+            questions.append(_clean_question_sentence(f"Which {dept_word} has highest average {salary_word}?"))
         if dept_col and attrition_col:
-            questions.append(f"Show {attrition_col} risk by {dept_col}")
-        if salary_col and employee_name_col:
-            questions.append(f"Top 5 {employee_name_col} by {salary_col}")
+            ac = str(attrition_col).replace("_", " ").lower()
+            if "attrition" in ac:
+                phrase = "attrition risk" if "risk" in ac else "attrition"
+            else:
+                phrase = "risk indicators"
+            questions.append(_clean_question_sentence(f"Show {phrase} by {dept_word}"))
+        if salary_col:
+            questions.append(_clean_question_sentence(f"Top 5 employees by {salary_word}"))
         if location_col:
-            questions.append(f"{location_col} wise employee distribution")
+            questions.append("Location wise employee distribution")
         if dept_col and attendance_col:
-            questions.append(f"Which {dept_col} has lowest {attendance_col} percentage?")
+            questions.append(
+                _clean_question_sentence(f"Which {dept_word} has lowest attendance percentage?")
+            )
 
     if sales_hint:
         sales_col = next((c for c in columns if contains_any(c, ["sales", "revenue", "amount", "total", "value"])), None)
         product_col = next((c for c in columns if contains_any(c, ["product", "item", "sku", "category"])), None)
-        region_col = next((c for c in columns if contains_any(c, ["region", "state", "city", "location"])), None)
+        region_col = next((c for c in columns if contains_any(c, ["region", "state", "city"])), None)
+        product_word = "product"
+        sales_word = "sales"
+
         if sales_col and product_col:
             questions.extend(
                 [
-                    f"Show {sales_col} by {product_col}",
-                    f"Which {product_col} has highest {sales_col}?",
+                    _clean_question_sentence(f"Show {sales_word} by {product_word}"),
+                    _clean_question_sentence(f"Which {product_word} has highest {sales_word}?"),
                 ]
             )
         if date_cols and sales_col:
-            questions.append(f"Monthly {sales_col} trend")
+            questions.append(_clean_question_sentence("Monthly sales trend"))
         if region_col and sales_col:
-            questions.append(f"Show {sales_col} by {region_col}")
+            questions.append(_clean_question_sentence(f"Show {sales_word} by region"))
 
     # Generic fallbacks by types
     if not questions:
         if numeric_cols and category_cols:
-            questions.append(f"Show average {numeric_cols[0]} by {category_cols[0]}")
-            questions.append(f"Top 5 {category_cols[0]} by {numeric_cols[0]}")
+            questions.append(
+                _clean_question_sentence(
+                    f"Show average {pretty_fallback_column(numeric_cols[0])} by {pretty_fallback_column(category_cols[0])}"
+                )
+            )
+            questions.append(
+                _clean_question_sentence(
+                    f"Top 5 {pretty_fallback_column(category_cols[0])} by {pretty_fallback_column(numeric_cols[0])}"
+                )
+            )
         if date_cols and numeric_cols:
-            questions.append(f"{numeric_cols[0]} trend over {date_cols[0]}")
+            questions.append(
+                _clean_question_sentence(
+                    f"{pretty_fallback_column(numeric_cols[0]).title()} trend over {pretty_fallback_column(date_cols[0])}"
+                )
+            )
         if category_cols:
-            questions.append(f"{category_cols[0]} wise record distribution")
+            questions.append(
+                _clean_question_sentence(
+                    f"{pretty_fallback_column(category_cols[0]).title()} wise record distribution"
+                )
+            )
         if numeric_cols:
-            questions.append(f"What are min, max, and average of {numeric_cols[0]}?")
+            questions.append(
+                _clean_question_sentence(
+                    f"What are min, max, and average of {pretty_fallback_column(numeric_cols[0])}?"
+                )
+            )
 
     # keep concise and unique
     dedup = []
     seen = set()
     for q in questions:
-        norm = q.strip().lower()
+        qc = _clean_question_sentence(q)
+        norm = qc.strip().lower()
         if norm and norm not in seen:
             seen.add(norm)
-            dedup.append(q.strip())
+            dedup.append(qc)
 
     return dedup[:6] or [
         "Show key trends in this dataset",
@@ -363,6 +597,7 @@ def build_suggested_questions():
 def build_upload_response(sheet_names):
     global df, selected_sheet_name, column_mapping, uploaded_file_name, uploaded_file_bytes, dataset_profile
 
+    kpi_cards, dataset_kind = build_kpi_cards()
     return {
         "file": {
             "name": uploaded_file_name,
@@ -375,6 +610,8 @@ def build_upload_response(sheet_names):
         "selected_sheet": selected_sheet_name,
         "profile": dataset_profile or build_profile(df),
         "kpis": calculate_kpis(),
+        "kpi_cards": kpi_cards,
+        "dataset_kind": dataset_kind,
         "suggested_questions": build_suggested_questions(),
         "column_mapping": {
             "product_column": column_mapping.get("product"),
@@ -523,9 +760,12 @@ def update_column_mapping(data: ColumnMappingRequest):
             column_mapping[key] = None
     updated_kpis = calculate_kpis()
     dataset_profile = build_profile(df)
+    kpi_cards, dataset_kind = build_kpi_cards()
 
     return {
         "kpis": updated_kpis,
+        "kpi_cards": kpi_cards,
+        "dataset_kind": dataset_kind,
         "suggested_questions": build_suggested_questions(),
         "column_mapping": {
             "product_column": column_mapping.get("product"),
