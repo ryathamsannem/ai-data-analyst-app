@@ -1390,6 +1390,444 @@ def update_column_mapping(data: ColumnMappingRequest):
     }
 
 
+def _pretty_label_text(raw, max_len: int = 56) -> str:
+    s = str(raw).replace("_", " ").strip()
+    if len(s) > max_len:
+        return s[: max_len - 1] + "…"
+    return s
+
+
+def _chart_title_from_question(question: str) -> str:
+    t = question.strip()
+    if not t:
+        return "Chart"
+    one_line = " ".join(t.split())
+    if len(one_line) > 72:
+        return one_line[:69].rstrip() + "…"
+    return one_line[0].upper() + one_line[1:] if len(one_line) > 1 else one_line.upper()
+
+
+def _extract_after_by(q: str) -> Optional[str]:
+    m = re.search(r"\bby\s+([a-z0-9][a-z0-9_\s%/\-]*)", q, re.I)
+    if not m:
+        return None
+    return m.group(1).strip()
+
+
+def _extract_top_n(q: str) -> Optional[int]:
+    m = re.search(r"\btop\s+(\d{1,2})\b", q, re.I)
+    if m:
+        return max(2, min(50, int(m.group(1))))
+    word_map = {
+        "five": 5,
+        "ten": 10,
+        "three": 3,
+        "four": 4,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+    }
+    for w, n in word_map.items():
+        if re.search(rf"\btop\s+{w}\b", q, re.I):
+            return n
+    return None
+
+
+def _match_column_from_phrase(phrase: str, columns: List[str], profile: Dict[str, Any]) -> Optional[str]:
+    if not phrase:
+        return None
+    p = phrase.lower().replace(" ", "_").strip()
+    ct = profile.get("column_types", {})
+    best = None
+    best_score = 0
+    for c in columns:
+        cn = str(c).lower().replace(" ", "_")
+        score = 0
+        if p == cn:
+            score = 100
+        elif p in cn or cn in p:
+            score = 75
+        else:
+            toks = [t for t in p.split("_") if len(t) > 1]
+            if toks and all(any(tok in cn for tok in toks) for tok in toks):
+                score = 55
+        if ct.get(c) in ("category", "text", "date"):
+            score += 4
+        if score > best_score:
+            best_score = score
+            best = c
+    return best if best_score >= 50 else None
+
+
+def _resolve_by_column_from_question(q: str, columns: List[str], profile: Dict[str, Any]) -> Optional[str]:
+    phrase = _extract_after_by(q)
+    if phrase:
+        cat_pool = [
+            c
+            for c in columns
+            if profile.get("column_types", {}).get(c) in ("category", "text", "date")
+        ]
+        hit = _match_column_from_phrase(phrase, cat_pool or columns, profile)
+        if hit:
+            return hit
+    return None
+
+
+def _infer_dimension_column_from_question(
+    question_str: str, df, profile
+) -> Optional[str]:
+    """
+    Find a grouping dimension when the question does not say 'by X', e.g.
+    'Which department has the highest average salary?'
+    """
+    if df is None or df.empty:
+        return None
+    ql = question_str.lower()
+    ct = profile.get("column_types", {})
+    columns = df.columns.tolist()
+
+    cand_dims = [
+        c for c in columns if ct.get(c) in ("category", "text", "date")
+    ]
+
+    phrase = _extract_after_by(ql)
+    if phrase:
+        hit = _match_column_from_phrase(phrase, cand_dims or columns, profile)
+        if hit:
+            return hit
+
+    mm = re.search(
+        r"\bwhich\s+([a-z0-9][a-z0-9_\s]*?)\s+(?:has|have|shows?)\b",
+        ql,
+        re.I,
+    )
+    if mm:
+        raw_phrase = mm.group(1).strip().replace("-", "_")
+        hit = _match_column_from_phrase(raw_phrase, cand_dims or columns, profile)
+        if hit:
+            return hit
+        alt = raw_phrase.replace(" ", "_")
+        hit = _match_column_from_phrase(alt, cand_dims or columns, profile)
+        if hit:
+            return hit
+
+    scored: List[Tuple[int, str]] = []
+    for c in cand_dims:
+        variants = (
+            str(c).lower(),
+            str(c).lower().replace("_", " "),
+        )
+        for key in variants:
+            if len(key) < 3:
+                continue
+            if key in ql:
+                scored.append((len(key), c))
+                break
+
+    return max(scored, key=lambda t: t[0])[1] if scored else None
+
+
+def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[str, Any]]:
+    """
+    Map natural language to grouping column + value column + aggregation label.
+    Uses pandas dtypes only — no AI.
+    """
+    if df is None or df.empty:
+        return None
+    ql = question_str.lower().strip()
+    cols = df.columns.tolist()
+    ct = profile.get("column_types", {})
+    numeric_cols = [c for c in cols if ct.get(c) == "number"]
+
+    gcol = _resolve_by_column_from_question(ql, cols, profile)
+    if not gcol:
+        gcol = _infer_dimension_column_from_question(question_str, df, profile)
+
+    ncol = None
+    for c in numeric_cols:
+        kl = str(c).lower().replace("_", " ")
+        if kl in ql or str(c).lower() in ql:
+            ncol = c
+            break
+    if ncol is None and len(numeric_cols) == 1:
+        ncol = numeric_cols[0]
+
+    if not ncol or not gcol or ncol == gcol:
+        return None
+
+    if any(k in ql for k in ["average", "avg", "mean"]):
+        agg_label, agg_key = "Average", "mean"
+    elif "count" in ql or "how many" in ql or "number of" in ql:
+        agg_label, agg_key = "Count", "count"
+    elif (re.search(r"\b(sum|total)\b", ql)) and (
+        "average" not in ql and "mean" not in ql and "avg" not in ql
+    ):
+        agg_label, agg_key = "Total", "sum"
+    elif "minimum" in ql or "lowest" in ql or re.search(r"\bmin\b", ql):
+        agg_label, agg_key = "Minimum", "min"
+    elif "maximum" in ql or "highest" in ql or re.search(r"\bmax\b", ql):
+        agg_label, agg_key = "Maximum", "max"
+    else:
+        agg_label, agg_key = "Average", "mean"
+
+    return {
+        "group_col": gcol,
+        "value_col": ncol,
+        "agg_label": agg_label,
+        "agg_key": agg_key,
+        "normalized_question": ql,
+    }
+
+
+def _fallback_aggregate_chart(intent: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], str, str]:
+    """Produce name/value chart rows + internal chart_type + title from structured intent."""
+    global df
+
+    group_col = intent["group_col"]
+    target = intent["value_col"]
+    agg_key = intent["agg_key"]
+
+    chart_type_internal = "bar"
+
+    sub = df[[group_col, target]].copy()
+    sub["_v"] = numeric_series(target)
+    sub = sub.dropna(subset=[group_col, "_v"])
+    if sub.empty:
+        return [], "", ""
+
+    if agg_key == "sum":
+        g = sub.groupby(group_col)["_v"].sum()
+    elif agg_key == "mean":
+        g = sub.groupby(group_col)["_v"].mean()
+    elif agg_key == "min":
+        g = sub.groupby(group_col)["_v"].min()
+    elif agg_key == "max":
+        g = sub.groupby(group_col)["_v"].max()
+    elif agg_key == "count":
+        g = sub.groupby(group_col)["_v"].count()
+    else:
+        g = sub.groupby(group_col)["_v"].mean()
+
+    result = (
+        g.reset_index()
+        .rename(columns={group_col: "name", "_v": "value"})
+        .sort_values("value", ascending=False)
+    )
+    chart_data = [
+        {
+            "name": _pretty_label_text(r["name"]),
+            "value": float(r["value"]),
+        }
+        for _, r in result.iterrows()
+    ]
+    if not chart_data:
+        return [], "", ""
+
+    title = (
+        f"{intent['agg_label']} {_pretty_label_text(target)} by {_pretty_label_text(group_col)}"
+    )
+    return chart_data, chart_type_internal, title
+
+
+def _numeric_col_mentioned(q: str, numeric_cols: List[str]) -> Optional[str]:
+    ql = q.lower()
+    for c in numeric_cols:
+        cn = str(c).lower().replace("_", " ")
+        if cn in ql or str(c).lower() in ql:
+            return c
+    return None
+
+
+def _pick_label_column(sort_col: str, category_cols: List[str], columns: List[str]) -> str:
+    for c in category_cols:
+        if c != sort_col:
+            return c
+    for c in columns:
+        if c != sort_col:
+            return c
+    return sort_col
+
+
+def _looks_like_ranking_question(ql: str) -> bool:
+    if _extract_top_n(ql):
+        return True
+    if re.search(r"\btop\s+(?:\d+|five|ten|three|four|seven|eight)", ql):
+        return True
+    return any(k in ql for k in ("ranking", "rank ", "rank,", "ranked"))
+
+
+def _normalize_chart_records(rows: List[Any]) -> List[Dict[str, Any]]:
+    out = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        try:
+            v = float(r.get("value"))
+        except (TypeError, ValueError):
+            continue
+        raw_name = r.get("name")
+        nm = _pretty_label_text(raw_name if raw_name is not None else "—")
+        out.append({"name": nm, "value": v})
+    return out
+
+
+def build_smart_chart(question: str) -> Tuple[List[Dict[str, Any]], str, str, str]:
+    """When rule-based charts miss, infer bar/line/pie/h-bar from intent + schema."""
+    global df, dataset_profile
+    subtitle = "Generated from AI analysis"
+    if df is None or df.empty:
+        return [], "", "", ""
+
+    q = question.lower().strip()
+    profile = dataset_profile or build_profile(df)
+    ct_map = profile.get("column_types", {})
+    columns = df.columns.tolist()
+
+    numeric_cols = [c for c in columns if ct_map.get(c) == "number"]
+    date_cols = [c for c in columns if ct_map.get(c) == "date"]
+    cat_cols = [c for c in columns if ct_map.get(c) in ("category", "text")]
+    ct: Dict[str, Any] = {"column_types": ct_map}
+
+    trend_kw = (
+        "trend",
+        "over time",
+        "time series",
+        "monthly",
+        "by month",
+        "quarter",
+        "weekly",
+        "each month",
+        "every month",
+    )
+    pie_kw = (
+        "distribution",
+        "share",
+        "split",
+        "breakdown",
+        "proportion",
+        "percentage",
+        "mix",
+        "composition",
+        "% of ",
+        " percent",
+    )
+
+    # ---- Line: date bucket + numeric ----
+    if date_cols and numeric_cols and any(k in q for k in trend_kw):
+        ncol = _numeric_col_mentioned(q, numeric_cols)
+        if ncol is None and len(numeric_cols) == 1:
+            ncol = numeric_cols[0]
+        dcol = date_cols[0]
+        if ncol:
+            tmp = df[[dcol, ncol]].copy()
+            tmp["_dt"] = pd.to_datetime(tmp[dcol], errors="coerce")
+            tmp["_v"] = numeric_series(ncol)
+            tmp = tmp.dropna(subset=["_dt", "_v"])
+            if len(tmp) >= 2:
+                tmp["_m"] = tmp["_dt"].dt.to_period("M").astype(str)
+                gg = tmp.groupby("_m")["_v"].sum().reset_index().sort_values("_m")
+                gg = gg.rename(columns={"_m": "name", "_v": "value"})
+                chart_data = [
+                    {"name": str(r["name"]), "value": float(r["value"])}
+                    for _, r in gg.iterrows()
+                ]
+                title = f"{_pretty_label_text(ncol)} over time"
+                return chart_data, "line", title, subtitle
+
+    # ---- Pie / donut: category shares ----
+    if cat_cols and any(k in q for k in pie_kw):
+        ccol = _match_column_from_phrase(_extract_after_by(q) or "", cat_cols, ct) if _extract_after_by(
+            q
+        ) else None
+        if ccol is None:
+            for c in cat_cols:
+                if str(c).lower() in q:
+                    ccol = c
+                    break
+        if ccol is None:
+            ccol = cat_cols[0]
+        vc = df[ccol].astype(str).value_counts(dropna=False).head(14)
+        tot = float(vc.sum())
+        if tot <= 0:
+            pass
+        else:
+            chart_data = [
+                {"name": _pretty_label_text(i, 40), "value": round(100 * float(v) / tot, 1)}
+                for i, v in vc.items()
+            ]
+            if chart_data:
+                title = f"Distribution — {_pretty_label_text(ccol)}"
+                return chart_data, "pie", title, subtitle
+
+    # ---- Top‑N rows (horizontal bar): sort by numeric ----
+    top_n = _extract_top_n(q)
+    if top_n and numeric_cols:
+        sort_col = _numeric_col_mentioned(q, numeric_cols)
+        if sort_col is None and len(numeric_cols) == 1:
+            sort_col = numeric_cols[0]
+        if sort_col and sort_col in df.columns:
+            label_col = _pick_label_column(sort_col, cat_cols, columns)
+            show = df[[label_col, sort_col]].copy()
+            show["_v"] = numeric_series(sort_col)
+            show = show.dropna(subset=["_v"]).sort_values("_v", ascending=False).head(top_n)
+            if not show.empty:
+                chart_data = [
+                    {
+                        "name": _pretty_label_text(row[label_col]),
+                        "value": float(row["_v"]),
+                    }
+                    for _, row in show.iterrows()
+                ]
+                tn = top_n
+                title = f"Top {tn} — {_pretty_label_text(sort_col)}"
+                return chart_data, "bar_horizontal", title, subtitle
+
+    # ---- Generic aggregation: metric by category ----
+    gcol = _resolve_by_column_from_question(q, columns, ct)
+    if gcol and numeric_cols:
+        ncol = _numeric_col_mentioned(q, numeric_cols)
+        others = [c for c in numeric_cols if c != gcol]
+        if ncol is None and len(others) == 1:
+            ncol = others[0]
+        if ncol and ncol != gcol:
+            sub = df[[gcol, ncol]].copy()
+            sub["_v"] = numeric_series(ncol)
+            sub = sub.dropna(subset=[gcol, "_v"])
+            if not sub.empty:
+                want_mean = any(k in q for k in ("average", "avg", "mean"))
+                topn_b = _extract_top_n(q)
+                if want_mean:
+                    gb = sub.groupby(gcol)["_v"].mean()
+                elif "count" in q and "distinct" not in q:
+                    gb = sub.groupby(gcol)["_v"].count()
+                else:
+                    gb = sub.groupby(gcol)["_v"].sum()
+                out = gb.reset_index()
+                out.columns = ["name", "value"]
+                out = out.sort_values("value", ascending=False)
+                if topn_b:
+                    out = out.head(topn_b)
+                chart_data = [
+                    {"name": _pretty_label_text(r["name"]), "value": float(r["value"])}
+                    for _, r in out.iterrows()
+                ]
+                if chart_data:
+                    want_h = bool(topn_b) or len(chart_data) > 10 or any(
+                        k in q for k in ("rank", "ranking", "highest", "lowest")
+                    )
+                    op = (
+                        "Average"
+                        if want_mean
+                        else ("Count" if "count" in q else "Total")
+                    )
+                    title = f"{op} {_pretty_label_text(ncol)} by {_pretty_label_text(gcol)}"
+                    ctype = "bar_horizontal" if want_h else "bar"
+                    return chart_data, ctype, title, subtitle
+
+    return [], "", "", ""
+
+
 def analyze_data(question: str):
     global df
 
@@ -1452,7 +1890,83 @@ def analyze_data(question: str):
         metric = "count"
 
     if metric:
+        cols_list = df.columns.tolist()
+        group_col = _resolve_by_column_from_question(q, cols_list, profile)
+        if group_col is None:
+            group_col = _infer_dimension_column_from_question(question, df, profile)
         target = find_target_numeric_column()
+
+        if group_col and group_col in df.columns:
+            if metric == "count":
+                try:
+                    gc = df.groupby(group_col).size().reset_index(name="value")
+                    gc = gc.rename(columns={group_col: "name"}).sort_values(
+                        "value", ascending=False
+                    )
+                    topn = _extract_top_n(q)
+                    if topn:
+                        gc = gc.head(topn)
+                    chart_data = [
+                        {
+                            "name": _pretty_label_text(r["name"]),
+                            "value": float(r["value"]),
+                        }
+                        for _, r in gc.iterrows()
+                    ]
+                    if chart_data:
+                        want_h = bool(topn) or len(chart_data) > 10
+                        chart_type = "bar_horizontal" if want_h else "bar"
+                        exact_result = gc.to_string(index=False)
+                        return exact_result, chart_data, chart_type
+                except Exception:
+                    pass
+            elif target and group_col != target:
+                try:
+                    sub = df[[group_col, target]].copy()
+                    sub["_v"] = numeric_series(target)
+                    sub = sub.dropna(subset=[group_col, "_v"])
+                    if not sub.empty:
+                        if metric == "sum":
+                            g = sub.groupby(group_col)["_v"].sum()
+                        elif metric == "mean":
+                            g = sub.groupby(group_col)["_v"].mean()
+                        elif metric == "min":
+                            g = sub.groupby(group_col)["_v"].min()
+                        elif metric == "max":
+                            g = sub.groupby(group_col)["_v"].max()
+                        elif metric == "count":
+                            g = sub.groupby(group_col)["_v"].count()
+                        else:
+                            g = None
+                        if g is not None and not g.empty:
+                            result = g.reset_index()
+                            result.columns = ["name", "value"]
+                            result = result.sort_values("value", ascending=False)
+                            topn = _extract_top_n(q)
+                            if topn:
+                                result = result.head(topn)
+                            chart_data = [
+                                {
+                                    "name": _pretty_label_text(r["name"]),
+                                    "value": float(r["value"]),
+                                }
+                                for _, r in result.iterrows()
+                            ]
+                            want_h = bool(topn) or len(chart_data) > 10 or any(
+                                k in q
+                                for k in (
+                                    "rank",
+                                    "ranking",
+                                    "rank ",
+                                    "ranked",
+                                )
+                            )
+                            chart_type = "bar_horizontal" if want_h else "bar"
+                            exact_result = result.to_string(index=False)
+                            return exact_result, chart_data, chart_type
+                except Exception:
+                    pass
+
         if target:
             s = numeric_series(target)
             value = None
@@ -1627,6 +2141,304 @@ DATASET CONTEXT (schema/stats/sample):
     return exact_result, chart_data, chart_type
 
 
+def _looks_like_money_metric_column(col_name: Optional[str]) -> bool:
+    if not col_name:
+        return False
+    cn = str(col_name).lower().replace("_", " ")
+    return bool(
+        re.search(
+            r"\b(salary|wages?|monthly.?income|income|ctc|pay|compensation|earning|bonus|benefit)"
+            r"|(\brevenue\b|\bsales\b|amount\b|pricing|invoice|loan|premium|deposit|cash|capital|budget|profit\b|cost\b|qty)"
+            r"|(\border.?value\b|purchase|spend)",
+            cn,
+            re.I,
+        )
+    )
+
+
+def _looks_like_ratio_metric_column(col_name: Optional[str]) -> bool:
+    if not col_name:
+        return False
+    cn = str(col_name).lower().replace("_", " ")
+    return bool(
+        re.search(
+            r"\b(pct|percent(?:age)?|ratio|rates?|probability|conversion|score|ctr|spread)\b",
+            cn,
+            re.I,
+        )
+    )
+
+
+def _infer_agg_hint_from_question(q_lower: str) -> Optional[str]:
+    if any(k in q_lower for k in ("average", "avg", "mean")):
+        return "mean"
+    if "count" in q_lower or "how many" in q_lower or "number of" in q_lower:
+        return "count"
+    if re.search(r"\b(sum|total)\b", q_lower):
+        return "sum"
+    if "minimum" in q_lower or "lowest" in q_lower or re.search(r"\bmin\b", q_lower):
+        return "min"
+    if "maximum" in q_lower or "highest" in q_lower or re.search(r"\bmax\b", q_lower):
+        return "max"
+    return None
+
+
+def infer_visualization_rounding_category(
+    chart_type_internal: str,
+    question_lower: str,
+    value_column_hint: Optional[str],
+    agg_hint: Optional[str],
+    values_nonempty: List[float],
+) -> str:
+    ql = question_lower.lower()
+    if chart_type_internal == "pie":
+        return "pct_1"
+
+    ak = agg_hint or ""
+    if ak == "count":
+        return "int_0"
+    vmax = max((abs(v) for v in values_nonempty), default=0.0) if values_nonempty else 0.0
+
+    if ak == "mean":
+        if _looks_like_money_metric_column(value_column_hint):
+            return "money_0"
+        if _looks_like_ratio_metric_column(value_column_hint):
+            return "ratio_1"
+        return "money_0" if vmax >= 120 else "ratio_1"
+
+    if ak in ("sum", "max", "min"):
+        if _looks_like_money_metric_column(value_column_hint) or (
+            re.search(r"\b(revenue|sales)\b", ql)
+            and "distribution" not in ql
+        ):
+            return "money_0"
+        return "money_0" if vmax >= 500 else "ratio_1"
+
+    # Unknown aggregation heuristic
+    if _looks_like_money_metric_column(value_column_hint) or vmax >= 1000:
+        return "money_0"
+    if vmax <= 35 and vmax > 0:
+        return "ratio_1"
+    return "money_0"
+
+
+def round_display_numeric(category: str, val: float) -> float:
+    if category == "pct_1":
+        return round(float(val), 1)
+    if category in ("money_0", "int_0"):
+        return float(int(round(float(val))))
+    if category == "ratio_1":
+        return round(float(val), 1)
+    return round(float(val), 2)
+
+
+def format_display_numeric(category: str, val_rounded: float) -> str:
+    if category == "pct_1":
+        return f"{val_rounded:.1f}%"
+    if category == "money_0":
+        return f"{int(round(val_rounded)):,}"
+    if category == "int_0":
+        return f"{int(round(val_rounded)):,}"
+    if category == "ratio_1":
+        ir = round(val_rounded)
+        if abs(float(val_rounded) - ir) < 1e-5:
+            return f"{int(ir):,}"
+        s = f"{val_rounded:,.1f}"
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s
+    sx = f"{val_rounded:,.6f}".rstrip("0").rstrip(".")
+    return sx
+
+
+def build_visualization_anchor_for_prompt(viz: Dict[str, Any]) -> str:
+    labels = viz.get("labels") or []
+    disp = viz.get("valueDisplay")
+    vals = viz.get("values") or []
+    rows = []
+    for i, lab in enumerate(labels):
+        txt = ""
+        if isinstance(disp, list) and i < len(disp) and disp[i] is not None:
+            txt = str(disp[i])
+        elif i < len(vals):
+            txt = str(vals[i])
+        rows.append(f"  • {lab}: {txt}")
+    return "\n".join(rows)
+
+
+def _chart_type_for_api(internal: str) -> str:
+    """Public chart type names for structured visualization payloads."""
+    if internal == "bar_horizontal":
+        return "horizontalBar"
+    if internal in ("pie", "line", "bar"):
+        return internal
+    return "bar"
+
+
+def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+    """
+    Structured visualization pipeline: pandas/analysis only (never parse AI prose).
+    Returns (exact_numeric_context_for_ai, visualization_or_none).
+    """
+    global df
+
+    if df is None:
+        return "No dataset uploaded.", None
+
+    profile_live = dataset_profile or build_profile(df)
+    ql = question.lower().strip()
+
+    intent_debug = _describe_aggregate_intent(question, df, profile_live)
+
+    exact_result, chart_data, chart_type = analyze_data(question)
+    chart_data = list(_normalize_chart_records(chart_data))
+    chart_title = ""
+    chart_subtitle = "Generated from AI analysis"
+
+    fallback_used = False
+    print(
+        "[viz] received_question:",
+        repr((question or "").strip())[:520],
+        flush=True,
+    )
+    print(
+        "[viz] intent_category_col:",
+        intent_debug["group_col"] if intent_debug else None,
+        "intent_numeric_col:",
+        intent_debug["value_col"] if intent_debug else None,
+        "intent_agg:",
+        (intent_debug.get("agg_label"), intent_debug.get("agg_key")) if intent_debug else None,
+        flush=True,
+    )
+    print("[viz] after_analyze_chart_points=", len(chart_data), flush=True)
+
+    if not chart_data and intent_debug:
+        fb_rows, fb_type, fb_title = _fallback_aggregate_chart(intent_debug)
+        if fb_rows:
+            chart_data = list(_normalize_chart_records(fb_rows))
+            chart_type = (fb_type or "bar").strip() or "bar"
+            chart_title = (fb_title or "").strip()
+            fallback_used = True
+            print("[viz] used_intent_aggregate_fallback rows=", len(chart_data), flush=True)
+
+    if not chart_data:
+        sm_data, sm_type, sm_title, sm_sub = build_smart_chart(question)
+        if sm_data:
+            chart_data = list(_normalize_chart_records(sm_data))
+            chart_type = (sm_type or chart_type or "").strip() or "bar"
+            chart_title = (sm_title or "").strip()
+            chart_subtitle = (sm_sub or chart_subtitle).strip()
+
+    if chart_type == "bar" and chart_data and (
+        _looks_like_ranking_question(ql) or len(chart_data) >= 12
+    ):
+        chart_type = "bar_horizontal"
+
+    if not chart_data:
+        print(
+            "[viz] outgoing_visualization= None fallback_used=", fallback_used,
+            flush=True,
+        )
+        return exact_result, None
+
+    if not chart_title.strip():
+        hinted = None
+        if intent_debug:
+            hinted = (
+                f"{intent_debug['agg_label']} {_pretty_label_text(intent_debug['value_col'])}"
+                f" by {_pretty_label_text(intent_debug['group_col'])}"
+            )
+        chart_title = hinted or _chart_title_from_question(question)
+
+    print(
+        "[viz] finalized_category_col:",
+        intent_debug["group_col"] if intent_debug else None,
+        "finalized_numeric_col:",
+        intent_debug["value_col"] if intent_debug else None,
+        "finalized_agg:",
+        (intent_debug.get("agg_label"), intent_debug.get("agg_key"))
+        if intent_debug
+        else None,
+        "chart_type_internal=",
+        chart_type,
+        flush=True,
+    )
+
+    labels: List[str] = []
+    vals: List[float] = []
+    for row in chart_data:
+        try:
+            nm = row.get("name")
+            vv = row.get("value")
+            fv = float(vv)
+            if not (fv == fv):  # NaN
+                continue
+            labels.append(str(nm))
+            vals.append(fv)
+        except (TypeError, ValueError):
+            continue
+
+    ll = min(len(labels), len(vals))
+    if ll == 0:
+        return exact_result, None
+
+    ncol_guess = None
+    if intent_debug:
+        ncol_guess = intent_debug.get("value_col")
+    if ncol_guess is None:
+        ncol_guess = _numeric_col_mentioned(
+            ql,
+            [
+                c
+                for c in df.columns.tolist()
+                if profile_live.get("column_types", {}).get(c) == "number"
+            ],
+        )
+
+    agg_eff = intent_debug.get("agg_key") if intent_debug else None
+    if agg_eff is None:
+        agg_eff = _infer_agg_hint_from_question(ql)
+
+    trimmed_vals = vals[:ll]
+    round_cat = infer_visualization_rounding_category(
+        str(chart_type or ""),
+        ql,
+        ncol_guess,
+        agg_eff,
+        trimmed_vals,
+    )
+    rounded_vals = [round_display_numeric(round_cat, v) for v in trimmed_vals]
+    value_display = [format_display_numeric(round_cat, v) for v in rounded_vals]
+
+    visualization: Dict[str, Any] = {
+        "chartType": _chart_type_for_api(chart_type or "bar"),
+        "title": chart_title.strip(),
+        "subtitle": chart_subtitle,
+        "labels": labels[:ll],
+        "values": rounded_vals,
+        "valueDisplay": value_display,
+        "roundingHint": round_cat,
+    }
+    try:
+        print(
+            "[viz] outgoing_visualization=",
+            str(
+                {
+                    "chartType": visualization["chartType"],
+                    "title": visualization["title"],
+                    "point_count": len(visualization["labels"]),
+                    "sample_labels": visualization["labels"][:4],
+                    "sample_values": visualization["values"][:4],
+                    "fallback_aggregate_used": fallback_used,
+                }
+            )[:950],
+            flush=True,
+        )
+    except Exception:
+        print("[viz] outgoing_visualization print failed", flush=True)
+    return exact_result, visualization
+
+
 @app.post("/ask")
 def ask_question(data: QuestionRequest):
     global df
@@ -1634,14 +2446,30 @@ def ask_question(data: QuestionRequest):
     if df is None:
         return {
             "answer": "Please upload a CSV or Excel file first.",
-            "chart": [],
-            "chart_type": "",
+            "visualization": None,
         }
 
-    exact_result, chart_data, chart_type = analyze_data(data.question)
+    exact_result, visualization = compute_visualization_for_question(data.question)
+
+    viz_anchor = ""
+    viz_rule = ""
+    if visualization:
+        ctype = visualization.get("chartType", "")
+        npts = len(visualization.get("labels", []))
+        viz_anchor = (
+            "\nChart values generated from pandas (AUTHORITATIVE for prose — cite these amounts exactly):\n"
+            + build_visualization_anchor_for_prompt(visualization)
+            + "\n"
+        )
+        viz_rule = (
+            f"A {ctype} visualization with {npts} points accompanies this reply. "
+            "Your explanation MUST use ONLY the labeled amounts in the authoritative chart-values block above "
+            "(same rounding string). Do not recalculate totals or averages from prose.\n"
+        )
+
     trend_rule = ""
-    if chart_type == "line":
-        trend_rule = "- Explain only the monthly trend shown in the calculated result.\n"
+    if visualization and visualization.get("chartType") == "line":
+        trend_rule = "- Focus on the trajectory over periods shown in the calculated result.\n"
 
     ctx = get_ai_context(sample_rows=10)
     prompt = f"""
@@ -1653,11 +2481,11 @@ User question:
 Dataset context (use this, do not invent columns):
 {ctx}
 
-Exact calculated result:
+Exact calculated result (ground truth metrics / table):
 {exact_result}
-
+{viz_anchor}
 Rules:
-- Explain in simple business language.
+{viz_rule}- Explain in simple business language.
 - Do not use markdown symbols like # or **.
 - Keep answer short and useful.
 - Mention clear business insight if possible.
@@ -1670,7 +2498,6 @@ Rules:
     )
 
     return {
-        "answer": response.content[0].text,
-        "chart": chart_data,
-        "chart_type": chart_type,
+        "answer": response.content[0].text.strip(),
+        "visualization": visualization,
     }
