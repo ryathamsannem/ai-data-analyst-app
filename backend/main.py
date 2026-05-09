@@ -452,6 +452,614 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
     return cards, kind
 
 
+AUTO_DASHBOARD_LABELS = {
+    "hr": "HR / Employee",
+    "sales": "Sales",
+    "finance": "Finance",
+    "operations": "Operations",
+    "marketing": "Marketing",
+    "generic": "Generic",
+}
+
+
+def _domain_keyword_hits(lower_cols: List[str], keywords: List[str]) -> int:
+    hits = 0
+    for c in lower_cols:
+        cn = str(c).lower().replace(" ", "_")
+        for k in keywords:
+            if k in cn:
+                hits += 1
+                break
+    return hits
+
+
+def infer_auto_dashboard_kind() -> str:
+    """Wider taxonomy than infer_dataset_kind: hr, sales, finance, operations, marketing, generic."""
+    global df
+    if df is None:
+        return "generic"
+
+    columns = df.columns.tolist()
+    lower = _col_lower_list(columns)
+
+    hr_kw = [
+        "employee",
+        "emp_id",
+        "salary",
+        "department",
+        "attrition",
+        "staff",
+        "workforce",
+        "attendance",
+        "job_title",
+        "designation",
+        "benefits",
+        "tenure",
+    ]
+    fin_kw = [
+        "budget",
+        "expense",
+        "ledger",
+        "account",
+        "payment",
+        "tax",
+        "ebitda",
+        "payable",
+        "receivable",
+        "journal",
+        "invoice",
+        "margin",
+        "profit",
+        "cost_center",
+        "gl_",
+    ]
+    ops_kw = [
+        "inventory",
+        "warehouse",
+        "shipment",
+        "logistics",
+        "supply",
+        "production",
+        "capacity",
+        "defect",
+        "sla",
+        "fulfillment",
+        "stock",
+        "batch",
+        "routing",
+        "downtime",
+    ]
+    mkt_kw = [
+        "campaign",
+        "impression",
+        "click",
+        "ctr",
+        "conversion",
+        "channel",
+        "advertising",
+        "ad_",
+        "lead",
+        "funnel",
+        "acquisition",
+        "cpc",
+        "cpm",
+    ]
+
+    scores: Dict[str, int] = {
+        "finance": _domain_keyword_hits(lower, fin_kw),
+        "operations": _domain_keyword_hits(lower, ops_kw),
+        "marketing": _domain_keyword_hits(lower, mkt_kw),
+        "sales": _domain_keyword_hits(
+            lower,
+            ["sales", "revenue", "order", "qty", "quantity", "customer", "sku", "invoice"],
+        ),
+        "hr": _domain_keyword_hits(lower, hr_kw),
+    }
+
+    product_col = get_mapped_or_detected_column("product", ["product", "item", "sku"])
+    sales_col_guess = get_mapped_or_detected_column(
+        "sales", ["sales", "revenue", "amount", "total", "value"]
+    )
+
+    if product_col and sales_col_guess:
+        scores["sales"] += 6
+
+    hr_strong_row = ("salary" in " ".join(lower)) and any(
+        x in " ".join(lower) for x in ["department", "dept", "team"]
+    )
+    if hr_strong_row:
+        scores["hr"] += 4
+    if any("attrition" in c or "employee" in c for c in lower):
+        scores["hr"] += 2
+
+    base_kind = infer_dataset_kind()
+    if base_kind == "hr":
+        return "hr"
+    if base_kind == "sales":
+        return "sales"
+
+    best_secondary = max(
+        ["sales", "finance", "operations", "marketing"], key=lambda k: scores[k]
+    )
+    if scores[best_secondary] >= 2:
+        return best_secondary
+
+    if scores["hr"] >= 3 and base_kind != "sales":
+        return "hr"
+
+    return "generic"
+
+
+def _find_attrition_risk_column(columns):
+    for c in columns:
+        cn = str(c).lower().replace(" ", "_")
+        if ("risk" in cn) and ("attrition" in cn or "churn" in cn or "flight" in cn):
+            return c
+        if cn in ("attrition_risk", "risk_score", "risklevel", "attritionrisk"):
+            return c
+        if cn == "attrition" and "score" not in cn:
+            return c  # categorical Yes / High / Risk
+    return None
+
+
+def _count_high_attrition_risk(series) -> Tuple[int, int]:
+    """Return (high_count, total_considered)."""
+    s = series.dropna()
+    n = int(len(s))
+    if n == 0:
+        return 0, 0
+
+    numeric = pd.to_numeric(s.astype(str).str.strip(), errors="coerce")
+    if numeric.notna().sum() >= max(5, int(0.6 * n)):
+        vals = numeric.dropna()
+        if vals.max() <= 1.05 and vals.min() >= -0.05:
+            thresh = float(vals.quantile(0.75))
+            if thresh <= 1.5:
+                return int((vals >= 0.7).sum()), int(len(vals))
+        thresh = float(vals.quantile(0.85))
+        return int((vals >= thresh).sum()), int(len(vals))
+
+    lowered = s.astype(str).str.strip().str.lower()
+    highish = lowered.isin(
+        {"high", "yes", "y", "1", "true", "risk", "at risk", "at_risk"}
+    )
+    return int(highish.sum()), n
+
+
+def _find_order_id_column(columns):
+    return _find_first_column(
+        columns,
+        [
+            "order_id",
+            "order id",
+            "transaction_id",
+            "txn_id",
+            "order_number",
+            "order_no",
+            "invoice_id",
+            "transaction",
+        ],
+    )
+
+
+def build_auto_dashboard() -> Dict[str, Any]:
+    global df, dataset_profile
+    kind = infer_auto_dashboard_kind()
+    label = AUTO_DASHBOARD_LABELS[kind]
+
+    out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": []}
+    if df is None:
+        return out
+
+    profile = dataset_profile or build_profile(df)
+    ct = profile.get("column_types", {})
+    columns = df.columns.tolist()
+    kp = calculate_kpis()
+    cards: List[Dict[str, Any]] = []
+
+    def typed_count(tp: str) -> int:
+        return sum(1 for col in columns if ct.get(col) == tp)
+
+    cat_type_count = sum(
+        1 for col in columns if ct.get(col) in ("category", "text")
+    )
+
+    def clamp_cards(card_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        seen_titles = set()
+        trimmed: List[Dict[str, Any]] = []
+        for x in card_list:
+            if not x:
+                continue
+            t = str(x.get("title", "") or "").strip()
+            if not t or t in seen_titles:
+                continue
+            seen_titles.add(t)
+            trimmed.append(x)
+            if len(trimmed) >= 6:
+                break
+        pad_candidates = [
+            {
+                "title": "Total Columns",
+                "value": f"{len(columns):,}",
+                "subtitle": None,
+            },
+            {
+                "title": "Numeric Columns",
+                "value": f"{typed_count('number'):,}",
+                "subtitle": None,
+            },
+            {
+                "title": "Category Columns",
+                "value": f"{cat_type_count:,}",
+                "subtitle": None,
+            },
+            {
+                "title": "Total Rows",
+                "value": f"{int(len(df)):,}",
+                "subtitle": None,
+            },
+        ]
+        p = 0
+        while len(trimmed) < 3 and p < len(pad_candidates):
+            pc = pad_candidates[p]
+            p += 1
+            if pc["title"] not in seen_titles:
+                seen_titles.add(str(pc["title"]))
+                trimmed.append(pc)
+        return trimmed[:6]
+
+    if kind == "hr":
+        emp_id_col = _find_first_column(
+            columns,
+            ["employee_id", "emp_id", "staff_id", "emp id", "employee id"],
+        )
+        if emp_id_col is None:
+            for c in columns:
+                cl = str(c).lower().replace(" ", "_")
+                if "employee" in cl and "id" in cl:
+                    emp_id_col = c
+                    break
+
+        total_employees = int(df[emp_id_col].nunique(dropna=True)) if emp_id_col else int(len(df))
+        cards.append(
+            {"title": "Total Employees", "value": f"{total_employees:,}", "subtitle": None}
+        )
+
+        salary_col = _find_first_column(columns, ["salary", "ctc", "compensation", "pay", "wage"])
+        if salary_col:
+            sv = numeric_series(salary_col)
+            if sv.notna().any():
+                avg = float(sv.mean(skipna=True))
+                hi_val = float(sv.max(skipna=True))
+                cards.append(
+                    {
+                        "title": "Average Salary",
+                        "value": f"{avg:,.0f}",
+                        "subtitle": None,
+                    }
+                )
+                cards.append(
+                    {
+                        "title": "Highest Salary",
+                        "value": f"{hi_val:,.0f}",
+                        "subtitle": None,
+                    }
+                )
+            else:
+                cards.append({"title": "Average Salary", "value": "N/A", "subtitle": None})
+                cards.append({"title": "Highest Salary", "value": "N/A", "subtitle": None})
+        else:
+            cards.append({"title": "Average Salary", "value": "N/A", "subtitle": None})
+            cards.append({"title": "Highest Salary", "value": "N/A", "subtitle": None})
+
+        dept_col = _find_first_column(columns, ["department", "dept", "team", "division"])
+        if dept_col:
+            cards.append(
+                {
+                    "title": "Department Count",
+                    "value": f'{int(df[dept_col].nunique(dropna=True)):,}',
+                    "subtitle": None,
+                }
+            )
+        else:
+            cards.append({"title": "Department Count", "value": "N/A", "subtitle": None})
+
+        risk_col = _find_attrition_risk_column(columns)
+        if risk_col and risk_col in df.columns:
+            hi_cnt, denom = _count_high_attrition_risk(df[risk_col])
+            sub = f"{hi_cnt:,} of {denom:,} flagged" if denom else None
+            cards.append(
+                {"title": "High Attrition Risk Count", "value": f"{hi_cnt:,}", "subtitle": sub}
+            )
+
+        out["cards"] = clamp_cards(cards)
+        return out
+
+    if kind == "sales":
+        sales_col_inner = get_mapped_or_detected_column(
+            "sales", ["sales", "revenue", "amount", "total", "value"]
+        )
+        rev_label = "Total Revenue"
+        if sales_col_inner and "revenue" not in str(sales_col_inner).lower():
+            rev_label = "Total Sales"
+
+        if kp.get("total_sales") is not None:
+            cards.append(
+                {
+                    "title": rev_label,
+                    "value": f'{float(kp["total_sales"]):,.0f}',
+                    "subtitle": None,
+                }
+            )
+        else:
+            cards.append({"title": rev_label, "value": "N/A", "subtitle": None})
+
+        if kp.get("top_product"):
+            tp = kp["top_product"]
+            cards.append(
+                {
+                    "title": "Top Product",
+                    "value": str(tp.get("name", "—"))[:60],
+                    "subtitle": f'{float(tp.get("value", 0)):,.0f}',
+                }
+            )
+        else:
+            cards.append({"title": "Top Product", "value": "N/A", "subtitle": None})
+
+        if kp.get("unique_products") is not None:
+            cards.append(
+                {
+                    "title": "Product Count",
+                    "value": f'{int(kp["unique_products"]):,}',
+                    "subtitle": None,
+                }
+            )
+        else:
+            cards.append({"title": "Product Count", "value": "N/A", "subtitle": None})
+
+        region_col = get_mapped_or_detected_column(
+            "region", ["region", "state", "city", "location", "country", "territory"]
+        )
+        sales_col_eff = sales_col_inner
+        if region_col and sales_col_eff:
+            temp = df[[region_col, sales_col_eff]].copy()
+            temp["_v"] = numeric_series(sales_col_eff)
+            g = temp.groupby(region_col, dropna=True)["_v"].sum().sort_values(ascending=False)
+            if not g.empty:
+                top_reg = str(g.index[0])[:42]
+                top_val = float(g.iloc[0])
+                cards.append(
+                    {
+                        "title": "Best Region",
+                        "value": top_reg,
+                        "subtitle": rev_label.replace("Total ", "") + f" {top_val:,.0f}",
+                    }
+                )
+
+        order_col = _find_order_id_column(columns)
+        if order_col and sales_col_eff and kp.get("total_sales") is not None:
+            sub_o = df[[order_col, sales_col_eff]].dropna(subset=[order_col])
+            sub_o["_v"] = numeric_series(sales_col_eff)
+            uniq_orders = sub_o[order_col].nunique(dropna=True)
+            if uniq_orders > 1:
+                aov = float(kp["total_sales"]) / float(uniq_orders)
+                cards.append(
+                    {
+                        "title": "Average Order Value",
+                        "value": f"{aov:,.0f}",
+                        "subtitle": f"{int(uniq_orders):,} orders",
+                    }
+                )
+
+        out["cards"] = clamp_cards(cards)
+        return out
+
+    if kind == "generic":
+        num_n = typed_count("number")
+        cat_n = cat_type_count
+        date_n = typed_count("date")
+        cards = [
+            {"title": "Total Rows", "value": f"{int(len(df)):,}", "subtitle": None},
+            {"title": "Total Columns", "value": f"{len(columns):,}", "subtitle": None},
+            {"title": "Numeric Columns", "value": f"{num_n:,}", "subtitle": None},
+            {"title": "Category Columns", "value": f"{cat_n:,}", "subtitle": None},
+            {"title": "Date Columns", "value": f"{date_n:,}", "subtitle": None},
+        ]
+        out["cards"] = cards[:6]
+        return out
+
+    if kind == "finance":
+        cards.append({"title": "Total Records", "value": f"{int(len(df)):,}", "subtitle": None})
+        amt_col = _find_first_column(
+            columns,
+            ["amount", "total_amount", "value", "debit", "credit", "payment", "budget", "expense", "balance", "net"],
+        )
+        if amt_col:
+            sv = numeric_series(amt_col)
+            if sv.notna().any():
+                cards.append(
+                    {
+                        "title": "Sum of Amounts",
+                        "value": f"{float(sv.sum(skipna=True)):,.0f}",
+                        "subtitle": str(amt_col)[:42],
+                    }
+                )
+
+        profit_col = _find_first_column(
+            columns, ["profit", "net profit", "ebitda", "margin", "income"]
+        )
+        if profit_col:
+            pv = numeric_series(profit_col)
+            if pv.notna().any():
+                cards.append(
+                    {
+                        "title": "Total Profit",
+                        "value": f"{float(pv.sum(skipna=True)):,.0f}",
+                        "subtitle": None,
+                    }
+                )
+
+        acct_col = _find_first_column(
+            columns, ["account", "gl_", "cost_center", "category", "line item"]
+        )
+        if acct_col:
+            cards.append(
+                {
+                    "title": "Distinct Accounts",
+                    "value": f'{int(df[acct_col].nunique(dropna=True)):,}',
+                    "subtitle": None,
+                }
+            )
+
+        date_col = _find_first_column(columns, ["date", "period", "month", "fiscal"])
+        cards.append({"title": "Total Columns", "value": f"{len(columns):,}", "subtitle": None})
+
+        if date_col:
+            dc = pd.to_datetime(df[date_col], errors="coerce").dropna()
+            if len(dc) >= 2:
+                rng = dc.max() - dc.min()
+                cards.append(
+                    {
+                        "title": "Date Span",
+                        "value": str(rng.days) + " days",
+                        "subtitle": f"{dc.min().date()} → {dc.max().date()}",
+                    }
+                )
+
+        out["cards"] = clamp_cards(cards)
+        return out
+
+    if kind == "operations":
+        cards.append({"title": "Total Records", "value": f"{int(len(df)):,}", "subtitle": None})
+
+        vol_col = _find_first_column(
+            columns,
+            ["quantity", "units", "qty", "volume", "shipped", "produced", "output", "throughput"],
+        )
+        if vol_col:
+            qv = numeric_series(vol_col)
+            if qv.notna().any():
+                cards.append(
+                    {
+                        "title": "Total Volume",
+                        "value": f"{float(qv.sum(skipna=True)):,.0f}",
+                        "subtitle": str(vol_col)[:42],
+                    }
+                )
+
+        sku_like = _find_first_column(columns, ["sku", "item_id", "part", "material"])
+        if sku_like:
+            cards.append(
+                {
+                    "title": "Unique SKUs",
+                    "value": f'{int(df[sku_like].nunique(dropna=True)):,}',
+                    "subtitle": None,
+                }
+            )
+
+        loc_col = _find_first_column(
+            columns, ["warehouse", "site", "location", "plant", "facility"]
+        )
+        if loc_col:
+            cards.append(
+                {
+                    "title": "Sites / Warehouses",
+                    "value": f'{int(df[loc_col].nunique(dropna=True)):,}',
+                    "subtitle": None,
+                }
+            )
+
+        def_col = _find_first_column(columns, ["defect", "scrap", "rework", "downtime"])
+        if def_col:
+            dv = numeric_series(def_col)
+            if dv.notna().any():
+                cards.append(
+                    {
+                        "title": "Total Defects / Events",
+                        "value": f"{float(dv.sum(skipna=True)):,.0f}",
+                        "subtitle": str(def_col)[:38],
+                    }
+                )
+
+        cards.append(
+            {"title": "Numeric Columns", "value": f"{typed_count('number'):,}", "subtitle": None}
+        )
+
+        out["cards"] = clamp_cards(cards)
+        return out
+
+    if kind == "marketing":
+        cards.append({"title": "Total Records", "value": f"{int(len(df)):,}", "subtitle": None})
+
+        spend_col = _find_first_column(columns, ["spend", "cost", "budget", "ad_spend"])
+        if spend_col:
+            sp = numeric_series(spend_col)
+            if sp.notna().any():
+                cards.append(
+                    {"title": "Total Spend", "value": f"{float(sp.sum()):,.0f}", "subtitle": None}
+                )
+
+        impr_col = _find_first_column(columns, ["impression", "imps", "impr"])
+        if impr_col:
+            im = numeric_series(impr_col)
+            if im.notna().any():
+                cards.append(
+                    {
+                        "title": "Total Impressions",
+                        "value": f"{float(im.sum()):,.0f}",
+                        "subtitle": None,
+                    }
+                )
+
+        clk_col = _find_first_column(columns, ["click", "clicks"])
+        if clk_col:
+            ck = numeric_series(clk_col)
+            if ck.notna().any():
+                cards.append(
+                    {"title": "Total Clicks", "value": f"{float(ck.sum()):,.0f}", "subtitle": None}
+                )
+
+        conv_col = _find_first_column(columns, ["conversion", "conversions"])
+        if conv_col:
+            cv = numeric_series(conv_col)
+            if cv.notna().any():
+                cards.append(
+                    {
+                        "title": "Total Conversions",
+                        "value": f"{float(cv.sum()):,.0f}",
+                        "subtitle": None,
+                    }
+                )
+
+        ctr_col = _find_first_column(columns, ["ctr"])
+        if ctr_col:
+            ctrv = numeric_series(ctr_col)
+            if ctrv.notna().any():
+                avg_ctr = float(ctrv.mean(skipna=True))
+                if avg_ctr > 1:
+                    ctr_show = f"{avg_ctr:.2f}%"
+                else:
+                    ctr_show = f"{avg_ctr:.2%}"
+                cards.append({"title": "Avg CTR", "value": ctr_show, "subtitle": None})
+
+        camp_col = _find_first_column(columns, ["campaign", "channel"])
+        if camp_col:
+            cards.append(
+                {
+                    "title": "Active Campaigns",
+                    "value": f'{int(df[camp_col].nunique(dropna=True)):,}',
+                    "subtitle": None,
+                }
+            )
+
+        out["cards"] = clamp_cards(cards)
+        return out
+
+    # fallback (should not reach — all kinds handled above)
+    out["cards"] = clamp_cards([])
+    return out
+
+
 def _clean_question_sentence(s: str) -> str:
     s = re.sub(r"\s+", " ", s.strip())
     # avoid doubled words like "... risk risk"
@@ -598,6 +1206,7 @@ def build_upload_response(sheet_names):
     global df, selected_sheet_name, column_mapping, uploaded_file_name, uploaded_file_bytes, dataset_profile
 
     kpi_cards, dataset_kind = build_kpi_cards()
+    auto_dashboard = build_auto_dashboard()
     return {
         "file": {
             "name": uploaded_file_name,
@@ -612,6 +1221,7 @@ def build_upload_response(sheet_names):
         "kpis": calculate_kpis(),
         "kpi_cards": kpi_cards,
         "dataset_kind": dataset_kind,
+        "auto_dashboard": auto_dashboard,
         "suggested_questions": build_suggested_questions(),
         "column_mapping": {
             "product_column": column_mapping.get("product"),
@@ -761,11 +1371,13 @@ def update_column_mapping(data: ColumnMappingRequest):
     updated_kpis = calculate_kpis()
     dataset_profile = build_profile(df)
     kpi_cards, dataset_kind = build_kpi_cards()
+    auto_dashboard = build_auto_dashboard()
 
     return {
         "kpis": updated_kpis,
         "kpi_cards": kpi_cards,
         "dataset_kind": dataset_kind,
+        "auto_dashboard": auto_dashboard,
         "suggested_questions": build_suggested_questions(),
         "column_mapping": {
             "product_column": column_mapping.get("product"),
