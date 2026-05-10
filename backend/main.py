@@ -1067,139 +1067,388 @@ def _clean_question_sentence(s: str) -> str:
     return s
 
 
-def build_suggested_questions():
+def _q_token(col: Optional[str]) -> str:
+    """Embed real column names so /ask intent + numeric matchers can resolve them."""
+    if not col:
+        return "values"
+    return str(col).strip()
+
+
+def _dataset_suggestion_confidence(
+    domain_kind: str,
+    n_num: int,
+    n_cat: int,
+    n_rows: int,
+) -> str:
+    """Heuristic for mixing generic vs schema-tight suggestions (no LLM)."""
+    if n_rows < 12 or (n_num == 0 and n_cat == 0):
+        return "low"
+    if domain_kind == "generic":
+        if n_num >= 1 and n_cat >= 1:
+            return "medium"
+        return "low"
+    if n_num >= 1 and n_cat >= 1:
+        return "high"
+    if n_num >= 1 or n_cat >= 1:
+        return "medium"
+    return "low"
+
+
+def _generic_suggested_questions() -> List[str]:
+    return [
+        "What are the strongest numeric patterns in this dataset?",
+        "Which categories appear most often?",
+        "Highlight any obvious outliers worth investigating.",
+        "Summarize key differences between the largest groups.",
+    ]
+
+
+def _dedup_question_list(items: List[str], max_n: int = 8) -> List[str]:
+    out: List[str] = []
+    seen: set = set()
+    for q in items:
+        qc = _clean_question_sentence(q)
+        key = qc.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            out.append(qc)
+        if len(out) >= max_n:
+            break
+    return out
+
+
+def _schema_suggested_questions(
+    numeric_cols: List[str],
+    category_cols: List[str],
+    date_cols: List[str],
+) -> List[str]:
+    qs: List[str] = []
+    if numeric_cols and category_cols:
+        n0, c0 = numeric_cols[0], category_cols[0]
+        qs.append(
+            _clean_question_sentence(
+                f"Show average {_q_token(n0)} by {_q_token(c0)}"
+            )
+        )
+        qs.append(
+            _clean_question_sentence(
+                f"Which {_q_token(c0)} has the highest average {_q_token(n0)}?"
+            )
+        )
+        qs.append(
+            _clean_question_sentence(
+                f"Top 5 {_q_token(c0)} by {_q_token(n0)}"
+            )
+        )
+    if date_cols and numeric_cols:
+        qs.append(
+            _clean_question_sentence(
+                f"Show {_q_token(numeric_cols[0])} trend over time using {_q_token(date_cols[0])}"
+            )
+        )
+    if category_cols and not qs:
+        qs.append(
+            _clean_question_sentence(
+                f"Show distribution of {_q_token(category_cols[0])}"
+            )
+        )
+    return qs
+
+
+def build_suggested_questions() -> List[str]:
+    """
+    Deterministic, dataset-aware suggested questions (schema + domain heuristics).
+    Uses infer_auto_dashboard_kind, dtypes, and mapped columns — no LLM.
+    """
     global df, dataset_profile
 
     if df is None:
-        return [
-            "Show key trends in this dataset",
-            "What are the top 5 records by main metric?",
-            "What data quality issues should I fix first?",
-        ]
+        return _generic_suggested_questions()[:5]
 
     profile = dataset_profile or build_profile(df)
-    column_types = profile.get("column_types", {})
+    ct = profile.get("column_types", {})
     columns = df.columns.tolist()
-    lower_cols = [c.lower() for c in columns]
+    numeric_cols = [c for c in columns if ct.get(c) == "number"]
+    date_cols = [c for c in columns if ct.get(c) == "date"]
+    category_cols = [c for c in columns if ct.get(c) in ("category", "text")]
 
-    def contains_any(col_name, keywords):
-        c = col_name.lower()
-        return any(k in c for k in keywords)
+    domain = infer_auto_dashboard_kind()
+    row_n = int(len(df))
+    conf = _dataset_suggestion_confidence(domain, len(numeric_cols), len(category_cols), row_n)
 
-    numeric_cols = [c for c in columns if column_types.get(c) == "number"]
-    date_cols = [c for c in columns if column_types.get(c) == "date"]
-    category_cols = [c for c in columns if column_types.get(c) in ("category", "text")]
-
-    questions = []
-
-    # Domain hinting: employee/workforce datasets
-    workforce_hint = any(
-        any(k in c for k in ["employee", "emp", "department", "attendance", "attrition", "salary"])
-        for c in lower_cols
+    product_col = get_mapped_or_detected_column("product", ["product", "item", "sku", "category"])
+    sales_col = get_mapped_or_detected_column(
+        "sales", ["sales", "revenue", "amount", "total", "value", "qty", "quantity"]
     )
-    sales_hint = any(
-        any(k in c for k in ["sales", "revenue", "product", "order", "customer", "region"])
-        for c in lower_cols
+    region_col = get_mapped_or_detected_column(
+        "region", ["region", "state", "city", "location", "territory"]
+    )
+    customer_col = get_mapped_or_detected_column(
+        "customer", ["customer", "client", "buyer", "account", "company"]
+    )
+    profit_col = get_mapped_or_detected_column(
+        "profit", ["profit", "margin", "net profit", "earnings", "gp"]
+    )
+    date_col = get_mapped_or_detected_column(
+        "date", ["date", "order date", "transaction date", "invoice date", "month", "period"]
     )
 
-    dept_word = "department"
-    salary_word = "salary"
+    qs: List[str] = []
 
-    def pretty_fallback_column(col: str) -> str:
-        raw = str(col).replace("_", " ").strip()
-        return raw[0].lower() + raw[1:] if raw else "this field"
+    # ---- HR ----
+    if domain == "hr":
+        dept = _find_first_column(
+            columns, ["department", "dept", "team", "division", "business unit", "business_unit"]
+        )
+        salary = _find_first_column(columns, ["salary", "ctc", "compensation", "pay", "wage", "income"])
+        loc = _find_first_column(columns, ["location", "city", "site", "office", "country", "region"])
+        att = _find_first_column(columns, ["attendance", "present", "utilization", "absent"])
+        hire = _find_first_column(
+            columns,
+            ["hire date", "hiring date", "joining date", "join date", "start date", "date of join", "doj"],
+        )
+        emp_id = _find_first_column(
+            columns,
+            ["employee_id", "emp_id", "staff_id", "emp id", "employee id", "eeid"],
+        )
+        ar_col = _find_attrition_risk_column(columns)
+        if not ar_col:
+            ar_col = _find_first_column(columns, ["attrition", "churn", "turnover"])
 
-    if workforce_hint:
-        dept_col = next((c for c in columns if contains_any(c, ["department", "team", "function"])), None)
-        salary_col = next((c for c in columns if contains_any(c, ["salary", "ctc", "compensation", "pay"])), None)
-        attrition_col = next((c for c in columns if contains_any(c, ["attrition", "churn", "exit"])), None)
-        location_col = next((c for c in columns if contains_any(c, ["location", "city", "region", "office"])), None)
-        attendance_col = next((c for c in columns if contains_any(c, ["attendance", "present", "utilization"])), None)
-
-        if dept_col and salary_col:
-            questions.append(_clean_question_sentence(f"Which {dept_word} has highest average {salary_word}?"))
-        if dept_col and attrition_col:
-            ac = str(attrition_col).replace("_", " ").lower()
-            if "attrition" in ac:
-                phrase = "attrition risk" if "risk" in ac else "attrition"
-            else:
-                phrase = "risk indicators"
-            questions.append(_clean_question_sentence(f"Show {phrase} by {dept_word}"))
-        if salary_col:
-            questions.append(_clean_question_sentence(f"Top 5 employees by {salary_word}"))
-        if location_col:
-            questions.append("Location wise employee distribution")
-        if dept_col and attendance_col:
-            questions.append(
-                _clean_question_sentence(f"Which {dept_word} has lowest attendance percentage?")
+        if dept and salary:
+            qs.append(
+                _clean_question_sentence(
+                    f"Which {_q_token(dept)} has the highest average {_q_token(salary)}?"
+                )
+            )
+            qs.append(
+                _clean_question_sentence(
+                    f"Compare average {_q_token(salary)} across {_q_token(dept)}"
+                )
+            )
+        if dept and ar_col:
+            qs.append(
+                _clean_question_sentence(
+                    f"Show attrition risk by {_q_token(dept)} using {_q_token(ar_col)}"
+                )
+            )
+        if loc and emp_id:
+            qs.append(
+                _clean_question_sentence(
+                    f"Which {_q_token(loc)} has the highest employee count?"
+                )
+            )
+        elif loc and dept:
+            qs.append(
+                _clean_question_sentence(
+                    f"Show employee distribution by {_q_token(loc)}"
+                )
+            )
+        if hire and date_col:
+            qs.append(
+                _clean_question_sentence(
+                    f"Hiring trend over time using {_q_token(date_col)} and {_q_token(hire)}"
+                )
+            )
+        if dept and att:
+            qs.append(
+                _clean_question_sentence(
+                    f"Which {_q_token(dept)} has the lowest average {_q_token(att)}?"
+                )
             )
 
-    if sales_hint:
-        sales_col = next((c for c in columns if contains_any(c, ["sales", "revenue", "amount", "total", "value"])), None)
-        product_col = next((c for c in columns if contains_any(c, ["product", "item", "sku", "category"])), None)
-        region_col = next((c for c in columns if contains_any(c, ["region", "state", "city"])), None)
-        product_word = "product"
-        sales_word = "sales"
-
-        if sales_col and product_col:
-            questions.extend(
-                [
-                    _clean_question_sentence(f"Show {sales_word} by {product_word}"),
-                    _clean_question_sentence(f"Which {product_word} has highest {sales_word}?"),
-                ]
+    # ---- Sales (and marketing-adjacent product metrics) ----
+    elif domain == "sales":
+        if product_col and sales_col:
+            qs.append(
+                _clean_question_sentence(
+                    f"Which {_q_token(product_col)} generated the highest {_q_token(sales_col)}?"
+                )
             )
-        if date_cols and sales_col:
-            questions.append(_clean_question_sentence("Monthly sales trend"))
+            qs.append(
+                _clean_question_sentence(
+                    f"Show {_q_token(sales_col)} by {_q_token(product_col)}"
+                )
+            )
+        if date_col and sales_col:
+            qs.append(
+                _clean_question_sentence(
+                    f"Monthly {_q_token(sales_col)} trend using {_q_token(date_col)}"
+                )
+            )
         if region_col and sales_col:
-            questions.append(_clean_question_sentence(f"Show {sales_word} by region"))
-
-    # Generic fallbacks by types
-    if not questions:
-        if numeric_cols and category_cols:
-            questions.append(
+            qs.append(
                 _clean_question_sentence(
-                    f"Show average {pretty_fallback_column(numeric_cols[0])} by {pretty_fallback_column(category_cols[0])}"
+                    f"Show {_q_token(sales_col)} by {_q_token(region_col)}"
                 )
             )
-            questions.append(
+        if customer_col and sales_col:
+            qs.append(
                 _clean_question_sentence(
-                    f"Top 5 {pretty_fallback_column(category_cols[0])} by {pretty_fallback_column(numeric_cols[0])}"
+                    f"Top 10 {_q_token(customer_col)} by {_q_token(sales_col)}"
                 )
             )
-        if date_cols and numeric_cols:
-            questions.append(
+        if profit_col and product_col:
+            qs.append(
                 _clean_question_sentence(
-                    f"{pretty_fallback_column(numeric_cols[0]).title()} trend over {pretty_fallback_column(date_cols[0])}"
-                )
-            )
-        if category_cols:
-            questions.append(
-                _clean_question_sentence(
-                    f"{pretty_fallback_column(category_cols[0]).title()} wise record distribution"
-                )
-            )
-        if numeric_cols:
-            questions.append(
-                _clean_question_sentence(
-                    f"What are min, max, and average of {pretty_fallback_column(numeric_cols[0])}?"
+                    f"Which {_q_token(product_col)} has the highest {_q_token(profit_col)}?"
                 )
             )
 
-    # keep concise and unique
-    dedup = []
-    seen = set()
-    for q in questions:
-        qc = _clean_question_sentence(q)
-        norm = qc.strip().lower()
-        if norm and norm not in seen:
-            seen.add(norm)
-            dedup.append(qc)
+    # ---- Finance ----
+    elif domain == "finance":
+        exp = _find_first_column(
+            columns,
+            ["expense", "spend", "spending", "cost", "payment", "outflow", "debit"],
+        )
+        bud = _find_first_column(columns, ["budget", "planned", "forecast", "target amount"])
+        act = _find_first_column(columns, ["actual", "realized", "spent", "outturn"])
+        dept_f = _find_first_column(columns, ["department", "cost center", "cost_center", "division"])
+        cat_f = _find_first_column(columns, ["category", "gl", "account", "ledger", "line item"])
+        cash = _find_first_column(columns, ["cash flow", "cashflow", "net cash", "liquidity"])
+        if exp and cat_f:
+            qs.append(
+                _clean_question_sentence(
+                    f"Show expense breakdown by {_q_token(cat_f)} using {_q_token(exp)}"
+                )
+            )
+        if bud and act and date_col:
+            qs.append(
+                _clean_question_sentence(
+                    f"Compare {_q_token(bud)} vs {_q_token(act)} over {_q_token(date_col)}"
+                )
+            )
+        elif bud and act:
+            qs.append(
+                _clean_question_sentence(
+                    f"Compare {_q_token(bud)} vs {_q_token(act)}"
+                )
+            )
+        if exp and dept_f:
+            qs.append(
+                _clean_question_sentence(
+                    f"Which {_q_token(dept_f)} has the highest {_q_token(exp)}?"
+                )
+            )
+        if date_col and (exp or act or sales_col):
+            mcol = exp or act or sales_col
+            qs.append(
+                _clean_question_sentence(
+                    f"Show {_q_token(mcol)} trend over time using {_q_token(date_col)}"
+                )
+            )
+        if profit_col and dept_f:
+            qs.append(
+                _clean_question_sentence(
+                    f"Profit margin analysis by {_q_token(dept_f)} using {_q_token(profit_col)}"
+                )
+            )
+        if cash and date_col:
+            qs.append(
+                _clean_question_sentence(
+                    f"Show {_q_token(cash)} trend over time using {_q_token(date_col)}"
+                )
+            )
+        elif cash:
+            qs.append(
+                _clean_question_sentence(
+                    f"What are min, max, and average of {_q_token(cash)}?"
+                )
+            )
 
-    return dedup[:6] or [
-        "Show key trends in this dataset",
-        "Which categories contribute most?",
-        "What are the top outliers to investigate?",
-    ]
+    # ---- Operations ----
+    elif domain == "operations":
+        reg_o = region_col or _find_first_column(columns, ["region", "warehouse", "site", "plant"])
+        delay = _find_first_column(columns, ["delay", "latency", "lead time", "lead_time", "sla breach"])
+        vol = _find_first_column(columns, ["volume", "orders", "units", "throughput", "output"])
+        ship = _find_first_column(columns, ["shipment", "delivery", "dispatch", "fulfillment"])
+        sla = _find_first_column(columns, ["sla", "otif", "on time", "service level"])
+        if reg_o and ship:
+            qs.append(
+                _clean_question_sentence(
+                    f"Delivery performance by {_q_token(reg_o)} using {_q_token(ship)}"
+                )
+            )
+        if date_col and delay:
+            qs.append(
+                _clean_question_sentence(
+                    f"Delay trend over time using {_q_token(date_col)} and {_q_token(delay)}"
+                )
+            )
+        elif date_col and vol:
+            qs.append(
+                _clean_question_sentence(
+                    f"Order volume trend using {_q_token(date_col)} and {_q_token(vol)}"
+                )
+            )
+        if sla:
+            qs.append(
+                _clean_question_sentence(
+                    f"SLA performance summary using {_q_token(sla)}"
+                )
+            )
+        if vol and reg_o:
+            qs.append(
+                _clean_question_sentence(
+                    f"Top operational bottlenecks: highest {_q_token(vol)} by {_q_token(reg_o)}"
+                )
+            )
+
+    # ---- Marketing ----
+    elif domain == "marketing":
+        camp = _find_first_column(columns, ["campaign", "ad group", "adset", "channel"])
+        conv = _find_first_column(columns, ["conversion", "conversions", "signup", "lead"])
+        impr = _find_first_column(columns, ["impression", "impr", "views"])
+        spend = _find_first_column(columns, ["spend", "cost", "budget", "cpc", "cpm"])
+        if camp and conv:
+            qs.append(
+                _clean_question_sentence(
+                    f"Which {_q_token(camp)} has the highest {_q_token(conv)}?"
+                )
+            )
+        if date_col and spend:
+            qs.append(
+                _clean_question_sentence(
+                    f"Show {_q_token(spend)} trend over {_q_token(date_col)}"
+                )
+            )
+        channel_col = _find_first_column(columns, ["channel", "source", "medium"])
+        if channel_col and spend:
+            qs.append(
+                _clean_question_sentence(
+                    f"Compare {_q_token(spend)} across {_q_token(channel_col)}"
+                )
+            )
+        if impr and camp:
+            qs.append(
+                _clean_question_sentence(
+                    f"Top campaigns by {_q_token(impr)}"
+                )
+            )
+
+    # Schema-driven questions fill gaps for any domain
+    qs.extend(_schema_suggested_questions(numeric_cols, category_cols, date_cols))
+
+    deduped = _dedup_question_list(qs, max_n=12)
+
+    if conf == "low":
+        merged: List[str] = []
+        for g in _generic_suggested_questions():
+            merged.append(g)
+        for x in deduped:
+            if x not in merged:
+                merged.append(x)
+        deduped = _dedup_question_list(merged, max_n=8)
+
+    if len(deduped) < 5:
+        for g in _generic_suggested_questions():
+            if g not in deduped:
+                deduped.append(g)
+        deduped = _dedup_question_list(deduped, max_n=8)
+
+    if len(deduped) >= 5:
+        return deduped[:8]
+    return _dedup_question_list(deduped + _generic_suggested_questions(), max_n=8)
 
 
 def build_upload_response(sheet_names):
@@ -1672,10 +1921,15 @@ def _normalize_chart_records(rows: List[Any]) -> List[Dict[str, Any]]:
     return out
 
 
-def build_smart_chart(question: str) -> Tuple[List[Dict[str, Any]], str, str, str]:
+def build_smart_chart(
+    question: str, trace: Optional[Dict[str, Any]] = None
+) -> Tuple[List[Dict[str, Any]], str, str, str]:
     """When rule-based charts miss, infer bar/line/pie/h-bar from intent + schema."""
     global df, dataset_profile
     subtitle = "Generated from AI analysis"
+    if trace is not None:
+        trace.clear()
+        trace["routing"] = "smart_chart"
     if df is None or df.empty:
         return [], "", "", ""
 
@@ -1733,6 +1987,17 @@ def build_smart_chart(question: str) -> Tuple[List[Dict[str, Any]], str, str, st
                     for _, r in gg.iterrows()
                 ]
                 title = f"{_pretty_label_text(ncol)} over time"
+                if trace is not None:
+                    trace.update(
+                        {
+                            "category_column": dcol,
+                            "numeric_column": ncol,
+                            "aggregation": "sum",
+                            "aggregation_key": "sum",
+                            "rows_analyzed": int(len(tmp)),
+                            "notes": "Monthly buckets from date column",
+                        }
+                    )
                 return chart_data, "line", title, subtitle
 
     # ---- Pie / donut: category shares ----
@@ -1758,6 +2023,17 @@ def build_smart_chart(question: str) -> Tuple[List[Dict[str, Any]], str, str, st
             ]
             if chart_data:
                 title = f"Distribution — {_pretty_label_text(ccol)}"
+                if trace is not None:
+                    trace.update(
+                        {
+                            "category_column": ccol,
+                            "numeric_column": None,
+                            "aggregation": "share",
+                            "aggregation_key": "sum",
+                            "rows_analyzed": int(df[ccol].notna().sum()),
+                            "notes": "Percent share of row counts per category",
+                        }
+                    )
                 return chart_data, "pie", title, subtitle
 
     # ---- Top‑N rows (horizontal bar): sort by numeric ----
@@ -1770,7 +2046,9 @@ def build_smart_chart(question: str) -> Tuple[List[Dict[str, Any]], str, str, st
             label_col = _pick_label_column(sort_col, cat_cols, columns)
             show = df[[label_col, sort_col]].copy()
             show["_v"] = numeric_series(sort_col)
-            show = show.dropna(subset=["_v"]).sort_values("_v", ascending=False).head(top_n)
+            show = show.dropna(subset=["_v"]).sort_values("_v", ascending=False)
+            ranked_n = int(len(show))
+            show = show.head(top_n)
             if not show.empty:
                 chart_data = [
                     {
@@ -1781,6 +2059,17 @@ def build_smart_chart(question: str) -> Tuple[List[Dict[str, Any]], str, str, st
                 ]
                 tn = top_n
                 title = f"Top {tn} — {_pretty_label_text(sort_col)}"
+                if trace is not None:
+                    trace.update(
+                        {
+                            "category_column": label_col,
+                            "numeric_column": sort_col,
+                            "aggregation": "value",
+                            "aggregation_key": "max",
+                            "rows_analyzed": ranked_n,
+                            "notes": f"Top {tn} rows by numeric column",
+                        }
+                    )
                 return chart_data, "bar_horizontal", title, subtitle
 
     # ---- Generic aggregation: metric by category ----
@@ -1823,6 +2112,17 @@ def build_smart_chart(question: str) -> Tuple[List[Dict[str, Any]], str, str, st
                     )
                     title = f"{op} {_pretty_label_text(ncol)} by {_pretty_label_text(gcol)}"
                     ctype = "bar_horizontal" if want_h else "bar"
+                    if trace is not None:
+                        ak = "mean" if want_mean else ("count" if "count" in q else "sum")
+                        trace.update(
+                            {
+                                "category_column": gcol,
+                                "numeric_column": ncol,
+                                "aggregation": op.lower(),
+                                "aggregation_key": ak,
+                                "rows_analyzed": int(len(sub)),
+                            }
+                        )
                     return chart_data, ctype, title, subtitle
 
     return [], "", "", ""
@@ -2275,6 +2575,170 @@ def _chart_type_for_api(internal: str) -> str:
     return "bar"
 
 
+def _humanize_chart_type_for_provenance(api_chart_type: str) -> str:
+    t = (api_chart_type or "bar").strip()
+    return {
+        "bar": "Vertical bar chart",
+        "horizontalBar": "Horizontal bar chart",
+        "line": "Line chart",
+        "pie": "Pie chart",
+    }.get(t, t)
+
+
+def _agg_label_readable_from_key(agg_key: Optional[str]) -> str:
+    ak = (agg_key or "mean").strip().lower()
+    return {
+        "mean": "Average",
+        "sum": "Total",
+        "count": "Count",
+        "min": "Minimum",
+        "max": "Maximum",
+    }.get(ak, "Average")
+
+
+def _count_valid_pair_rows(df, group_col: Optional[str], value_col: Optional[str]) -> Optional[int]:
+    if df is None or df.empty or not group_col or not value_col:
+        return None
+    if group_col not in df.columns or value_col not in df.columns:
+        return None
+    try:
+        sub = df[[group_col, value_col]].copy()
+        sub["_v"] = numeric_series(value_col)
+        sub = sub.dropna(subset=[group_col, "_v"])
+        return int(sub.shape[0])
+    except Exception:
+        return None
+
+
+def _compute_provenance_confidence(
+    *,
+    rows_analyzed: int,
+    chart_points: int,
+    intent_structured: bool,
+    fallback_used: bool,
+    smart_routing_used: bool,
+    category_column: Optional[str],
+    numeric_column: Optional[str],
+    chart_type_internal: str,
+) -> str:
+    """Heuristic trust level for the explainability panel (pandas-only)."""
+    pie = chart_type_internal == "pie"
+    clear_category = bool(category_column and str(category_column).strip())
+    clear_numeric = bool(numeric_column and str(numeric_column).strip()) or pie
+    very_small = rows_analyzed < 5 or chart_points < 2
+    weak_mapping = not clear_category or not clear_numeric
+
+    if very_small or (weak_mapping and smart_routing_used):
+        return "Low"
+    if fallback_used:
+        return "Medium"
+    if smart_routing_used and (not intent_structured or weak_mapping):
+        return "Medium"
+    if intent_structured and clear_category and clear_numeric and rows_analyzed >= 5:
+        return "High"
+    if (
+        not intent_structured
+        and weak_mapping
+        and rows_analyzed >= 5
+        and chart_points >= 3
+        and not smart_routing_used
+        and not fallback_used
+    ):
+        return "Medium"
+    if not intent_structured and weak_mapping:
+        return "Low"
+    if weak_mapping or rows_analyzed < 5:
+        return "Medium"
+    return "Medium"
+
+
+def _assemble_visualization_provenance(
+    *,
+    df,
+    intent_debug: Optional[Dict[str, Any]],
+    smart_trace: Dict[str, Any],
+    fallback_used: bool,
+    smart_routing_used: bool,
+    chart_type_internal: str,
+    chart_points: int,
+    agg_eff: Optional[str],
+) -> Dict[str, Any]:
+    cat_col: Optional[str] = None
+    num_col: Optional[str] = None
+    agg_key_out: Optional[str] = agg_eff
+    agg_label_out: str = _agg_label_readable_from_key(str(agg_eff or "mean")).lower()
+
+    if intent_debug:
+        cat_col = intent_debug.get("group_col")
+        num_col = intent_debug.get("value_col")
+        if intent_debug.get("agg_key"):
+            agg_key_out = intent_debug.get("agg_key")
+        lab = str(intent_debug.get("agg_label") or "").strip()
+        if lab:
+            agg_label_out = lab.lower()
+
+    if smart_trace:
+        cat_col = cat_col or smart_trace.get("category_column")
+        if not num_col:
+            num_col = smart_trace.get("numeric_column")
+        if smart_trace.get("aggregation_key"):
+            agg_key_out = smart_trace.get("aggregation_key")
+        if smart_trace.get("aggregation"):
+            agg_label_out = str(smart_trace["aggregation"]).strip().lower()
+
+    agg_key_out = agg_key_out or agg_eff or "mean"
+    if not agg_label_out:
+        agg_label_out = _agg_label_readable_from_key(str(agg_key_out)).lower()
+
+    rows_analyzed: int = int(len(df)) if df is not None and not df.empty else 0
+    if smart_trace.get("rows_analyzed") is not None:
+        try:
+            rows_analyzed = int(smart_trace["rows_analyzed"])
+        except (TypeError, ValueError):
+            pass
+    else:
+        rc = _count_valid_pair_rows(df, cat_col, num_col)
+        if rc is not None:
+            rows_analyzed = rc
+
+    intent_structured = bool(
+        intent_debug
+        and intent_debug.get("group_col")
+        and intent_debug.get("value_col")
+        and intent_debug.get("group_col") != intent_debug.get("value_col")
+    )
+
+    api_type = _chart_type_for_api(chart_type_internal or "bar")
+    confidence = _compute_provenance_confidence(
+        rows_analyzed=rows_analyzed,
+        chart_points=chart_points,
+        intent_structured=intent_structured,
+        fallback_used=fallback_used,
+        smart_routing_used=smart_routing_used,
+        category_column=cat_col,
+        numeric_column=num_col,
+        chart_type_internal=str(chart_type_internal or ""),
+    )
+
+    return {
+        "categoryColumn": cat_col,
+        "numericColumn": num_col,
+        "aggregation": agg_label_out,
+        "aggregationKey": agg_key_out,
+        "rowsAnalyzed": rows_analyzed,
+        "chartPoints": chart_points,
+        "visualizationType": _humanize_chart_type_for_provenance(api_type),
+        "chartTypeApi": api_type,
+        "confidence": confidence,
+        "flags": {
+            "fallbackAggregateUsed": bool(fallback_used),
+            "smartChartRoutingUsed": bool(smart_routing_used),
+            "intentStructured": bool(intent_structured),
+        },
+        "notes": smart_trace.get("notes"),
+    }
+
+
 def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dict[str, Any]]]:
     """
     Structured visualization pipeline: pandas/analysis only (never parse AI prose).
@@ -2296,6 +2760,8 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
     chart_subtitle = "Generated from AI analysis"
 
     fallback_used = False
+    smart_trace: Dict[str, Any] = {}
+    smart_routing_used = False
     print(
         "[viz] received_question:",
         repr((question or "").strip())[:520],
@@ -2322,8 +2788,9 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
             print("[viz] used_intent_aggregate_fallback rows=", len(chart_data), flush=True)
 
     if not chart_data:
-        sm_data, sm_type, sm_title, sm_sub = build_smart_chart(question)
+        sm_data, sm_type, sm_title, sm_sub = build_smart_chart(question, smart_trace)
         if sm_data:
+            smart_routing_used = True
             chart_data = list(_normalize_chart_records(sm_data))
             chart_type = (sm_type or chart_type or "").strip() or "bar"
             chart_title = (sm_title or "").strip()
@@ -2410,6 +2877,17 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
     rounded_vals = [round_display_numeric(round_cat, v) for v in trimmed_vals]
     value_display = [format_display_numeric(round_cat, v) for v in rounded_vals]
 
+    provenance = _assemble_visualization_provenance(
+        df=df,
+        intent_debug=intent_debug,
+        smart_trace=smart_trace,
+        fallback_used=fallback_used,
+        smart_routing_used=smart_routing_used,
+        chart_type_internal=str(chart_type or "bar"),
+        chart_points=ll,
+        agg_eff=agg_eff,
+    )
+
     visualization: Dict[str, Any] = {
         "chartType": _chart_type_for_api(chart_type or "bar"),
         "title": chart_title.strip(),
@@ -2418,6 +2896,7 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
         "values": rounded_vals,
         "valueDisplay": value_display,
         "roundingHint": round_cat,
+        "provenance": provenance,
     }
     try:
         print(
