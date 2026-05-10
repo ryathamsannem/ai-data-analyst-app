@@ -1068,10 +1068,306 @@ def _clean_question_sentence(s: str) -> str:
 
 
 def _q_token(col: Optional[str]) -> str:
-    """Embed real column names so /ask intent + numeric matchers can resolve them."""
+    """Raw column token (internal / edge cases only)."""
     if not col:
         return "values"
     return str(col).strip()
+
+
+def _q_label(col: Optional[str]) -> str:
+    """
+    Business-facing wording for suggested questions (no underscores).
+    Matchers still resolve: _numeric_col_mentioned uses space-normalized column names.
+    """
+    if not col:
+        return "values"
+    s = str(col).strip().replace("_", " ").strip()
+    s = re.sub(r"\bpercent\b", "percentage", s, flags=re.I)
+    s = re.sub(r"\bpct\b", "percentage", s, flags=re.I)
+    s = re.sub(r"\s+id\s*$", "", s, flags=re.I).strip()
+    return s.lower()
+
+
+def _dim_scope_plural_from_col(col: Optional[str]) -> str:
+    """Natural plural phrase for 'across …' (lowercase)."""
+    raw = (col or "").lower()
+    lab = _q_label(col)
+    if "department" in raw or "department" in lab or re.search(r"\bdept\b", raw + lab):
+        return "departments"
+    if "region" in raw or "region" in lab or "territory" in raw:
+        return "regions"
+    if "location" in raw or "location" in lab or "site" in raw or "office" in raw:
+        return "locations"
+    if "city" in raw or "city" in lab:
+        return "cities"
+    if "country" in raw or "country" in lab:
+        return "countries"
+    if "segment" in raw or "segment" in lab:
+        return "segments"
+    if "category" in raw or "category" in lab:
+        return "categories"
+    if "product" in raw or "product" in lab or "sku" in raw or "item" in lab:
+        return "products"
+    if "channel" in raw or "channel" in lab:
+        return "channels"
+    if "team" in raw or "team" in lab:
+        return "teams"
+    if "division" in raw or "division" in lab:
+        return "divisions"
+    if "campaign" in raw or "campaign" in lab:
+        return "campaigns"
+    if "customer" in raw or "client" in lab or "account" in raw:
+        return "customers"
+    if "designation" in raw or "title" in lab or "job" in lab:
+        return "roles"
+    if "status" in raw or "status" in lab:
+        return "status groups"
+    w = lab.split()[-1] if lab else "group"
+    if w.endswith("y") and len(w) > 2 and w[-2] not in "aeiou":
+        return w[:-1] + "ies"
+    if w.endswith("s"):
+        return w
+    return f"{w}s"
+
+
+_BUSINESS_DIMENSION_HINTS = (
+    "department",
+    "dept",
+    "region",
+    "territory",
+    "location",
+    "city",
+    "state",
+    "country",
+    "segment",
+    "category",
+    "product",
+    "channel",
+    "status",
+    "designation",
+    "title",
+    "job",
+    "team",
+    "division",
+    "office",
+    "business unit",
+    "cost center",
+    "district",
+    "area",
+    "zone",
+    "branch",
+    "store",
+)
+
+
+def _id_like_column_name(col: Optional[str]) -> bool:
+    """Identifiers / keys that read poorly in business questions."""
+    if not col:
+        return True
+    c = str(col).strip().lower().replace(" ", "_")
+    if re.search(r"\b(uuid|guid|row_?id|rowid|index|seq|sequence)\b", c):
+        return True
+    if re.search(
+        r"(^|_)(transaction|txn|order|customer|client|user|emp|employee|account|invoice|payment)_?id$|^id$|^ids$",
+        c,
+    ):
+        return True
+    if c.endswith("_id") or c.endswith("_ids"):
+        return True
+    return False
+
+
+def _column_uniqueness_ratio(df, col: str) -> float:
+    if df is None or col not in df.columns or len(df) == 0:
+        return 1.0
+    try:
+        nu = int(df[col].nunique(dropna=True))
+        return float(nu) / float(len(df))
+    except Exception:
+        return 1.0
+
+
+def _grain_product_dimension(col: Optional[str]) -> bool:
+    """Product / SKU style columns may be high-cardinality but are still business dimensions."""
+    if not col or _id_like_column_name(col):
+        return False
+    cl = str(col).lower()
+    return any(k in cl for k in ("product", "sku", "item", "article", "style", "model"))
+
+
+def _score_dimension_column(df, col: str, profile: Dict[str, Any], uniq_ratio: float) -> int:
+    """Deterministic score for category-like business dimensions (higher is better)."""
+    score = 0
+    ct = profile.get("column_types", {})
+    cl = str(col).lower().replace("_", " ")
+    if ct.get(col) == "category":
+        score += 5
+    nu = int(df[col].nunique(dropna=True)) if len(df) else 0
+    if nu >= 2 and uniq_ratio < 0.5:
+        score += 5
+    if uniq_ratio <= 0.35 and nu >= 2:
+        score += 3
+    if any(h in cl for h in _BUSINESS_DIMENSION_HINTS):
+        score += 5
+    if _grain_product_dimension(col):
+        score += 2
+    return score
+
+
+def _rank_category_dimensions(
+    df, category_cols: List[str], profile: Dict[str, Any]
+) -> List[Tuple[str, int]]:
+    ranked: List[Tuple[str, int]] = []
+    for c in category_cols:
+        if _id_like_column_name(c):
+            continue
+        ur = _column_uniqueness_ratio(df, c)
+        if ur > 0.80 and not _grain_product_dimension(c):
+            continue
+        sc = _score_dimension_column(df, c, profile, ur)
+        if sc <= 0:
+            continue
+        ranked.append((c, sc))
+    ranked.sort(key=lambda t: (-t[1], str(t[0]).lower()))
+    return ranked
+
+
+def _score_metric_column(df, col: str) -> int:
+    score = 0
+    cl = str(col).lower().replace("_", " ")
+    if _id_like_column_name(col):
+        return -99
+    if any(
+        k in cl
+        for k in (
+            "salary",
+            "revenue",
+            "sales",
+            "amount",
+            "profit",
+            "margin",
+            "cost",
+            "expense",
+            "budget",
+            "qty",
+            "quantity",
+            "price",
+            "payment",
+            "spend",
+            "conversion",
+            "impression",
+            "delay",
+            "volume",
+            "attendance",
+            "attrition",
+            "cash",
+        )
+    ):
+        score += 6
+    try:
+        ur = float(df[col].nunique(dropna=True)) / max(len(df), 1)
+        if ur > 0.95:
+            score -= 4
+    except Exception:
+        pass
+    return score
+
+
+def _rank_numeric_metrics(df, numeric_cols: List[str]) -> List[Tuple[str, int]]:
+    ranked: List[Tuple[str, int]] = []
+    for c in numeric_cols:
+        sc = _score_metric_column(df, c)
+        if sc <= -10:
+            continue
+        ranked.append((c, sc))
+    ranked.sort(key=lambda t: (-t[1], str(t[0]).lower()))
+    return ranked
+
+
+def _dim_score_map(ranked: List[Tuple[str, int]]) -> Dict[str, int]:
+    return {c: s for c, s in ranked}
+
+
+def _resolve_dimension(
+    columns: List[str],
+    keywords: List[str],
+    ranked: List[Tuple[str, int]],
+    min_score: int = 1,
+) -> Optional[str]:
+    """Prefer _find_first_column hit only if it passes ranking; else best ranked fuzzy match."""
+    hit = _find_first_column(columns, keywords)
+    smap = _dim_score_map(ranked)
+    if hit and not _id_like_column_name(hit) and smap.get(hit, 0) >= min_score:
+        return hit
+    kl = [k.lower() for k in keywords]
+    for col, sc in ranked:
+        if sc < min_score:
+            continue
+        cl = str(col).lower().replace("_", " ")
+        if any(k in cl for k in kl):
+            return col
+    for col, sc in ranked:
+        if sc >= min_score + 3:
+            return col
+    return ranked[0][0] if ranked and ranked[0][1] >= min_score else None
+
+
+def _resolve_metric(columns: List[str], keywords: List[str], ranked: List[Tuple[str, int]]) -> Optional[str]:
+    if not ranked:
+        return None
+    hit = _find_first_column(columns, keywords)
+    smap = {c: s for c, s in ranked}
+    if hit and not _id_like_column_name(hit) and smap.get(hit, -99) > -10:
+        return hit
+    for col, sc in ranked:
+        if sc <= 0:
+            continue
+        cl = str(col).lower()
+        if any(k in cl for k in keywords):
+            return col
+    return ranked[0][0] if ranked else None
+
+
+def _tpl_compare_avg_across(metric: str, dim: str) -> str:
+    ml = _q_label(metric)
+    scope = _dim_scope_plural_from_col(dim)
+    return _clean_question_sentence(f"Compare average {ml} across {scope}")
+
+
+def _tpl_lead_on_avg(metric: str, dim: str) -> str:
+    dl = _q_label(dim)
+    ml = _q_label(metric)
+    return _clean_question_sentence(f"Which {dl} has the highest average {ml}?")
+
+
+def _tpl_ranking(dim: str, metric: str, n: int = 5) -> str:
+    dl = _q_label(dim)
+    ml = _q_label(metric)
+    return _clean_question_sentence(f"What are the top {n} {dl} ranked by {ml}?")
+
+
+def _tpl_distribution_mix(dim: str) -> str:
+    dl = _q_label(dim)
+    return _clean_question_sentence(f"How does the business mix break down by {dl}?")
+
+
+def _tpl_trend(metric: str, date_c: str) -> str:
+    ml = _q_label(metric)
+    tl = _q_label(date_c)
+    return _clean_question_sentence(f"How does {ml} trend over {tl}?")
+
+
+def _tpl_outliers(metric: str) -> str:
+    ml = _q_label(metric)
+    return _clean_question_sentence(f"Where are the largest outliers in {ml}?")
+
+
+def _tpl_concentration(loc_dim: str, group_dim: str) -> str:
+    ll = _q_label(loc_dim)
+    gl = _q_label(group_dim)
+    return _clean_question_sentence(
+        f"Which {ll} has the strongest headcount concentration by {gl}?"
+    )
 
 
 def _dataset_suggestion_confidence(
@@ -1103,56 +1399,47 @@ def _generic_suggested_questions() -> List[str]:
     ]
 
 
-def _dedup_question_list(items: List[str], max_n: int = 8) -> List[str]:
+def _dedup_question_list(items: List[str], max_n: int = 6) -> List[str]:
+    """Exact dedup, preserve order, cap length (deterministic)."""
     out: List[str] = []
     seen: set = set()
     for q in items:
         qc = _clean_question_sentence(q)
         key = qc.strip().lower()
-        if key and key not in seen:
-            seen.add(key)
-            out.append(qc)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(qc)
         if len(out) >= max_n:
             break
     return out
 
 
 def _schema_suggested_questions(
-    numeric_cols: List[str],
-    category_cols: List[str],
+    ranked_dims: List[Tuple[str, int]],
+    ranked_metrics: List[Tuple[str, int]],
     date_cols: List[str],
+    domain_q_count: int,
 ) -> List[str]:
+    """Light schema filler — fewer templates when domain already produced enough."""
+    if not ranked_dims or not ranked_metrics:
+        return []
+    d0 = ranked_dims[0][0]
+    m0 = ranked_metrics[0][0]
     qs: List[str] = []
-    if numeric_cols and category_cols:
-        n0, c0 = numeric_cols[0], category_cols[0]
-        qs.append(
-            _clean_question_sentence(
-                f"Show average {_q_token(n0)} by {_q_token(c0)}"
-            )
-        )
-        qs.append(
-            _clean_question_sentence(
-                f"Which {_q_token(c0)} has the highest average {_q_token(n0)}?"
-            )
-        )
-        qs.append(
-            _clean_question_sentence(
-                f"Top 5 {_q_token(c0)} by {_q_token(n0)}"
-            )
-        )
-    if date_cols and numeric_cols:
-        qs.append(
-            _clean_question_sentence(
-                f"Show {_q_token(numeric_cols[0])} trend over time using {_q_token(date_cols[0])}"
-            )
-        )
-    if category_cols and not qs:
-        qs.append(
-            _clean_question_sentence(
-                f"Show distribution of {_q_token(category_cols[0])}"
-            )
-        )
+    if domain_q_count < 3:
+        qs.append(_tpl_compare_avg_across(m0, d0))
+    if domain_q_count < 4 and date_cols:
+        qs.append(_tpl_trend(m0, date_cols[0]))
+    if domain_q_count < 2:
+        qs.append(_tpl_lead_on_avg(m0, d0))
     return qs
+
+
+def _mapped_col_safe(col: Optional[str]) -> Optional[str]:
+    if not col or _id_like_column_name(col):
+        return None
+    return col
 
 
 def build_suggested_questions() -> List[str]:
@@ -1163,7 +1450,7 @@ def build_suggested_questions() -> List[str]:
     global df, dataset_profile
 
     if df is None:
-        return _generic_suggested_questions()[:5]
+        return _generic_suggested_questions()[:6]
 
     profile = dataset_profile or build_profile(df)
     ct = profile.get("column_types", {})
@@ -1172,22 +1459,47 @@ def build_suggested_questions() -> List[str]:
     date_cols = [c for c in columns if ct.get(c) == "date"]
     category_cols = [c for c in columns if ct.get(c) in ("category", "text")]
 
+    ranked_dims = _rank_category_dimensions(df, category_cols, profile)
+    ranked_metrics = _rank_numeric_metrics(df, numeric_cols)
+    if not ranked_dims:
+        for c in category_cols:
+            if _id_like_column_name(c):
+                continue
+            if _column_uniqueness_ratio(df, c) > 0.90:
+                continue
+            ranked_dims = [(c, 1)]
+            break
+    if not ranked_metrics:
+        for c in numeric_cols:
+            if _id_like_column_name(c):
+                continue
+            ranked_metrics = [(c, 1)]
+            break
+
     domain = infer_auto_dashboard_kind()
     row_n = int(len(df))
     conf = _dataset_suggestion_confidence(domain, len(numeric_cols), len(category_cols), row_n)
 
-    product_col = get_mapped_or_detected_column("product", ["product", "item", "sku", "category"])
-    sales_col = get_mapped_or_detected_column(
-        "sales", ["sales", "revenue", "amount", "total", "value", "qty", "quantity"]
+    product_col = _mapped_col_safe(
+        get_mapped_or_detected_column("product", ["product", "item", "sku", "category"])
     )
-    region_col = get_mapped_or_detected_column(
-        "region", ["region", "state", "city", "location", "territory"]
+    sales_col = _mapped_col_safe(
+        get_mapped_or_detected_column(
+            "sales", ["sales", "revenue", "amount", "total", "value", "qty", "quantity"]
+        )
     )
-    customer_col = get_mapped_or_detected_column(
-        "customer", ["customer", "client", "buyer", "account", "company"]
+    region_col = _mapped_col_safe(
+        get_mapped_or_detected_column(
+            "region", ["region", "state", "city", "location", "territory"]
+        )
     )
-    profit_col = get_mapped_or_detected_column(
-        "profit", ["profit", "margin", "net profit", "earnings", "gp"]
+    customer_col = _mapped_col_safe(
+        get_mapped_or_detected_column(
+            "customer", ["customer", "client", "buyer", "account", "company"]
+        )
+    )
+    profit_col = _mapped_col_safe(
+        get_mapped_or_detected_column("profit", ["profit", "margin", "net profit", "earnings", "gp"])
     )
     date_col = get_mapped_or_detected_column(
         "date", ["date", "order date", "transaction date", "invoice date", "month", "period"]
@@ -1197,239 +1509,198 @@ def build_suggested_questions() -> List[str]:
 
     # ---- HR ----
     if domain == "hr":
-        dept = _find_first_column(
-            columns, ["department", "dept", "team", "division", "business unit", "business_unit"]
+        dept = _resolve_dimension(
+            columns,
+            ["department", "dept", "team", "division", "business unit", "business_unit"],
+            ranked_dims,
         )
-        salary = _find_first_column(columns, ["salary", "ctc", "compensation", "pay", "wage", "income"])
-        loc = _find_first_column(columns, ["location", "city", "site", "office", "country", "region"])
+        salary = _resolve_metric(
+            columns, ["salary", "ctc", "compensation", "pay", "wage", "income"], ranked_metrics
+        )
+        loc = _resolve_dimension(
+            columns, ["location", "city", "site", "office", "country"], ranked_dims
+        )
         att = _find_first_column(columns, ["attendance", "present", "utilization", "absent"])
+        if att and ct.get(att) != "number":
+            att = None
         hire = _find_first_column(
             columns,
             ["hire date", "hiring date", "joining date", "join date", "start date", "date of join", "doj"],
-        )
-        emp_id = _find_first_column(
-            columns,
-            ["employee_id", "emp_id", "staff_id", "emp id", "employee id", "eeid"],
         )
         ar_col = _find_attrition_risk_column(columns)
         if not ar_col:
             ar_col = _find_first_column(columns, ["attrition", "churn", "turnover"])
 
         if dept and salary:
-            qs.append(
-                _clean_question_sentence(
-                    f"Which {_q_token(dept)} has the highest average {_q_token(salary)}?"
-                )
-            )
-            qs.append(
-                _clean_question_sentence(
-                    f"Compare average {_q_token(salary)} across {_q_token(dept)}"
-                )
-            )
+            qs.append(_tpl_compare_avg_across(salary, dept))
+            qs.append(_tpl_lead_on_avg(salary, dept))
         if dept and ar_col:
+            scope = _dim_scope_plural_from_col(dept)
             qs.append(
-                _clean_question_sentence(
-                    f"Show attrition risk by {_q_token(dept)} using {_q_token(ar_col)}"
-                )
+                _clean_question_sentence(f"Compare {_q_label(ar_col)} across {scope}")
             )
-        if loc and emp_id:
+        if loc and dept:
+            qs.append(_tpl_concentration(loc, dept))
+        elif loc:
+            scope_l = _dim_scope_plural_from_col(loc)
             qs.append(
-                _clean_question_sentence(
-                    f"Which {_q_token(loc)} has the highest employee count?"
-                )
-            )
-        elif loc and dept:
-            qs.append(
-                _clean_question_sentence(
-                    f"Show employee distribution by {_q_token(loc)}"
-                )
+                _clean_question_sentence(f"How does headcount spread across {scope_l}?")
             )
         if hire and date_col:
             qs.append(
                 _clean_question_sentence(
-                    f"Hiring trend over time using {_q_token(date_col)} and {_q_token(hire)}"
+                    f"How does hiring activity trend over {_q_label(date_col)} by {_q_label(hire)}?"
                 )
             )
         if dept and att:
             qs.append(
                 _clean_question_sentence(
-                    f"Which {_q_token(dept)} has the lowest average {_q_token(att)}?"
+                    f"Which {_q_label(dept)} has the lowest {_q_label(att)}?"
                 )
             )
 
     # ---- Sales (and marketing-adjacent product metrics) ----
     elif domain == "sales":
-        if product_col and sales_col:
+        prod = product_col or _resolve_dimension(columns, ["product", "sku", "item", "category"], ranked_dims)
+        rev = sales_col or _resolve_metric(
+            columns, ["sales", "revenue", "amount", "total", "value"], ranked_metrics
+        )
+        reg = region_col or _resolve_dimension(columns, ["region", "state", "territory"], ranked_dims)
+        cust = customer_col or _resolve_dimension(columns, ["customer", "client", "company"], ranked_dims)
+
+        if prod and rev:
             qs.append(
                 _clean_question_sentence(
-                    f"Which {_q_token(product_col)} generated the highest {_q_token(sales_col)}?"
+                    f"Which {_q_label(prod)} drives the highest {_q_label(rev)}?"
                 )
             )
+            qs.append(_tpl_compare_avg_across(rev, prod))
+        if date_col and rev:
+            qs.append(_tpl_trend(rev, date_col))
+        if reg and rev:
+            scope_r = _dim_scope_plural_from_col(reg)
             qs.append(
                 _clean_question_sentence(
-                    f"Show {_q_token(sales_col)} by {_q_token(product_col)}"
+                    f"Compare {_q_label(rev)} performance across {scope_r}"
                 )
             )
-        if date_col and sales_col:
+        if cust and rev and not _id_like_column_name(cust):
+            qs.append(_tpl_ranking(cust, rev, 10))
+        if profit_col and prod:
             qs.append(
                 _clean_question_sentence(
-                    f"Monthly {_q_token(sales_col)} trend using {_q_token(date_col)}"
-                )
-            )
-        if region_col and sales_col:
-            qs.append(
-                _clean_question_sentence(
-                    f"Show {_q_token(sales_col)} by {_q_token(region_col)}"
-                )
-            )
-        if customer_col and sales_col:
-            qs.append(
-                _clean_question_sentence(
-                    f"Top 10 {_q_token(customer_col)} by {_q_token(sales_col)}"
-                )
-            )
-        if profit_col and product_col:
-            qs.append(
-                _clean_question_sentence(
-                    f"Which {_q_token(product_col)} has the highest {_q_token(profit_col)}?"
+                    f"Which {_q_label(prod)} delivers the strongest {_q_label(profit_col)}?"
                 )
             )
 
     # ---- Finance ----
     elif domain == "finance":
-        exp = _find_first_column(
-            columns,
-            ["expense", "spend", "spending", "cost", "payment", "outflow", "debit"],
+        exp = _resolve_metric(
+            columns, ["expense", "spend", "spending", "cost", "payment", "outflow", "debit"], ranked_metrics
         )
-        bud = _find_first_column(columns, ["budget", "planned", "forecast", "target amount"])
-        act = _find_first_column(columns, ["actual", "realized", "spent", "outturn"])
-        dept_f = _find_first_column(columns, ["department", "cost center", "cost_center", "division"])
-        cat_f = _find_first_column(columns, ["category", "gl", "account", "ledger", "line item"])
-        cash = _find_first_column(columns, ["cash flow", "cashflow", "net cash", "liquidity"])
+        bud = _resolve_metric(columns, ["budget", "planned", "forecast", "target amount"], ranked_metrics)
+        act = _resolve_metric(columns, ["actual", "realized", "spent", "outturn"], ranked_metrics)
+        dept_f = _resolve_dimension(
+            columns, ["department", "cost center", "cost_center", "division"], ranked_dims
+        )
+        cat_f = _resolve_dimension(
+            columns, ["category", "gl", "account", "ledger", "line item"], ranked_dims
+        )
+        cash = _resolve_metric(columns, ["cash flow", "cashflow", "net cash", "liquidity"], ranked_metrics)
         if exp and cat_f:
+            scope_c = _dim_scope_plural_from_col(cat_f)
             qs.append(
                 _clean_question_sentence(
-                    f"Show expense breakdown by {_q_token(cat_f)} using {_q_token(exp)}"
+                    f"Compare {_q_label(exp)} across {scope_c}"
                 )
             )
         if bud and act and date_col:
             qs.append(
                 _clean_question_sentence(
-                    f"Compare {_q_token(bud)} vs {_q_token(act)} over {_q_token(date_col)}"
+                    f"Compare {_q_label(bud)} vs {_q_label(act)} over {_q_label(date_col)}"
                 )
             )
         elif bud and act:
             qs.append(
                 _clean_question_sentence(
-                    f"Compare {_q_token(bud)} vs {_q_token(act)}"
+                    f"Compare {_q_label(bud)} vs {_q_label(act)}"
                 )
             )
         if exp and dept_f:
-            qs.append(
-                _clean_question_sentence(
-                    f"Which {_q_token(dept_f)} has the highest {_q_token(exp)}?"
-                )
-            )
+            qs.append(_tpl_lead_on_avg(exp, dept_f))
         if date_col and (exp or act or sales_col):
             mcol = exp or act or sales_col
-            qs.append(
-                _clean_question_sentence(
-                    f"Show {_q_token(mcol)} trend over time using {_q_token(date_col)}"
-                )
-            )
+            if mcol:
+                qs.append(_tpl_trend(mcol, date_col))
         if profit_col and dept_f:
-            qs.append(
-                _clean_question_sentence(
-                    f"Profit margin analysis by {_q_token(dept_f)} using {_q_token(profit_col)}"
-                )
-            )
+            qs.append(_tpl_compare_avg_across(profit_col, dept_f))
         if cash and date_col:
-            qs.append(
-                _clean_question_sentence(
-                    f"Show {_q_token(cash)} trend over time using {_q_token(date_col)}"
-                )
-            )
+            qs.append(_tpl_trend(cash, date_col))
         elif cash:
-            qs.append(
-                _clean_question_sentence(
-                    f"What are min, max, and average of {_q_token(cash)}?"
-                )
-            )
+            qs.append(_tpl_outliers(cash))
 
     # ---- Operations ----
     elif domain == "operations":
-        reg_o = region_col or _find_first_column(columns, ["region", "warehouse", "site", "plant"])
-        delay = _find_first_column(columns, ["delay", "latency", "lead time", "lead_time", "sla breach"])
-        vol = _find_first_column(columns, ["volume", "orders", "units", "throughput", "output"])
+        reg_o = region_col or _resolve_dimension(
+            columns, ["region", "warehouse", "site", "plant", "location"], ranked_dims
+        )
+        delay = _resolve_metric(columns, ["delay", "latency", "lead time", "sla breach"], ranked_metrics)
+        vol = _resolve_metric(columns, ["volume", "orders", "units", "throughput", "output"], ranked_metrics)
         ship = _find_first_column(columns, ["shipment", "delivery", "dispatch", "fulfillment"])
         sla = _find_first_column(columns, ["sla", "otif", "on time", "service level"])
         if reg_o and ship:
+            scope_o = _dim_scope_plural_from_col(reg_o)
             qs.append(
                 _clean_question_sentence(
-                    f"Delivery performance by {_q_token(reg_o)} using {_q_token(ship)}"
+                    f"Compare {_q_label(ship)} outcomes across {scope_o}"
                 )
             )
         if date_col and delay:
-            qs.append(
-                _clean_question_sentence(
-                    f"Delay trend over time using {_q_token(date_col)} and {_q_token(delay)}"
-                )
-            )
+            qs.append(_tpl_trend(delay, date_col))
         elif date_col and vol:
-            qs.append(
-                _clean_question_sentence(
-                    f"Order volume trend using {_q_token(date_col)} and {_q_token(vol)}"
-                )
-            )
+            qs.append(_tpl_trend(vol, date_col))
         if sla:
             qs.append(
                 _clean_question_sentence(
-                    f"SLA performance summary using {_q_token(sla)}"
+                    f"How does {_q_label(sla)} vary across the operation?"
                 )
             )
         if vol and reg_o:
-            qs.append(
-                _clean_question_sentence(
-                    f"Top operational bottlenecks: highest {_q_token(vol)} by {_q_token(reg_o)}"
-                )
-            )
+            qs.append(_tpl_ranking(reg_o, vol, 5))
 
     # ---- Marketing ----
     elif domain == "marketing":
-        camp = _find_first_column(columns, ["campaign", "ad group", "adset", "channel"])
-        conv = _find_first_column(columns, ["conversion", "conversions", "signup", "lead"])
-        impr = _find_first_column(columns, ["impression", "impr", "views"])
-        spend = _find_first_column(columns, ["spend", "cost", "budget", "cpc", "cpm"])
+        camp = _resolve_dimension(columns, ["campaign", "ad group", "adset", "channel"], ranked_dims)
+        conv = _resolve_metric(columns, ["conversion", "conversions", "signup", "lead"], ranked_metrics)
+        impr = _resolve_metric(columns, ["impression", "impr", "views"], ranked_metrics)
+        spend = _resolve_metric(columns, ["spend", "cost", "budget", "cpc", "cpm"], ranked_metrics)
         if camp and conv:
             qs.append(
                 _clean_question_sentence(
-                    f"Which {_q_token(camp)} has the highest {_q_token(conv)}?"
+                    f"Which {_q_label(camp)} delivers the strongest {_q_label(conv)}?"
                 )
             )
         if date_col and spend:
-            qs.append(
-                _clean_question_sentence(
-                    f"Show {_q_token(spend)} trend over {_q_token(date_col)}"
-                )
-            )
-        channel_col = _find_first_column(columns, ["channel", "source", "medium"])
+            qs.append(_tpl_trend(spend, date_col))
+        channel_col = _resolve_dimension(columns, ["channel", "source", "medium"], ranked_dims)
         if channel_col and spend:
+            scope_ch = _dim_scope_plural_from_col(channel_col)
             qs.append(
                 _clean_question_sentence(
-                    f"Compare {_q_token(spend)} across {_q_token(channel_col)}"
+                    f"Compare {_q_label(spend)} across {scope_ch}"
                 )
             )
         if impr and camp:
-            qs.append(
-                _clean_question_sentence(
-                    f"Top campaigns by {_q_token(impr)}"
-                )
-            )
+            qs.append(_tpl_ranking(camp, impr, 5))
 
-    # Schema-driven questions fill gaps for any domain
-    qs.extend(_schema_suggested_questions(numeric_cols, category_cols, date_cols))
+    # Schema-driven questions fill gaps for any domain (fewer when domain already filled slots)
+    qs.extend(
+        _schema_suggested_questions(
+            ranked_dims, ranked_metrics, date_cols, len(qs)
+        )
+    )
 
-    deduped = _dedup_question_list(qs, max_n=12)
+    deduped = _dedup_question_list(qs, max_n=6)
 
     if conf == "low":
         merged: List[str] = []
@@ -1438,17 +1709,17 @@ def build_suggested_questions() -> List[str]:
         for x in deduped:
             if x not in merged:
                 merged.append(x)
-        deduped = _dedup_question_list(merged, max_n=8)
+        deduped = _dedup_question_list(merged, max_n=6)
 
     if len(deduped) < 5:
         for g in _generic_suggested_questions():
             if g not in deduped:
                 deduped.append(g)
-        deduped = _dedup_question_list(deduped, max_n=8)
+        deduped = _dedup_question_list(deduped, max_n=6)
 
     if len(deduped) >= 5:
-        return deduped[:8]
-    return _dedup_question_list(deduped + _generic_suggested_questions(), max_n=8)
+        return deduped[:6]
+    return _dedup_question_list(deduped + _generic_suggested_questions(), max_n=6)
 
 
 def build_upload_response(sheet_names):
@@ -1793,10 +2064,11 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     if not gcol:
         gcol = _infer_dimension_column_from_question(question_str, df, profile)
 
+    ql_n = _norm_metric_phrase_for_match(ql)
     ncol = None
     for c in numeric_cols:
-        kl = str(c).lower().replace("_", " ")
-        if kl in ql or str(c).lower() in ql:
+        kl = _norm_metric_phrase_for_match(str(c))
+        if kl in ql_n or str(c).lower() in ql:
             ncol = c
             break
     if ncol is None and len(numeric_cols) == 1:
@@ -1879,11 +2151,19 @@ def _fallback_aggregate_chart(intent: Dict[str, Any]) -> Tuple[List[Dict[str, An
     return chart_data, chart_type_internal, title
 
 
+def _norm_metric_phrase_for_match(s: str) -> str:
+    """Align suggested-question wording (percentage, pct) with column token matching."""
+    t = str(s).lower().replace("_", " ")
+    t = re.sub(r"\bpercentage\b", "percent", t)
+    t = re.sub(r"\bpct\b", "percent", t)
+    return t
+
+
 def _numeric_col_mentioned(q: str, numeric_cols: List[str]) -> Optional[str]:
-    ql = q.lower()
+    ql = _norm_metric_phrase_for_match(q)
     for c in numeric_cols:
-        cn = str(c).lower().replace("_", " ")
-        if cn in ql or str(c).lower() in ql:
+        cn = _norm_metric_phrase_for_match(str(c))
+        if cn in ql or str(c).lower() in q.lower():
             return c
     return None
 
