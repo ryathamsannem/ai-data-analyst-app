@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 import pandas as pd
 from anthropic import Anthropic
 from dotenv import load_dotenv
@@ -8,6 +8,7 @@ import os
 from io import BytesIO
 from typing import Optional, List, Dict, Any, Tuple
 import re
+import math
 
 load_dotenv()
 
@@ -38,8 +39,26 @@ column_mapping = {
 }
 
 
+class ConversationContextPayload(BaseModel):
+    """Client round-trip snapshot of the last successful analysis (single session)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    lastQuestion: Optional[str] = None
+    lastChartTitle: Optional[str] = None
+    metricColumn: Optional[str] = None
+    categoryColumn: Optional[str] = None
+    aggregation: Optional[str] = None
+    chartType: Optional[str] = None
+    intentBucket: Optional[str] = None
+    filtersApplied: List[str] = Field(default_factory=list)
+
+
 class QuestionRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     question: str
+    conversation_context: Optional[ConversationContextPayload] = None
 
 
 class SheetRequest(BaseModel):
@@ -642,12 +661,387 @@ def _find_order_id_column(columns):
     )
 
 
+def _append_unique_dashboard_chart(
+    out: List[Dict[str, Any]], payload: Optional[Dict[str, Any]]
+) -> None:
+    if not payload:
+        return
+    if len(out) >= 3:
+        return
+    title = str(payload.get("title") or "").strip()
+    if not title:
+        return
+    if any(str(c.get("title", "")).strip() == title for c in out):
+        return
+    out.append(payload)
+
+
+def _dash_series_payload(
+    title: str,
+    series: pd.Series,
+    *,
+    chart_type: str,
+    max_points: int = 14,
+) -> Optional[Dict[str, Any]]:
+    if series is None or series.empty:
+        return None
+    ct_in = chart_type.strip().lower()
+    if ct_in == "line":
+        try:
+            order = sorted(series.index.tolist(), key=lambda x: str(x))
+            series = series.reindex(order).dropna(how="all").head(max_points)
+        except Exception:
+            series = series.head(max_points)
+    else:
+        series = series.sort_values(ascending=False).head(max_points)
+    labels = [_pretty_label_text(x) for x in series.index.tolist()]
+    try:
+        values = [float(v) if (v == v) else 0.0 for v in series.values]
+    except Exception:
+        return None
+    if not labels or not values:
+        return None
+    ct_norm = chart_type.strip()
+    if ct_norm.lower() == "horizontalbar":
+        ct_norm = "horizontalBar"
+    elif ct_norm.lower() == "donut":
+        ct_norm = "donut"
+    elif ct_norm.lower() == "pie":
+        ct_norm = "pie"
+    else:
+        ct_norm = "bar"
+    return {"title": title.strip(), "chartType": ct_norm, "labels": labels, "values": values}
+
+
+def _dash_hr_dashboard_charts() -> List[Dict[str, Any]]:
+    global df, dataset_profile
+    out_ch: List[Dict[str, Any]] = []
+    if df is None or df.empty:
+        return out_ch
+    columns = df.columns.tolist()
+
+    emp_id_col = _find_first_column(
+        columns,
+        ["employee_id", "emp_id", "staff_id", "emp id", "employee id"],
+    )
+    if emp_id_col is None:
+        for c in columns:
+            cl = str(c).lower().replace(" ", "_")
+            if "employee" in cl and "id" in cl:
+                emp_id_col = c
+                break
+
+    dept_col = _find_first_column(columns, ["department", "dept", "team", "division"])
+    salary_col = _find_first_column(
+        columns, ["salary", "ctc", "compensation", "pay", "wage"]
+    )
+
+    loc_col = get_mapped_or_detected_column(
+        "region", ["location", "city", "office", "site", "branch", "region", "state"]
+    )
+    if loc_col == dept_col:
+        loc_col = None
+    if not loc_col:
+        loc_col = _find_first_column(
+            columns,
+            ["location", "city", "office", "site", "branch", "region", "state"],
+        )
+    if loc_col == dept_col:
+        loc_col = _find_first_column(
+            columns,
+            ["office", "site", "branch", "country"],
+        )
+
+    if dept_col and dept_col in df.columns:
+        try:
+            use_cols = [dept_col] + ([emp_id_col] if emp_id_col else [])
+            sub = df[use_cols].dropna(subset=[dept_col])
+            if not sub.empty:
+                if emp_id_col and emp_id_col in sub.columns:
+                    g = sub.groupby(dept_col)[emp_id_col].nunique(dropna=True)
+                else:
+                    g = sub.groupby(dept_col).size()
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(
+                        "Employee count by department", g, chart_type="bar"
+                    ),
+                )
+        except Exception:
+            pass
+
+    if dept_col and salary_col and dept_col != salary_col:
+        try:
+            sub = df[[dept_col, salary_col]].copy()
+            sub["_v"] = numeric_series(salary_col)
+            sub = sub.dropna(subset=[dept_col, "_v"])
+            if not sub.empty:
+                g = sub.groupby(dept_col)["_v"].mean()
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(
+                        "Average salary by department",
+                        g,
+                        chart_type="horizontalBar",
+                    ),
+                )
+        except Exception:
+            pass
+
+    if (
+        loc_col
+        and loc_col in df.columns
+        and (not dept_col or loc_col != dept_col)
+    ):
+        try:
+            use_cols = [loc_col] + ([emp_id_col] if emp_id_col else [])
+            sub = df[use_cols].dropna(subset=[loc_col])
+            if not sub.empty:
+                if emp_id_col and emp_id_col in sub.columns:
+                    g = sub.groupby(loc_col)[emp_id_col].nunique(dropna=True)
+                else:
+                    g = sub.groupby(loc_col).size()
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(
+                        "Employee count by location",
+                        g,
+                        chart_type="horizontalBar",
+                    ),
+                )
+        except Exception:
+            pass
+
+    return out_ch[:3]
+
+
+def _dash_sales_dashboard_charts() -> List[Dict[str, Any]]:
+    global df
+    out_ch: List[Dict[str, Any]] = []
+    if df is None or df.empty:
+        return out_ch
+    columns = df.columns.tolist()
+    sales_col = get_mapped_or_detected_column(
+        "sales", ["sales", "revenue", "amount", "total", "value"]
+    )
+    if not sales_col or sales_col not in df.columns:
+        return out_ch
+
+    product_col = get_mapped_or_detected_column(
+        "product",
+        ["product", "sku", "item", "material", "category", "segment", "line"],
+    )
+
+    region_col = get_mapped_or_detected_column(
+        "region",
+        ["region", "state", "location", "territory", "country", "area", "market"],
+    )
+
+    date_col = get_mapped_or_detected_column(
+        "date",
+        ["date", "order date", "transaction date", "invoice date", "month", "period"],
+    )
+
+    if product_col and product_col in df.columns:
+        title = (
+            "Revenue by category"
+            if any(
+                k in str(product_col).lower()
+                for k in ("category", "segment", "class", "type")
+            )
+            else "Revenue by product"
+        )
+        try:
+            sub = df[[product_col, sales_col]].copy()
+            sub["_v"] = numeric_series(sales_col)
+            sub = sub.dropna(subset=[product_col, "_v"])
+            if not sub.empty:
+                g = sub.groupby(product_col)["_v"].sum()
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(title, g, chart_type="horizontalBar"),
+                )
+        except Exception:
+            pass
+
+    if region_col and region_col in df.columns and region_col != product_col:
+        try:
+            sub = df[[region_col, sales_col]].copy()
+            sub["_v"] = numeric_series(sales_col)
+            sub = sub.dropna(subset=[region_col, "_v"])
+            if not sub.empty:
+                g = sub.groupby(region_col)["_v"].sum()
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload("Revenue by region", g, chart_type="bar"),
+                )
+        except Exception:
+            pass
+
+    if date_col and date_col in df.columns:
+        try:
+            temp = pd.DataFrame(
+                {"_d": pd.to_datetime(df[date_col], errors="coerce")}
+            )
+            temp["_v"] = numeric_series(sales_col)
+            temp = temp.dropna(subset=["_d", "_v"])
+            if len(temp) >= 2:
+                temp["_bucket"] = temp["_d"].dt.to_period("M").astype(str)
+                g = temp.groupby("_bucket", sort=False)["_v"].sum()
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(
+                        "Sales trend by month", g, chart_type="line"
+                    ),
+                )
+        except Exception:
+            pass
+
+    return out_ch[:3]
+
+
+def _dash_pick_generic_category(
+    df_in: pd.DataFrame, columns: List[str], ct: Dict[str, Any], exclude: Optional[set]
+) -> Optional[str]:
+    ex = exclude or set()
+    scored: List[Tuple[int, int, str]] = []
+    for c in columns:
+        if c in ex or ct.get(c) not in ("category", "text"):
+            continue
+        nu = int(df_in[c].dropna().astype(str).nunique())
+        if nu < 2 or nu > 55:
+            continue
+        skew = abs(nu - 14)
+        scored.append((skew, nu, str(c)))
+    scored.sort(key=lambda t: (t[0], t[1]))
+    return scored[0][2] if scored else None
+
+
+def _dash_pick_generic_numeric(
+    df_in: pd.DataFrame, columns: List[str], ct: Dict[str, Any], exclude: Optional[set]
+) -> Optional[str]:
+    ex = exclude or set()
+    for c in columns:
+        if c in ex or ct.get(c) != "number":
+            continue
+        if _id_like_column_name(c):
+            continue
+        ss = numeric_series(c)
+        if ss.notna().sum() >= 3:
+            return str(c)
+    nums = [c for c in columns if ct.get(c) == "number" and c not in ex]
+    return nums[0] if nums else None
+
+
+def _dash_pick_generic_date(
+    df_in: pd.DataFrame, columns: List[str], ct: Dict[str, Any]
+) -> Optional[str]:
+    for c in columns:
+        if ct.get(c) == "date":
+            dd = pd.to_datetime(df_in[c], errors="coerce")
+            if dd.notna().sum() >= max(5, int(0.08 * len(df_in))):
+                return str(c)
+    for c in columns:
+        if ct.get(c) not in ("text", "category"):
+            continue
+        dd = pd.to_datetime(df_in[c], errors="coerce")
+        hits = dd.notna().sum()
+        if hits >= max(10, int(0.18 * len(df_in))):
+            return str(c)
+    return _find_first_column(
+        df_in.columns.tolist(),
+        ["date", "order date", "transaction date", "timestamp", "created", "month"],
+    )
+
+
+def _dash_generic_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
+    global df, dataset_profile
+    out_ch: List[Dict[str, Any]] = []
+    if df is None or df.empty:
+        return out_ch
+    _ = kind
+    profile = dataset_profile or build_profile(df)
+    ct = profile.get("column_types", {})
+    columns = df.columns.tolist()
+
+    exclude: set = set()
+    cat1 = _dash_pick_generic_category(df, columns, ct, exclude)
+    if cat1:
+        exclude.add(cat1)
+    num1 = _dash_pick_generic_numeric(df, columns, ct, exclude)
+
+    if cat1 and num1:
+        try:
+            sub = df[[cat1, num1]].copy()
+            sub["_v"] = numeric_series(num1)
+            sub = sub.dropna(subset=[cat1, "_v"])
+            if not sub.empty:
+                g = sub.groupby(cat1)["_v"].mean()
+                nice_cat = _pretty_label_text(cat1)
+                nice_num = _pretty_label_text(num1)
+                tit = f"Average {nice_num.lower()} by {nice_cat.lower()}"
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(tit, g, chart_type="horizontalBar"),
+                )
+        except Exception:
+            pass
+
+    date_c = _dash_pick_generic_date(df, columns, ct)
+    num_for_trend = _dash_pick_generic_numeric(df, columns, ct, exclude)
+    if date_c and num_for_trend and date_c != num_for_trend:
+        try:
+            temp = pd.DataFrame(
+                {"_d": pd.to_datetime(df[date_c], errors="coerce")}
+            )
+            temp["_v"] = numeric_series(num_for_trend)
+            temp = temp.dropna(subset=["_d", "_v"])
+            if len(temp) >= 2:
+                temp["_bucket"] = temp["_d"].dt.to_period("M").astype(str)
+                g = temp.groupby("_bucket", sort=False)["_v"].sum()
+                lbl = _pretty_label_text(num_for_trend)
+                tit = f"{lbl} trend by month"
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(tit, g, chart_type="line"),
+                )
+        except Exception:
+            pass
+
+    cat_dist = _dash_pick_generic_category(df, columns, ct, exclude)
+    if cat_dist and cat_dist in df.columns:
+        try:
+            vc = df[cat_dist].dropna().astype(str).value_counts().head(12)
+            if not vc.empty and len(out_ch) < 3:
+                lbl = _pretty_label_text(cat_dist)
+                tit = f"Category distribution · {lbl}"
+                api_typ = "donut" if len(vc) >= 6 else "pie"
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(
+                        tit, vc.astype(float), chart_type=api_typ
+                    ),
+                )
+        except Exception:
+            pass
+
+    return out_ch[:3]
+
+
+def build_auto_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
+    if kind == "hr":
+        return _dash_hr_dashboard_charts()
+    if kind == "sales":
+        return _dash_sales_dashboard_charts()
+    return _dash_generic_dashboard_charts(kind)
+
+
 def build_auto_dashboard() -> Dict[str, Any]:
     global df, dataset_profile
     kind = infer_auto_dashboard_kind()
     label = AUTO_DASHBOARD_LABELS[kind]
 
-    out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": []}
+    out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": [], "charts": []}
     if df is None:
         return out
 
@@ -773,6 +1167,7 @@ def build_auto_dashboard() -> Dict[str, Any]:
             )
 
         out["cards"] = clamp_cards(cards)
+        out["charts"] = build_auto_dashboard_charts(kind)
         return out
 
     if kind == "sales":
@@ -852,6 +1247,7 @@ def build_auto_dashboard() -> Dict[str, Any]:
                 )
 
         out["cards"] = clamp_cards(cards)
+        out["charts"] = build_auto_dashboard_charts(kind)
         return out
 
     if kind == "generic":
@@ -866,6 +1262,7 @@ def build_auto_dashboard() -> Dict[str, Any]:
             {"title": "Date Columns", "value": f"{date_n:,}", "subtitle": None},
         ]
         out["cards"] = cards[:6]
+        out["charts"] = build_auto_dashboard_charts(kind)
         return out
 
     if kind == "finance":
@@ -927,6 +1324,7 @@ def build_auto_dashboard() -> Dict[str, Any]:
                 )
 
         out["cards"] = clamp_cards(cards)
+        out["charts"] = build_auto_dashboard_charts(kind)
         return out
 
     if kind == "operations":
@@ -986,6 +1384,7 @@ def build_auto_dashboard() -> Dict[str, Any]:
         )
 
         out["cards"] = clamp_cards(cards)
+        out["charts"] = build_auto_dashboard_charts(kind)
         return out
 
     if kind == "marketing":
@@ -1053,10 +1452,12 @@ def build_auto_dashboard() -> Dict[str, Any]:
             )
 
         out["cards"] = clamp_cards(cards)
+        out["charts"] = build_auto_dashboard_charts(kind)
         return out
 
     # fallback (should not reach — all kinds handled above)
     out["cards"] = clamp_cards([])
+    out["charts"] = build_auto_dashboard_charts(kind)
     return out
 
 
@@ -1917,6 +2318,86 @@ def _pretty_label_text(raw, max_len: int = 56) -> str:
     return s
 
 
+def _strip_id_metric_stem(column_name: Optional[str]) -> str:
+    """Strip common id/suffix tokens for friendlier count labels (employee_id → employee)."""
+    if not column_name:
+        return ""
+    c = str(column_name).strip().lower().replace(" ", "_")
+    for suf in ("_ids", "_id", "_key", "_number", "_no", "_code"):
+        if c.endswith(suf) and len(c) > len(suf) + 1:
+            c = c[: -len(suf)]
+            break
+    return c.strip("_")
+
+
+def _title_case_words(phrase: str) -> str:
+    s = str(phrase).replace("_", " ").strip()
+    if not s:
+        return ""
+    parts = [p for p in s.split() if p]
+    out: List[str] = []
+    for p in parts:
+        if p.lower() in ("id", "no", "n/a"):
+            continue
+        out.append(p[:1].upper() + p[1:].lower() if len(p) > 1 else p.upper())
+    return " ".join(out).strip()
+
+
+def _business_metric_series_label(
+    agg_key: Optional[str],
+    agg_label: Optional[str],
+    value_col: Optional[str],
+) -> str:
+    """
+    SME-friendly metric phrase for chart titles / axes (not raw column tokens).
+    e.g. count + employee_id → "Employee count".
+    """
+    ak = (str(agg_key or "")).strip().lower()
+    al = (str(agg_label or "")).strip().lower()
+    raw_pretty = _pretty_label_text(value_col) if value_col else "Value"
+
+    if ak == "count" or al == "count":
+        stem = _strip_id_metric_stem(value_col) or (str(value_col or "").strip().lower())
+        ent = _title_case_words(stem)
+        if not ent:
+            return "Count"
+        if ent.lower().endswith(" count"):
+            return ent
+        return f"{ent} count"
+
+    if ak == "mean" or al in ("average", "mean", "avg") or "average" in al:
+        if raw_pretty.lower() in ("average", "mean", "avg", "value"):
+            return "Average"
+        return f"Average {raw_pretty}"
+
+    if ak == "sum" or al in ("total", "sum"):
+        if raw_pretty.lower() in ("total", "sum", "value"):
+            return "Total"
+        return f"Total {raw_pretty}"
+
+    if ak == "min" or al.startswith("min"):
+        return f"Lowest {raw_pretty}" if raw_pretty else "Minimum"
+
+    if ak == "max" or al.startswith("max"):
+        return f"Highest {raw_pretty}" if raw_pretty else "Maximum"
+
+    lab = str(agg_label or "").strip()
+    if lab and value_col:
+        return f"{lab} {raw_pretty}".strip()
+    return raw_pretty or lab or "Value"
+
+
+def _business_chart_title(
+    agg_key: Optional[str],
+    agg_label: Optional[str],
+    value_col: Optional[str],
+    group_col: Optional[str],
+) -> str:
+    metric = _business_metric_series_label(agg_key, agg_label, value_col)
+    dim = _pretty_label_text(group_col) if group_col else "Category"
+    return f"{metric} by {dim}".strip()
+
+
 def _chart_title_from_question(question: str) -> str:
     t = question.strip()
     if not t:
@@ -1932,6 +2413,158 @@ def _extract_after_by(q: str) -> Optional[str]:
     if not m:
         return None
     return m.group(1).strip()
+
+
+def _extract_all_by_dimension_phrases(ql: str) -> List[str]:
+    """All phrases following 'by …' (supports 'by A and B')."""
+    out: List[str] = []
+    for m in re.finditer(
+        r"\bby\s+([a-z0-9][a-z0-9_\s%/\-]*?)(?=\s*(?:,|\.|;|\?|\)|$)|\s+vs\b|\s+versus\b|\s+compared\b)",
+        ql,
+        re.I,
+    ):
+        chunk = m.group(1).strip()
+        for part in re.split(r"\s+and\s+", chunk, flags=re.I):
+            sub = part.strip().strip(",").strip()
+            if sub:
+                out.append(sub)
+    return out
+
+
+def _which_has_focus_phrase_raw(ql: str) -> Optional[str]:
+    m = re.search(
+        r"\bwhich\s+([a-z0-9][a-z0-9_\s]{0,48}?)\s+(?:has|have|shows?)\b",
+        ql,
+        re.I,
+    )
+    if not m:
+        return None
+    return m.group(1).strip()
+
+
+def _safe_recharts_series_key(label: str, used: set) -> str:
+    base = re.sub(r"[^a-zA-Z0-9]+", "_", str(label).strip())
+    base = re.sub(r"_+", "_", base).strip("_") or "series"
+    if base and base[0].isdigit():
+        base = "s_" + base
+    k = base
+    n = 2
+    while k in used:
+        k = f"{base}_{n}"
+        n += 1
+    used.add(k)
+    return k
+
+
+def _try_build_stacked_two_category_chart(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    primary: str,
+    secondary: str,
+    agg_key: str,
+    value_col: Optional[str],
+) -> Optional[Tuple[str, List[Dict[str, Any]], str, Dict[str, Any]]]:
+    """
+    Stacked bars: primary on category axis, stacks = secondary dimension.
+    Returns (exact_result, chart_rows, title, multi_series_meta) or None.
+    """
+    if primary not in df.columns or secondary not in df.columns or primary == secondary:
+        return None
+    if agg_key != "count":
+        return None
+    ct = profile.get("column_types", {})
+    try:
+        use_cols = [primary, secondary]
+        if value_col and value_col in df.columns and value_col not in use_cols:
+            use_cols.append(value_col)
+        sub = df[use_cols].dropna(subset=[primary, secondary])
+        if sub.empty:
+            return None
+        if value_col and value_col in sub.columns and ct.get(str(value_col)) not in (
+            "number",
+        ):
+            g = sub.groupby([primary, secondary])[value_col].nunique()
+        else:
+            g = sub.groupby([primary, secondary]).size()
+        g = g.reset_index(name="_v")
+        piv = g.pivot(index=primary, columns=secondary, values="_v").fillna(0)
+        if piv.shape[0] == 0 or piv.shape[1] == 0:
+            return None
+        col_totals = piv.sum(axis=0).sort_values(ascending=False).head(12)
+        piv = piv[[c for c in col_totals.index if c in piv.columns]]
+        if piv.shape[1] == 0:
+            return None
+        row_totals = piv.sum(axis=1).sort_values(ascending=False).head(28)
+        piv = piv.loc[[idx for idx in row_totals.index if idx in piv.index]]
+
+        used: set = set()
+        key_map: Dict[str, str] = {}
+        display_by_key: Dict[str, str] = {}
+        for col in piv.columns:
+            sk = _safe_recharts_series_key(str(col), used)
+            key_map[str(col)] = sk
+            display_by_key[sk] = _pretty_label_text(col)
+
+        rows_out: List[Dict[str, Any]] = []
+        for idx in piv.index:
+            row: Dict[str, Any] = {"name": _pretty_label_text(idx), "value": 0.0}
+            tot = 0.0
+            for orig_c in piv.columns:
+                vv = float(piv.loc[idx, orig_c])
+                sk = key_map[str(orig_c)]
+                row[sk] = vv
+                tot += vv
+            row["value"] = tot
+            rows_out.append(row)
+
+        series_keys = [key_map[str(c)] for c in piv.columns]
+        exact = piv.to_string(max_rows=40, max_cols=20)
+        met_phrase = _business_metric_series_label(
+            "count", "count", str(value_col) if value_col else None
+        )
+        title = (
+            f"{met_phrase} by {_pretty_label_text(primary)} "
+            f"({_pretty_label_text(secondary)} breakdown)"
+        ).strip()
+        meta = {
+            "layout": "stacked_bar",
+            "categoryAxisTitle": _pretty_label_text(primary),
+            "stackAxisTitle": _pretty_label_text(secondary),
+            "seriesKeys": series_keys,
+            "seriesLabels": display_by_key,
+            "rows": rows_out,
+        }
+        return exact, rows_out, title, meta
+    except Exception:
+        return None
+
+
+def _build_analysis_validation_block(
+    *,
+    intent_debug: Optional[Dict[str, Any]],
+    multi_rendered: bool,
+    secondary_requested: bool,
+    partial_message: Optional[str],
+) -> Dict[str, Any]:
+    metric_ok = bool(intent_debug and intent_debug.get("value_col"))
+    primary_ok = bool(intent_debug and intent_debug.get("group_col"))
+    sec_ok = bool(multi_rendered and secondary_requested)
+    sec_label = (
+        "Secondary breakdown rendered in chart"
+        if secondary_requested
+        else "Secondary dimension (not required)"
+    )
+    if secondary_requested and not sec_ok:
+        sec_label = "Secondary grouping omitted or simplified in chart"
+    checks = [
+        {"label": "Metric aligned with question", "ok": bool(metric_ok)},
+        {"label": "Primary dimension aligned with question", "ok": bool(primary_ok)},
+        {"label": sec_label, "ok": bool(sec_ok)},
+    ]
+    return {
+        "checks": checks,
+        "partialVisualizationWarning": (partial_message or "").strip() or None,
+    }
 
 
 def _extract_top_n(q: str) -> Optional[int]:
@@ -1950,6 +2583,22 @@ def _extract_top_n(q: str) -> Optional[int]:
     }
     for w, n in word_map.items():
         if re.search(rf"\btop\s+{w}\b", q, re.I):
+            return n
+    return None
+
+
+def _extract_bottom_n(q: str) -> Optional[int]:
+    m = re.search(r"\bbottom\s+(\d{1,2})\b", q, re.I)
+    if m:
+        return max(2, min(50, int(m.group(1))))
+    word_map = {
+        "five": 5,
+        "ten": 10,
+        "three": 3,
+        "four": 4,
+    }
+    for w, n in word_map.items():
+        if re.search(rf"\bbottom\s+{w}\b", q, re.I):
             return n
     return None
 
@@ -2060,17 +2709,54 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     ct = profile.get("column_types", {})
     numeric_cols = [c for c in cols if ct.get(c) == "number"]
 
-    gcol = _resolve_by_column_from_question(ql, cols, profile)
-    if not gcol:
-        gcol = _infer_dimension_column_from_question(question_str, df, profile)
+    cand_dims = [c for c in cols if ct.get(c) in ("category", "text", "date")]
+    by_phrases = _extract_all_by_dimension_phrases(ql)
+    by_cols_ordered: List[str] = []
+    seen_b: set = set()
+    for phrase in by_phrases:
+        hit = _match_column_from_phrase(phrase, cand_dims or cols, profile)
+        if hit and hit not in seen_b:
+            by_cols_ordered.append(hit)
+            seen_b.add(hit)
 
-    ql_n = _norm_metric_phrase_for_match(ql)
-    ncol = None
-    for c in numeric_cols:
-        kl = _norm_metric_phrase_for_match(str(c))
-        if kl in ql_n or str(c).lower() in ql:
-            ncol = c
-            break
+    focus_raw = _which_has_focus_phrase_raw(ql)
+    focus_col = (
+        _match_column_from_phrase(focus_raw, cand_dims or cols, profile)
+        if focus_raw
+        else None
+    )
+
+    secondary_col: Optional[str] = None
+    gcol: Optional[str] = None
+
+    if focus_col and by_cols_ordered:
+        if focus_col != by_cols_ordered[-1]:
+            gcol = focus_col
+            secondary_col = by_cols_ordered[-1]
+        else:
+            gcol = focus_col
+    elif len(by_cols_ordered) >= 2:
+        gcol = by_cols_ordered[0]
+        secondary_col = by_cols_ordered[1]
+    else:
+        gcol = _resolve_by_column_from_question(ql, cols, profile)
+        if not gcol and by_cols_ordered:
+            gcol = by_cols_ordered[0]
+        if not gcol:
+            gcol = _infer_dimension_column_from_question(question_str, df, profile)
+
+    ncol = _best_numeric_column_for_question(question_str, numeric_cols)
+    if ncol is None and (
+        re.search(r"\b(count|how many|number of)\b", ql)
+        or "employee" in ql
+        or "headcount" in ql
+    ):
+        idc = _find_first_column(
+            cols,
+            ["employee_id", "emp_id", "staff_id", "employee id", "emp id", "staff id"],
+        )
+        if idc and gcol and str(idc) != str(gcol):
+            ncol = idc
     if ncol is None and len(numeric_cols) == 1:
         ncol = numeric_cols[0]
 
@@ -2079,7 +2765,7 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
 
     if any(k in ql for k in ["average", "avg", "mean"]):
         agg_label, agg_key = "Average", "mean"
-    elif "count" in ql or "how many" in ql or "number of" in ql:
+    elif "count" in ql or "how many" in ql or "number of" in ql or "headcount" in ql:
         agg_label, agg_key = "Count", "count"
     elif (re.search(r"\b(sum|total)\b", ql)) and (
         "average" not in ql and "mean" not in ql and "avg" not in ql
@@ -2089,66 +2775,152 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         agg_label, agg_key = "Minimum", "min"
     elif "maximum" in ql or "highest" in ql or re.search(r"\bmax\b", ql):
         agg_label, agg_key = "Maximum", "max"
+    elif any(k in ql for k in ("compare", "versus", " vs ")):
+        agg_label, agg_key = "Average", "mean"
+    elif any(
+        k in ql
+        for k in (
+            "trend",
+            "over time",
+            "monthly",
+            "by month",
+            "quarter",
+            "weekly",
+        )
+    ):
+        agg_label, agg_key = "Total", "sum"
     else:
         agg_label, agg_key = "Average", "mean"
 
-    return {
+    if agg_key != "count" and ncol not in numeric_cols:
+        return None
+
+    out_intent: Dict[str, Any] = {
         "group_col": gcol,
         "value_col": ncol,
         "agg_label": agg_label,
         "agg_key": agg_key,
         "normalized_question": ql,
+        "question_focus_col": focus_col,
+        "secondary_group_col": secondary_col,
     }
+    if secondary_col and (not focus_col) and len(by_cols_ordered) >= 2:
+        out_intent["dimension_notes"] = (
+            "Multiple 'by' dimensions detected; using first as primary axis "
+            f"and second as stack ({_pretty_label_text(by_cols_ordered[0])} × "
+            f"{_pretty_label_text(by_cols_ordered[1])})."
+        )
+    elif secondary_col and focus_col:
+        out_intent["dimension_notes"] = (
+            f"Primary breakdown: {_pretty_label_text(focus_col)}; "
+            f"stacked by {_pretty_label_text(secondary_col)}."
+        )
+    return out_intent
 
 
 def _fallback_aggregate_chart(intent: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], str, str]:
     """Produce name/value chart rows + internal chart_type + title from structured intent."""
-    global df
+    global df, dataset_profile
 
     group_col = intent["group_col"]
     target = intent["value_col"]
     agg_key = intent["agg_key"]
 
     chart_type_internal = "bar"
+    profile = dataset_profile or build_profile(df)
+    ct = profile.get("column_types", {})
 
-    sub = df[[group_col, target]].copy()
-    sub["_v"] = numeric_series(target)
-    sub = sub.dropna(subset=[group_col, "_v"])
-    if sub.empty:
-        return [], "", ""
-
-    if agg_key == "sum":
-        g = sub.groupby(group_col)["_v"].sum()
-    elif agg_key == "mean":
-        g = sub.groupby(group_col)["_v"].mean()
-    elif agg_key == "min":
-        g = sub.groupby(group_col)["_v"].min()
-    elif agg_key == "max":
-        g = sub.groupby(group_col)["_v"].max()
-    elif agg_key == "count":
-        g = sub.groupby(group_col)["_v"].count()
+    if agg_key == "count" and ct.get(target) not in ("number",):
+        try:
+            tmp = df[[group_col, target]].dropna(subset=[group_col])
+            if tmp.empty:
+                return [], "", ""
+            g = tmp.groupby(group_col).size()
+        except Exception:
+            return [], "", ""
+        result = g.reset_index()
+        if result.shape[1] < 2:
+            return [], "", ""
+        c0, c1 = result.columns[0], result.columns[1]
+        result = result.rename(columns={c0: "name", c1: "value"}).sort_values(
+            "value", ascending=False
+        )
+        chart_data = [
+            {
+                "name": _pretty_label_text(r["name"]),
+                "value": float(r["value"]),
+            }
+            for _, r in result.iterrows()
+        ]
+        if not chart_data:
+            return [], "", ""
+        title = _business_chart_title(
+            str(intent.get("agg_key") or ""),
+            str(intent.get("agg_label") or ""),
+            str(target),
+            str(group_col),
+        )
+        return chart_data, chart_type_internal, title
     else:
-        g = sub.groupby(group_col)["_v"].mean()
+        sub = df[[group_col, target]].copy()
+        sub["_v"] = numeric_series(target)
+        sub = sub.dropna(subset=[group_col, "_v"])
+        if sub.empty:
+            return [], "", ""
 
-    result = (
-        g.reset_index()
-        .rename(columns={group_col: "name", "_v": "value"})
-        .sort_values("value", ascending=False)
-    )
-    chart_data = [
-        {
-            "name": _pretty_label_text(r["name"]),
-            "value": float(r["value"]),
-        }
-        for _, r in result.iterrows()
-    ]
-    if not chart_data:
-        return [], "", ""
+        if agg_key == "sum":
+            g = sub.groupby(group_col)["_v"].sum()
+        elif agg_key == "mean":
+            g = sub.groupby(group_col)["_v"].mean()
+        elif agg_key == "min":
+            g = sub.groupby(group_col)["_v"].min()
+        elif agg_key == "max":
+            g = sub.groupby(group_col)["_v"].max()
+        elif agg_key == "count":
+            g = sub.groupby(group_col)["_v"].count()
+        else:
+            g = sub.groupby(group_col)["_v"].mean()
 
-    title = (
-        f"{intent['agg_label']} {_pretty_label_text(target)} by {_pretty_label_text(group_col)}"
-    )
-    return chart_data, chart_type_internal, title
+        result = (
+            g.reset_index()
+            .rename(columns={group_col: "name", "_v": "value"})
+            .sort_values("value", ascending=False)
+        )
+        chart_data = [
+            {
+                "name": _pretty_label_text(r["name"]),
+                "value": float(r["value"]),
+            }
+            for _, r in result.iterrows()
+        ]
+        if not chart_data:
+            return [], "", ""
+
+        title = _business_chart_title(
+            str(intent.get("agg_key") or ""),
+            str(intent.get("agg_label") or ""),
+            str(target),
+            str(group_col),
+        )
+        return chart_data, chart_type_internal, title
+
+
+def _tabular_exact_from_name_value_rows(
+    rows: List[Dict[str, Any]], max_rows: int = 55
+) -> str:
+    if not rows:
+        return ""
+    lines = ["name\tvalue"]
+    for r in rows[:max_rows]:
+        nm = _pretty_label_text(r.get("name"))
+        try:
+            vv = float(r.get("value"))
+        except (TypeError, ValueError):
+            continue
+        lines.append(f"{nm}\t{vv:g}")
+    if len(rows) > max_rows:
+        lines.append(f"(… {len(rows) - max_rows} more rows omitted)")
+    return "\n".join(lines)
 
 
 def _norm_metric_phrase_for_match(s: str) -> str:
@@ -2159,11 +2931,79 @@ def _norm_metric_phrase_for_match(s: str) -> str:
     return t
 
 
-def _numeric_col_mentioned(q: str, numeric_cols: List[str]) -> Optional[str]:
-    ql = _norm_metric_phrase_for_match(q)
-    for c in numeric_cols:
+def _column_phrase_matches_normalized_question(ql_norm: str, col: str) -> bool:
+    """
+    True when the column's natural phrase appears in the question.
+    Uses word boundaries for short tokens to avoid traps like column 'age'
+    matching inside the word 'percentage'.
+    """
+    phrase = _norm_metric_phrase_for_match(str(col)).strip()
+    if not phrase or not ql_norm:
+        return False
+    parts = phrase.split()
+    if len(parts) == 1:
+        token = parts[0]
+        if len(token) <= 3:
+            return re.search(r"(?<!\w)" + re.escape(token) + r"(?!\w)", ql_norm) is not None
+        return token in ql_norm
+    pat = r"(?<!\w)" + r"\s+".join(re.escape(p) for p in parts) + r"(?!\w)"
+    return re.search(pat, ql_norm) is not None
+
+
+def _best_numeric_column_for_question(q: str, numeric_cols: List[str]) -> Optional[str]:
+    """
+    Pick the numeric column the question is most likely about (deterministic).
+    Prefers longer / more specific column phrases and avoids substring false positives.
+    """
+    if not numeric_cols:
+        return None
+    ql_raw = str(q).lower()
+    ql_norm = _norm_metric_phrase_for_match(q)
+    best: Optional[str] = None
+    best_score = 0
+    ranked = sorted(
+        numeric_cols,
+        key=lambda c: len(_norm_metric_phrase_for_match(str(c))),
+        reverse=True,
+    )
+    for c in ranked:
         cn = _norm_metric_phrase_for_match(str(c))
-        if cn in ql or str(c).lower() in q.lower():
+        if not cn:
+            continue
+        if _id_like_column_name(c) and not re.search(
+            r"\b(employee|emp|staff|worker)\b.*\b(id|ids|identifier|number)\b|"
+            r"\b(id|ids|identifier|number)\b.*\b(employee|emp|staff|worker)\b",
+            ql_norm,
+        ):
+            continue
+        score = 0
+        raw_l = str(c).strip().lower()
+        raw_spaced = raw_l.replace("_", " ")
+        if raw_l in ql_raw.replace(" ", "_") or raw_spaced in ql_raw:
+            score = 500 + len(cn)
+        elif _column_phrase_matches_normalized_question(ql_norm, c):
+            score = 100 + len(cn)
+        if "salary" in ql_raw and "salary" in cn:
+            score += 140
+        if any(k in ql_raw for k in ("attendance", "absent", "present")) and (
+            "attend" in cn or "absent" in cn or "present" in cn
+        ):
+            score += 140
+        if score > best_score:
+            best_score = score
+            best = c
+    return best
+
+
+def _numeric_col_mentioned(q: str, numeric_cols: List[str]) -> Optional[str]:
+    """Prefer the same scoring as aggregate intent (consistent charts / smart routing)."""
+    hit = _best_numeric_column_for_question(q, numeric_cols)
+    if hit:
+        return hit
+    ql = _norm_metric_phrase_for_match(q)
+    for c in sorted(numeric_cols, key=lambda x: len(_norm_metric_phrase_for_match(str(x))), reverse=True):
+        cn = _norm_metric_phrase_for_match(str(c))
+        if _column_phrase_matches_normalized_question(ql, c):
             return c
     return None
 
@@ -2197,7 +3037,22 @@ def _normalize_chart_records(rows: List[Any]) -> List[Dict[str, Any]]:
             continue
         raw_name = r.get("name")
         nm = _pretty_label_text(raw_name if raw_name is not None else "—")
-        out.append({"name": nm, "value": v})
+        item: Dict[str, Any] = {"name": nm, "value": v}
+        if r.get("x") is not None:
+            try:
+                item["x"] = float(r["x"])
+            except (TypeError, ValueError):
+                pass
+        for ek, ev in r.items():
+            if ek in ("name", "value", "x"):
+                continue
+            try:
+                fv = float(ev)
+            except (TypeError, ValueError):
+                continue
+            if fv == fv:
+                item[str(ek)] = fv
+        out.append(item)
     return out
 
 
@@ -2223,6 +3078,42 @@ def build_smart_chart(
     cat_cols = [c for c in columns if ct_map.get(c) in ("category", "text")]
     ct: Dict[str, Any] = {"column_types": ct_map}
 
+    sp = _scatter_pair_from_question(q, numeric_cols)
+    if sp:
+        xc, yc = sp
+        try:
+            tmp = df[[xc, yc]].copy()
+            tmp["_x"] = numeric_series(xc)
+            tmp["_y"] = numeric_series(yc)
+            tmp = tmp.dropna(subset=["_x", "_y"]).head(450)
+            if len(tmp) >= 3:
+                chart_data: List[Dict[str, Any]] = []
+                for i, (_, row) in enumerate(tmp.iterrows()):
+                    chart_data.append(
+                        {
+                            "name": f"•{i + 1}",
+                            "x": float(row["_x"]),
+                            "value": float(row["_y"]),
+                        }
+                    )
+                title = f"{_pretty_label_text(yc)} vs {_pretty_label_text(xc)}"
+                if trace is not None:
+                    trace.update(
+                        {
+                            "category_column": xc,
+                            "numeric_column": yc,
+                            "aggregation": "scatter",
+                            "aggregation_key": "mean",
+                            "rows_analyzed": int(len(tmp)),
+                            "notes": "Scatter: each point is one row (y vs x).",
+                            "scatter_x_column": xc,
+                            "scatter_y_column": yc,
+                        }
+                    )
+                return chart_data, "scatter", title, subtitle
+        except Exception:
+            pass
+
     trend_kw = (
         "trend",
         "over time",
@@ -2233,6 +3124,11 @@ def build_smart_chart(
         "weekly",
         "each month",
         "every month",
+        "joining",
+        "join trend",
+        "hire trend",
+        "hiring trend",
+        "momentum",
     )
     pie_kw = (
         "distribution",
@@ -2390,7 +3286,8 @@ def build_smart_chart(
                         if want_mean
                         else ("Count" if "count" in q else "Total")
                     )
-                    title = f"{op} {_pretty_label_text(ncol)} by {_pretty_label_text(gcol)}"
+                    ak_title = "mean" if want_mean else ("count" if "count" in q else "sum")
+                    title = _business_chart_title(ak_title, op, str(ncol), str(gcol))
                     ctype = "bar_horizontal" if want_h else "bar"
                     if trace is not None:
                         ak = "mean" if want_mean else ("count" if "count" in q else "sum")
@@ -2439,20 +3336,26 @@ def analyze_data(question: str):
     numeric_cols = [c for c, t in profile.get("column_types", {}).items() if t == "number"]
 
     def find_target_numeric_column():
+        best = _best_numeric_column_for_question(q, numeric_cols)
+        if best:
+            return best
         # Prefer mapped sales if user asks about sales/revenue/amount/total/value
         if any(k in q for k in ["sales", "revenue", "amount", "total", "value"]):
             mapped_sales = get_mapped_or_detected_column(
                 "sales", ["sales", "revenue", "amount", "total", "value"]
             )
-            if mapped_sales:
+            if mapped_sales and mapped_sales in numeric_cols:
                 return mapped_sales
 
-        # Match explicit column names in question
+        # Match explicit column names as whole tokens (avoid substring traps)
         for col in df.columns:
-            if str(col).lower() in q and col in numeric_cols:
+            if col not in numeric_cols:
+                continue
+            if _column_phrase_matches_normalized_question(
+                _norm_metric_phrase_for_match(q), str(col)
+            ):
                 return col
 
-        # Fallback: single numeric column
         if len(numeric_cols) == 1:
             return numeric_cols[0]
         return None
@@ -2771,8 +3674,10 @@ def infer_visualization_rounding_category(
     values_nonempty: List[float],
 ) -> str:
     ql = question_lower.lower()
-    if chart_type_internal == "pie":
+    if chart_type_internal in ("pie", "donut"):
         return "pct_1"
+    if chart_type_internal == "scatter":
+        return "ratio_1"
 
     ak = agg_hint or ""
     if ak == "count":
@@ -2832,9 +3737,44 @@ def format_display_numeric(category: str, val_rounded: float) -> str:
 
 
 def build_visualization_anchor_for_prompt(viz: Dict[str, Any]) -> str:
+    srows = viz.get("stackedBarRows")
+    ms = viz.get("multiSeries") if isinstance(viz.get("multiSeries"), dict) else {}
+    keys = ms.get("seriesKeys") if isinstance(ms.get("seriesKeys"), list) else []
+    labels_map = (
+        ms.get("seriesLabels") if isinstance(ms.get("seriesLabels"), dict) else {}
+    )
+    if isinstance(srows, list) and srows and keys:
+        lines: List[str] = []
+        for r in srows:
+            if not isinstance(r, dict):
+                continue
+            nm = str(r.get("name", "")).strip()
+            tot = r.get("valueDisplay")
+            if tot is None:
+                tot = r.get("value")
+            parts = []
+            for k in keys:
+                sk = str(k)
+                if sk not in r:
+                    continue
+                lab = str(labels_map.get(sk) or sk).strip()
+                try:
+                    fv = float(r[sk])
+                except (TypeError, ValueError):
+                    continue
+                if fv == fv and fv != 0.0:
+                    parts.append(f"{lab}: {fv:g}")
+            if parts:
+                lines.append(f"  • {nm}: total={tot} (" + "; ".join(parts) + ")")
+            else:
+                lines.append(f"  • {nm}: total={tot}")
+        if lines:
+            return "\n".join(lines)
+
     labels = viz.get("labels") or []
     disp = viz.get("valueDisplay")
     vals = viz.get("values") or []
+    sx_disp = viz.get("scatterXDisplay")
     rows = []
     for i, lab in enumerate(labels):
         txt = ""
@@ -2842,7 +3782,10 @@ def build_visualization_anchor_for_prompt(viz: Dict[str, Any]) -> str:
             txt = str(disp[i])
         elif i < len(vals):
             txt = str(vals[i])
-        rows.append(f"  • {lab}: {txt}")
+        if isinstance(sx_disp, list) and i < len(sx_disp) and sx_disp[i] is not None:
+            rows.append(f"  • {lab}: x={sx_disp[i]} y={txt}")
+        else:
+            rows.append(f"  • {lab}: {txt}")
     return "\n".join(rows)
 
 
@@ -2850,7 +3793,7 @@ def _chart_type_for_api(internal: str) -> str:
     """Public chart type names for structured visualization payloads."""
     if internal == "bar_horizontal":
         return "horizontalBar"
-    if internal in ("pie", "line", "bar"):
+    if internal in ("pie", "donut", "line", "area", "bar", "scatter"):
         return internal
     return "bar"
 
@@ -2861,7 +3804,10 @@ def _humanize_chart_type_for_provenance(api_chart_type: str) -> str:
         "bar": "Vertical bar chart",
         "horizontalBar": "Horizontal bar chart",
         "line": "Line chart",
+        "area": "Area chart",
         "pie": "Pie chart",
+        "donut": "Donut chart",
+        "scatter": "Scatter plot",
     }.get(t, t)
 
 
@@ -2900,23 +3846,33 @@ def _compute_provenance_confidence(
     category_column: Optional[str],
     numeric_column: Optional[str],
     chart_type_internal: str,
+    partial_alignment: bool = False,
+    multi_series_rendered: bool = False,
+    chart_suppressed_misleading: bool = False,
 ) -> str:
     """Heuristic trust level for the explainability panel (pandas-only)."""
-    pie = chart_type_internal == "pie"
+    pie = chart_type_internal in ("pie", "donut")
+    scatter = chart_type_internal == "scatter"
     clear_category = bool(category_column and str(category_column).strip())
-    clear_numeric = bool(numeric_column and str(numeric_column).strip()) or pie
+    clear_numeric = (
+        bool(numeric_column and str(numeric_column).strip()) or pie or scatter
+    )
     very_small = rows_analyzed < 5 or chart_points < 2
     weak_mapping = not clear_category or not clear_numeric
 
-    if very_small or (weak_mapping and smart_routing_used):
+    if chart_suppressed_misleading:
         return "Low"
-    if fallback_used:
-        return "Medium"
-    if smart_routing_used and (not intent_structured or weak_mapping):
-        return "Medium"
-    if intent_structured and clear_category and clear_numeric and rows_analyzed >= 5:
-        return "High"
-    if (
+
+    base = "Medium"
+    if very_small or (weak_mapping and smart_routing_used):
+        base = "Low"
+    elif fallback_used:
+        base = "Medium"
+    elif smart_routing_used and (not intent_structured or weak_mapping):
+        base = "Medium"
+    elif intent_structured and clear_category and clear_numeric and rows_analyzed >= 5:
+        base = "High"
+    elif (
         not intent_structured
         and weak_mapping
         and rows_analyzed >= 5
@@ -2924,12 +3880,316 @@ def _compute_provenance_confidence(
         and not smart_routing_used
         and not fallback_used
     ):
-        return "Medium"
-    if not intent_structured and weak_mapping:
-        return "Low"
-    if weak_mapping or rows_analyzed < 5:
-        return "Medium"
-    return "Medium"
+        base = "Medium"
+    elif not intent_structured and weak_mapping:
+        base = "Low"
+    elif weak_mapping or rows_analyzed < 5:
+        base = "Medium"
+
+    if multi_series_rendered and base == "Medium" and not partial_alignment:
+        if intent_structured and clear_category and rows_analyzed >= 5 and chart_points >= 2:
+            base = "High"
+    if partial_alignment and base == "High":
+        base = "Medium"
+    return base
+
+
+def _series_label_looks_temporal(label: str) -> bool:
+    """Deterministic time-bucket detection for chart category labels (no LLM)."""
+    s = str(label).strip()
+    if not s:
+        return False
+    if re.match(
+        r"^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b",
+        s,
+        re.I,
+    ):
+        return True
+    if re.search(r"\bq[1-4]\b(?:\s*[''\u2019]?|/|\s|,)\s*\d{2,4}$", s, re.I):
+        return True
+    if re.match(r"^\d{4}-\d{2}-\d{2}", s):
+        return True
+    if re.match(r"^\d{4}-\d{2}$", s):
+        return True
+    if re.match(r"^\d{4}$", s) and len(s) == 4 and s.isdigit():
+        return True
+    ts = pd.to_datetime(s, errors="coerce")
+    if pd.notna(ts):
+        return True
+    return False
+
+
+def _chart_series_labels_all_temporal(chart_data: List[Dict[str, Any]]) -> bool:
+    if len(chart_data) < 2:
+        return False
+    for r in chart_data:
+        if not _series_label_looks_temporal(str(r.get("name", ""))):
+            return False
+    return True
+
+
+def _values_look_like_percent_shares(vals: List[float]) -> bool:
+    if not vals:
+        return False
+    s = sum(vals)
+    if 99.0 <= s <= 101.0:
+        return True
+    if all(0.0 <= v <= 100.0 for v in vals) and s <= 100.5:
+        return True
+    return False
+
+
+def _chart_selection_question_bucket(ql: str) -> str:
+    """
+    High-level intent bucket for chart selection (deterministic, no LLM).
+    """
+    q = str(ql).lower()
+    if re.search(r"\b(vs\.?|versus|against)\b", q):
+        return "relationship"
+    if any(
+        k in q
+        for k in (
+            "trend",
+            "over time",
+            "time series",
+            "monthly",
+            "by month",
+            "quarter",
+            "weekly",
+            "each month",
+            "momentum",
+        )
+    ):
+        return "trend"
+    if _question_asks_share_or_composition_pie(q) or (
+        "distribution" in q and " by " in q and "average" not in q and "mean" not in q
+    ):
+        return "distribution"
+    if _looks_like_ranking_question(q) or _extract_top_n(q) is not None:
+        return "ranking"
+    if re.search(
+        r"\b(compare|comparison|across departments|across regions|across each|by department|by region|by product)\b",
+        q,
+    ):
+        return "compare"
+    if (
+        " by " not in q
+        and re.search(
+            r"\b(total|sum|average|mean|count of|how many employees|headcount|number of employees)\b",
+            q,
+        )
+    ):
+        return "kpi_summary"
+    return "compare"
+
+
+def _scatter_pair_from_question(q: str, numeric_cols: List[str]) -> Optional[Tuple[str, str]]:
+    """Two numeric columns named in a vs / versus / against question."""
+    if not numeric_cols or not re.search(r"\b(vs\.?|versus|against)\b", str(q).lower()):
+        return None
+    ql_norm = _norm_metric_phrase_for_match(q)
+    hits: List[str] = []
+    for c in sorted(
+        numeric_cols,
+        key=lambda x: len(_norm_metric_phrase_for_match(str(x))),
+        reverse=True,
+    ):
+        if _column_phrase_matches_normalized_question(ql_norm, c):
+            hits.append(c)
+    seen: set = set()
+    ordered: List[str] = []
+    for h in hits:
+        if h not in seen:
+            seen.add(h)
+            ordered.append(h)
+    if len(ordered) >= 2:
+        return ordered[0], ordered[1]
+    return None
+
+
+def _question_asks_share_or_composition_pie(ql: str) -> bool:
+    """When true, a modest-sized category breakdown is better as pie/donut than bars."""
+    if any(
+        k in ql
+        for k in (
+            "contribution",
+            "share of",
+            " proportion",
+            "proportion of",
+            "mix",
+            "composition",
+        )
+    ):
+        return True
+    if "distribution" in ql and not any(
+        k in ql for k in ("average", "avg", "mean", "median")
+    ):
+        return True
+    return False
+
+
+def determine_chart_type_and_reason(
+    ql: str,
+    chart_type_in: str,
+    chart_data: List[Dict[str, Any]],
+    intent_debug: Optional[Dict[str, Any]],
+    smart_trace: Dict[str, Any],
+) -> Tuple[str, str, str]:
+    """
+    Deterministic chart selection (no LLM).
+    Returns (internal_chart_type, human_reason, selection_confidence High|Medium|Low).
+    """
+    base = (chart_type_in or "bar").strip() or "bar"
+    n = len(chart_data)
+    if n == 0:
+        return "bar", "No chart points available.", "Low"
+
+    names = [str(r.get("name", "")).strip() for r in chart_data]
+    vals: List[float] = []
+    for r in chart_data:
+        try:
+            vals.append(float(r.get("value")))
+        except (TypeError, ValueError):
+            vals.append(float("nan"))
+    if any(math.isnan(v) for v in vals):
+        return base, "Numeric series contains invalid values; keeping the upstream chart type.", "Low"
+
+    if base == "scatter":
+        return (
+            "scatter",
+            "Scatter plot: each point pairs two numeric measurements from the dataset.",
+            "High",
+        )
+
+    if smart_trace.get("multi_series"):
+        return (
+            "bar",
+            "Stacked bars: primary category on the axis with segments for the secondary dimension.",
+            "High",
+        )
+
+    trendish = any(
+        k in ql
+        for k in (
+            "trend",
+            "over time",
+            "time series",
+            "monthly",
+            "by month",
+            "quarter",
+            "weekly",
+            "each month",
+            "every month",
+            "joining",
+            "join trend",
+            "hire trend",
+            "hiring trend",
+            "momentum",
+            "over the year",
+            "fiscal year",
+        )
+    ) or bool(re.search(r"\b(monthly|quarterly|weekly|annual)\b", ql))
+
+    temporal_all = _chart_series_labels_all_temporal(chart_data)
+    date_hint = None
+    if smart_trace.get("category_column"):
+        date_hint = str(smart_trace["category_column"])
+    elif intent_debug and intent_debug.get("group_col"):
+        date_hint = str(intent_debug["group_col"])
+    dc_pretty = _pretty_label_text(date_hint) if date_hint else "the time field"
+
+    if base == "line":
+        if n >= 10 and trendish:
+            return (
+                "area",
+                f"Time-series with {n} periods; area chart emphasizes volume over time (bucketed from {dc_pretty}).",
+                "High",
+            )
+        return (
+            "line",
+            f"Time-series trend detected from {dc_pretty}.",
+            "High",
+        )
+
+    if base in ("bar", "bar_horizontal") and temporal_all and trendish:
+        if n >= 10:
+            return (
+                "area",
+                f"Ordered time buckets on the category axis ({n} points); area chart for dense series.",
+                "High",
+            )
+        return (
+            "line",
+            f"Time-series pattern read from category labels (via {dc_pretty}).",
+            "High",
+        )
+
+    if base == "bar_horizontal":
+        return (
+            base,
+            "Ranking-style question or long labels; horizontal bar chart.",
+            "High",
+        )
+
+    if base == "bar":
+        bucket = _chart_selection_question_bucket(ql)
+        if (
+            bucket == "compare"
+            and n <= 14
+            and not (_looks_like_ranking_question(ql) or _extract_top_n(ql))
+        ):
+            return (
+                "bar",
+                "Comparison of one numeric metric across categorical groups; vertical bar chart.",
+                "High",
+            )
+        if _looks_like_ranking_question(ql) or _extract_top_n(ql) is not None:
+            return (
+                "bar_horizontal",
+                "Top-N / ranking intent; horizontal bars for readable ordering.",
+                "High",
+            )
+        if n >= 12:
+            return (
+                "bar_horizontal",
+                f"{n} categories; horizontal layout reduces label overlap.",
+                "High",
+            )
+
+    if base == "pie":
+        kind = "donut" if n >= 5 else "pie"
+        pct_like = _values_look_like_percent_shares(vals)
+        tail = (
+            "segment values are percent shares."
+            if pct_like
+            else "counts normalized to percent of total for the chart."
+        )
+        return (
+            kind,
+            f"Composition chart with {n} segments ({tail})",
+            "High",
+        )
+
+    if base == "bar" and _question_asks_share_or_composition_pie(ql) and 3 <= n <= 10 and not temporal_all:
+        kind = "donut" if n >= 5 else "pie"
+        return (
+            kind,
+            "Share or composition phrasing with a modest number of categories; pie-style view.",
+            "High",
+        )
+
+    gcol = intent_debug.get("group_col") if intent_debug else None
+    gro = _pretty_label_text(gcol) if gcol else "categories"
+    if base == "bar":
+        return (
+            base,
+            f"Category comparison across {gro} ({n} groups); vertical bar chart.",
+            "Medium",
+        )
+
+    if n < 3:
+        return base, "Very few points; vertical bar chart as a stable default.", "Low"
+    return base, "Standard comparison; vertical bar chart.", "Medium"
 
 
 def _assemble_visualization_provenance(
@@ -2942,6 +4202,11 @@ def _assemble_visualization_provenance(
     chart_type_internal: str,
     chart_points: int,
     agg_eff: Optional[str],
+    chart_selection_reason: Optional[str] = None,
+    analysis_validation: Optional[Dict[str, Any]] = None,
+    partial_alignment: bool = False,
+    multi_series_rendered: bool = False,
+    chart_suppressed_misleading: bool = False,
 ) -> Dict[str, Any]:
     cat_col: Optional[str] = None
     num_col: Optional[str] = None
@@ -2998,11 +4263,27 @@ def _assemble_visualization_provenance(
         category_column=cat_col,
         numeric_column=num_col,
         chart_type_internal=str(chart_type_internal or ""),
+        partial_alignment=partial_alignment,
+        multi_series_rendered=multi_series_rendered,
+        chart_suppressed_misleading=chart_suppressed_misleading,
     )
+
+    num_disp = None
+    cat_disp = None
+    if num_col:
+        num_disp = _business_metric_series_label(
+            str(agg_key_out or ""),
+            str(agg_label_out or ""),
+            str(num_col),
+        )
+    if cat_col:
+        cat_disp = _pretty_label_text(cat_col)
 
     return {
         "categoryColumn": cat_col,
         "numericColumn": num_col,
+        "numericColumnDisplay": num_disp,
+        "categoryColumnDisplay": cat_disp,
         "aggregation": agg_label_out,
         "aggregationKey": agg_key_out,
         "rowsAnalyzed": rows_analyzed,
@@ -3016,32 +4297,666 @@ def _assemble_visualization_provenance(
             "intentStructured": bool(intent_structured),
         },
         "notes": smart_trace.get("notes"),
+        "chartSelectionReason": (chart_selection_reason or "").strip() or None,
+        "analysisValidation": analysis_validation,
     }
 
 
-def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+def _detect_intent_tags(question: str) -> List[str]:
+    ql = str(question).lower()
+    tags: List[str] = []
+    if any(k in ql for k in ("highest", "maximum", "largest", "peak")) or re.search(
+        r"\bmax\b", ql
+    ):
+        tags.append("highest")
+    if any(k in ql for k in ("lowest", "minimum", "smallest", "least")) or re.search(
+        r"\bmin\b", ql
+    ):
+        tags.append("lowest")
+    if any(k in ql for k in ("average", "mean", "avg")):
+        tags.append("average")
+    if any(k in ql for k in ("compare", "versus", " vs ")):
+        tags.append("compare")
+    if any(
+        k in ql
+        for k in (
+            "trend",
+            "over time",
+            "monthly",
+            "quarterly",
+            "weekly",
+            "annual",
+        )
+    ):
+        tags.append("trend")
+    if _extract_top_n(ql) or re.search(r"\btop\s+\d+\b", ql):
+        tags.append("topN")
+    if any(
+        k in ql
+        for k in (
+            "distribution",
+            "share",
+            "mix",
+            "composition",
+            "proportion",
+            "breakdown",
+        )
+    ):
+        tags.append("distribution")
+    out: List[str] = []
+    seen: set = set()
+    for t in tags:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
+def _metric_type_for_chart_recommendation(col_hint: Optional[str]) -> str:
+    if not col_hint:
+        return "numeric"
+    if _looks_like_ratio_metric_column(str(col_hint)):
+        return "percent"
+    if _looks_like_money_metric_column(str(col_hint)):
+        return "currency"
+    return "numeric"
+
+
+def _build_chart_recommendation_dict(
+    ql: str,
+    ll: int,
+    ncol_guess: Optional[str],
+    chart_type_internal: str,
+    selection_explanation: str,
+) -> Dict[str, Any]:
+    return {
+        "detectedIntent": _chart_selection_question_bucket(ql),
+        "categoryCount": int(ll),
+        "metricType": _metric_type_for_chart_recommendation(ncol_guess),
+        "recommendedChart": _chart_type_for_api(chart_type_internal or "bar"),
+        "selectionExplanation": (selection_explanation or "").strip()
+        or "Vertical bar chart selected as a stable default.",
+    }
+
+
+def _build_focus_kpis_from_intent(
+    intent: Optional[Dict[str, Any]], chart_point_count: int
+) -> List[Dict[str, Any]]:
+    if not intent:
+        return []
+    m = intent.get("value_col")
+    g = intent.get("group_col")
+    agg_lab = intent.get("agg_label")
+    met_disp = (
+        _business_metric_series_label(
+            str(intent.get("agg_key") or ""),
+            str(agg_lab or ""),
+            str(m) if m else None,
+        )
+        if m
+        else "—"
+    )
+    return [
+        {
+            "title": "Metric analyzed",
+            "value": met_disp,
+            "subtitle": str(agg_lab) if agg_lab else None,
+        },
+        {
+            "title": "Breakdown dimension",
+            "value": _pretty_label_text(g) if g else "—",
+            "subtitle": None,
+        },
+        {
+            "title": "Chart series points",
+            "value": f"{int(chart_point_count):,}",
+            "subtitle": "Aligned with AI appendix and chart",
+        },
+    ]
+
+
+def _build_unified_analysis_payload(
+    *,
+    question: str,
+    intent_debug: Optional[Dict[str, Any]],
+    chart_title: str,
+    chart_type_internal: str,
+    exact_result: str,
+    chart_points: int,
+    alignment_repaired: bool,
+    chart_recommendation: Optional[Dict[str, Any]] = None,
+    analysis_validation: Optional[Dict[str, Any]] = None,
+    partial_visualization_warning: Optional[str] = None,
+) -> Dict[str, Any]:
+    api_t = _chart_type_for_api(chart_type_internal or "bar")
+    agg_label = None
+    agg_key = None
+    if intent_debug:
+        agg_label = str(intent_debug.get("agg_label") or "").strip() or None
+        agg_key = intent_debug.get("agg_key")
+    m_disp = None
+    c_disp = None
+    if intent_debug and intent_debug.get("value_col"):
+        m_disp = _business_metric_series_label(
+            str(intent_debug.get("agg_key") or ""),
+            str(intent_debug.get("agg_label") or ""),
+            str(intent_debug.get("value_col") or ""),
+        )
+    if intent_debug and intent_debug.get("group_col"):
+        c_disp = _pretty_label_text(intent_debug.get("group_col"))
+
+    out: Dict[str, Any] = {
+        "metricColumn": intent_debug.get("value_col") if intent_debug else None,
+        "categoryColumn": intent_debug.get("group_col") if intent_debug else None,
+        "secondaryGroupColumn": intent_debug.get("secondary_group_col")
+        if intent_debug
+        else None,
+        "metricColumnDisplay": m_disp,
+        "categoryColumnDisplay": c_disp,
+        "aggregation": agg_label,
+        "aggregationKey": agg_key,
+        "chartType": api_t,
+        "chartTypeInternal": str(chart_type_internal or "bar"),
+        "chartTitle": (chart_title or "").strip(),
+        "insightSummary": (exact_result or "")[:12000],
+        "detectedIntent": _detect_intent_tags(question),
+        "alignmentRepaired": bool(alignment_repaired),
+        "chartPointCount": int(chart_points),
+        "focusKpis": _build_focus_kpis_from_intent(intent_debug, chart_points),
+    }
+    if chart_recommendation:
+        out["chartRecommendation"] = chart_recommendation
+    if analysis_validation:
+        out["analysisValidation"] = analysis_validation
+    if partial_visualization_warning:
+        out["partialVisualizationWarning"] = partial_visualization_warning.strip()
+    return out
+
+
+# Strong signals: meaningful without prior context (used to reject when no snapshot).
+_FOLLOW_UP_STANDALONE = re.compile(
+    r"(?:^|\b)(?:why|explain)\b|"
+    r"^\s*(?:show\s+)?(?:only\s+)?top\s+\d{1,2}\b|"
+    r"^\s*(?:show\s+)?(?:only\s+)?top\s+(?:three|four|five|six|seven|eight|nine|ten)\b|"
+    r"^\s*(?:show\s+)?bottom\s+\d{1,2}\b|"
+    r"^\s*(?:show\s+)?bottom\s+(?:three|four|five|ten)\b|"
+    r"convert(?:\s+to)?|show\s+as|as\s+a\s+(?:pie|line|bar|donut|area)\b|"
+    r"(?:pie|line|bar|donut|area)\s+chart\b|"
+    r"sort\s+(?:ascending|descending|desc|asc)\b",
+    re.I,
+)
+
+# Extra tokens when prior analysis exists (continuation / refinement).
+_FOLLOW_UP_WITH_PRIOR = re.compile(
+    r"\bonly\b|\bfilters?\b|"
+    r"\btop\s+\d{1,2}\b|\btop\s+(?:three|four|five|six|seven|eight|nine|ten)\b|"
+    r"\bbottom\s+\d{1,2}\b|\bbottom\s+(?:three|four|five|ten)\b|"
+    r"convert(?:\s+to)?|show\s+as|as\s+a\s+(?:pie|line|bar|donut|area)\b|"
+    r"(?:pie|line|bar|donut|area)\s+chart\b|"
+    r"sort\s+(?:ascending|descending|desc|asc)\b|"
+    r"(?:^|\b)(?:why|explain)\b",
+    re.I,
+)
+
+
+def _looks_like_follow_up_question(q: str, *, has_prior: bool) -> bool:
+    s = (q or "").strip()
+    if not s:
+        return False
+    if has_prior:
+        if _FOLLOW_UP_WITH_PRIOR.search(s):
+            return True
+    else:
+        if _FOLLOW_UP_STANDALONE.search(s):
+            return True
+    if len(s) <= 36 and re.match(r"^\s*(why|explain)\s*\??\s*$", s, re.I):
+        return True
+    return False
+
+
+def _is_explanation_follow_up(q: str) -> bool:
+    s = (q or "").strip()
+    if not s:
+        return False
+    if len(s) > 48:
+        return False
+    return bool(re.match(r"^\s*(why|explain)(\s+that|\s+this|\s+it)?\s*\??\s*$", s, re.I))
+
+
+def _parse_forced_chart_mutation(q: str) -> Optional[str]:
+    ql = (q or "").lower()
+    if "donut" in ql:
+        return "donut"
+    if "pie" in ql:
+        return "pie"
+    if "area" in ql:
+        return "area"
+    if "line" in ql:
+        return "line"
+    if "horizontal" in ql and "bar" in ql:
+        return "bar_horizontal"
+    if re.search(r"\bbar\s+chart\b", ql) or (
+        "bar" in ql and "horizontal" not in ql and "chart" in ql
+    ):
+        return "bar"
+    if re.search(r"\bbar\b", ql) and "horizontal" not in ql:
+        return "bar"
+    return None
+
+
+def _parse_sort_direction_follow_up(q: str) -> Optional[bool]:
+    """True = descending by value, False = ascending, None = no sort instruction."""
+    ql = (q or "").lower()
+    if re.search(r"sort\s+(descending|desc)\b", ql):
+        return True
+    if re.search(r"sort\s+(ascending|asc)\b", ql):
+        return False
+    return None
+
+
+def _attach_conversation_followup_payload(
+    analysis_ctx: Dict[str, Any],
+    sidecar: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    if not sidecar:
+        return analysis_ctx
+    out = dict(analysis_ctx)
+    out["conversationFollowUp"] = sidecar
+    return out
+
+
+def _apply_follow_up_post_process_chart(
+    chart_data: List[Dict[str, Any]],
+    chart_type: str,
+    ops: Optional[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], str]:
+    if not chart_data or not ops:
+        return chart_data, chart_type
+    if str(chart_type or "").strip() == "scatter":
+        return chart_data, chart_type
+    ct = str(chart_type or "bar").strip()
+    fc = ops.get("forced_chart_internal")
+    if isinstance(fc, str) and fc.strip():
+        ct = fc.strip()
+    rows: List[Dict[str, Any]] = []
+    for r in chart_data:
+        if not isinstance(r, dict):
+            continue
+        rows.append(dict(r))
+    if not rows:
+        return chart_data, ct
+    sd = ops.get("sort_desc")
+    if sd is True:
+        rows.sort(key=lambda x: float(x.get("value", 0)), reverse=True)
+    elif sd is False:
+        rows.sort(key=lambda x: float(x.get("value", 0)))
+    st = ops.get("slice_top")
+    sb = ops.get("slice_bottom")
+    if isinstance(st, int) and st > 0:
+        rows = rows[: min(st, len(rows))]
+    elif isinstance(sb, int) and sb > 0:
+        rows.sort(key=lambda x: float(x.get("value", 0)))
+        rows = rows[: min(sb, len(rows))]
+    return rows, ct
+
+
+def _try_build_follow_up_filtered_df(
+    base_df: pd.DataFrame,
+    profile: Dict[str, Any],
+    ctx: Optional[ConversationContextPayload],
+    follow_q: str,
+) -> Tuple[pd.DataFrame, List[str]]:
+    """
+    Deterministic row filters parsed from the follow-up text only.
+    Returns (filtered_df, human-readable filter labels).
+    """
+    labels: List[str] = []
+    out = base_df
+    q = (follow_q or "").strip()
+    if not q:
+        return out, labels
+    ql = q.lower()
+    ct = profile.get("column_types", {}) or {}
+    cols = out.columns.tolist()
+
+    def _norm_series(col: str) -> pd.Series:
+        return out[col].astype(str).str.strip().str.lower()
+
+    # --- only <phrase> ---
+    m_only = re.search(
+        r"\bonly\s+(?:the\s+)?(.+?)(?:\s+employees)?(?:\s+staff)?$",
+        q,
+        re.I,
+    )
+    if m_only:
+        phrase = m_only.group(1).strip().strip('"').strip("'")
+        phrase_l = phrase.lower()
+        target_col = None
+        if ctx and ctx.categoryColumn and str(ctx.categoryColumn) in out.columns:
+            cc = str(ctx.categoryColumn)
+            try:
+                if out[cc].astype(str).str.lower().str.contains(re.escape(phrase_l), na=False).any():
+                    target_col = cc
+            except Exception:
+                pass
+        if target_col is None:
+            hints = [
+                "location",
+                "city",
+                "region",
+                "state",
+                "department",
+                "dept",
+                "team",
+                "office",
+                "country",
+            ]
+            for c in cols:
+                cn = str(c).lower().replace(" ", "_")
+                if ct.get(c) in ("text", "category") and any(h in cn for h in hints):
+                        try:
+                            if _norm_series(c).str.contains(re.escape(phrase_l), na=False).any():
+                                target_col = c
+                                break
+                        except Exception:
+                            continue
+        if target_col is None:
+            for c in cols:
+                if c == (ctx.categoryColumn if ctx else None):
+                    continue
+                try:
+                    if _norm_series(c).str.contains(re.escape(phrase_l), na=False).any():
+                        target_col = c
+                        break
+                except Exception:
+                    continue
+        if target_col:
+            try:
+                mask = _norm_series(target_col).str.contains(re.escape(phrase_l), na=False)
+                n0 = len(out)
+                out = out.loc[mask].copy()
+                labels.append(f"Only rows where {target_col} matches “{phrase}” ({n0} → {len(out)})")
+            except Exception:
+                pass
+
+    # --- <col> above / below <num> ---
+    m_cmp = re.search(
+        r"\b([a-z0-9][a-z0-9_\s]{0,40}?)\s+(above|over|greater\s+than|>|below|under|less\s+than|<)\s*([\d,]+(?:\.\d+)?)",
+        ql,
+        re.I,
+    )
+    if m_cmp:
+        col_hint = m_cmp.group(1).strip().replace(" ", "_")
+        opw = m_cmp.group(2).lower()
+        try:
+            threshold = float(str(m_cmp.group(3)).replace(",", ""))
+        except (TypeError, ValueError):
+            threshold = float("nan")
+        if threshold == threshold:
+            ncol = None
+            if ctx and ctx.metricColumn and str(ctx.metricColumn) in out.columns:
+                if col_hint in str(ctx.metricColumn).lower().replace(" ", "_"):
+                    ncol = str(ctx.metricColumn)
+            if ncol is None:
+                ncol = _match_column_from_phrase(col_hint.replace("_", " "), cols, profile)
+            if ncol and ncol in out.columns and ct.get(ncol) == "number":
+                vs = pd.to_numeric(
+                    out[ncol]
+                    .astype(str)
+                    .str.replace(",", "", regex=False)
+                    .str.replace("₹", "", regex=False)
+                    .str.replace("$", "", regex=False),
+                    errors="coerce",
+                )
+                if opw in ("above", "over", "greater than", ">"):
+                    mask = vs > threshold
+                    lab = f"{ncol} above {threshold:g}"
+                else:
+                    mask = vs < threshold
+                    lab = f"{ncol} below {threshold:g}"
+                n0 = len(out)
+                out = out.loc[mask].copy()
+                labels.append(f"{lab} ({n0} → {len(out)})")
+
+    return out, labels
+
+
+def resolve_follow_up_turn(
+    raw_question: str,
+    ctx: Optional[ConversationContextPayload],
+) -> Dict[str, Any]:
+    """
+    Deterministic follow-up routing. Returns keys used by /ask:
+    blocked, blocked_message, effective_question, follow_up_ops,
+    conversation_sidecar (for analysis + UI), filtered_df, filter_labels
+    """
+    rq = (raw_question or "").strip()
+    out: Dict[str, Any] = {
+        "blocked": False,
+        "blocked_message": "",
+        "effective_question": rq,
+        "follow_up_ops": None,
+        "conversation_sidecar": None,
+        "filtered_df": None,
+        "filter_labels": [],
+        "ai_context_block": "",
+    }
+    if not rq:
+        return out
+
+    prior = (ctx.lastQuestion or "").strip() if ctx else ""
+    is_follow = _looks_like_follow_up_question(rq, has_prior=bool(prior))
+
+    if is_follow and not prior:
+        out["blocked"] = True
+        out["blocked_message"] = (
+            "Please ask an initial analysis question first."
+        )
+        return out
+
+    if not is_follow or not ctx:
+        return out
+
+    explanation = _is_explanation_follow_up(rq)
+    if explanation:
+        eff = prior
+    else:
+        eff = f"{prior} {rq}".strip()
+
+    out["effective_question"] = eff
+
+    prev_summary = (ctx.lastChartTitle or "").strip() or prior[:120]
+    applied_bits: List[str] = []
+    if explanation:
+        applied_bits.append("Explain / why (same calculation as previous question)")
+    else:
+        applied_bits.append(f"Continued from previous question ({rq})")
+
+    fchart = _parse_forced_chart_mutation(rq)
+    sortd = _parse_sort_direction_follow_up(rq)
+    stn = _extract_top_n(rq.lower()) if not explanation else None
+    sbn = _extract_bottom_n(rq.lower()) if not explanation else None
+
+    ops: Dict[str, Any] = {}
+    if fchart:
+        ops["forced_chart_internal"] = fchart
+        applied_bits.append(f"Chart preference: {fchart}")
+    if sortd is not None:
+        ops["sort_desc"] = sortd
+        applied_bits.append("Sort: " + ("descending" if sortd else "ascending"))
+    if stn:
+        ops["slice_top"] = int(stn)
+        applied_bits.append(f"Top {stn}")
+    if sbn:
+        ops["slice_bottom"] = int(sbn)
+        applied_bits.append(f"Bottom {sbn}")
+
+    if ops:
+        out["follow_up_ops"] = ops
+
+    follow_line = " · ".join(applied_bits)
+    ctx_used = (
+        f"Previous analysis: {prev_summary}\nFollow-up applied: {follow_line}"
+    )
+    ai_block = (
+        "Conversation context (follow-up — keep metrics aligned with this thread):\n"
+        f"- Previous question: {prior}\n"
+        f"- Previous chart title: {ctx.lastChartTitle or '—'}\n"
+        f"- Metric column (prior): {ctx.metricColumn or '—'}\n"
+        f"- Category column (prior): {ctx.categoryColumn or '—'}\n"
+        f"- Aggregation (prior): {ctx.aggregation or '—'}\n"
+        f"- This user message may be a short follow-up; interpret it in light of the above.\n"
+    )
+    out["ai_context_block"] = ai_block
+    out["conversation_sidecar"] = {
+        "wasFollowUp": True,
+        "previousAnalysisSummary": prev_summary,
+        "followUpApplied": follow_line,
+        "contextUsedLine": ctx_used,
+        "originalFollowUp": rq,
+    }
+    return out
+
+
+def compute_visualization_for_question(
+    question: str,
+    conversation_sidecar: Optional[Dict[str, Any]] = None,
+    follow_up_ops: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, Any]]:
     """
     Structured visualization pipeline: pandas/analysis only (never parse AI prose).
-    Returns (exact_numeric_context_for_ai, visualization_or_none).
+    Returns (exact_numeric_context_for_ai, visualization_or_none, unified_analysis_context).
     """
     global df
 
+    def fin(ac: Dict[str, Any]) -> Dict[str, Any]:
+        return _attach_conversation_followup_payload(ac, conversation_sidecar)
+
     if df is None:
-        return "No dataset uploaded.", None
+        return (
+            "No dataset uploaded.",
+            None,
+            fin(
+                _build_unified_analysis_payload(
+                    question=question,
+                    intent_debug=None,
+                    chart_title="",
+                    chart_type_internal="bar",
+                    exact_result="No dataset uploaded.",
+                    chart_points=0,
+                    alignment_repaired=False,
+                )
+            ),
+        )
 
     profile_live = dataset_profile or build_profile(df)
     ql = question.lower().strip()
 
     intent_debug = _describe_aggregate_intent(question, df, profile_live)
 
-    exact_result, chart_data, chart_type = analyze_data(question)
-    chart_data = list(_normalize_chart_records(chart_data))
+    partial_visualization_warning: Optional[str] = None
+    suppress_auto_charts = False
+    used_two_dim_stacked = False
+    partial_alignment = False
+    chart_suppressed_misleading = False
+
+    exact_result = ""
+    chart_data: List[Any] = []
+    chart_type = ""
     chart_title = ""
     chart_subtitle = "Generated from AI analysis"
 
     fallback_used = False
     smart_trace: Dict[str, Any] = {}
     smart_routing_used = False
+    alignment_repaired = False
+
+    chart_path_handled = False
+    sec_dim = (intent_debug or {}).get("secondary_group_col")
+    pri_dim = (intent_debug or {}).get("group_col")
+    agg_key_here = str((intent_debug or {}).get("agg_key") or "")
+
+    if (
+        intent_debug
+        and sec_dim
+        and pri_dim
+        and str(sec_dim) != str(pri_dim)
+    ):
+        if agg_key_here == "count":
+            st_try = _try_build_stacked_two_category_chart(
+                df,
+                profile_live,
+                str(pri_dim),
+                str(sec_dim),
+                "count",
+                intent_debug.get("value_col"),
+            )
+            if st_try:
+                exact_result, raw_rows, chart_title, meta_stack = st_try
+                chart_data = list(_normalize_chart_records(raw_rows))
+                chart_type = "bar"
+                used_two_dim_stacked = True
+                chart_path_handled = True
+                smart_trace = {
+                    "category_column": str(pri_dim),
+                    "numeric_column": intent_debug.get("value_col"),
+                    "aggregation": str(intent_debug.get("agg_label", "")).lower(),
+                    "aggregation_key": intent_debug.get("agg_key"),
+                    "rows_analyzed": int(len(df)),
+                    "notes": intent_debug.get("dimension_notes"),
+                    "multi_series": True,
+                    "multi_series_meta": meta_stack,
+                    "secondary_column": str(sec_dim),
+                }
+            else:
+                intent_one = dict(intent_debug)
+                intent_one["secondary_group_col"] = None
+                fb_rows, fb_type, fb_title = _fallback_aggregate_chart(intent_one)
+                er_ana, _, _ = analyze_data(question)
+                if fb_rows:
+                    chart_data = list(_normalize_chart_records(fb_rows))
+                    chart_type = (fb_type or "bar").strip() or "bar"
+                    chart_title = (fb_title or "").strip()
+                    fallback_used = True
+                    partial_alignment = True
+                    partial_visualization_warning = (
+                        "Visualization partially answers the question."
+                    )
+                    tab = _tabular_exact_from_name_value_rows(
+                        [
+                            {"name": r.get("name"), "value": r.get("value")}
+                            for r in chart_data
+                        ]
+                    )
+                    exact_result = "\n\n".join(
+                        x for x in (tab, (er_ana or "").strip()) if x
+                    )
+                    chart_path_handled = True
+                else:
+                    suppress_auto_charts = True
+                    chart_suppressed_misleading = True
+                    chart_data = []
+                    chart_type = ""
+                    partial_visualization_warning = (
+                        "Advanced multi-dimensional visualization not available yet."
+                    )
+                    exact_result, _, _ = analyze_data(question)
+                    chart_path_handled = True
+        else:
+            suppress_auto_charts = True
+            chart_suppressed_misleading = True
+            partial_visualization_warning = (
+                "Advanced multi-dimensional visualization not available yet."
+            )
+            exact_result, _, _ = analyze_data(question)
+            chart_data = []
+            chart_type = ""
+            chart_path_handled = True
+
+    if not chart_path_handled:
+        exact_result, chart_data, chart_type = analyze_data(question)
+
+    chart_data = list(_normalize_chart_records(chart_data))
     print(
         "[viz] received_question:",
         repr((question or "").strip())[:520],
@@ -3054,11 +4969,15 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
         intent_debug["value_col"] if intent_debug else None,
         "intent_agg:",
         (intent_debug.get("agg_label"), intent_debug.get("agg_key")) if intent_debug else None,
+        "secondary_dim:",
+        intent_debug.get("secondary_group_col") if intent_debug else None,
+        "stacked_two_dim:",
+        used_two_dim_stacked,
         flush=True,
     )
     print("[viz] after_analyze_chart_points=", len(chart_data), flush=True)
 
-    if not chart_data and intent_debug:
+    if not chart_data and intent_debug and not suppress_auto_charts:
         fb_rows, fb_type, fb_title = _fallback_aggregate_chart(intent_debug)
         if fb_rows:
             chart_data = list(_normalize_chart_records(fb_rows))
@@ -3067,7 +4986,7 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
             fallback_used = True
             print("[viz] used_intent_aggregate_fallback rows=", len(chart_data), flush=True)
 
-    if not chart_data:
+    if not chart_data and not suppress_auto_charts:
         sm_data, sm_type, sm_title, sm_sub = build_smart_chart(question, smart_trace)
         if sm_data:
             smart_routing_used = True
@@ -3076,26 +4995,137 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
             chart_title = (sm_title or "").strip()
             chart_subtitle = (sm_sub or chart_subtitle).strip()
 
-    if chart_type == "bar" and chart_data and (
-        _looks_like_ranking_question(ql) or len(chart_data) >= 12
+    if (
+        chart_data
+        and intent_debug
+        and intent_debug.get("value_col")
+        and smart_routing_used
+        and smart_trace.get("numeric_column")
+        and not smart_trace.get("multi_series")
     ):
-        chart_type = "bar_horizontal"
+        iv = str(intent_debug["value_col"]).strip()
+        sv = str(smart_trace.get("numeric_column")).strip()
+        if (
+            sv
+            and iv
+            and sv != iv
+            and str(smart_trace.get("aggregation", "")).lower() != "scatter"
+        ):
+            fb_rows, fb_type, fb_title = _fallback_aggregate_chart(intent_debug)
+            if fb_rows:
+                chart_data = list(_normalize_chart_records(fb_rows))
+                chart_type = "bar"
+                chart_title = (fb_title or "").strip()
+                smart_routing_used = False
+                fallback_used = True
+                alignment_repaired = True
+                smart_trace = {
+                    "category_column": intent_debug["group_col"],
+                    "numeric_column": intent_debug["value_col"],
+                    "aggregation": str(intent_debug.get("agg_label", "")).lower(),
+                    "aggregation_key": intent_debug.get("agg_key"),
+                    "rows_analyzed": int(len(df)),
+                    "notes": "Visualization rebuilt so the chart metric matches the question.",
+                }
 
     if not chart_data:
         print(
             "[viz] outgoing_visualization= None fallback_used=", fallback_used,
             flush=True,
         )
-        return exact_result, None
+        kpi_rec = {
+            "detectedIntent": _chart_selection_question_bucket(ql),
+            "categoryCount": 0,
+            "metricType": "numeric",
+            "recommendedChart": "kpiCards",
+            "selectionExplanation": "Single-value summary; KPI cards convey the answer without a multi-point chart.",
+        }
+        av_empty = _build_analysis_validation_block(
+            intent_debug=intent_debug,
+            multi_rendered=False,
+            secondary_requested=bool(sec_dim),
+            partial_message=partial_visualization_warning,
+        )
+        analysis_empty = _build_unified_analysis_payload(
+            question=question,
+            intent_debug=intent_debug,
+            chart_title="",
+            chart_type_internal="bar",
+            exact_result=exact_result,
+            chart_points=0,
+            alignment_repaired=alignment_repaired,
+            chart_recommendation=kpi_rec,
+            analysis_validation=av_empty,
+            partial_visualization_warning=partial_visualization_warning,
+        )
+        return exact_result, None, fin(analysis_empty)
+
+    chart_type, chart_sel_reason, chart_sel_conf = determine_chart_type_and_reason(
+        ql,
+        chart_type,
+        chart_data,
+        intent_debug,
+        smart_trace or {},
+    )
+    if chart_sel_conf == "Low" and chart_type not in (
+        "line",
+        "area",
+        "bar_horizontal",
+        "pie",
+        "donut",
+        "scatter",
+    ):
+        chart_type = "bar"
+        extra = "Low confidence in chart pattern; defaulting to a vertical bar chart."
+        chart_sel_reason = f"{chart_sel_reason} {extra}".strip()
+
+    if follow_up_ops:
+        chart_data, chart_type = _apply_follow_up_post_process_chart(
+            chart_data, chart_type, follow_up_ops
+        )
+        fc = follow_up_ops.get("forced_chart_internal")
+        if isinstance(fc, str) and fc.strip():
+            note = f"Follow-up requested chart type: {fc}."
+            chart_sel_reason = (
+                f"{chart_sel_reason} {note}".strip() if chart_sel_reason else note
+            )
+
+    if chart_type in ("pie", "donut") and chart_data:
+        vals_f: List[float] = []
+        for r in chart_data:
+            try:
+                vals_f.append(float(r.get("value")))
+            except (TypeError, ValueError):
+                vals_f.append(float("nan"))
+        if vals_f and not any(math.isnan(v) for v in vals_f):
+            if not _values_look_like_percent_shares(vals_f):
+                s = float(sum(vals_f))
+                if s > 0:
+                    chart_data = [
+                        {
+                            "name": r.get("name"),
+                            "value": 100.0 * float(r["value"]) / s,
+                        }
+                        for r in chart_data
+                    ]
 
     if not chart_title.strip():
-        hinted = None
-        if intent_debug:
-            hinted = (
-                f"{intent_debug['agg_label']} {_pretty_label_text(intent_debug['value_col'])}"
-                f" by {_pretty_label_text(intent_debug['group_col'])}"
-            )
-        chart_title = hinted or _chart_title_from_question(question)
+        chart_title = _chart_title_from_question(question)
+
+    if (
+        intent_debug
+        and intent_debug.get("value_col")
+        and intent_debug.get("group_col")
+        and chart_type not in ("pie", "donut", "line", "area", "scatter")
+        and not smart_trace.get("multi_series")
+    ):
+        if alignment_repaired or not smart_routing_used:
+            chart_title = _business_chart_title(
+                str(intent_debug.get("agg_key") or ""),
+                str(intent_debug.get("agg_label") or ""),
+                str(intent_debug.get("value_col") or ""),
+                str(intent_debug.get("group_col") or ""),
+            ).strip()
 
     print(
         "[viz] finalized_category_col:",
@@ -3111,23 +5141,64 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
         flush=True,
     )
 
+    is_scatter = str(chart_type or "").strip() == "scatter"
     labels: List[str] = []
     vals: List[float] = []
-    for row in chart_data:
-        try:
-            nm = row.get("name")
-            vv = row.get("value")
-            fv = float(vv)
-            if not (fv == fv):  # NaN
+    xs_src: List[float] = []
+    if is_scatter:
+        for row in chart_data:
+            try:
+                fx = float(row.get("x"))
+                fy = float(row.get("value"))
+            except (TypeError, ValueError):
                 continue
-            labels.append(str(nm))
-            vals.append(fv)
-        except (TypeError, ValueError):
-            continue
+            if not (fx == fx and fy == fy):
+                continue
+            labels.append(str(row.get("name", "")).strip() or "•")
+            vals.append(fy)
+            xs_src.append(fx)
+    else:
+        for row in chart_data:
+            try:
+                nm = row.get("name")
+                vv = row.get("value")
+                fv = float(vv)
+                if not (fv == fv):  # NaN
+                    continue
+                labels.append(str(nm))
+                vals.append(fv)
+            except (TypeError, ValueError):
+                continue
 
     ll = min(len(labels), len(vals))
+    if is_scatter:
+        ll = min(ll, len(xs_src))
     if ll == 0:
-        return exact_result, None
+        av_ll0 = _build_analysis_validation_block(
+            intent_debug=intent_debug,
+            multi_rendered=False,
+            secondary_requested=bool(sec_dim),
+            partial_message=partial_visualization_warning,
+        )
+        analysis_empty = _build_unified_analysis_payload(
+            question=question,
+            intent_debug=intent_debug,
+            chart_title=chart_title.strip(),
+            chart_type_internal=str(chart_type or "bar"),
+            exact_result=exact_result,
+            chart_points=0,
+            alignment_repaired=alignment_repaired,
+            chart_recommendation=_build_chart_recommendation_dict(
+                ql,
+                0,
+                intent_debug.get("value_col") if intent_debug else None,
+                "bar",
+                "No valid numeric pairs for the requested chart; defaulting to KPI-style text.",
+            ),
+            analysis_validation=av_ll0,
+            partial_visualization_warning=partial_visualization_warning,
+        )
+        return exact_result, None, fin(analysis_empty)
 
     ncol_guess = None
     if intent_debug:
@@ -3141,6 +5212,8 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
                 if profile_live.get("column_types", {}).get(c) == "number"
             ],
         )
+    if is_scatter and smart_trace.get("scatter_y_column"):
+        ncol_guess = str(smart_trace.get("scatter_y_column"))
 
     agg_eff = intent_debug.get("agg_key") if intent_debug else None
     if agg_eff is None:
@@ -3157,6 +5230,53 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
     rounded_vals = [round_display_numeric(round_cat, v) for v in trimmed_vals]
     value_display = [format_display_numeric(round_cat, v) for v in rounded_vals]
 
+    scatter_x_rounded: List[float] = []
+    scatter_x_display: List[str] = []
+    if is_scatter and ll > 0:
+        xtrim = xs_src[:ll]
+        scatter_x_rounded = [round_display_numeric(round_cat, v) for v in xtrim]
+        scatter_x_display = [
+            format_display_numeric(round_cat, v) for v in scatter_x_rounded
+        ]
+
+    analysis_validation_block = _build_analysis_validation_block(
+        intent_debug=intent_debug,
+        multi_rendered=bool(used_two_dim_stacked),
+        secondary_requested=bool(sec_dim),
+        partial_message=partial_visualization_warning,
+    )
+
+    stacked_bar_payload: Optional[List[Dict[str, Any]]] = None
+    multi_series_payload: Optional[Dict[str, Any]] = None
+    meta_ms = smart_trace.get("multi_series_meta") if smart_trace else None
+    if smart_trace.get("multi_series") and isinstance(meta_ms, dict):
+        keys = meta_ms.get("seriesKeys") or []
+        stacked_bar_payload = []
+        for i in range(ll):
+            r = chart_data[i] if i < len(chart_data) else {}
+            if not isinstance(r, dict):
+                continue
+            entry: Dict[str, Any] = {
+                "name": labels[i],
+                "value": rounded_vals[i],
+                "valueDisplay": value_display[i],
+            }
+            for sk in keys:
+                sks = str(sk)
+                if sks in r:
+                    try:
+                        entry[sks] = round_display_numeric(round_cat, float(r[sks]))
+                    except (TypeError, ValueError):
+                        pass
+            stacked_bar_payload.append(entry)
+        multi_series_payload = {
+            "layout": meta_ms.get("layout"),
+            "seriesKeys": keys,
+            "seriesLabels": meta_ms.get("seriesLabels") or {},
+            "categoryAxisTitle": meta_ms.get("categoryAxisTitle"),
+            "stackAxisTitle": meta_ms.get("stackAxisTitle"),
+        }
+
     provenance = _assemble_visualization_provenance(
         df=df,
         intent_debug=intent_debug,
@@ -3166,6 +5286,19 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
         chart_type_internal=str(chart_type or "bar"),
         chart_points=ll,
         agg_eff=agg_eff,
+        chart_selection_reason=chart_sel_reason,
+        analysis_validation=analysis_validation_block,
+        partial_alignment=partial_alignment,
+        multi_series_rendered=bool(used_two_dim_stacked),
+        chart_suppressed_misleading=chart_suppressed_misleading,
+    )
+
+    chart_rec = _build_chart_recommendation_dict(
+        ql,
+        ll,
+        ncol_guess,
+        str(chart_type or "bar"),
+        chart_sel_reason,
     )
 
     visualization: Dict[str, Any] = {
@@ -3177,7 +5310,42 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
         "valueDisplay": value_display,
         "roundingHint": round_cat,
         "provenance": provenance,
+        "chartRecommendation": chart_rec,
     }
+    if stacked_bar_payload and multi_series_payload:
+        visualization["stackedBarRows"] = stacked_bar_payload
+        visualization["multiSeries"] = multi_series_payload
+    if partial_visualization_warning:
+        visualization["partialVisualizationWarning"] = (
+            partial_visualization_warning.strip()
+        )
+    if is_scatter and scatter_x_rounded:
+        visualization["scatterX"] = scatter_x_rounded
+        visualization["scatterXDisplay"] = scatter_x_display
+        visualization["scatterXLabel"] = _pretty_label_text(
+            smart_trace.get("scatter_x_column")
+        )
+        visualization["scatterYLabel"] = _pretty_label_text(
+            smart_trace.get("scatter_y_column")
+        )
+
+    if conversation_sidecar and isinstance(
+        conversation_sidecar.get("contextUsedLine"), str
+    ):
+        visualization["contextUsed"] = conversation_sidecar["contextUsedLine"]
+
+    analysis_ctx = _build_unified_analysis_payload(
+        question=question,
+        intent_debug=intent_debug,
+        chart_title=str(visualization.get("title") or ""),
+        chart_type_internal=str(chart_type or "bar"),
+        exact_result=exact_result,
+        chart_points=ll,
+        alignment_repaired=alignment_repaired,
+        chart_recommendation=chart_rec,
+        analysis_validation=analysis_validation_block,
+        partial_visualization_warning=partial_visualization_warning,
+    )
     try:
         print(
             "[viz] outgoing_visualization=",
@@ -3189,13 +5357,14 @@ def compute_visualization_for_question(question: str) -> Tuple[str, Optional[Dic
                     "sample_labels": visualization["labels"][:4],
                     "sample_values": visualization["values"][:4],
                     "fallback_aggregate_used": fallback_used,
+                    "alignment_repaired": alignment_repaired,
                 }
             )[:950],
             flush=True,
         )
     except Exception:
         print("[viz] outgoing_visualization print failed", flush=True)
-    return exact_result, visualization
+    return exact_result, visualization, fin(analysis_ctx)
 
 
 @app.post("/ask")
@@ -3206,9 +5375,58 @@ def ask_question(data: QuestionRequest):
         return {
             "answer": "Please upload a CSV or Excel file first.",
             "visualization": None,
+            "analysis": None,
         }
 
-    exact_result, visualization = compute_visualization_for_question(data.question)
+    plan = resolve_follow_up_turn(data.question, data.conversation_context)
+    if plan.get("blocked"):
+        return {
+            "answer": plan.get("blocked_message")
+            or "Please ask an initial analysis question first.",
+            "visualization": None,
+            "analysis": None,
+        }
+
+    prev_filters: List[str] = []
+    if data.conversation_context and data.conversation_context.filtersApplied:
+        prev_filters = list(data.conversation_context.filtersApplied)
+
+    eff_q = str(plan.get("effective_question") or data.question).strip()
+    sidecar = plan.get("conversation_sidecar")
+    filter_added: List[str] = []
+    if sidecar and data.conversation_context:
+        profile_live = dataset_profile or build_profile(df)
+        fd, flabs = _try_build_follow_up_filtered_df(
+            df,
+            profile_live,
+            data.conversation_context,
+            data.question.strip(),
+        )
+        if flabs:
+            filter_added = list(flabs)
+            plan["filtered_df"] = fd
+            sc = dict(sidecar)
+            extra = "; ".join(flabs)
+            sc["followUpApplied"] = (
+                f"{sc.get('followUpApplied', '')} · {extra}".replace("  ", " ").strip(" ·")
+            )
+            sc["contextUsedLine"] = (
+                f"{sc.get('contextUsedLine', '')}\nRow filters: {extra}"
+            ).strip()
+            sidecar = sc
+            plan["conversation_sidecar"] = sc
+
+    saved_df = df
+    try:
+        if plan.get("filtered_df") is not None:
+            df = plan["filtered_df"]
+        exact_result, visualization, analysis_ctx = compute_visualization_for_question(
+            eff_q,
+            conversation_sidecar=sidecar,
+            follow_up_ops=plan.get("follow_up_ops"),
+        )
+    finally:
+        df = saved_df
 
     viz_anchor = ""
     viz_rule = ""
@@ -3227,12 +5445,33 @@ def ask_question(data: QuestionRequest):
         )
 
     trend_rule = ""
-    if visualization and visualization.get("chartType") == "line":
+    if visualization and visualization.get("chartType") in ("line", "area"):
         trend_rule = "- Focus on the trajectory over periods shown in the calculated result.\n"
+
+    focus_line = ""
+    if analysis_ctx.get("metricColumn"):
+        focus_line = (
+            "\nDetected question focus (do not substitute a different metric or column):\n"
+            f"- Metric column: {analysis_ctx.get('metricColumn')}\n"
+            f"- Breakdown dimension: {analysis_ctx.get('categoryColumn')}\n"
+            f"- Aggregation: {analysis_ctx.get('aggregation')} ({analysis_ctx.get('aggregationKey')})\n"
+        )
+        sec_g = analysis_ctx.get("secondaryGroupColumn")
+        if sec_g:
+            focus_line += f"- Secondary breakdown dimension: {sec_g}\n"
+
+    conv_block = plan.get("ai_context_block") or ""
+    if sidecar and isinstance(sidecar.get("contextUsedLine"), str):
+        conv_block = (
+            f"{conv_block}\nContext used (for your reasoning — user-visible in the app):\n"
+            f"{sidecar.get('contextUsedLine')}\n"
+        ).strip()
 
     ctx = get_ai_context(sample_rows=10)
     prompt = f"""
 You are a business data analyst for small and medium businesses.
+
+{conv_block}
 
 User question:
 {data.question}
@@ -3242,6 +5481,7 @@ Dataset context (use this, do not invent columns):
 
 Exact calculated result (ground truth metrics / table):
 {exact_result}
+{focus_line}
 {viz_anchor}
 Rules:
 {viz_rule}- Explain in simple business language.
@@ -3256,7 +5496,28 @@ Rules:
         messages=[{"role": "user", "content": prompt}],
     )
 
+    chart_rec_out = (
+        analysis_ctx.get("chartRecommendation")
+        if isinstance(analysis_ctx.get("chartRecommendation"), dict)
+        else {}
+    )
+    viz_title = ""
+    if visualization and isinstance(visualization.get("title"), str):
+        viz_title = visualization["title"].strip()
+    conv_out = {
+        "lastQuestion": eff_q,
+        "lastChartTitle": viz_title or str(analysis_ctx.get("chartTitle") or "").strip(),
+        "metricColumn": analysis_ctx.get("metricColumn"),
+        "categoryColumn": analysis_ctx.get("categoryColumn"),
+        "aggregation": analysis_ctx.get("aggregation"),
+        "chartType": analysis_ctx.get("chartType"),
+        "intentBucket": chart_rec_out.get("detectedIntent"),
+        "filtersApplied": prev_filters + filter_added,
+    }
+
     return {
         "answer": response.content[0].text.strip(),
         "visualization": visualization,
+        "analysis": analysis_ctx,
+        "conversation_context": conv_out,
     }
