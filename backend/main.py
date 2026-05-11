@@ -6,12 +6,16 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 import os
 from io import BytesIO
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Callable
 from contextlib import contextmanager
 import re
 import math
+import json
+import logging
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -282,6 +286,7 @@ def _infer_business_domain(columns: List[str]) -> str:
     ecom_kw = (
         "order", "cart", "checkout", "sku", "product", "customer", "invoice",
         "shipment", "payment", "channel", "listing", "variant",
+        "order_value", "revenue", "line_total", "delivery_days",
     )
     mfg = sum(1 for k in mfg_kw if k in joined)
     eco = sum(1 for k in ecom_kw if k in joined)
@@ -370,26 +375,96 @@ def _product_role_keyword_score(col: str) -> Tuple[int, List[str]]:
     return score, reasons
 
 
-def _sales_role_keyword_score(col: str) -> Tuple[int, List[str]]:
+def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, List[str]]:
+    """
+    Business-keyword score for the sales / primary value metric role.
+    Ecommerce: prioritize monetary columns; penalize operational KPIs (delivery time, ratings, counts).
+    """
     n = _norm_header_token(col)
     reasons: List[str] = []
     score = 0
-    for kw, w in (
-        ("revenue", 40),
-        ("sales", 38),
-        ("amount", 22),
-        ("total", 16),
-        ("subtotal", 18),
-        ("net_sales", 36),
-        ("gross_sales", 34),
-        ("price", 20),
-        ("qty", 24),
-        ("quantity", 24),
-        ("units", 20),
-    ):
+
+    # Primary monetary intent (substring match on normalized header; longer phrases first).
+    monetary = (
+        ("order_value", 64),
+        ("line_total", 54),
+        ("order_total", 54),
+        ("transaction_total", 50),
+        ("transaction_value", 50),
+        ("extended_price", 48),
+        ("grand_total", 46),
+        ("total_revenue", 44),
+        ("total_sales", 44),
+        ("gross_sales", 44),
+        ("net_sales", 44),
+        ("net_revenue", 44),
+        ("sales_amount", 44),
+        ("order_amount", 44),
+        ("payment_amount", 42),
+        ("total_amount", 40),
+        ("amount_paid", 40),
+        ("revenue", 42),
+        ("sale_amount", 40),
+        ("subtotal", 36),
+        ("spend", 34),
+        ("sales", 36),
+        ("amount", 30),
+        ("total", 22),
+        ("unit_price", 34),
+        ("price", 28),
+        ("profit", 28),
+        ("margin", 22),
+    )
+    for kw, w in monetary:
         if kw in n:
             score += w
-            reasons.append(f"name:{kw}+{w}")
+            reasons.append(f"biz_kw:{kw}+{w}")
+
+    # Operational / secondary metrics — never preferred as primary "sales" value.
+    operational_penalties = (
+        ("delivery_days", 58),
+        ("days_to_deliver", 54),
+        ("day_to_delivery", 54),
+        ("days_to_delivery", 54),
+        ("delivery_time", 50),
+        ("ship_days", 48),
+        ("days_to_ship", 48),
+        ("shipping_days", 48),
+        ("processing_days", 46),
+        ("lead_time", 36),
+        ("handling_time", 32),
+        ("fulfillment_days", 48),
+        ("warehouse_days", 40),
+        ("star_rating", 44),
+        ("review_rating", 42),
+        ("customer_rating", 42),
+        ("product_rating", 42),
+        ("satisfaction_score", 40),
+        ("nps_score", 32),
+        ("review_score", 40),
+        ("rating", 38),
+        ("score", 26),
+    )
+    for kw, pen in operational_penalties:
+        if kw in n:
+            score -= pen
+            reasons.append(f"ops_penalty:{kw}-{-pen}")
+
+    if domain == "ecommerce":
+        if re.search(r"(^|_)(qty|quantity)|units_ordered|line_qty|order_qty", n):
+            score -= 28
+            reasons.append("eco:penalize_qty_units(-28)")
+    elif domain == "manufacturing":
+        for kw, w in (("qty", 20), ("quantity", 20), ("units", 18), ("output", 22)):
+            if kw in n:
+                score += w
+                reasons.append(f"mfg_qty:{kw}+{w}")
+    else:
+        for kw, w in (("qty", 20), ("quantity", 20), ("units", 16)):
+            if kw in n:
+                score += w
+                reasons.append(f"gen_qty:{kw}+{w}")
+
     return score, reasons
 
 
@@ -455,7 +530,7 @@ def _date_role_keyword_score(col: str) -> Tuple[int, List[str]]:
 
 
 def _cardinality_profile_score(
-    df_in: pd.DataFrame, col: str, role: str
+    df_in: pd.DataFrame, col: str, role: str, domain: str = "generic"
 ) -> Tuple[float, List[str]]:
     """Returns (points, reasons) using nunique vs row count."""
     reasons: List[str] = []
@@ -491,6 +566,41 @@ def _cardinality_profile_score(
         elif ratio >= 0.995:
             pts -= 25.0
             reasons.append("cardinality:likely_surrogate_id(-25)")
+    elif role == "sales":
+        nm = _norm_header_token(col)
+        money_like = any(
+            k in nm
+            for k in (
+                "revenue",
+                "sales",
+                "amount",
+                "total",
+                "price",
+                "value",
+                "payment",
+                "profit",
+                "spend",
+                "subtotal",
+                "gross",
+                "net_",
+                "order_",
+                "transaction",
+                "extended",
+                "grand",
+            )
+        )
+        if 0.0001 <= ratio <= 0.995:
+            pts += 12.0
+            reasons.append("cardinality:sales_spread(+12)")
+        elif ratio > 0.995 and money_like:
+            pts += 11.0
+            reasons.append("cardinality:sales_high_unique_monetary(+11)")
+        elif ratio > 0.995:
+            pts += 3.0
+            reasons.append("cardinality:sales_high_unique_weak(+3)")
+        if domain == "ecommerce" and money_like and 0.02 <= ratio <= 0.98:
+            pts += 4.0
+            reasons.append("cardinality:eco_monetary_sweetspot(+4)")
     else:
         if 0.001 <= ratio <= 0.95:
             pts += 10.0
@@ -540,7 +650,125 @@ def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[
         if "customer" in n or "client" in n:
             pts += 8.0
             reasons.append("domain:ecommerce_customer(+8)")
+    if domain == "ecommerce" and role == "sales":
+        nm = _norm_header_token(col)
+        if any(
+            k in nm
+            for k in (
+                "order_value",
+                "revenue",
+                "sales",
+                "amount",
+                "total",
+                "price",
+                "payment",
+                "transaction",
+            )
+        ):
+            pts += 8.0
+            reasons.append("domain:eco_sales_monetary_hint(+8)")
+        if any(k in nm for k in ("delivery", "ship_days", "days_to", "rating", "review", "nps")):
+            pts -= 12.0
+            reasons.append("domain:eco_sales_operational_hint(-12)")
     return pts, reasons
+
+
+def _sales_numeric_usefulness_score(df_in: pd.DataFrame, col: str) -> Tuple[float, List[str]]:
+    """Variance / range signals: monetary columns usually spread; penalize flat or binary scales."""
+    reasons: List[str] = []
+    if df_in is None or col not in df_in.columns or len(df_in) < 3:
+        return 0.0, reasons
+    try:
+        s = pd.to_numeric(df_in[col], errors="coerce").dropna()
+    except Exception:
+        return 0.0, reasons
+    if len(s) < 5:
+        reasons.append("numeric:few_values(0)")
+        return 0.0, reasons
+    nu = int(s.nunique(dropna=True))
+    if nu <= 1:
+        reasons.append("numeric:constant(-18)")
+        return -18.0, reasons
+    mn = float(s.min())
+    mx = float(s.max())
+    if not math.isfinite(mn) or not math.isfinite(mx) or mn == mx:
+        reasons.append("numeric:no_range(-14)")
+        return -14.0, reasons
+    mean_abs = abs(float(s.mean())) + 1e-9
+    std = float(s.std(ddof=0))
+    cv = std / mean_abs if mean_abs > 1e-12 else 0.0
+    pts = min(16.0, 4.0 + min(cv, 6.0) * 2.0)
+    reasons.append(f"numeric:cv_bonus(+{pts:.1f})")
+    if mx <= 1.0 and mn >= 0.0 and nu <= 3:
+        pts -= 10.0
+        reasons.append("numeric:binary_like_penalty(-10)")
+    return pts, reasons
+
+
+def _sales_metric_intent_distribution(
+    df_in: pd.DataFrame, col: str, domain: str
+) -> Tuple[float, List[str]]:
+    """
+    Penalize small-integer patterns that look like durations/counts when the name
+    suggests operations (ecommerce), without double-penalizing already-keyworded names.
+    """
+    reasons: List[str] = []
+    if domain != "ecommerce" or df_in is None or col not in df_in.columns:
+        return 0.0, reasons
+    n = _norm_header_token(col)
+    if not any(
+        k in n
+        for k in (
+            "day",
+            "deliver",
+            "ship",
+            "lead",
+            "handling",
+            "fulfillment",
+            "processing",
+            "rating",
+            "review",
+            "score",
+            "qty",
+            "quantity",
+            "units_",
+        )
+    ):
+        return 0.0, reasons
+    try:
+        s = pd.to_numeric(df_in[col], errors="coerce").dropna()
+    except Exception:
+        return 0.0, reasons
+    if len(s) < 8:
+        return 0.0, reasons
+    mx = float(s.max())
+    mn = float(s.min())
+    if not math.isfinite(mx) or not math.isfinite(mn):
+        return 0.0, reasons
+    span = mx - mn
+    nuniq = int(s.nunique(dropna=True))
+    if mx <= 180.0 and span <= 120.0 and nuniq <= 60:
+        try:
+            frac_whole = float(((s - s.round()).abs() < 1e-5).mean())
+        except Exception:
+            frac_whole = 0.0
+        if frac_whole >= 0.85:
+            reasons.append("dist:eco_small_integer_pattern(-16)")
+            return -16.0, reasons
+    return 0.0, reasons
+
+
+def _sales_auxiliary_scores(
+    df_in: pd.DataFrame, domain: str, col: str
+) -> Tuple[float, List[str], Dict[str, float]]:
+    """Weighted extras for sales metric: numeric usefulness + distribution / intent."""
+    breakdown: Dict[str, float] = {}
+    nu_pts, nu_r = _sales_numeric_usefulness_score(df_in, col)
+    breakdown["numeric_usefulness"] = round(nu_pts, 2)
+    di_pts, di_r = _sales_metric_intent_distribution(df_in, col, domain)
+    breakdown["metric_intent_distribution"] = round(di_pts, 2)
+    total = nu_pts + di_pts
+    return total, nu_r + di_r, breakdown
 
 
 def _score_role_candidates(
@@ -549,6 +777,7 @@ def _score_role_candidates(
     role: str,
     domain: str,
     keyword_fn,
+    auxiliary_fn: Optional[Callable[[str], Tuple[float, List[str], Dict[str, float]]]] = None,
 ) -> List[Dict[str, Any]]:
     columns = df_in.columns.tolist()
     out: List[Dict[str, Any]] = []
@@ -572,17 +801,33 @@ def _score_role_candidates(
 
         ks, kr = keyword_fn(col)
 
-        cp, cr = _cardinality_profile_score(df_in, col, role)
+        aux_pts = 0.0
+        aux_r: List[str] = []
+        aux_bd: Dict[str, float] = {}
+        if auxiliary_fn is not None:
+            aux_pts, aux_r, aux_bd = auxiliary_fn(col)
+
+        cp, cr = _cardinality_profile_score(df_in, col, role, domain)
         tb, tr = _type_profile_bonus(col, profile, role)
         dw, dr = _domain_weight_bonus(domain, role, col)
 
-        total = float(ks) + cp + tb + dw
-        reasons = kr + cr + tr + dr
+        total = float(ks) + cp + tb + dw + float(aux_pts)
+        reasons = kr + cr + tr + dr + aux_r
+        breakdown: Dict[str, Any] = {
+            "business_keyword": float(ks),
+            "cardinality": round(cp, 2),
+            "dtype": round(tb, 2),
+            "domain_role_bonus": round(dw, 2),
+            "auxiliary_total": round(float(aux_pts), 2),
+        }
+        if aux_bd:
+            breakdown["auxiliary_detail"] = aux_bd
         out.append(
             {
                 "column": col,
                 "score": round(total, 2),
                 "reasons": reasons,
+                "breakdown": breakdown,
             }
         )
     out.sort(key=lambda x: (-float(x["score"]), str(x["column"]).lower()))
@@ -625,7 +870,12 @@ def compute_semantic_column_mapping(
         frame, profile, "product", domain, _product_role_keyword_score
     )
     sales_cands = _score_role_candidates(
-        frame, profile, "sales", domain, _sales_role_keyword_score
+        frame,
+        profile,
+        "sales",
+        domain,
+        lambda c: _sales_role_keyword_score(c, domain),
+        auxiliary_fn=lambda c: _sales_auxiliary_scores(frame, domain, c),
     )
     region_cands = _score_role_candidates(
         frame, profile, "region", domain, _region_role_keyword_score
@@ -693,8 +943,65 @@ def compute_semantic_column_mapping(
             "selected": sel,
             "confidence": conf,
             "top_candidates": top3,
-            "score_breakdown_hint": "Scores combine semantic keywords, cardinality, dtype, and domain hints.",
+            "score_breakdown_hint": "Scores combine semantic keywords, cardinality, dtype, domain hints, and (for sales) numeric usefulness + intent distribution.",
         }
+        if key == "sales" and cands:
+            win = cands[0]
+            rs = win.get("reasons") or []
+            domain_adj_lines = [
+                r
+                for r in rs
+                if any(
+                    r.startswith(p)
+                    for p in (
+                        "domain:",
+                        "eco:",
+                        "ops_penalty:",
+                        "dist:",
+                        "mfg_qty:",
+                        "gen_qty:",
+                    )
+                )
+            ]
+            sales_debug = {
+                "selected_metric_reason": "; ".join(str(x) for x in rs[:16]),
+                "candidate_metric_scores": [
+                    {
+                        "column": str(r.get("column")),
+                        "score": r.get("score"),
+                        "reasons": (r.get("reasons") or [])[:14],
+                        "breakdown": r.get("breakdown") or {},
+                    }
+                    for r in cands[:15]
+                ],
+                "domain_adjustments": {
+                    "inferred_domain": domain,
+                    "matched_reason_lines": domain_adj_lines,
+                    "domain_role_bonus_breakdown": (win.get("breakdown") or {}).get(
+                        "domain_role_bonus"
+                    ),
+                },
+            }
+            roles_meta[key]["debug"] = sales_debug
+            try:
+                logger.info(
+                    "semantic_sales_metric_selection %s",
+                    json.dumps(
+                        {
+                            "selected_column": sel,
+                            "selected_metric_reason": sales_debug["selected_metric_reason"],
+                            "candidate_metric_scores": sales_debug["candidate_metric_scores"],
+                            "domain_adjustments": sales_debug["domain_adjustments"],
+                        },
+                        default=str,
+                    ),
+                )
+            except Exception:
+                logger.info(
+                    "semantic_sales_metric_selection selected=%s scores=%s",
+                    sel,
+                    [c.get("column") for c in cands[:8]],
+                )
 
     notes: List[str] = []
     notes.append(f"Inferred domain: {domain}.")
@@ -3066,13 +3373,21 @@ def _generic_suggested_questions() -> List[str]:
     ]
 
 
+def _normalize_suggested_question_key(q: str) -> str:
+    """Lowercase, trim, strip punctuation, collapse spaces — for dedup / near-dup removal."""
+    qc = _clean_question_sentence(q).strip().lower()
+    qc = re.sub(r"[^a-z0-9\s]+", " ", qc, flags=re.I)
+    qc = re.sub(r"\s+", " ", qc).strip()
+    return qc
+
+
 def _dedup_question_list(items: List[str], max_n: int = 6) -> List[str]:
-    """Exact dedup, preserve order, cap length (deterministic)."""
+    """Dedup by normalized key (near-duplicate removal), preserve order, cap length."""
     out: List[str] = []
     seen: set = set()
     for q in items:
         qc = _clean_question_sentence(q)
-        key = qc.strip().lower()
+        key = _normalize_suggested_question_key(qc)
         if not key or key in seen:
             continue
         seen.add(key)
@@ -5212,6 +5527,59 @@ def build_smart_chart(
     return [], "", "", ""
 
 
+def _numeric_spread_pattern_rows(
+    df_in: pd.DataFrame, numeric_cols: List[str], limit: int = 14
+) -> List[Dict[str, Any]]:
+    """
+    Rank numeric columns by variability (IQR / scale) for generic exploration charts.
+    Used for 'strongest numeric patterns' style questions — not sales-trend routing.
+    """
+    scored: List[Tuple[str, float]] = []
+    for c in numeric_cols:
+        if _id_like_column_name(c):
+            continue
+        try:
+            s = pd.to_numeric(df_in[c], errors="coerce").dropna()
+        except Exception:
+            continue
+        if len(s) < 8 or int(s.nunique(dropna=True)) < 3:
+            continue
+        med = float(s.median())
+        iqr = float(s.quantile(0.75) - s.quantile(0.25))
+        if not math.isfinite(iqr) or iqr <= 0:
+            continue
+        sc = iqr / (abs(med) + 1e-6)
+        scored.append((c, sc))
+    scored.sort(key=lambda t: (-t[1], str(t[0]).lower()))
+    out: List[Dict[str, Any]] = []
+    for c, sc in scored[:limit]:
+        v = float(sc)
+        out.append(
+            {
+                "name": _pretty_label_text(c),
+                "value": v,
+                "displayValue": f"{v:.3g}",
+            }
+        )
+    return out
+
+
+def _question_asks_numeric_spread_patterns(q_lower: str) -> bool:
+    """Matches the /ask numeric exploration branch (spread by metric, not sales trend)."""
+    q = q_lower
+    return (
+        ("strongest" in q and "numeric" in q and "pattern" in q)
+        or ("numeric pattern" in q)
+        or ("numeric patterns" in q)
+        or (
+            "pattern" in q
+            and "numeric" in q
+            and "dataset" in q
+            and any(k in q for k in ("strong", "strongest", "key", "main"))
+        )
+    )
+
+
 def analyze_data(question: str):
     global df
 
@@ -5241,6 +5609,17 @@ def analyze_data(question: str):
     # ---- Simple numeric Q&A via pandas (ground truth) ----
     profile = dataset_profile or build_profile(df)
     numeric_cols = [c for c, t in profile.get("column_types", {}).items() if t == "number"]
+
+    if _question_asks_numeric_spread_patterns(q):
+        rows = _numeric_spread_pattern_rows(df, numeric_cols, limit=14)
+        if rows:
+            chart_data = rows
+            chart_type = "bar_horizontal"
+            tbl = pd.DataFrame(
+                [{"metric": r["name"], "spread_index": r["value"]} for r in rows]
+            )
+            exact_result = tbl.to_string(index=False)
+            return exact_result, chart_data, chart_type
 
     def find_target_numeric_column():
         best = _best_numeric_column_for_question(q, numeric_cols)
@@ -7181,6 +7560,17 @@ def compute_visualization_for_question(
                 str(intent_debug.get("value_col") or ""),
                 str(intent_debug.get("group_col") or ""),
             ).strip()
+
+    if (
+        _question_asks_numeric_spread_patterns(ql)
+        and chart_data
+        and str(chart_type).strip() == "bar_horizontal"
+    ):
+        chart_title = "Numeric spread by metric"
+        chart_subtitle = (
+            "Each bar is a numeric field ranked by relative spread "
+            "(IQR ÷ median scale); higher means more dispersed values."
+        )
 
     print(
         "[viz] finalized_category_col:",
