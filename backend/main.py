@@ -1445,18 +1445,15 @@ def _dash_sales_dashboard_charts() -> List[Dict[str, Any]]:
 
     if date_col and date_col in df.columns:
         try:
-            temp = pd.DataFrame(
-                {"_d": pd.to_datetime(df[date_col], errors="coerce")}
+            g_series, _tsm = _adaptive_time_series_grouped(
+                df, str(date_col), str(sales_col), agg_key="sum"
             )
-            temp["_v"] = numeric_series(sales_col)
-            temp = temp.dropna(subset=["_d", "_v"])
-            if len(temp) >= 2:
-                temp["_bucket"] = temp["_d"].dt.to_period("M").astype(str)
-                g = temp.groupby("_bucket", sort=False)["_v"].sum()
+            if g_series is not None and len(g_series) >= 2:
+                tb = _freq_human_label(str(_tsm.get("timeBucket") or "M"))
                 _append_unique_dashboard_chart(
                     out_ch,
                     _dash_series_payload(
-                        "Sales trend by month", g, chart_type="line"
+                        f"Sales trend ({tb})", g_series, chart_type="line"
                     ),
                 )
         except Exception:
@@ -1561,19 +1558,16 @@ def _dash_generic_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
     num_for_trend = _dash_pick_generic_numeric(df, columns, ct, exclude)
     if date_c and num_for_trend and date_c != num_for_trend:
         try:
-            temp = pd.DataFrame(
-                {"_d": pd.to_datetime(df[date_c], errors="coerce")}
+            g_series, _tsm = _adaptive_time_series_grouped(
+                df, str(date_c), str(num_for_trend), agg_key="sum"
             )
-            temp["_v"] = numeric_series(num_for_trend)
-            temp = temp.dropna(subset=["_d", "_v"])
-            if len(temp) >= 2:
-                temp["_bucket"] = temp["_d"].dt.to_period("M").astype(str)
-                g = temp.groupby("_bucket", sort=False)["_v"].sum()
+            if g_series is not None and len(g_series) >= 2:
                 lbl = _pretty_label_text(num_for_trend)
-                tit = f"{lbl} trend by month"
+                tb = _freq_human_label(str(_tsm.get("timeBucket") or "M"))
+                tit = f"{lbl} trend ({tb})"
                 _append_unique_dashboard_chart(
                     out_ch,
-                    _dash_series_payload(tit, g, chart_type="line"),
+                    _dash_series_payload(tit, g_series, chart_type="line"),
                 )
         except Exception:
             pass
@@ -3711,8 +3705,10 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     return out_intent
 
 
-def _fallback_aggregate_chart(intent: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], str, str]:
-    """Produce name/value chart rows + internal chart_type + title from structured intent."""
+def _fallback_aggregate_chart(
+    intent: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], str, str, Optional[Dict[str, Any]]]:
+    """Produce name/value chart rows + internal chart_type + title (+ optional time-series meta)."""
     global df, dataset_profile
 
     group_col = intent["group_col"]
@@ -3727,13 +3723,13 @@ def _fallback_aggregate_chart(intent: Dict[str, Any]) -> Tuple[List[Dict[str, An
         try:
             tmp = df[[group_col, target]].dropna(subset=[group_col])
             if tmp.empty:
-                return [], "", ""
+                return [], "", "", None
             g = tmp.groupby(group_col).size()
         except Exception:
-            return [], "", ""
+            return [], "", "", None
         result = g.reset_index()
         if result.shape[1] < 2:
-            return [], "", ""
+            return [], "", "", None
         c0, c1 = result.columns[0], result.columns[1]
         result = result.rename(columns={c0: "name", c1: "value"}).sort_values(
             "value", ascending=False
@@ -3746,20 +3742,38 @@ def _fallback_aggregate_chart(intent: Dict[str, Any]) -> Tuple[List[Dict[str, An
             for _, r in result.iterrows()
         ]
         if not chart_data:
-            return [], "", ""
+            return [], "", "", None
         title = _business_chart_title(
             str(intent.get("agg_key") or ""),
             str(intent.get("agg_label") or ""),
             str(target),
             str(group_col),
         )
-        return chart_data, chart_type_internal, title
+        return chart_data, chart_type_internal, title, None
     else:
         sub = df[[group_col, target]].copy()
         sub["_v"] = numeric_series(target)
         sub = sub.dropna(subset=[group_col, "_v"])
         if sub.empty:
-            return [], "", ""
+            return [], "", "", None
+
+        if ct.get(str(group_col)) == "date" and str(agg_key) in (
+            "sum",
+            "mean",
+            "min",
+            "max",
+        ):
+            g_series, ts_meta = _adaptive_time_series_grouped(
+                df[[group_col, target]].copy(),
+                str(group_col),
+                str(target),
+                agg_key=str(agg_key),
+            )
+            if g_series is not None and len(g_series) >= 2:
+                chart_data = _time_series_rows_from_grouped(g_series)
+                tb = _freq_human_label(str(ts_meta.get("timeBucket") or "M"))
+                title = f"{_pretty_label_text(str(target))} over time ({tb})".strip()
+                return chart_data, "line", title, ts_meta
 
         if agg_key == "sum":
             g = sub.groupby(group_col)["_v"].sum()
@@ -3787,7 +3801,7 @@ def _fallback_aggregate_chart(intent: Dict[str, Any]) -> Tuple[List[Dict[str, An
             for _, r in result.iterrows()
         ]
         if not chart_data:
-            return [], "", ""
+            return [], "", "", None
 
         title = _business_chart_title(
             str(intent.get("agg_key") or ""),
@@ -3795,7 +3809,7 @@ def _fallback_aggregate_chart(intent: Dict[str, Any]) -> Tuple[List[Dict[str, An
             str(target),
             str(group_col),
         )
-        return chart_data, chart_type_internal, title
+        return chart_data, chart_type_internal, title, None
 
 
 def _tabular_exact_from_name_value_rows(
@@ -3949,6 +3963,229 @@ def _normalize_chart_records(rows: List[Any]) -> List[Dict[str, Any]]:
     return out
 
 
+def _time_series_span_days(dt: pd.Series) -> float:
+    """Calendar span (max − min) in fractional days; 0 if empty or single instant."""
+    s = pd.to_datetime(dt, errors="coerce").dropna()
+    if s.empty:
+        return 0.0
+    delta = s.max() - s.min()
+    return max(0.0, float(delta / pd.Timedelta(days=1)))
+
+
+def _time_coverage_meta(dt_clean: pd.Series, n_input_rows: int) -> Dict[str, Any]:
+    """Lightweight coverage + density for UI / provenance (not statistical tests)."""
+    span = _time_series_span_days(dt_clean)
+    norms = dt_clean.dt.normalize()
+    udays = int(norms.nunique())
+    rows_per_ud = float(n_input_rows) / max(udays, 1)
+    # Higher when many rows land on relatively few calendar days (dense sampling).
+    density_raw = float(n_input_rows) / max(float(udays), 1.0)
+    density_score = float(max(0.0, min(1.0, math.log1p(density_raw) / math.log1p(24.0))))
+    return {
+        "spanDays": round(span, 4),
+        "uniqueCalendarDays": udays,
+        "avgRowsPerUniqueDay": round(rows_per_ud, 4),
+        "dateDensityScore": round(density_score, 4),
+    }
+
+
+def _preferred_time_bucket_from_span(span_days: float) -> str:
+    """
+    Adaptive granularity:
+    <= 7 days  -> daily
+    <= 90 days -> weekly (ISO week starting Monday)
+    > 90 days  -> monthly
+    """
+    if span_days <= 7:
+        return "D"
+    if span_days <= 90:
+        return "W"
+    return "M"
+
+
+def _bucket_labels_for_freq(dt: pd.Series, freq: str) -> pd.Series:
+    """Map timestamps to stable bucket label strings for grouping."""
+    d = pd.to_datetime(dt, errors="coerce")
+    if freq == "M":
+        return d.dt.to_period("M").astype(str)
+    if freq == "W":
+        return d.dt.to_period("W-MON").astype(str)
+    if freq == "D":
+        return d.dt.normalize().dt.strftime("%Y-%m-%d")
+    if freq == "H":
+        return d.dt.floor("h").dt.strftime("%Y-%m-%d %H:00")
+    if freq == "T":
+        return d.dt.floor("min").dt.strftime("%Y-%m-%d %H:%M")
+    return d.dt.to_period("M").astype(str)
+
+
+def _finer_time_bucket(freq: str) -> Optional[str]:
+    return {"M": "W", "W": "D", "D": "H", "H": "T"}.get(freq)
+
+
+def _freq_human_label(freq: str) -> str:
+    return {
+        "M": "monthly",
+        "W": "weekly",
+        "D": "daily",
+        "H": "hourly",
+        "T": "by minute",
+        "raw": "raw timestamps",
+    }.get(freq, freq)
+
+
+def _bucket_label_sort_key(label: str) -> Tuple[int, float, str]:
+    """Stable ordering for bucket labels (ISO dates, pandas weekly period strings, etc.)."""
+    s = str(label).strip()
+    t = pd.to_datetime(s, errors="coerce")
+    if pd.notna(t):
+        return (0, float(t.value), s)
+    if "/" in s:
+        left = s.split("/", 1)[0].strip()
+        t2 = pd.to_datetime(left, errors="coerce")
+        if pd.notna(t2):
+            return (0, float(t2.value), s)
+    return (1, 0.0, s)
+
+
+def _sort_chronologically_by_bucket_labels(g: pd.Series) -> pd.Series:
+    """Reorder aggregated series so line charts read left-to-right in time."""
+    if g.empty:
+        return g
+    idx = [str(x) for x in g.index.tolist()]
+    order = sorted(range(len(idx)), key=lambda i: _bucket_label_sort_key(idx[i]))
+    return g.iloc[order]
+
+
+def _adaptive_time_series_grouped(
+    df_in: pd.DataFrame, date_col: str, value_col: str, agg_key: str = "sum"
+) -> Tuple[Optional[pd.Series], Dict[str, Any]]:
+    """
+    Group (date, value) into adaptive time buckets; widen/narrow buckets to avoid
+    degenerate single-point series when possible.
+
+    Returns (aggregated series indexed by bucket label, meta) or (None, meta).
+    """
+    meta: Dict[str, Any] = {
+        "timeBucket": None,
+        "spanDays": None,
+        "timeCoverage": {},
+        "selectionReason": "",
+        "granularityFallbackChain": [],
+    }
+    try:
+        tmp = df_in[[date_col, value_col]].copy()
+    except Exception:
+        return None, {**meta, "reason": "missing_columns"}
+
+    tmp["_dt"] = pd.to_datetime(tmp[date_col], errors="coerce")
+    tmp["_v"] = numeric_series(value_col)
+    tmp = tmp.dropna(subset=["_dt", "_v"])
+    n_in = int(len(tmp))
+    if n_in < 2:
+        return None, {**meta, "reason": "insufficient_valid_pairs", "rowsUsed": n_in}
+
+    span = _time_series_span_days(tmp["_dt"])
+    coverage = _time_coverage_meta(tmp["_dt"], n_in)
+    preferred = _preferred_time_bucket_from_span(span)
+    meta["spanDays"] = round(span, 4)
+    meta["timeCoverage"] = coverage
+
+    freqs: List[str] = []
+    cur: Optional[str] = preferred
+    while cur:
+        freqs.append(cur)
+        cur = _finer_time_bucket(cur)
+
+    chosen: Optional[str] = None
+    g_out: Optional[pd.Series] = None
+    for freq in freqs:
+        bk = _bucket_labels_for_freq(tmp["_dt"], freq)
+        n_buck = int(bk.nunique())
+        meta["granularityFallbackChain"].append({"freq": freq, "uniqueBuckets": n_buck})
+        if n_buck >= 2:
+            chosen = freq
+            gb = tmp.groupby(bk, sort=False)["_v"]
+            if agg_key == "mean":
+                g_out = gb.mean()
+            elif agg_key == "min":
+                g_out = gb.min()
+            elif agg_key == "max":
+                g_out = gb.max()
+            else:
+                g_out = gb.sum()
+            break
+
+    if g_out is None or g_out.empty:
+        # Minute-level buckets (same calendar day, many intraday points).
+        bk = _bucket_labels_for_freq(tmp["_dt"], "T")
+        if int(bk.nunique()) >= 2:
+            chosen = "T"
+            gb = tmp.groupby(bk, sort=False)["_v"]
+            if agg_key == "mean":
+                g_out = gb.mean()
+            elif agg_key == "min":
+                g_out = gb.min()
+            elif agg_key == "max":
+                g_out = gb.max()
+            else:
+                g_out = gb.sum()
+            meta["granularityFallbackChain"].append({"freq": "T", "uniqueBuckets": int(bk.nunique())})
+
+    if g_out is None or g_out.empty:
+        # One row per distinct timestamp (no calendar bucketing).
+        gb = tmp.groupby(tmp["_dt"].dt.floor("s").astype(str), sort=False)["_v"]
+        if agg_key == "mean":
+            g_try = gb.mean()
+        elif agg_key == "min":
+            g_try = gb.min()
+        elif agg_key == "max":
+            g_try = gb.max()
+        else:
+            g_try = gb.sum()
+        if len(g_try) >= 2:
+            chosen = "raw"
+            g_out = g_try
+            meta["granularityFallbackChain"].append({"freq": "raw", "uniqueBuckets": len(g_try)})
+
+    if g_out is None or len(g_out) < 2:
+        return None, {
+            **meta,
+            "reason": "insufficient_time_distribution",
+            "timeBucket": chosen,
+        }
+
+    g_out = _sort_chronologically_by_bucket_labels(g_out)
+    meta["timeBucket"] = chosen or preferred
+    meta["uniqueBuckets"] = int(len(g_out))
+    pref_h = _freq_human_label(str(preferred))
+    sel_h = _freq_human_label(str(chosen or preferred))
+    if chosen == preferred:
+        meta["selectionReason"] = (
+            f"Adaptive {sel_h} buckets: span ≈ {span:.1f} d, {n_in} rows, "
+            f"{len(g_out)} periods (preferred granularity for this span)."
+        )
+    else:
+        meta["selectionReason"] = (
+            f"Started with {pref_h} for span ≈ {span:.1f} d; refined to {sel_h} "
+            f"({len(g_out)} periods) to avoid a single-bucket chart."
+        )
+    return g_out, meta
+
+
+def _time_series_rows_from_grouped(g: pd.Series) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for k, v in g.items():
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            continue
+        if not (fv == fv):
+            continue
+        rows.append({"name": _pretty_label_text(str(k)), "value": fv})
+    return rows
+
+
 def build_smart_chart(
     question: str, trace: Optional[Dict[str, Any]] = None
 ) -> Tuple[List[Dict[str, Any]], str, str, str]:
@@ -4036,26 +4273,20 @@ def build_smart_chart(
         " percent",
     )
 
-    # ---- Line: date bucket + numeric ----
+    # ---- Line: date bucket + numeric (adaptive daily / weekly / monthly) ----
     if date_cols and numeric_cols and any(k in q for k in trend_kw):
         ncol = _numeric_col_mentioned(q, numeric_cols)
         if ncol is None and len(numeric_cols) == 1:
             ncol = numeric_cols[0]
         dcol = date_cols[0]
         if ncol:
-            tmp = df[[dcol, ncol]].copy()
-            tmp["_dt"] = pd.to_datetime(tmp[dcol], errors="coerce")
-            tmp["_v"] = numeric_series(ncol)
-            tmp = tmp.dropna(subset=["_dt", "_v"])
-            if len(tmp) >= 2:
-                tmp["_m"] = tmp["_dt"].dt.to_period("M").astype(str)
-                gg = tmp.groupby("_m")["_v"].sum().reset_index().sort_values("_m")
-                gg = gg.rename(columns={"_m": "name", "_v": "value"})
-                chart_data = [
-                    {"name": str(r["name"]), "value": float(r["value"])}
-                    for _, r in gg.iterrows()
-                ]
-                title = f"{_pretty_label_text(ncol)} over time"
+            g_series, ts_meta = _adaptive_time_series_grouped(
+                df, str(dcol), str(ncol), agg_key="sum"
+            )
+            if g_series is not None and len(g_series) >= 2:
+                chart_data = _time_series_rows_from_grouped(g_series)
+                tb_l = _freq_human_label(str(ts_meta.get("timeBucket") or "M"))
+                title = f"{_pretty_label_text(ncol)} over time ({tb_l})"
                 if trace is not None:
                     trace.update(
                         {
@@ -4063,11 +4294,63 @@ def build_smart_chart(
                             "numeric_column": ncol,
                             "aggregation": "sum",
                             "aggregation_key": "sum",
-                            "rows_analyzed": int(len(tmp)),
-                            "notes": "Monthly buckets from date column",
+                            "rows_analyzed": int(len(df)),
+                            "notes": ts_meta.get("selectionReason")
+                            or f"Adaptive {tb_l} buckets from date column",
+                            "timeSeriesAnalysis": {
+                                **{
+                                    k: v
+                                    for k, v in ts_meta.items()
+                                    if k != "granularityFallbackChain"
+                                },
+                                "granularityFallbackChain": ts_meta.get(
+                                    "granularityFallbackChain", []
+                                ),
+                            },
                         }
                     )
                 return chart_data, "line", title, subtitle
+            # Sparse / degenerate time axis: fall back to category totals if possible.
+            if cat_cols:
+                ccol = cat_cols[0]
+                try:
+                    sub = df[[ccol, ncol]].copy()
+                    sub["_v"] = numeric_series(ncol)
+                    sub = sub.dropna(subset=[ccol, "_v"])
+                    if len(sub) >= 2 and int(sub[ccol].nunique()) >= 2:
+                        g2 = (
+                            sub.groupby(ccol)["_v"]
+                            .sum()
+                            .sort_values(ascending=False)
+                            .head(12)
+                        )
+                        chart_data = [
+                            {"name": _pretty_label_text(str(i), 40), "value": float(v)}
+                            for i, v in g2.items()
+                        ]
+                        if len(chart_data) >= 2:
+                            title = (
+                                f"{_pretty_label_text(ncol)} by {_pretty_label_text(ccol)} "
+                                f"(sparse dates — category totals)"
+                            )
+                            if trace is not None:
+                                trace.update(
+                                    {
+                                        "category_column": ccol,
+                                        "numeric_column": ncol,
+                                        "aggregation": "sum",
+                                        "aggregation_key": "sum",
+                                        "rows_analyzed": int(len(sub)),
+                                        "notes": (
+                                            (ts_meta.get("reason") or "sparse_time_distribution")
+                                            + " · Fallback: category totals."
+                                        ),
+                                        "timeSeriesAnalysis": ts_meta,
+                                    }
+                                )
+                            return chart_data, "bar", title, subtitle
+                except Exception:
+                    pass
 
     # ---- Pie / donut: category shares ----
     if cat_cols and any(k in q for k in pie_kw):
@@ -4375,18 +4658,22 @@ def analyze_data(question: str):
         temp = temp.dropna(subset=["_date", "_value"])
 
         if not temp.empty:
-            temp["_month"] = temp["_date"].dt.to_period("M").astype(str)
-            result = (
-                temp.groupby("_month")["_value"]
-                .sum()
-                .reset_index()
-                .sort_values("_month")
+            g_series, _tsm = _adaptive_time_series_grouped(
+                df[[date_col, sales_col]].copy(),
+                str(date_col),
+                str(sales_col),
+                agg_key="sum",
             )
-
-            result = result.rename(columns={"_month": "name", "_value": "value"})
-            chart_data = result.to_dict(orient="records")
-            exact_result = result.to_string(index=False)
-            chart_type = "line"
+            if g_series is not None and len(g_series) >= 2:
+                chart_data = _time_series_rows_from_grouped(g_series)
+                result = pd.DataFrame(chart_data)
+                exact_result = result.to_string(index=False)
+                chart_type = "line"
+            else:
+                exact_result = (
+                    "Date and sales values parsed, but time bucketing produced fewer than "
+                    "two periods — try a wider date range or a category breakdown question."
+                )
         else:
             exact_result = (
                 "Date and sales values could not be parsed for monthly trend analysis."
@@ -5172,7 +5459,7 @@ def _assemble_visualization_provenance(
     if cat_col:
         cat_disp = _pretty_label_text(cat_col)
 
-    return {
+    out: Dict[str, Any] = {
         "categoryColumn": cat_col,
         "numericColumn": num_col,
         "numericColumnDisplay": num_disp,
@@ -5193,6 +5480,9 @@ def _assemble_visualization_provenance(
         "chartSelectionReason": (chart_selection_reason or "").strip() or None,
         "analysisValidation": analysis_validation,
     }
+    if smart_trace and isinstance(smart_trace.get("timeSeriesAnalysis"), dict):
+        out["timeSeriesAnalysis"] = smart_trace["timeSeriesAnalysis"]
+    return out
 
 
 def _detect_intent_tags(question: str) -> List[str]:
@@ -5308,6 +5598,111 @@ def _build_focus_kpis_from_intent(
     ]
 
 
+def _insight_confidence_meta(n_rows: int, chart_pts: int) -> Dict[str, Any]:
+    """
+    Evidence / sample-size metadata for API clients and prompt contracts.
+    chart_pts = number of points in the returned chart series (may differ from n_rows).
+    """
+    n = max(0, int(n_rows))
+    cp = max(0, int(chart_pts))
+    small = n < 100
+    if n <= 0:
+        return {
+            "analysisRowCount": 0,
+            "chartSeriesPointCount": cp,
+            "insightConfidenceScore": 0,
+            "insightConfidenceLevel": "low",
+            "smallSampleCohort": True,
+            "insightConfidenceRationale": "No rows in scope for this analysis.",
+            "evidenceSummaryLine": "No filtered rows; do not infer business outcomes.",
+        }
+    if n < 30:
+        level, score = "low", 22
+        rationale = "Very few rows — treat any pattern as anecdotal."
+    elif n < 100:
+        level, score = "low", 40
+        rationale = "Under 100 rows — avoid definitive business conclusions."
+    elif n < 500:
+        level, score = "medium", 58
+        rationale = "Moderate sample; qualify interpretations."
+    elif n < 3000:
+        level, score = "medium", 74
+        rationale = "Reasonable sample for directional insights."
+    else:
+        level, score = "high", 90
+        rationale = "Large cohort — still anchor claims in the calculated result."
+
+    if cp < 2 and n >= 30:
+        score = max(25, score - 10)
+        if level == "high" and score < 82:
+            level = "medium"
+    if cp < 2 and n < 100:
+        score = min(score, 35)
+        level = "low"
+
+    return {
+        "analysisRowCount": n,
+        "chartSeriesPointCount": cp,
+        "insightConfidenceScore": int(score),
+        "insightConfidenceLevel": level,
+        "smallSampleCohort": bool(small),
+        "insightConfidenceRationale": rationale,
+        "evidenceSummaryLine": (
+            f"Aggregations and chart are based on {n:,} filtered row(s) "
+            f"and {cp} chart series point(s)."
+        ),
+    }
+
+
+def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
+    """Row-aware instructions appended to the /ask user prompt."""
+    n = int(conf.get("analysisRowCount") or 0)
+    cp = int(conf.get("chartSeriesPointCount") or 0)
+    small = bool(conf.get("smallSampleCohort"))
+    level = str(conf.get("insightConfidenceLevel") or "low")
+    lines: List[str] = [
+        "Confidence-aware reasoning (mandatory):",
+        f"- Engine sample: **{n:,} filtered rows**; chart series: **{cp}** point(s). "
+        f"Insight confidence level (heuristic): **{level}**.",
+        "- Ground every numeric claim in the exact calculated result and/or authoritative chart-values block. "
+        "If a claim is not supported there, do not state it.",
+        "- Separate your reply into labeled sections (use plain text labels with a colon, no markdown heading symbols):",
+        "  1) Statistical observations — only facts visible from the numbers/table.",
+        "  2) Inferred hypotheses — clearly marked as not proven, tentative, and tied to what would falsify them.",
+        "  3) Recommendations — optional, conservative, and framed as next data to collect or validate (not as facts).",
+        "- Do not diagnose data quality, customer dissatisfaction, churn, loyalty, or operational failure "
+        "unless the calculated result explicitly quantifies those constructs with defined columns. "
+        "If unsupported, say there is insufficient evidence in this sample.",
+        "- Avoid words like proves, definitively, clearly indicates, obviously, must be, always when the sample is small "
+        "or when no statistical test output is provided.",
+    ]
+    if small:
+        lines.extend(
+            [
+                f"- **Small sample (<100 rows)** — use cautious phrasing such as "
+                f"\"may indicate\", \"could suggest\", \"is consistent with (weakly)\", "
+                f"and explicitly mention **small sample size** once.",
+                "- Do not present strong business conclusions; prefer exploratory language.",
+            ]
+        )
+    else:
+        lines.append(
+            "- You may be somewhat more direct than for tiny samples, but still avoid claims "
+            "not evidenced by the calculated result."
+        )
+    return "\n".join(lines)
+
+
+INSIGHT_SAFETY_SYSTEM_PROMPT = (
+    "You are an analyst assistant for tabular business data. "
+    "You must not hallucinate columns, metrics, or magnitudes. "
+    "Never invent statistical significance: if no p-values, confidence intervals, or "
+    "explicit tests appear in the user message, do not claim significance. "
+    "Prefer calibrated, honest uncertainty. Keep answers concise and plain text "
+    "(no markdown # or **)."
+)
+
+
 def _build_unified_analysis_payload(
     *,
     question: str,
@@ -5317,6 +5712,7 @@ def _build_unified_analysis_payload(
     exact_result: str,
     chart_points: int,
     alignment_repaired: bool,
+    analysis_row_count: int = 0,
     chart_recommendation: Optional[Dict[str, Any]] = None,
     analysis_validation: Optional[Dict[str, Any]] = None,
     partial_visualization_warning: Optional[str] = None,
@@ -5338,6 +5734,19 @@ def _build_unified_analysis_payload(
     if intent_debug and intent_debug.get("group_col"):
         c_disp = _pretty_label_text(intent_debug.get("group_col"))
 
+    focus_kpis = _build_focus_kpis_from_intent(intent_debug, chart_points)
+    if analysis_row_count > 0:
+        focus_kpis = [
+            {
+                "title": "Rows in analysis",
+                "value": f"{int(analysis_row_count):,}",
+                "subtitle": "Filtered cohort for this answer",
+            },
+            *focus_kpis,
+        ]
+
+    conf = _insight_confidence_meta(analysis_row_count, chart_points)
+
     out: Dict[str, Any] = {
         "metricColumn": intent_debug.get("value_col") if intent_debug else None,
         "categoryColumn": intent_debug.get("group_col") if intent_debug else None,
@@ -5355,7 +5764,8 @@ def _build_unified_analysis_payload(
         "detectedIntent": _detect_intent_tags(question),
         "alignmentRepaired": bool(alignment_repaired),
         "chartPointCount": int(chart_points),
-        "focusKpis": _build_focus_kpis_from_intent(intent_debug, chart_points),
+        "focusKpis": focus_kpis,
+        **conf,
     }
     if chart_recommendation:
         out["chartRecommendation"] = chart_recommendation
@@ -5738,10 +6148,12 @@ def compute_visualization_for_question(
                     exact_result="No dataset uploaded.",
                     chart_points=0,
                     alignment_repaired=False,
+                    analysis_row_count=0,
                 )
             ),
         )
 
+    analysis_row_count = int(len(df))
     profile_live = dataset_profile or build_profile(df)
     ql = question.lower().strip()
 
@@ -5804,7 +6216,7 @@ def compute_visualization_for_question(
             else:
                 intent_one = dict(intent_debug)
                 intent_one["secondary_group_col"] = None
-                fb_rows, fb_type, fb_title = _fallback_aggregate_chart(intent_one)
+                fb_rows, fb_type, fb_title, _fb_ts = _fallback_aggregate_chart(intent_one)
                 er_ana, _, _ = analyze_data(question)
                 if fb_rows:
                     chart_data = list(_normalize_chart_records(fb_rows))
@@ -5871,12 +6283,24 @@ def compute_visualization_for_question(
     print("[viz] after_analyze_chart_points=", len(chart_data), flush=True)
 
     if not chart_data and intent_debug and not suppress_auto_charts:
-        fb_rows, fb_type, fb_title = _fallback_aggregate_chart(intent_debug)
+        fb_rows, fb_type, fb_title, fb_ts = _fallback_aggregate_chart(intent_debug)
         if fb_rows:
             chart_data = list(_normalize_chart_records(fb_rows))
             chart_type = (fb_type or "bar").strip() or "bar"
             chart_title = (fb_title or "").strip()
             fallback_used = True
+            if fb_ts and isinstance(fb_ts, dict):
+                smart_trace = {
+                    "category_column": intent_debug.get("group_col"),
+                    "numeric_column": intent_debug.get("value_col"),
+                    "aggregation": str(intent_debug.get("agg_label", "")).lower(),
+                    "aggregation_key": intent_debug.get("agg_key"),
+                    "rows_analyzed": int(len(df)),
+                    "notes": intent_debug.get("dimension_notes")
+                    or str(fb_ts.get("selectionReason") or "").strip()
+                    or None,
+                    "timeSeriesAnalysis": fb_ts,
+                }
             print("[viz] used_intent_aggregate_fallback rows=", len(chart_data), flush=True)
 
     if not chart_data and not suppress_auto_charts:
@@ -5904,22 +6328,28 @@ def compute_visualization_for_question(
             and sv != iv
             and str(smart_trace.get("aggregation", "")).lower() != "scatter"
         ):
-            fb_rows, fb_type, fb_title = _fallback_aggregate_chart(intent_debug)
+            fb_rows, fb_type, fb_title, fb_ts = _fallback_aggregate_chart(intent_debug)
             if fb_rows:
                 chart_data = list(_normalize_chart_records(fb_rows))
-                chart_type = "bar"
+                chart_type = (fb_type or "bar").strip() or "bar"
                 chart_title = (fb_title or "").strip()
                 smart_routing_used = False
                 fallback_used = True
                 alignment_repaired = True
+                st_line = "Visualization rebuilt so the chart metric matches the question."
                 smart_trace = {
                     "category_column": intent_debug["group_col"],
                     "numeric_column": intent_debug["value_col"],
                     "aggregation": str(intent_debug.get("agg_label", "")).lower(),
                     "aggregation_key": intent_debug.get("agg_key"),
                     "rows_analyzed": int(len(df)),
-                    "notes": "Visualization rebuilt so the chart metric matches the question.",
+                    "notes": st_line,
                 }
+                if fb_ts and isinstance(fb_ts, dict):
+                    smart_trace["timeSeriesAnalysis"] = fb_ts
+                    extra = str(fb_ts.get("selectionReason") or "").strip()
+                    if extra:
+                        smart_trace["notes"] = f"{st_line} {extra}".strip()
 
     if not chart_data:
         print(
@@ -5947,6 +6377,7 @@ def compute_visualization_for_question(
             exact_result=exact_result,
             chart_points=0,
             alignment_repaired=alignment_repaired,
+            analysis_row_count=analysis_row_count,
             chart_recommendation=kpi_rec,
             analysis_validation=av_empty,
             partial_visualization_warning=partial_visualization_warning,
@@ -6081,6 +6512,7 @@ def compute_visualization_for_question(
             exact_result=exact_result,
             chart_points=0,
             alignment_repaired=alignment_repaired,
+            analysis_row_count=analysis_row_count,
             chart_recommendation=_build_chart_recommendation_dict(
                 ql,
                 0,
@@ -6256,6 +6688,7 @@ def compute_visualization_for_question(
         exact_result=exact_result,
         chart_points=ll,
         alignment_repaired=alignment_repaired,
+        analysis_row_count=analysis_row_count,
         chart_recommendation=chart_rec,
         analysis_validation=analysis_validation_block,
         partial_visualization_warning=partial_visualization_warning,
@@ -6463,6 +6896,35 @@ def ask_question(data: QuestionRequest):
             ).strip()
 
         ctx = get_ai_context(sample_rows=10)
+        evidence_line = ""
+        esl = analysis_ctx.get("evidenceSummaryLine")
+        if isinstance(esl, str) and esl.strip():
+            evidence_line = f"\nEvidence scope (use verbatim when discussing sample size):\n{esl.strip()}\n"
+        rationale_line = ""
+        icr = analysis_ctx.get("insightConfidenceRationale")
+        if isinstance(icr, str) and icr.strip():
+            rationale_line = f"\nHeuristic confidence note: {icr.strip()}\n"
+
+        conf_prompt = _confidence_answer_prompt_block(
+            {
+                "analysisRowCount": int(analysis_ctx.get("analysisRowCount") or 0),
+                "chartSeriesPointCount": int(
+                    analysis_ctx.get("chartSeriesPointCount")
+                    or analysis_ctx.get("chartPointCount")
+                    or 0
+                ),
+                "smallSampleCohort": bool(analysis_ctx.get("smallSampleCohort")),
+                "insightConfidenceLevel": str(
+                    analysis_ctx.get("insightConfidenceLevel") or "low"
+                ),
+            }
+        )
+        insight_style_line = (
+            "- Mention a clear, evidence-backed takeaway if the numbers support it.\n"
+            if not bool(analysis_ctx.get("smallSampleCohort"))
+            else "- Favor cautious, exploratory language over definitive business claims.\n"
+        )
+
         prompt = f"""
 You are a business data analyst for small and medium businesses.
 
@@ -6478,16 +6940,19 @@ Exact calculated result (ground truth metrics / table):
 {exact_result}
 {focus_line}
 {viz_anchor}
+{evidence_line}{rationale_line}
 Rules:
 {viz_rule}- Explain in simple business language.
 - Do not use markdown symbols like # or **.
-- Keep answer short and useful.
-- Mention clear business insight if possible.
+- Keep the answer concise but complete enough to include the three labeled sections when asked below.
+{insight_style_line}
+{conf_prompt}
 {trend_rule}"""
 
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=400,
+            max_tokens=520,
+            system=INSIGHT_SAFETY_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )
 
