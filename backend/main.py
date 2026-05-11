@@ -38,6 +38,8 @@ column_mapping = {
     "profit": None,
     "date": None,
 }
+# Explainable semantic mapping from last inference (upload / sheet change).
+column_mapping_metadata: Optional[Dict[str, Any]] = None
 
 # Sheet list for Excel uploads; set on `/upload` and `/select-sheet` (CSV → ["CSV"]).
 available_sheet_names: Optional[List[str]] = None
@@ -264,6 +266,471 @@ def read_sheet_from_excel(file_bytes, sheet_name):
 
     sheet_df = pd.read_excel(BytesIO(file_bytes), sheet_name=sheet_name, header=header_row)
     return clean_dataframe(sheet_df)
+
+
+def _norm_header_token(col: str) -> str:
+    return re.sub(r"[\s\-]+", "_", str(col).strip().lower())
+
+
+def _infer_business_domain(columns: List[str]) -> str:
+    """Lightweight domain hint for mapping weights (ecommerce / manufacturing / generic)."""
+    joined = " ".join(_norm_header_token(c) for c in columns)
+    mfg_kw = (
+        "bom", "work_order", "routing", "batch", "lot", "plant", "assembly",
+        "sku", "material", "warehouse", "inventory", "production",
+    )
+    ecom_kw = (
+        "order", "cart", "checkout", "sku", "product", "customer", "invoice",
+        "shipment", "payment", "channel", "listing", "variant",
+    )
+    mfg = sum(1 for k in mfg_kw if k in joined)
+    eco = sum(1 for k in ecom_kw if k in joined)
+    if mfg >= 3 and mfg >= eco:
+        return "manufacturing"
+    if eco >= 2:
+        return "ecommerce"
+    return "generic"
+
+
+def _product_role_forbidden(col: str) -> bool:
+    """
+    customer_id / order_id / invoice_id must never be used as product/category dimension.
+    """
+    n = _norm_header_token(col)
+    if re.search(
+        r"(^|_)(customer|cust|client|user|buyer|shopper|member)_?id$",
+        n,
+    ):
+        return True
+    if re.search(
+        r"(^|_)(order|invoice|transaction|payment|shipment|line|cart|session|visit|row)_?id$",
+        n,
+    ):
+        return True
+    if n in ("id", "ids", "uuid", "guid", "rowid", "index"):
+        return True
+    if _id_like_column_name(col):
+        # Allow only obvious catalog identifiers.
+        if re.search(r"(product|sku|item|variant|article|style|model)_id$", n):
+            return False
+        return True
+    return False
+
+
+def _customer_role_keyword_score(col: str) -> Tuple[int, List[str]]:
+    """Prefer human-readable customer fields; customer_id is valid for the customer role only."""
+    n = _norm_header_token(col)
+    reasons: List[str] = []
+    s = 0
+    for kw, w in (
+        ("customer_name", 44),
+        ("client_name", 34),
+        ("customer_id", 36),
+        ("cust_id", 32),
+        ("client_id", 28),
+        ("customer", 26),
+        ("client", 22),
+        ("buyer", 18),
+        ("shopper", 14),
+        ("account_name", 30),
+        ("company_name", 28),
+        ("email", 8),
+    ):
+        if kw in n:
+            s += w
+            reasons.append(f"name:{kw}+{w}")
+    return s, reasons
+
+
+def _product_role_keyword_score(col: str) -> Tuple[int, List[str]]:
+    n = _norm_header_token(col)
+    reasons: List[str] = []
+    score = 0
+    pairs = (
+        ("product", 42),
+        ("sku", 40),
+        ("item", 28),
+        ("category", 36),
+        ("subcategory", 32),
+        ("brand", 30),
+        ("segment", 22),
+        ("collection", 18),
+        ("variant", 24),
+        ("article", 14),
+        ("merchandise", 16),
+        ("style", 12),
+        ("model", 12),
+        ("description", 6),
+        ("title", 8),
+    )
+    for kw, w in pairs:
+        if kw in n:
+            score += w
+            reasons.append(f"name:{kw}+{w}")
+    return score, reasons
+
+
+def _sales_role_keyword_score(col: str) -> Tuple[int, List[str]]:
+    n = _norm_header_token(col)
+    reasons: List[str] = []
+    score = 0
+    for kw, w in (
+        ("revenue", 40),
+        ("sales", 38),
+        ("amount", 22),
+        ("total", 16),
+        ("subtotal", 18),
+        ("net_sales", 36),
+        ("gross_sales", 34),
+        ("price", 20),
+        ("qty", 24),
+        ("quantity", 24),
+        ("units", 20),
+    ):
+        if kw in n:
+            score += w
+            reasons.append(f"name:{kw}+{w}")
+    return score, reasons
+
+
+def _region_role_keyword_score(col: str) -> Tuple[int, List[str]]:
+    n = _norm_header_token(col)
+    reasons: List[str] = []
+    score = 0
+    for kw, w in (
+        ("region", 34),
+        ("state", 18),
+        ("country", 22),
+        ("city", 20),
+        ("zip", 10),
+        ("postal", 12),
+        ("territory", 26),
+        ("location", 16),
+        ("market", 14),
+        ("geo", 10),
+    ):
+        if kw in n:
+            score += w
+            reasons.append(f"name:{kw}+{w}")
+    return score, reasons
+
+
+def _profit_role_keyword_score(col: str) -> Tuple[int, List[str]]:
+    n = _norm_header_token(col)
+    reasons: List[str] = []
+    score = 0
+    for kw, w in (
+        ("profit", 36),
+        ("margin", 30),
+        ("gp", 18),
+        ("ebitda", 22),
+        ("earnings", 18),
+        ("net_income", 24),
+    ):
+        if kw in n:
+            score += w
+            reasons.append(f"name:{kw}+{w}")
+    return score, reasons
+
+
+def _date_role_keyword_score(col: str) -> Tuple[int, List[str]]:
+    n = _norm_header_token(col)
+    reasons: List[str] = []
+    score = 0
+    for kw, w in (
+        ("order_date", 38),
+        ("invoice_date", 34),
+        ("ship_date", 28),
+        ("transaction_date", 32),
+        ("created_at", 22),
+        ("timestamp", 18),
+        ("date", 20),
+        ("month", 8),
+        ("period", 8),
+    ):
+        if kw in n:
+            score += w
+            reasons.append(f"name:{kw}+{w}")
+    return score, reasons
+
+
+def _cardinality_profile_score(
+    df_in: pd.DataFrame, col: str, role: str
+) -> Tuple[float, List[str]]:
+    """Returns (points, reasons) using nunique vs row count."""
+    reasons: List[str] = []
+    if df_in is None or col not in df_in.columns or len(df_in) == 0:
+        return 0.0, reasons
+    n = int(len(df_in))
+    try:
+        nu = int(df_in[col].nunique(dropna=True))
+    except Exception:
+        return 0.0, reasons
+    ratio = float(nu) / float(max(n, 1))
+    pts = 0.0
+    if nu <= 1:
+        reasons.append("cardinality:constant(0)")
+        return 0.0, reasons
+    if role == "product":
+        if ratio >= 0.995:
+            pts -= 35.0
+            reasons.append("cardinality:almost_unique_penalty(-35)")
+        elif ratio >= 0.92:
+            pts -= 12.0
+            reasons.append("cardinality:very_high_cardinality(-12)")
+        elif 0.0003 <= ratio <= 0.85:
+            pts += 18.0
+            reasons.append("cardinality:healthy_dimension(+18)")
+        elif ratio < 0.0003:
+            pts -= 8.0
+            reasons.append("cardinality:too_few_levels(-8)")
+    elif role == "customer":
+        if 0.002 <= ratio <= 0.9:
+            pts += 16.0
+            reasons.append("cardinality:customer_like(+16)")
+        elif ratio >= 0.995:
+            pts -= 25.0
+            reasons.append("cardinality:likely_surrogate_id(-25)")
+    else:
+        if 0.001 <= ratio <= 0.95:
+            pts += 10.0
+            reasons.append("cardinality:usable(+10)")
+    return pts, reasons
+
+
+def _type_profile_bonus(col: str, profile: Dict[str, Any], role: str) -> Tuple[float, List[str]]:
+    ct = (profile or {}).get("column_types", {}) or {}
+    t = ct.get(col)
+    reasons: List[str] = []
+    pts = 0.0
+    if role in ("product", "customer", "region"):
+        if t == "category":
+            pts += 8.0
+            reasons.append("dtype:category(+8)")
+        elif t == "text":
+            pts += 4.0
+            reasons.append("dtype:text(+4)")
+    elif role in ("sales", "profit"):
+        if t == "number":
+            pts += 12.0
+            reasons.append("dtype:number(+12)")
+    elif role == "date":
+        if t == "date":
+            pts += 25.0
+            reasons.append("dtype:date(+25)")
+        elif t in ("text", "category"):
+            pts += 3.0
+            reasons.append("dtype:text_or_category(+3)")
+    return pts, reasons
+
+
+def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[str]]:
+    n = _norm_header_token(col)
+    reasons: List[str] = []
+    pts = 0.0
+    if domain == "ecommerce" and role == "product":
+        if any(k in n for k in ("listing", "variant", "channel", "sku", "product")):
+            pts += 10.0
+            reasons.append("domain:ecommerce_product(+10)")
+    if domain == "manufacturing" and role == "product":
+        if any(k in n for k in ("material", "bom", "sku", "item", "part")):
+            pts += 12.0
+            reasons.append("domain:mfg_product(+12)")
+    if domain == "ecommerce" and role == "customer":
+        if "customer" in n or "client" in n:
+            pts += 8.0
+            reasons.append("domain:ecommerce_customer(+8)")
+    return pts, reasons
+
+
+def _score_role_candidates(
+    df_in: pd.DataFrame,
+    profile: Dict[str, Any],
+    role: str,
+    domain: str,
+    keyword_fn,
+) -> List[Dict[str, Any]]:
+    columns = df_in.columns.tolist()
+    out: List[Dict[str, Any]] = []
+    for col in columns:
+        if role == "product" and _product_role_forbidden(col):
+            continue
+        if role == "region" and _id_like_column_name(col):
+            continue
+        if role == "customer":
+            n = _norm_header_token(col)
+            if _id_like_column_name(col) and not re.search(
+                r"(customer|cust|client|buyer|account)_?id$", n
+            ):
+                continue
+        if role in ("sales", "profit"):
+            if profile.get("column_types", {}).get(col) not in ("number",):
+                continue
+        if role == "date":
+            if profile.get("column_types", {}).get(col) not in ("date", "text", "category"):
+                continue
+
+        ks, kr = keyword_fn(col)
+
+        cp, cr = _cardinality_profile_score(df_in, col, role)
+        tb, tr = _type_profile_bonus(col, profile, role)
+        dw, dr = _domain_weight_bonus(domain, role, col)
+
+        total = float(ks) + cp + tb + dw
+        reasons = kr + cr + tr + dr
+        out.append(
+            {
+                "column": col,
+                "score": round(total, 2),
+                "reasons": reasons,
+            }
+        )
+    out.sort(key=lambda x: (-float(x["score"]), str(x["column"]).lower()))
+    return out
+
+
+def _confidence_from_top1_top2(cands: List[Dict[str, Any]]) -> str:
+    if not cands or float(cands[0].get("score", 0)) <= 0:
+        return "low"
+    s1 = float(cands[0]["score"])
+    s2 = float(cands[1]["score"]) if len(cands) > 1 else 0.0
+    gap = s1 - s2
+    if s1 >= 35 and gap >= 8:
+        return "high"
+    if s1 >= 18 and gap >= 4:
+        return "medium"
+    return "low"
+
+
+def compute_semantic_column_mapping(
+    frame: pd.DataFrame, profile: Dict[str, Any]
+) -> Tuple[Dict[str, Optional[str]], Dict[str, Any]]:
+    """
+    Returns (proposed_column_mapping, mapping_metadata) without mutating globals.
+    """
+    empty_map = {k: None for k in ("product", "sales", "region", "customer", "profit", "date")}
+    if frame is None or frame.empty:
+        meta = {
+            "domain": "generic",
+            "roles": {},
+            "notes": ["Empty dataframe; mapping skipped."],
+            "rules_applied": [],
+        }
+        return empty_map, meta
+
+    columns = frame.columns.tolist()
+    domain = _infer_business_domain(columns)
+
+    product_cands = _score_role_candidates(
+        frame, profile, "product", domain, _product_role_keyword_score
+    )
+    sales_cands = _score_role_candidates(
+        frame, profile, "sales", domain, _sales_role_keyword_score
+    )
+    region_cands = _score_role_candidates(
+        frame, profile, "region", domain, _region_role_keyword_score
+    )
+    customer_cands = _score_role_candidates(
+        frame, profile, "customer", domain, _customer_role_keyword_score
+    )
+    profit_cands = _score_role_candidates(
+        frame, profile, "profit", domain, _profit_role_keyword_score
+    )
+    date_cands = _score_role_candidates(
+        frame, profile, "date", domain, _date_role_keyword_score
+    )
+
+    def pick(cands: List[Dict[str, Any]], role_key: str) -> Optional[str]:
+        if cands and float(cands[0].get("score", 0)) > 0:
+            return str(cands[0]["column"])
+        if role_key == "date":
+            for c in columns:
+                if profile.get("column_types", {}).get(c) == "date":
+                    return str(c)
+        return None
+
+    proposed = {
+        "product": pick(product_cands, "product"),
+        "sales": pick(sales_cands, "sales"),
+        "region": pick(region_cands, "region"),
+        "customer": pick(customer_cands, "customer"),
+        "profit": pick(profit_cands, "profit"),
+        "date": pick(date_cands, "date"),
+    }
+
+    # Avoid using the same column for unrelated roles (e.g. product == customer).
+    if proposed.get("customer") and proposed["customer"] == proposed.get("product"):
+        alt = None
+        for row in customer_cands[1:]:
+            c = str(row["column"])
+            if c and c != proposed.get("product"):
+                alt = c
+                break
+        proposed["customer"] = alt
+
+    if proposed.get("region") and proposed["region"] == proposed.get("product"):
+        alt_r = None
+        for row in region_cands[1:]:
+            c = str(row["column"])
+            if c and c not in (proposed.get("product"), proposed.get("customer")):
+                alt_r = c
+                break
+        proposed["region"] = alt_r
+
+    roles_meta: Dict[str, Any] = {}
+    for key, cands in (
+        ("product", product_cands),
+        ("sales", sales_cands),
+        ("region", region_cands),
+        ("customer", customer_cands),
+        ("profit", profit_cands),
+        ("date", date_cands),
+    ):
+        top3 = cands[:3]
+        conf = _confidence_from_top1_top2(cands)
+        sel = proposed.get(key)
+        roles_meta[key] = {
+            "selected": sel,
+            "confidence": conf,
+            "top_candidates": top3,
+            "score_breakdown_hint": "Scores combine semantic keywords, cardinality, dtype, and domain hints.",
+        }
+
+    notes: List[str] = []
+    notes.append(f"Inferred domain: {domain}.")
+    if proposed.get("product"):
+        notes.append(
+            f"Product / category dimension: {_pretty_label_text(proposed['product'])}."
+        )
+    else:
+        notes.append("No strong product/category column detected (IDs excluded).")
+
+    meta = {
+        "domain": domain,
+        "roles": roles_meta,
+        "notes": notes,
+        "rules_applied": [
+            "customer_id / order_id / invoice_id never rank as product/category.",
+            "Semantic keywords, cardinality, uniqueness, dtype, and domain weights are combined.",
+        ],
+    }
+    return proposed, meta
+
+
+def apply_semantic_column_mapping(frame: pd.DataFrame, profile: Dict[str, Any]) -> Dict[str, Any]:
+    """Writes global column_mapping + column_mapping_metadata from inference."""
+    global column_mapping, column_mapping_metadata
+    proposed, meta = compute_semantic_column_mapping(frame, profile)
+    column_mapping = proposed
+    column_mapping_metadata = meta
+    return meta
+
+
+def infer_semantic_column_mapping(
+    frame: pd.DataFrame, profile: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Back-compat wrapper: infer + apply."""
+    return apply_semantic_column_mapping(frame, profile)
 
 
 def find_column(possible_names):
@@ -2411,7 +2878,7 @@ def build_dimension_catalog_for_ui(
 
 
 def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
-    global df, selected_sheet_name, column_mapping, uploaded_file_name, uploaded_file_bytes, dataset_profile
+    global df, selected_sheet_name, column_mapping, uploaded_file_name, uploaded_file_bytes, dataset_profile, column_mapping_metadata
 
     kpi_cards, dataset_kind = build_kpi_cards()
     auto_dashboard = build_auto_dashboard()
@@ -2446,6 +2913,7 @@ def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
         "filter_breadcrumb": bc,
         "filter_summary": [],
         "empty": False,
+        "mapping_metadata": column_mapping_metadata,
     }
     return _json_safe(payload)
 
@@ -2553,7 +3021,7 @@ def _compose_empty_filtered_payload(
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile, available_sheet_names
+    global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile, available_sheet_names, column_mapping_metadata
 
     uploaded_file_bytes = await file.read()
     if not file.filename:
@@ -2580,6 +3048,7 @@ async def upload_file(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Uploaded file has no data.")
         selected_sheet_name = "CSV"
         dataset_profile = build_profile(df)
+        apply_semantic_column_mapping(df, dataset_profile)
         available_sheet_names = ["CSV"]
         return build_upload_response(["CSV"])
 
@@ -2610,6 +3079,7 @@ async def upload_file(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Uploaded file has no usable tabular data.")
         selected_sheet_name = best_sheet
         dataset_profile = build_profile(df)
+        apply_semantic_column_mapping(df, dataset_profile)
         available_sheet_names = list(sheet_names)
 
         return build_upload_response(sheet_names)
@@ -2619,7 +3089,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.post("/select-sheet")
 def select_sheet(data: SheetRequest):
-    global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile, available_sheet_names
+    global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile, available_sheet_names, column_mapping_metadata
 
     if uploaded_file_bytes is None:
         raise HTTPException(status_code=400, detail="Please upload an Excel file first.")
@@ -2638,6 +3108,7 @@ def select_sheet(data: SheetRequest):
     if df.empty:
         raise HTTPException(status_code=400, detail="Selected sheet has no usable data.")
     dataset_profile = build_profile(df)
+    apply_semantic_column_mapping(df, dataset_profile)
     available_sheet_names = list(sheet_names)
 
     return build_upload_response(sheet_names)
@@ -2669,7 +3140,7 @@ def get_preview(data: PreviewRequest):
 
 @app.post("/update-column-mapping")
 def update_column_mapping(data: ColumnMappingRequest):
-    global df, selected_sheet_name, uploaded_file_name, uploaded_file_bytes, column_mapping, dataset_profile
+    global df, selected_sheet_name, uploaded_file_name, uploaded_file_bytes, column_mapping, dataset_profile, column_mapping_metadata
 
     if df is None:
         raise HTTPException(status_code=400, detail="Please upload a CSV or Excel file first.")
@@ -2683,11 +3154,29 @@ def update_column_mapping(data: ColumnMappingRequest):
         "date": data.date_column,
     }
 
+    prof_now = dataset_profile or build_profile(df)
+    proposed, meta = compute_semantic_column_mapping(df, prof_now)
     for key, value in incoming_map.items():
         if value and value in df.columns:
             column_mapping[key] = value
         else:
             column_mapping[key] = None
+
+    roles = meta.get("roles") or {}
+    for rk in ("product", "sales", "region", "customer", "profit", "date"):
+        rm = dict(roles.get(rk) or {})
+        fin = column_mapping.get(rk)
+        auto = proposed.get(rk)
+        rm["selected"] = fin
+        rm["auto_selected"] = auto
+        if fin != auto:
+            rm["confidence"] = "user"
+            rm["override_note"] = "Saved mapping differs from auto-detect."
+        roles[rk] = rm
+    meta["roles"] = roles
+    meta.setdefault("notes", []).append("Column mapping updated from client request.")
+    column_mapping_metadata = meta
+
     updated_kpis = calculate_kpis()
     dataset_profile = build_profile(df)
     kpi_cards, dataset_kind = build_kpi_cards()
@@ -2703,6 +3192,7 @@ def update_column_mapping(data: ColumnMappingRequest):
         "profile": prof,
         "dimension_options": build_dimension_catalog_for_ui(df, prof),
         "filter_breadcrumb": build_filter_breadcrumb(df, prof, [], None),
+        "mapping_metadata": column_mapping_metadata,
         "column_mapping": {
             "product_column": column_mapping.get("product"),
             "sales_column": column_mapping.get("sales"),
