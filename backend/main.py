@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import os
 from io import BytesIO
 from typing import Optional, List, Dict, Any, Tuple
+from contextlib import contextmanager
 import re
 import math
 
@@ -38,6 +39,11 @@ column_mapping = {
     "date": None,
 }
 
+# Sheet list for Excel uploads; set on `/upload` and `/select-sheet` (CSV → ["CSV"]).
+available_sheet_names: Optional[List[str]] = None
+
+NO_RECORDS_FILTERS_MSG = "No records match current filters."
+
 
 class ConversationContextPayload(BaseModel):
     """Client round-trip snapshot of the last successful analysis (single session)."""
@@ -54,11 +60,38 @@ class ConversationContextPayload(BaseModel):
     filtersApplied: List[str] = Field(default_factory=list)
 
 
+class DashboardFilterEntryModel(BaseModel):
+    """Explicit dashboard filter slice (applied before AI / KPI recompute)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    column: str = Field(description="Actual dataframe column name")
+    label: str = Field(default="", description="Human label shown in chips")
+    value: str
+
+
+class DashboardDateRangeModel(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    column: str
+    start: Optional[str] = Field(default=None, description="ISO date string inclusive")
+    end: Optional[str] = Field(default=None, description="ISO date string inclusive")
+
+
 class QuestionRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     question: str
     conversation_context: Optional[ConversationContextPayload] = None
+    dashboard_filters: List[DashboardFilterEntryModel] = Field(default_factory=list)
+    date_range: Optional[DashboardDateRangeModel] = None
+
+
+class FilteredDashboardRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    dashboard_filters: List[DashboardFilterEntryModel] = Field(default_factory=list)
+    date_range: Optional[DashboardDateRangeModel] = None
 
 
 class SheetRequest(BaseModel):
@@ -682,6 +715,7 @@ def _dash_series_payload(
     *,
     chart_type: str,
     max_points: int = 14,
+    category_column: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     if series is None or series.empty:
         return None
@@ -710,7 +744,24 @@ def _dash_series_payload(
         ct_norm = "pie"
     else:
         ct_norm = "bar"
-    return {"title": title.strip(), "chartType": ct_norm, "labels": labels, "values": values}
+    out: Dict[str, Any] = {
+        "title": title.strip(),
+        "chartType": ct_norm,
+        "labels": labels,
+        "values": values,
+    }
+    if category_column and str(category_column).strip():
+        cc = str(category_column).strip()
+        out["interaction"] = {
+            "drillDimensions": [
+                {
+                    "column": cc,
+                    "role": "primary",
+                    "label": _pretty_label_text(cc),
+                }
+            ]
+        }
+    return out
 
 
 def _dash_hr_dashboard_charts() -> List[Dict[str, Any]]:
@@ -764,7 +815,10 @@ def _dash_hr_dashboard_charts() -> List[Dict[str, Any]]:
                 _append_unique_dashboard_chart(
                     out_ch,
                     _dash_series_payload(
-                        "Employee count by department", g, chart_type="bar"
+                        "Employee count by department",
+                        g,
+                        chart_type="bar",
+                        category_column=dept_col,
                     ),
                 )
         except Exception:
@@ -783,6 +837,7 @@ def _dash_hr_dashboard_charts() -> List[Dict[str, Any]]:
                         "Average salary by department",
                         g,
                         chart_type="horizontalBar",
+                        category_column=dept_col,
                     ),
                 )
         except Exception:
@@ -807,6 +862,7 @@ def _dash_hr_dashboard_charts() -> List[Dict[str, Any]]:
                         "Employee count by location",
                         g,
                         chart_type="horizontalBar",
+                        category_column=loc_col,
                     ),
                 )
         except Exception:
@@ -859,7 +915,12 @@ def _dash_sales_dashboard_charts() -> List[Dict[str, Any]]:
                 g = sub.groupby(product_col)["_v"].sum()
                 _append_unique_dashboard_chart(
                     out_ch,
-                    _dash_series_payload(title, g, chart_type="horizontalBar"),
+                    _dash_series_payload(
+                        title,
+                        g,
+                        chart_type="horizontalBar",
+                        category_column=product_col,
+                    ),
                 )
         except Exception:
             pass
@@ -873,7 +934,12 @@ def _dash_sales_dashboard_charts() -> List[Dict[str, Any]]:
                 g = sub.groupby(region_col)["_v"].sum()
                 _append_unique_dashboard_chart(
                     out_ch,
-                    _dash_series_payload("Revenue by region", g, chart_type="bar"),
+                    _dash_series_payload(
+                        "Revenue by region",
+                        g,
+                        chart_type="bar",
+                        category_column=region_col,
+                    ),
                 )
         except Exception:
             pass
@@ -982,7 +1048,12 @@ def _dash_generic_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
                 tit = f"Average {nice_num.lower()} by {nice_cat.lower()}"
                 _append_unique_dashboard_chart(
                     out_ch,
-                    _dash_series_payload(tit, g, chart_type="horizontalBar"),
+                    _dash_series_payload(
+                        tit,
+                        g,
+                        chart_type="horizontalBar",
+                        category_column=cat1,
+                    ),
                 )
         except Exception:
             pass
@@ -1019,7 +1090,10 @@ def _dash_generic_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
                 _append_unique_dashboard_chart(
                     out_ch,
                     _dash_series_payload(
-                        tit, vc.astype(float), chart_type=api_typ
+                        tit,
+                        vc.astype(float),
+                        chart_type=api_typ,
+                        category_column=cat_dist,
                     ),
                 )
         except Exception:
@@ -2123,11 +2197,195 @@ def build_suggested_questions() -> List[str]:
     return _dedup_question_list(deduped + _generic_suggested_questions(), max_n=6)
 
 
-def build_upload_response(sheet_names):
+def _find_column_in_frame(frame: pd.DataFrame, possible_names: List[str]) -> Optional[str]:
+    columns = frame.columns.tolist()
+    lower_map = {str(col).lower(): col for col in columns}
+    for name in possible_names:
+        for col_lower, original_col in lower_map.items():
+            if name in col_lower:
+                return original_col
+    return None
+
+
+def resolve_standard_dimension_columns(
+    frame: pd.DataFrame, profile: Optional[Dict[str, Any]] = None
+) -> Dict[str, Optional[str]]:
+    """Map logical roles to concrete columns for filters / drilldown."""
+    cols = frame.columns.tolist()
+    prof = profile or build_profile(frame)
+    ct = prof.get("column_types", {}) or {}
+
+    dept = _find_first_column(cols, ["department", "dept", "team", "division"])
+    mapped_reg = column_mapping.get("region")
+    loc: Optional[str] = None
+    if mapped_reg and mapped_reg in frame.columns:
+        loc = mapped_reg
+    if not loc:
+        loc = _find_column_in_frame(
+            frame,
+            ["location", "city", "office", "site", "branch", "region", "state"],
+        )
+    if loc == dept:
+        loc = _find_column_in_frame(frame, ["office", "site", "branch", "country"])
+    if loc == dept:
+        loc = None
+
+    desig = _find_first_column(
+        cols, ["designation", "job_title", "title", "job title", "position", "role"]
+    )
+
+    date_c: Optional[str] = None
+    for c in cols:
+        if ct.get(c) == "date":
+            date_c = str(c)
+            break
+    if not date_c:
+        date_c = _dash_pick_generic_date(frame, cols, ct)
+
+    return {
+        "department": dept,
+        "location": loc,
+        "designation": desig,
+        "date": date_c,
+    }
+
+
+def _series_values_match(series: pd.Series, needle: str) -> pd.Series:
+    n = needle.strip().lower()
+    if not n:
+        return pd.Series(False, index=series.index)
+    raw = series.astype(str).str.strip()
+    m = raw.str.lower() == n
+    try:
+        pretty_m = raw.map(
+            lambda x: _pretty_label_text(str(x)).strip().lower() == n
+        )
+        m = m | pretty_m.fillna(False)
+    except Exception:
+        pass
+    return m
+
+
+def apply_dashboard_filters_to_df(
+    base_df: pd.DataFrame,
+    filters: List[DashboardFilterEntryModel],
+    date_range: Optional[DashboardDateRangeModel],
+) -> Tuple[pd.DataFrame, List[str]]:
+    """AND filters; same column appears twice → last wins."""
+    labels: List[str] = []
+    if base_df is None:
+        return base_df, labels
+    out = base_df
+    merged: Dict[str, DashboardFilterEntryModel] = {}
+    for f in filters or []:
+        col = str(f.column).strip()
+        if col and col in out.columns:
+            merged[col] = f
+    for _col_key, f in merged.items():
+        col = str(f.column).strip()
+        lab = str(f.label).strip() if f.label else _pretty_label_text(col)
+        val = str(f.value).strip()
+        mask = _series_values_match(out[col], val)
+        out = out.loc[mask].copy()
+        labels.append(f"{lab} = {val}")
+        if out.empty:
+            return out, labels
+
+    dr = date_range
+    if dr:
+        dc = str(dr.column).strip()
+        if dc and dc in out.columns:
+            dtp = pd.to_datetime(out[dc], errors="coerce")
+            nice = _pretty_label_text(dc)
+            if dr.start:
+                ts = pd.Timestamp(dr.start)
+                out = out.loc[dtp >= ts].copy()
+                labels.append(f"{nice} ≥ {dr.start}")
+            if dr.end and not out.empty:
+                te = pd.Timestamp(dr.end)
+                day_only = isinstance(dr.end, str) and (
+                    len(str(dr.end).strip()) <= 10 and "T" not in str(dr.end).upper()
+                )
+                if day_only:
+                    te = te.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+                out = out.loc[dtp <= te].copy()
+                labels.append(f"{nice} ≤ {dr.end}")
+    return out, labels
+
+
+def _ordered_dashboard_filters(
+    filters: List[DashboardFilterEntryModel],
+    dim_map: Dict[str, Optional[str]],
+) -> List[DashboardFilterEntryModel]:
+    col_to_pri: Dict[str, int] = {}
+    for i, role in enumerate(["location", "department", "designation"]):
+        c = dim_map.get(role)
+        if c:
+            col_to_pri[str(c)] = i
+    dr_col = dim_map.get("date")
+    if dr_col:
+        col_to_pri[str(dr_col)] = 4
+
+    def pri(f: DashboardFilterEntryModel) -> Tuple[int, str]:
+        return (col_to_pri.get(str(f.column), 99), str(f.column))
+
+    return sorted(filters or [], key=pri)
+
+
+def build_filter_breadcrumb(
+    base_frame: pd.DataFrame,
+    profile: Dict[str, Any],
+    filters: List[DashboardFilterEntryModel],
+    date_range: Optional[DashboardDateRangeModel],
+) -> str:
+    root = "All Employees" if infer_dataset_kind() == "hr" else "All records"
+    dim_map = resolve_standard_dimension_columns(base_frame, profile)
+    parts: List[str] = [root]
+    for f in _ordered_dashboard_filters(list(filters or []), dim_map):
+        v = str(f.value).strip()
+        if v:
+            parts.append(v)
+    if date_range and (date_range.start or date_range.end):
+        ds = str(date_range.start or "").strip()
+        de = str(date_range.end or "").strip()
+        if ds and de:
+            parts.append(f"{ds} — {de}")
+        elif ds or de:
+            parts.append(ds or de)
+    return " → ".join(parts)
+
+
+def build_dimension_catalog_for_ui(
+    frame: pd.DataFrame, profile: Dict[str, Any]
+) -> Dict[str, Any]:
+    dims = resolve_standard_dimension_columns(frame, profile)
+    out: Dict[str, Any] = {}
+    for key, col in dims.items():
+        if not col or col not in frame.columns:
+            continue
+        if key == "date":
+            out[key] = {
+                "column": col,
+                "label": _pretty_label_text(col),
+                "values": [],
+            }
+            continue
+        ser = frame[col].dropna().astype(str).str.strip()
+        vals = sorted({str(x) for x in ser.unique() if str(x)}, key=lambda z: z.lower())[
+            :200
+        ]
+        out[key] = {"column": col, "label": _pretty_label_text(col), "values": vals}
+    return out
+
+
+def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
     global df, selected_sheet_name, column_mapping, uploaded_file_name, uploaded_file_bytes, dataset_profile
 
     kpi_cards, dataset_kind = build_kpi_cards()
     auto_dashboard = build_auto_dashboard()
+    prof = dataset_profile or build_profile(df)
+    dim_opts = build_dimension_catalog_for_ui(df, prof)
+    bc = build_filter_breadcrumb(df, prof, [], None)
     return {
         "file": {
             "name": uploaded_file_name,
@@ -2138,7 +2396,7 @@ def build_upload_response(sheet_names):
         "preview": df.head(15).to_dict(orient="records"),
         "sheets": sheet_names,
         "selected_sheet": selected_sheet_name,
-        "profile": dataset_profile or build_profile(df),
+        "profile": prof,
         "kpis": calculate_kpis(),
         "kpi_cards": kpi_cards,
         "dataset_kind": dataset_kind,
@@ -2152,12 +2410,116 @@ def build_upload_response(sheet_names):
             "profit_column": column_mapping.get("profit"),
             "date_column": column_mapping.get("date"),
         },
+        "dimension_options": dim_opts,
+        "filter_breadcrumb": bc,
+        "filter_summary": [],
+        "empty": False,
+    }
+
+
+def build_upload_response(sheet_names):
+    return _compose_upload_payload(sheet_names)
+
+
+@app.post("/filtered-dashboard")
+def filtered_dashboard(data: FilteredDashboardRequest):
+    """Recompute KPIs, auto dashboard, and preview for the active filter slice."""
+    global df, dataset_profile, available_sheet_names, uploaded_file_name, uploaded_file_bytes, selected_sheet_name
+
+    if df is None:
+        raise HTTPException(status_code=400, detail="Please upload a CSV or Excel file first.")
+
+    base_profile = dataset_profile or build_profile(df)
+    fd, filt_labels = apply_dashboard_filters_to_df(
+        df, data.dashboard_filters, data.date_range
+    )
+    dim_opts = build_dimension_catalog_for_ui(df, base_profile)
+    bc = build_filter_breadcrumb(
+        df, base_profile, data.dashboard_filters, data.date_range
+    )
+    sheet_names = available_sheet_names or (
+        ["CSV"]
+        if (uploaded_file_name or "").lower().endswith(".csv")
+        else [selected_sheet_name or "Sheet1"]
+    )
+
+    if fd.empty:
+        return {
+            **_compose_empty_filtered_payload(
+                sheet_names, base_profile, filt_labels, bc, dim_opts
+            ),
+        }
+
+    saved_df = df
+    saved_prof = dataset_profile
+    try:
+        df = fd
+        dataset_profile = build_profile(fd)
+        payload = _compose_upload_payload(sheet_names)
+    finally:
+        df = saved_df
+        dataset_profile = saved_prof
+
+    payload["filter_summary"] = filt_labels
+    payload["filter_breadcrumb"] = bc
+    payload["dimension_options"] = dim_opts
+    payload["empty"] = False
+    return payload
+
+
+def _compose_empty_filtered_payload(
+    sheet_names: List[str],
+    base_profile: Dict[str, Any],
+    filt_labels: List[str],
+    breadcrumb: str,
+    dim_opts: Dict[str, Any],
+) -> Dict[str, Any]:
+    global uploaded_file_name, uploaded_file_bytes, selected_sheet_name, column_mapping, df
+
+    kind = infer_auto_dashboard_kind()
+    label = AUTO_DASHBOARD_LABELS.get(kind, "Generic")
+    empty_ad = {"kind": kind, "type_label": label, "cards": [], "charts": []}
+    return {
+        "empty": True,
+        "message": NO_RECORDS_FILTERS_MSG,
+        "file": {
+            "name": uploaded_file_name,
+            "size_bytes": len(uploaded_file_bytes) if uploaded_file_bytes else 0,
+        },
+        "columns": df.columns.tolist(),
+        "rows": 0,
+        "preview": [],
+        "sheets": sheet_names,
+        "selected_sheet": selected_sheet_name,
+        "profile": base_profile,
+        "kpis": {
+            "total_rows": 0,
+            "total_columns": len(df.columns),
+            "total_sales": None,
+            "top_product": None,
+            "unique_products": None,
+        },
+        "kpi_cards": [],
+        "dataset_kind": kind,
+        "auto_dashboard": empty_ad,
+        "suggested_questions": build_suggested_questions(),
+        "column_mapping": {
+            "product_column": column_mapping.get("product"),
+            "sales_column": column_mapping.get("sales"),
+            "region_column": column_mapping.get("region"),
+            "customer_column": column_mapping.get("customer"),
+            "profit_column": column_mapping.get("profit"),
+            "date_column": column_mapping.get("date"),
+        },
+        "dimension_options": dim_opts,
+        "filter_breadcrumb": breadcrumb,
+        "filter_summary": filt_labels,
     }
 
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile
+    global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile, available_sheet_names
 
     uploaded_file_bytes = await file.read()
     if not file.filename:
@@ -2184,6 +2546,7 @@ async def upload_file(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Uploaded file has no data.")
         selected_sheet_name = "CSV"
         dataset_profile = build_profile(df)
+        available_sheet_names = ["CSV"]
         return build_upload_response(["CSV"])
 
     if lower_name.endswith(".xlsx") or lower_name.endswith(".xls"):
@@ -2213,6 +2576,7 @@ async def upload_file(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Uploaded file has no usable tabular data.")
         selected_sheet_name = best_sheet
         dataset_profile = build_profile(df)
+        available_sheet_names = list(sheet_names)
 
         return build_upload_response(sheet_names)
 
@@ -2221,7 +2585,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.post("/select-sheet")
 def select_sheet(data: SheetRequest):
-    global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile
+    global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile, available_sheet_names
 
     if uploaded_file_bytes is None:
         raise HTTPException(status_code=400, detail="Please upload an Excel file first.")
@@ -2240,6 +2604,7 @@ def select_sheet(data: SheetRequest):
     if df.empty:
         raise HTTPException(status_code=400, detail="Selected sheet has no usable data.")
     dataset_profile = build_profile(df)
+    available_sheet_names = list(sheet_names)
 
     return build_upload_response(sheet_names)
 
@@ -2293,6 +2658,7 @@ def update_column_mapping(data: ColumnMappingRequest):
     dataset_profile = build_profile(df)
     kpi_cards, dataset_kind = build_kpi_cards()
     auto_dashboard = build_auto_dashboard()
+    prof = dataset_profile or build_profile(df)
 
     return {
         "kpis": updated_kpis,
@@ -2300,6 +2666,9 @@ def update_column_mapping(data: ColumnMappingRequest):
         "dataset_kind": dataset_kind,
         "auto_dashboard": auto_dashboard,
         "suggested_questions": build_suggested_questions(),
+        "profile": prof,
+        "dimension_options": build_dimension_catalog_for_ui(df, prof),
+        "filter_breadcrumb": build_filter_breadcrumb(df, prof, [], None),
         "column_mapping": {
             "product_column": column_mapping.get("product"),
             "sales_column": column_mapping.get("sales"),
@@ -5315,6 +5684,27 @@ def compute_visualization_for_question(
     if stacked_bar_payload and multi_series_payload:
         visualization["stackedBarRows"] = stacked_bar_payload
         visualization["multiSeries"] = multi_series_payload
+    drill_dims: List[Dict[str, Any]] = []
+    pri_d = intent_debug.get("group_col") if intent_debug else None
+    if pri_d:
+        drill_dims.append(
+            {
+                "column": str(pri_d),
+                "role": "primary",
+                "label": _pretty_label_text(str(pri_d)),
+            }
+        )
+    sec_d = intent_debug.get("secondary_group_col") if intent_debug else None
+    if sec_d:
+        drill_dims.append(
+            {
+                "column": str(sec_d),
+                "role": "secondary",
+                "label": _pretty_label_text(str(sec_d)),
+            }
+        )
+    if drill_dims:
+        visualization["interaction"] = {"drillDimensions": drill_dims}
     if partial_visualization_warning:
         visualization["partialVisualizationWarning"] = (
             partial_visualization_warning.strip()
@@ -5369,7 +5759,7 @@ def compute_visualization_for_question(
 
 @app.post("/ask")
 def ask_question(data: QuestionRequest):
-    global df
+    global df, dataset_profile
 
     if df is None:
         return {
@@ -5394,17 +5784,49 @@ def ask_question(data: QuestionRequest):
     eff_q = str(plan.get("effective_question") or data.question).strip()
     sidecar = plan.get("conversation_sidecar")
     filter_added: List[str] = []
-    if sidecar and data.conversation_context:
-        profile_live = dataset_profile or build_profile(df)
-        fd, flabs = _try_build_follow_up_filtered_df(
+
+    base_profile = dataset_profile or build_profile(df)
+    dash_slice, dash_labs = apply_dashboard_filters_to_df(
+        df,
+        list(data.dashboard_filters or []),
+        data.date_range,
+    )
+    if dash_slice.empty:
+        bc_early = build_filter_breadcrumb(
             df,
-            profile_live,
+            base_profile,
+            list(data.dashboard_filters or []),
+            data.date_range,
+        )
+        return {
+            "answer": NO_RECORDS_FILTERS_MSG,
+            "visualization": None,
+            "analysis": None,
+            "conversation_context": {
+                "lastQuestion": eff_q or data.question.strip(),
+                "lastChartTitle": "",
+                "metricColumn": None,
+                "categoryColumn": None,
+                "aggregation": None,
+                "chartType": "",
+                "intentBucket": "",
+                "filtersApplied": prev_filters,
+            },
+            "dashboard_filter_summary": dash_labs,
+            "filter_breadcrumb": bc_early,
+        }
+
+    profile_dash = build_profile(dash_slice)
+    if sidecar and data.conversation_context:
+        fd_follow, flabs = _try_build_follow_up_filtered_df(
+            dash_slice,
+            profile_dash,
             data.conversation_context,
             data.question.strip(),
         )
         if flabs:
             filter_added = list(flabs)
-            plan["filtered_df"] = fd
+            plan["filtered_df"] = fd_follow
             sc = dict(sidecar)
             extra = "; ".join(flabs)
             sc["followUpApplied"] = (
@@ -5416,59 +5838,108 @@ def ask_question(data: QuestionRequest):
             sidecar = sc
             plan["conversation_sidecar"] = sc
 
+    final_df = (
+        plan["filtered_df"]
+        if plan.get("filtered_df") is not None
+        else dash_slice
+    )
+    if final_df.empty:
+        bc_e = build_filter_breadcrumb(
+            df,
+            base_profile,
+            list(data.dashboard_filters or []),
+            data.date_range,
+        )
+        return {
+            "answer": NO_RECORDS_FILTERS_MSG,
+            "visualization": None,
+            "analysis": None,
+            "conversation_context": {
+                "lastQuestion": eff_q or data.question.strip(),
+                "lastChartTitle": "",
+                "metricColumn": None,
+                "categoryColumn": None,
+                "aggregation": None,
+                "chartType": "",
+                "intentBucket": "",
+                "filtersApplied": prev_filters + filter_added,
+            },
+            "dashboard_filter_summary": dash_labs + filter_added,
+            "filter_breadcrumb": bc_e,
+        }
+
+    bc_full = build_filter_breadcrumb(
+        df,
+        base_profile,
+        list(data.dashboard_filters or []),
+        data.date_range,
+    )
+
     saved_df = df
+    saved_prof = dataset_profile
     try:
-        if plan.get("filtered_df") is not None:
-            df = plan["filtered_df"]
+        df = final_df
+        dataset_profile = build_profile(final_df)
         exact_result, visualization, analysis_ctx = compute_visualization_for_question(
             eff_q,
             conversation_sidecar=sidecar,
             follow_up_ops=plan.get("follow_up_ops"),
         )
-    finally:
-        df = saved_df
 
-    viz_anchor = ""
-    viz_rule = ""
-    if visualization:
-        ctype = visualization.get("chartType", "")
-        npts = len(visualization.get("labels", []))
-        viz_anchor = (
-            "\nChart values generated from pandas (AUTHORITATIVE for prose — cite these amounts exactly):\n"
-            + build_visualization_anchor_for_prompt(visualization)
-            + "\n"
-        )
-        viz_rule = (
-            f"A {ctype} visualization with {npts} points accompanies this reply. "
-            "Your explanation MUST use ONLY the labeled amounts in the authoritative chart-values block above "
-            "(same rounding string). Do not recalculate totals or averages from prose.\n"
-        )
+        all_row_scope = list(dash_labs) + list(filter_added)
+        if visualization and all_row_scope:
+            prov = visualization.get("provenance")
+            if isinstance(prov, dict):
+                prov2 = dict(prov)
+                prov2["dashboardFiltersApplied"] = all_row_scope
+                visualization["provenance"] = prov2
 
-    trend_rule = ""
-    if visualization and visualization.get("chartType") in ("line", "area"):
-        trend_rule = "- Focus on the trajectory over periods shown in the calculated result.\n"
+        viz_anchor = ""
+        viz_rule = ""
+        if visualization:
+            ctype = visualization.get("chartType", "")
+            npts = len(visualization.get("labels", []))
+            viz_anchor = (
+                "\nChart values generated from pandas (AUTHORITATIVE for prose — cite these amounts exactly):\n"
+                + build_visualization_anchor_for_prompt(visualization)
+                + "\n"
+            )
+            viz_rule = (
+                f"A {ctype} visualization with {npts} points accompanies this reply. "
+                "Your explanation MUST use ONLY the labeled amounts in the authoritative chart-values block above "
+                "(same rounding string). Do not recalculate totals or averages from prose.\n"
+            )
 
-    focus_line = ""
-    if analysis_ctx.get("metricColumn"):
-        focus_line = (
-            "\nDetected question focus (do not substitute a different metric or column):\n"
-            f"- Metric column: {analysis_ctx.get('metricColumn')}\n"
-            f"- Breakdown dimension: {analysis_ctx.get('categoryColumn')}\n"
-            f"- Aggregation: {analysis_ctx.get('aggregation')} ({analysis_ctx.get('aggregationKey')})\n"
-        )
-        sec_g = analysis_ctx.get("secondaryGroupColumn")
-        if sec_g:
-            focus_line += f"- Secondary breakdown dimension: {sec_g}\n"
+        trend_rule = ""
+        if visualization and visualization.get("chartType") in ("line", "area"):
+            trend_rule = "- Focus on the trajectory over periods shown in the calculated result.\n"
 
-    conv_block = plan.get("ai_context_block") or ""
-    if sidecar and isinstance(sidecar.get("contextUsedLine"), str):
-        conv_block = (
-            f"{conv_block}\nContext used (for your reasoning — user-visible in the app):\n"
-            f"{sidecar.get('contextUsedLine')}\n"
-        ).strip()
+        focus_line = ""
+        if analysis_ctx.get("metricColumn"):
+            focus_line = (
+                "\nDetected question focus (do not substitute a different metric or column):\n"
+                f"- Metric column: {analysis_ctx.get('metricColumn')}\n"
+                f"- Breakdown dimension: {analysis_ctx.get('categoryColumn')}\n"
+                f"- Aggregation: {analysis_ctx.get('aggregation')} ({analysis_ctx.get('aggregationKey')})\n"
+            )
+            sec_g = analysis_ctx.get("secondaryGroupColumn")
+            if sec_g:
+                focus_line += f"- Secondary breakdown dimension: {sec_g}\n"
 
-    ctx = get_ai_context(sample_rows=10)
-    prompt = f"""
+        conv_block = plan.get("ai_context_block") or ""
+        if sidecar and isinstance(sidecar.get("contextUsedLine"), str):
+            conv_block = (
+                f"{conv_block}\nContext used (for your reasoning — user-visible in the app):\n"
+                f"{sidecar.get('contextUsedLine')}\n"
+            ).strip()
+        if dash_labs:
+            conv_block = (
+                f"{conv_block}\nActive dashboard filters (row subset):\n"
+                + "\n".join(f"- {ln}" for ln in dash_labs)
+            ).strip()
+
+        ctx = get_ai_context(sample_rows=10)
+        prompt = f"""
 You are a business data analyst for small and medium businesses.
 
 {conv_block}
@@ -5490,34 +5961,40 @@ Rules:
 - Mention clear business insight if possible.
 {trend_rule}"""
 
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=400,
-        messages=[{"role": "user", "content": prompt}],
-    )
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
 
-    chart_rec_out = (
-        analysis_ctx.get("chartRecommendation")
-        if isinstance(analysis_ctx.get("chartRecommendation"), dict)
-        else {}
-    )
-    viz_title = ""
-    if visualization and isinstance(visualization.get("title"), str):
-        viz_title = visualization["title"].strip()
-    conv_out = {
-        "lastQuestion": eff_q,
-        "lastChartTitle": viz_title or str(analysis_ctx.get("chartTitle") or "").strip(),
-        "metricColumn": analysis_ctx.get("metricColumn"),
-        "categoryColumn": analysis_ctx.get("categoryColumn"),
-        "aggregation": analysis_ctx.get("aggregation"),
-        "chartType": analysis_ctx.get("chartType"),
-        "intentBucket": chart_rec_out.get("detectedIntent"),
-        "filtersApplied": prev_filters + filter_added,
-    }
+        chart_rec_out = (
+            analysis_ctx.get("chartRecommendation")
+            if isinstance(analysis_ctx.get("chartRecommendation"), dict)
+            else {}
+        )
+        viz_title = ""
+        if visualization and isinstance(visualization.get("title"), str):
+            viz_title = visualization["title"].strip()
+        conv_out = {
+            "lastQuestion": eff_q,
+            "lastChartTitle": viz_title
+            or str(analysis_ctx.get("chartTitle") or "").strip(),
+            "metricColumn": analysis_ctx.get("metricColumn"),
+            "categoryColumn": analysis_ctx.get("categoryColumn"),
+            "aggregation": analysis_ctx.get("aggregation"),
+            "chartType": analysis_ctx.get("chartType"),
+            "intentBucket": chart_rec_out.get("detectedIntent"),
+            "filtersApplied": prev_filters + filter_added,
+        }
 
-    return {
-        "answer": response.content[0].text.strip(),
-        "visualization": visualization,
-        "analysis": analysis_ctx,
-        "conversation_context": conv_out,
-    }
+        return {
+            "answer": response.content[0].text.strip(),
+            "visualization": visualization,
+            "analysis": analysis_ctx,
+            "conversation_context": conv_out,
+            "dashboard_filter_summary": dash_labs,
+            "filter_breadcrumb": bc_full,
+        }
+    finally:
+        df = saved_df
+        dataset_profile = saved_prof
