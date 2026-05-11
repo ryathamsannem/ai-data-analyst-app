@@ -167,7 +167,11 @@ def detect_column_types(input_df: pd.DataFrame):
 
         # Date
         # pandas>=3 removed infer_datetime_format; inference is automatic
-        dt = pd.to_datetime(non_null, errors="coerce")
+        # Prefer mixed-format parser to avoid noisy per-element fallback warnings.
+        try:
+            dt = pd.to_datetime(non_null, errors="coerce", format="mixed")
+        except TypeError:
+            dt = pd.to_datetime(non_null, errors="coerce")
         date_ratio = float(dt.notna().mean()) if len(non_null) else 0.0
 
         if numeric_ratio >= 0.9:
@@ -204,6 +208,34 @@ def build_profile(input_df: pd.DataFrame):
         "null_counts": null_counts,
         "summary_stats": summary_stats,
     }
+
+
+def _json_safe(value: Any) -> Any:
+    """Recursively coerce NaN/Inf to JSON-safe values."""
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, tuple):
+        return [_json_safe(v) for v in value]
+    # Covers built-in floats plus numpy/pandas scalar float values.
+    if isinstance(value, (float, int)) and not isinstance(value, bool):
+        try:
+            fv = float(value)
+            if not math.isfinite(fv):
+                return None
+        except Exception:
+            pass
+        return value
+    # Last-resort numeric-ish objects (e.g., np.float64) that may not satisfy
+    # isinstance(x, float) in all environments.
+    try:
+        fv = float(value)
+        if not math.isfinite(fv):
+            return None
+    except Exception:
+        pass
+    return value
 
 
 def get_ai_context(sample_rows: int = 10):
@@ -2386,7 +2418,7 @@ def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
     prof = dataset_profile or build_profile(df)
     dim_opts = build_dimension_catalog_for_ui(df, prof)
     bc = build_filter_breadcrumb(df, prof, [], None)
-    return {
+    payload = {
         "file": {
             "name": uploaded_file_name,
             "size_bytes": len(uploaded_file_bytes) if uploaded_file_bytes else 0,
@@ -2415,6 +2447,7 @@ def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
         "filter_summary": [],
         "empty": False,
     }
+    return _json_safe(payload)
 
 
 def build_upload_response(sheet_names):
@@ -2479,7 +2512,7 @@ def _compose_empty_filtered_payload(
     kind = infer_auto_dashboard_kind()
     label = AUTO_DASHBOARD_LABELS.get(kind, "Generic")
     empty_ad = {"kind": kind, "type_label": label, "cards": [], "charts": []}
-    return {
+    payload = {
         "empty": True,
         "message": NO_RECORDS_FILTERS_MSG,
         "file": {
@@ -2515,6 +2548,7 @@ def _compose_empty_filtered_payload(
         "filter_breadcrumb": breadcrumb,
         "filter_summary": filt_labels,
     }
+    return _json_safe(payload)
 
 
 @app.post("/upload")
@@ -2627,10 +2661,10 @@ def get_preview(data: PreviewRequest):
         safe_limit = min(int(limit), 10000)
         view = df.head(safe_limit)
 
-    return {
+    return _json_safe({
         "rows": int(len(df)),
         "preview": view.to_dict(orient="records"),
-    }
+    })
 
 
 @app.post("/update-column-mapping")
@@ -2660,7 +2694,7 @@ def update_column_mapping(data: ColumnMappingRequest):
     auto_dashboard = build_auto_dashboard()
     prof = dataset_profile or build_profile(df)
 
-    return {
+    return _json_safe({
         "kpis": updated_kpis,
         "kpi_cards": kpi_cards,
         "dataset_kind": dataset_kind,
@@ -2677,7 +2711,7 @@ def update_column_mapping(data: ColumnMappingRequest):
             "profit_column": column_mapping.get("profit"),
             "date_column": column_mapping.get("date"),
         },
-    }
+    })
 
 
 def _pretty_label_text(raw, max_len: int = 56) -> str:
@@ -5987,14 +6021,14 @@ Rules:
             "filtersApplied": prev_filters + filter_added,
         }
 
-        return {
+        return _json_safe({
             "answer": response.content[0].text.strip(),
             "visualization": visualization,
             "analysis": analysis_ctx,
             "conversation_context": conv_out,
             "dashboard_filter_summary": dash_labs,
             "filter_breadcrumb": bc_full,
-        }
+        })
     finally:
         df = saved_df
         dataset_profile = saved_prof
