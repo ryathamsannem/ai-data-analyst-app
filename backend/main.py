@@ -2813,6 +2813,250 @@ def _dataset_suggestion_confidence(
     return "low"
 
 
+def _pick_date_column_for_suggestions(
+    mapped_date: Optional[str],
+    date_cols: List[str],
+    columns: List[str],
+    ct: Dict[str, Any],
+) -> Optional[str]:
+    """Prefer mapped date, then typed date columns, then name heuristics."""
+    if mapped_date and mapped_date in columns:
+        return mapped_date
+    for c in date_cols:
+        if c in columns and ct.get(c) == "date":
+            return c
+    if date_cols:
+        return date_cols[0]
+    return _find_first_column(
+        columns,
+        [
+            "date",
+            "order date",
+            "transaction date",
+            "timestamp",
+            "created",
+            "period",
+            "month",
+            "invoice date",
+        ],
+    )
+
+
+def _suggested_ecommerce_questions(
+    columns: List[str],
+    ct: Dict[str, Any],
+    ranked_dims: List[Tuple[str, int]],
+    ranked_metrics: List[Tuple[str, int]],
+    date_c: Optional[str],
+    product_col: Optional[str],
+    sales_col: Optional[str],
+    region_col: Optional[str],
+    customer_col: Optional[str],
+    profit_col: Optional[str],
+) -> List[str]:
+    """Executive / operational / anomaly / trend prompts for retail & ecommerce."""
+    qs: List[str] = []
+    prod = product_col or _resolve_dimension(
+        columns, ["product", "sku", "item", "style", "variant", "listing"], ranked_dims
+    )
+    rev = sales_col or _resolve_metric(
+        columns, ["sales", "revenue", "amount", "total", "value", "gmv"], ranked_metrics
+    )
+    reg = region_col or _resolve_dimension(
+        columns, ["region", "state", "territory", "country", "market", "geo"], ranked_dims
+    )
+    cust = customer_col or _resolve_dimension(
+        columns, ["customer", "client", "buyer", "account", "shopper"], ranked_dims
+    )
+    cat = _find_first_column(
+        columns, ["category", "segment", "collection", "department", "class", "subcategory"]
+    )
+    rating = _find_first_column(
+        columns,
+        [
+            "rating",
+            "review_score",
+            "stars",
+            "nps",
+            "satisfaction",
+            "csat",
+            "feedback_score",
+        ],
+    )
+    ret_col = _find_first_column(
+        columns,
+        ["returned", "is_return", "return_flag", "refund", "return_qty", "rma", "chargeback"],
+    )
+    discount = _find_first_column(columns, ["discount", "markdown", "promo", "coupon"])
+    order_col = _find_order_id_column(columns)
+
+    # Executive
+    if prod and rev:
+        qs.append(
+            _clean_question_sentence(
+                f"Which {_q_label(prod)} drive the most {_q_label(rev)}?"
+            )
+        )
+        qs.append(_tpl_ranking(prod, rev, 10))
+    if cat and rev:
+        qs.append(
+            _clean_question_sentence(
+                f"How concentrated is {_q_label(rev)} across {_q_label(cat)}?"
+            )
+        )
+
+    # Operational
+    if reg and rev:
+        qs.append(
+            _clean_question_sentence(
+                f"Which {_q_label(reg)} has the highest {_q_label(rev)}?"
+            )
+        )
+    if reg and ret_col:
+        qs.append(
+            _clean_question_sentence(
+                f"Which {_q_label(reg)} has the highest returns or refunds?"
+            )
+        )
+    if order_col and rev:
+        qs.append(
+            _clean_question_sentence(
+                f"What is average {_q_label(rev)} per order across the dataset?"
+            )
+        )
+    if cust and rev and not _id_like_column_name(str(cust)):
+        qs.append(_tpl_compare_avg_across(rev, cust))
+
+    # Customer experience
+    if rating and prod:
+        qs.append(
+            _clean_question_sentence(
+                f"What impacts {_q_label(rating)} across {_q_label(prod)}?"
+            )
+        )
+    elif rating and reg:
+        qs.append(
+            _clean_question_sentence(
+                f"How does {_q_label(rating)} compare across {_q_label(reg)}?"
+            )
+        )
+
+    # Anomaly
+    if rev:
+        qs.append(_tpl_outliers(rev))
+    if profit_col:
+        qs.append(_tpl_outliers(profit_col))
+    if discount:
+        qs.append(
+            _clean_question_sentence(
+                f"Where are unusually large {_q_label(discount)} values worth reviewing?"
+            )
+        )
+
+    # Trend
+    if date_c and rev:
+        qs.append(_tpl_trend(rev, date_c))
+    if date_c and ret_col:
+        qs.append(
+            _clean_question_sentence(
+                f"How do returns or refunds trend over {_q_label(date_c)}?"
+            )
+        )
+    if date_c and rating:
+        qs.append(_tpl_trend(rating, date_c))
+
+    return qs
+
+
+def _suggested_manufacturing_questions(
+    columns: List[str],
+    ct: Dict[str, Any],
+    ranked_dims: List[Tuple[str, int]],
+    ranked_metrics: List[Tuple[str, int]],
+    date_c: Optional[str],
+    region_col: Optional[str],
+) -> List[str]:
+    """Executive / operational / anomaly / trend prompts for manufacturing & ops."""
+    qs: List[str] = []
+    plant = region_col or _resolve_dimension(
+        columns,
+        ["plant", "site", "facility", "line", "work center", "workcenter", "warehouse", "cell"],
+        ranked_dims,
+    )
+    defect = _find_first_column(
+        columns, ["defect", "scrap", "reject", "ng_", "fault", "rework", "downtime"]
+    )
+    uptime = _find_first_column(columns, ["uptime", "availability", "oee", "utilization"])
+    prod = _resolve_metric(
+        columns,
+        ["output", "produced", "units_produced", "throughput", "production", "yield", "quantity"],
+        ranked_metrics,
+    )
+    shift = _find_first_column(columns, ["shift", "crew", "team", "operator"])
+    batch = _find_first_column(columns, ["batch", "lot", "work_order", "wo_", "run_id"])
+    maint = _find_first_column(columns, ["maintenance", "mttr", "pm_", "downtime_hours"])
+
+    # Executive
+    if plant and defect:
+        qs.append(
+            _clean_question_sentence(
+                f"Which {_q_label(plant)} has the highest {_q_label(defect)} load?"
+            )
+        )
+    if plant and prod:
+        qs.append(
+            _clean_question_sentence(
+                f"Which {_q_label(plant)} has the highest {_q_label(prod)} output?"
+            )
+        )
+        qs.append(_tpl_ranking(plant, prod, 5))
+
+    # Operational
+    if shift and uptime:
+        qs.append(
+            _clean_question_sentence(
+                f"Which {_q_label(shift)} has the lowest {_q_label(uptime)}?"
+            )
+        )
+    if shift and prod:
+        qs.append(_tpl_compare_avg_across(prod, shift))
+    if maint and plant:
+        qs.append(
+            _clean_question_sentence(
+                f"How does {_q_label(maint)} compare across {_dim_scope_plural_from_col(plant)}?"
+            )
+        )
+
+    # Trend
+    if date_c and prod:
+        qs.append(
+            _clean_question_sentence(
+                f"What is the {_q_label(prod)} trend over {_q_label(date_c)}?"
+            )
+        )
+    if date_c and defect:
+        qs.append(_tpl_trend(defect, date_c))
+    if date_c and uptime:
+        qs.append(_tpl_trend(uptime, date_c))
+
+    # Anomaly
+    if defect:
+        qs.append(_tpl_outliers(defect))
+    if prod:
+        qs.append(_tpl_outliers(prod))
+    if batch and defect:
+        qs.append(
+            _clean_question_sentence(
+                f"Which {_q_label(batch)} shows unusually high {_q_label(defect)}?"
+            )
+        )
+
+    if plant and prod:
+        qs.append(_tpl_compare_avg_across(prod, plant))
+
+    return qs
+
+
 def _generic_suggested_questions() -> List[str]:
     return [
         "What are the strongest numeric patterns in this dataset?",
@@ -2927,11 +3171,39 @@ def build_suggested_questions() -> List[str]:
     date_col = get_mapped_or_detected_column(
         "date", ["date", "order date", "transaction date", "invoice date", "month", "period"]
     )
+    kpi_domain = infer_kpi_domain()
+    date_for_trend = _pick_date_column_for_suggestions(date_col, date_cols, columns, ct)
 
     qs: List[str] = []
 
+    if kpi_domain == "ecommerce":
+        qs.extend(
+            _suggested_ecommerce_questions(
+                columns,
+                ct,
+                ranked_dims,
+                ranked_metrics,
+                date_for_trend,
+                product_col,
+                sales_col,
+                region_col,
+                customer_col,
+                profit_col,
+            )
+        )
+    elif kpi_domain == "manufacturing":
+        qs.extend(
+            _suggested_manufacturing_questions(
+                columns,
+                ct,
+                ranked_dims,
+                ranked_metrics,
+                date_for_trend,
+                region_col,
+            )
+        )
     # ---- HR ----
-    if domain == "hr":
+    elif domain == "hr":
         dept = _resolve_dimension(
             columns,
             ["department", "dept", "team", "division", "business unit", "business_unit"],
@@ -2981,6 +3253,10 @@ def build_suggested_questions() -> List[str]:
                     f"Which {_q_label(dept)} has the lowest {_q_label(att)}?"
                 )
             )
+        if salary:
+            qs.append(_tpl_outliers(salary))
+        if salary and date_col:
+            qs.append(_tpl_trend(salary, date_col))
 
     # ---- Sales (and marketing-adjacent product metrics) ----
     elif domain == "sales":
