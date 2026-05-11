@@ -862,20 +862,478 @@ def infer_dataset_kind() -> str:
     return "generic"
 
 
+def _ecommerce_column_hit(lower_cols: List[str]) -> int:
+    keys = [
+        "return",
+        "refund",
+        "cart",
+        "checkout",
+        "session_id",
+        "channel",
+        "marketplace",
+        "listing",
+        "order_line",
+        "fulfillment",
+        "shipping",
+        "payment_status",
+        "txn",
+    ]
+    return _domain_keyword_hits(lower_cols, keys)
+
+
+def _manufacturing_column_hit(lower_cols: List[str]) -> int:
+    keys = [
+        "plant",
+        "work_center",
+        "workcenter",
+        "bom",
+        "routing",
+        "batch",
+        "machine",
+        "oee",
+        "scrap",
+        "defect_rate",
+        "reject_rate",
+        "uptime",
+        "availability",
+        "downtime",
+        "maintenance",
+        "mttr",
+        "mtbf",
+        "yield",
+        "throughput",
+        "units_produced",
+        "output",
+        "shift",
+        "work_order",
+        "wo_",
+        "wip",
+        "station",
+        "line_id",
+    ]
+    return _domain_keyword_hits(lower_cols, keys)
+
+
+def infer_kpi_domain() -> str:
+    """
+    Domain label for KPI cards (executive-facing), finer than infer_dataset_kind().
+    Returns: manufacturing | ecommerce | hr | sales | generic
+    """
+    global df
+    if df is None or df.empty:
+        return "generic"
+    columns = df.columns.tolist()
+    lower = _col_lower_list(columns)
+    base = infer_dataset_kind()
+    if base == "hr":
+        return "hr"
+
+    mfg_h = _manufacturing_column_hit(lower)
+    eco_h = _ecommerce_column_hit(lower)
+    auto = infer_auto_dashboard_kind()
+    cust_col = get_mapped_or_detected_column(
+        "customer", ["customer", "client", "buyer", "account"]
+    )
+    order_hint = _find_order_id_column(columns)
+
+    if base == "sales":
+        if eco_h >= 2 or (eco_h >= 1 and order_hint and cust_col):
+            return "ecommerce"
+        return "sales"
+
+    if mfg_h >= 2 and mfg_h > eco_h:
+        return "manufacturing"
+    if auto == "operations" and mfg_h >= 2:
+        return "manufacturing"
+
+    return "generic"
+
+
+def _build_manufacturing_kpi_cards(
+    columns: List[str], profile: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """Executive manufacturing KPIs (best-effort from schema)."""
+    global df
+    cards: List[Dict[str, Any]] = []
+    if df is None or df.empty:
+        return cards
+    ct = (profile or {}).get("column_types", {}) or {}
+
+    def pick_num(kws: List[str]) -> Optional[str]:
+        for c in columns:
+            if ct.get(c) != "number":
+                continue
+            cl = str(c).lower().replace(" ", "_")
+            if any(k in cl for k in kws):
+                return str(c)
+        return None
+
+    def pick_cat(kws: List[str]) -> Optional[str]:
+        for c in columns:
+            if ct.get(c) not in ("category", "text"):
+                continue
+            cl = str(c).lower().replace(" ", "_")
+            if any(k in cl for k in kws):
+                return str(c)
+        return None
+
+    plant_col = pick_cat(["plant", "site", "facility", "location", "work_center", "workcenter", "line"])
+
+    produced_col = pick_num(
+        ["output", "produced", "units_produced", "production", "throughput", "good_qty", "quantity"]
+    )
+    defect_col = pick_num(["defect", "scrap", "reject", "ng_", "fault"])
+    good_col = pick_num(["good_qty", "pass_qty", "ok_qty", "accepted"])
+
+    # Defect rate %
+    dr: Optional[float] = None
+    if defect_col and good_col:
+        try:
+            d = numeric_series(defect_col)
+            g = numeric_series(good_col)
+            m = pd.concat([d, g], axis=1).dropna()
+            if len(m) >= 1:
+                td = float(m.iloc[:, 0].sum())
+                tg = float(m.iloc[:, 1].sum())
+                den = td + tg
+                if den > 0:
+                    dr = 100.0 * td / den
+        except Exception:
+            dr = None
+    if dr is None and defect_col:
+        dv = numeric_series(defect_col)
+        if dv.notna().any():
+            mx = float(dv.max(skipna=True))
+            mn = float(dv.min(skipna=True))
+            if mx <= 100.0 and mn >= 0.0 and mx > 1.0:
+                dr = float(dv.mean(skipna=True))
+            elif mx <= 1.05:
+                dr = 100.0 * float(dv.mean(skipna=True))
+
+    if dr is not None:
+        cards.append(
+            {
+                "title": "Defect / reject signal",
+                "value": f"{dr:.1f}%",
+                "subtitle": "Share or avg rate from defect & pass columns when available",
+            }
+        )
+
+    uptime_col = pick_num(["uptime", "availability", "oee"])
+    if uptime_col:
+        uv = numeric_series(uptime_col)
+        if uv.notna().any():
+            mu = float(uv.mean(skipna=True))
+            if mu <= 1.05:
+                mu *= 100.0
+            cards.append(
+                {
+                    "title": "Uptime / availability",
+                    "value": f"{mu:.1f}%",
+                    "subtitle": str(uptime_col)[:44],
+                }
+            )
+
+    if produced_col:
+        pv = numeric_series(produced_col)
+        if pv.notna().any():
+            cards.append(
+                {
+                    "title": "Avg production (per row)",
+                    "value": f"{float(pv.mean(skipna=True)):,.1f}",
+                    "subtitle": str(produced_col)[:44],
+                }
+            )
+
+    maint_col = pick_num(["maintenance", "mttr", "downtime", "pm_"])
+    run_col = pick_num(["runtime", "run_time", "operating_hours", "production_hours"])
+    if maint_col and run_col:
+        try:
+            m = numeric_series(maint_col).fillna(0)
+            r = numeric_series(run_col).fillna(0)
+            tot = float((m + r).sum())
+            if tot > 0:
+                ratio = 100.0 * float(m.sum()) / tot
+                cards.append(
+                    {
+                        "title": "Maintenance load",
+                        "value": f"{ratio:.1f}%",
+                        "subtitle": "Maintenance vs maintenance+runtime (row sums)",
+                    }
+                )
+        except Exception:
+            pass
+    elif maint_col:
+        mv = numeric_series(maint_col)
+        if mv.notna().any():
+            cards.append(
+                {
+                    "title": "Maintenance / downtime (total)",
+                    "value": f"{float(mv.sum(skipna=True)):,.0f}",
+                    "subtitle": str(maint_col)[:44],
+                }
+            )
+
+    if plant_col and produced_col:
+        try:
+            sub = df[[plant_col, produced_col]].copy()
+            sub["_v"] = numeric_series(produced_col)
+            sub = sub.dropna(subset=[plant_col, "_v"])
+            if not sub.empty:
+                g = sub.groupby(plant_col)["_v"].sum().sort_values(ascending=False)
+                if not g.empty:
+                    top_p = str(g.index[0])[:48]
+                    top_v = float(g.iloc[0])
+                    cards.append(
+                        {
+                            "title": "Highest output plant / line",
+                            "value": top_p,
+                            "subtitle": f"Output {top_v:,.0f}",
+                        }
+                    )
+        except Exception:
+            pass
+
+    if not cards:
+        cards.append(
+            {
+                "title": "Production records",
+                "value": f"{int(len(df)):,}",
+                "subtitle": "Upload operational fields (plant, output, defects) for richer KPIs",
+            }
+        )
+    return cards[:5]
+
+
+def _build_ecommerce_kpi_cards(
+    columns: List[str], profile: Dict[str, Any], kp: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """Executive ecommerce / retail KPIs."""
+    global df
+    cards: List[Dict[str, Any]] = []
+    if df is None or df.empty:
+        return cards
+
+    sales_col = get_mapped_or_detected_column(
+        "sales", ["sales", "revenue", "amount", "total", "value"]
+    )
+    order_col = _find_order_id_column(columns)
+    cust_col = get_mapped_or_detected_column(
+        "customer", ["customer", "client", "buyer", "account"]
+    )
+    cat_col = _find_first_column(
+        columns,
+        ["category", "segment", "collection", "department", "class", "subcategory"],
+    )
+    if cat_col is None:
+        cat_col = get_mapped_or_detected_column(
+            "product", ["product", "item", "sku", "style", "variant"]
+        )
+
+    if kp.get("total_sales") is not None and order_col:
+        try:
+            sub = df[[order_col]].dropna()
+            uo = int(sub[order_col].nunique(dropna=True))
+            if uo > 0:
+                aov = float(kp["total_sales"]) / float(uo)
+                cards.append(
+                    {
+                        "title": "Avg order value",
+                        "value": f"{aov:,.0f}",
+                        "subtitle": f"{uo:,} distinct orders",
+                    }
+                )
+        except Exception:
+            pass
+
+    ret_col = _find_first_column(
+        columns,
+        ["returned", "is_return", "return_flag", "refund", "return_qty", "return_quantity"],
+    )
+    if order_col and ret_col and ret_col in df.columns:
+        try:
+            tmp = df[[order_col, ret_col]].copy()
+            rc = tmp[ret_col]
+            if pd.api.types.is_numeric_dtype(rc):
+                bad = tmp[pd.to_numeric(rc, errors="coerce").fillna(0) > 0]
+            else:
+                rs = rc.astype(str).str.lower().str.strip()
+                bad = tmp[
+                    rs.isin(
+                        {"1", "true", "yes", "y", "returned", "refunded", "rma"}
+                    )
+                ]
+                tot_o = int(tmp[order_col].nunique())
+                ret_o = int(bad[order_col].nunique()) if not bad.empty else 0
+                if tot_o > 0:
+                    cards.append(
+                        {
+                            "title": "Return / refund rate (orders)",
+                            "value": f"{100.0 * ret_o / tot_o:.1f}%",
+                            "subtitle": f"{ret_o:,} of {tot_o:,} orders flagged",
+                        }
+                    )
+        except Exception:
+            pass
+
+    if order_col and cust_col:
+        try:
+            oc = df[[order_col, cust_col]].dropna()
+            if not oc.empty:
+                freq = oc.groupby(cust_col)[order_col].nunique()
+                repeat = int((freq > 1).sum())
+                buyers = int(freq.shape[0])
+                if buyers > 0:
+                    cards.append(
+                        {
+                            "title": "Repeat customer rate",
+                            "value": f"{100.0 * repeat / buyers:.1f}%",
+                            "subtitle": f"{repeat:,} repeat of {buyers:,} customers",
+                        }
+                    )
+        except Exception:
+            pass
+
+    if cat_col and sales_col:
+        try:
+            sub = df[[cat_col, sales_col]].copy()
+            sub["_v"] = numeric_series(sales_col)
+            sub = sub.dropna(subset=[cat_col, "_v"])
+            if not sub.empty:
+                g = sub.groupby(cat_col)["_v"].sum().sort_values(ascending=False)
+                if not g.empty:
+                    top_c = str(g.index[0])[:48]
+                    top_v = float(g.iloc[0])
+                    tot = float(g.sum()) or 1.0
+                    conc = 100.0 * top_v / tot
+                    hhi = float(((g / tot) ** 2).sum() * 100.0)
+                    cards.append(
+                        {
+                            "title": "Top category / SKU group",
+                            "value": top_c,
+                            "subtitle": f"{conc:.1f}% of revenue",
+                        }
+                    )
+                    cards.append(
+                        {
+                            "title": "Revenue concentration (HHI)",
+                            "value": f"{hhi:.0f}",
+                            "subtitle": "100 = single group; lower = more diversified mix",
+                        }
+                    )
+        except Exception:
+            pass
+
+    if kp.get("total_sales") is not None:
+        cards.append(
+            {
+                "title": "Total revenue",
+                "value": f'{float(kp["total_sales"]):,.0f}',
+                "subtitle": None,
+            }
+        )
+
+    out: List[Dict[str, Any]] = []
+    seen: set = set()
+    for c in cards:
+        t = str(c.get("title", "")).strip()
+        if t and t not in seen:
+            seen.add(t)
+            out.append(c)
+        if len(out) >= 5:
+            break
+    return out[:5]
+
+
+def _build_generic_executive_kpi_cards(
+    columns: List[str], profile: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """Prefer light business signals over raw schema counts."""
+    global df
+    cards: List[Dict[str, Any]] = []
+    if df is None or df.empty:
+        return cards
+    ct = (profile or {}).get("column_types", {}) or {}
+    cards.append(
+        {"title": "Records in dataset", "value": f"{int(len(df)):,}", "subtitle": None}
+    )
+
+    date_c = _find_first_column(
+        columns,
+        ["date", "order date", "timestamp", "created", "period", "month", "fiscal"],
+    )
+    if date_c:
+        try:
+            dc = pd.to_datetime(df[date_c], errors="coerce").dropna()
+            if len(dc) >= 2:
+                cards.append(
+                    {
+                        "title": "Reporting window",
+                        "value": f"{(dc.max() - dc.min()).days} days",
+                        "subtitle": f"{dc.min().date()} → {dc.max().date()}",
+                    }
+                )
+        except Exception:
+            pass
+
+    money_col = _find_first_column(
+        columns,
+        ["revenue", "sales", "amount", "total", "value", "price", "cost", "budget"],
+    )
+    if money_col and ct.get(money_col) == "number":
+        sv = numeric_series(money_col)
+        if sv.notna().any():
+            cards.append(
+                {
+                    "title": f"Total {_pretty_label_text(money_col)}",
+                    "value": f"{float(sv.sum(skipna=True)):,.0f}",
+                    "subtitle": "Sum of primary numeric metric",
+                }
+            )
+
+    cat_dim = None
+    for c in columns:
+        if ct.get(c) in ("category", "text") and df[c].nunique(dropna=True) <= 80:
+            cat_dim = c
+            break
+    if cat_dim:
+        try:
+            vc = df[cat_dim].astype(str).value_counts().head(1)
+            if not vc.empty:
+                cards.append(
+                    {
+                        "title": "Largest segment",
+                        "value": str(vc.index[0])[:52],
+                        "subtitle": f"{int(vc.iloc[0]):,} rows · {_pretty_label_text(cat_dim)}",
+                    }
+                )
+        except Exception:
+            pass
+
+    if len(cards) < 4:
+        cards.append(
+            {
+                "title": "Tracked attributes",
+                "value": f"{len(columns):,}",
+                "subtitle": "Columns available for analysis",
+            }
+        )
+    return cards[:5]
+
+
 def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
     """UI + PDF KPI cards with human-facing labels."""
     global df, dataset_profile
-    kind = infer_dataset_kind()
     if df is None:
-        return [], kind
+        return [], "generic"
 
+    domain = infer_kpi_domain()
     profile = dataset_profile or build_profile(df)
-    ct = profile.get("column_types", {})
     kp = calculate_kpis()
     cards: List[Dict[str, Any]] = []
     columns = df.columns.tolist()
 
-    if kind == "hr":
+    if domain == "hr":
         emp_id_col = _find_first_column(
             columns,
             ["employee_id", "emp_id", "staff_id", "emp id", "employee id"],
@@ -934,9 +1392,19 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
         else:
             cards.append({"title": "Departments", "value": "N/A", "subtitle": None})
 
-        return cards[:4], kind
+        return cards[:4], domain
 
-    if kind == "sales":
+    if domain == "manufacturing":
+        cards = _build_manufacturing_kpi_cards(columns, profile)
+        return (cards[:5] if cards else _build_generic_executive_kpi_cards(columns, profile)), domain
+
+    if domain == "ecommerce":
+        cards = _build_ecommerce_kpi_cards(columns, profile, kp)
+        if not cards:
+            cards = _build_generic_executive_kpi_cards(columns, profile)
+        return cards[:5], domain
+
+    if domain == "sales":
         if kp.get("total_sales") is not None:
             cards.append(
                 {
@@ -979,28 +1447,33 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
             "sales",
             ["sales", "revenue", "amount", "total", "value"],
         )
-        if date_col and sales_col:
+        order_col = _find_order_id_column(columns)
+        if order_col:
+            try:
+                uo = int(df[order_col].nunique(dropna=True))
+                if uo > 0:
+                    cards.append(
+                        {
+                            "title": "Distinct orders / transactions",
+                            "value": f"{uo:,}",
+                            "subtitle": "Count of unique order keys in this file",
+                        }
+                    )
+            except Exception:
+                pass
+        elif date_col and sales_col:
             cards.append(
                 {
-                    "title": "Period Trend",
-                    "value": "Supported",
-                    "subtitle": "Use a monthly / time-based sales question",
+                    "title": "Trend-ready",
+                    "value": "Yes",
+                    "subtitle": "Date + revenue fields detected for time-series questions",
                 }
             )
 
-        return cards[:4], kind
+        return cards[:5], domain
 
-    # generic
-    num_n = sum(1 for c in columns if ct.get(c) == "number")
-    cat_n = sum(1 for c in columns if ct.get(c) in ("category", "text"))
-
-    cards = [
-        {"title": "Total Rows", "value": f"{int(len(df)):,}", "subtitle": None},
-        {"title": "Total Columns", "value": f"{len(columns):,}", "subtitle": None},
-        {"title": "Numeric Columns", "value": f"{num_n:,}", "subtitle": None},
-        {"title": "Category Columns", "value": f"{cat_n:,}", "subtitle": None},
-    ]
-    return cards, kind
+    cards = _build_generic_executive_kpi_cards(columns, profile)
+    return cards[:5], domain
 
 
 AUTO_DASHBOARD_LABELS = {
@@ -1640,24 +2113,19 @@ def build_auto_dashboard() -> Dict[str, Any]:
                 break
         pad_candidates = [
             {
-                "title": "Total Columns",
-                "value": f"{len(columns):,}",
-                "subtitle": None,
-            },
-            {
-                "title": "Numeric Columns",
-                "value": f"{typed_count('number'):,}",
-                "subtitle": None,
-            },
-            {
-                "title": "Category Columns",
-                "value": f"{cat_type_count:,}",
-                "subtitle": None,
-            },
-            {
-                "title": "Total Rows",
+                "title": "Records in view",
                 "value": f"{int(len(df)):,}",
                 "subtitle": None,
+            },
+            {
+                "title": "Attributes tracked",
+                "value": f"{len(columns):,}",
+                "subtitle": "Columns available in this slice",
+            },
+            {
+                "title": "Breakdown-style fields",
+                "value": f"{cat_type_count:,}",
+                "subtitle": "Text / category columns (typical dimensions)",
             },
         ]
         p = 0
@@ -1818,17 +2286,8 @@ def build_auto_dashboard() -> Dict[str, Any]:
         return out
 
     if kind == "generic":
-        num_n = typed_count("number")
-        cat_n = cat_type_count
-        date_n = typed_count("date")
-        cards = [
-            {"title": "Total Rows", "value": f"{int(len(df)):,}", "subtitle": None},
-            {"title": "Total Columns", "value": f"{len(columns):,}", "subtitle": None},
-            {"title": "Numeric Columns", "value": f"{num_n:,}", "subtitle": None},
-            {"title": "Category Columns", "value": f"{cat_n:,}", "subtitle": None},
-            {"title": "Date Columns", "value": f"{date_n:,}", "subtitle": None},
-        ]
-        out["cards"] = cards[:6]
+        cards = _build_generic_executive_kpi_cards(columns, profile)
+        out["cards"] = clamp_cards(cards)
         out["charts"] = build_auto_dashboard_charts(kind)
         return out
 
@@ -1945,10 +2404,6 @@ def build_auto_dashboard() -> Dict[str, Any]:
                         "subtitle": str(def_col)[:38],
                     }
                 )
-
-        cards.append(
-            {"title": "Numeric Columns", "value": f"{typed_count('number'):,}", "subtitle": None}
-        )
 
         out["cards"] = clamp_cards(cards)
         out["charts"] = build_auto_dashboard_charts(kind)
