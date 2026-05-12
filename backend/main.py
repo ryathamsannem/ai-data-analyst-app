@@ -73,6 +73,15 @@ class ConversationContextPayload(BaseModel):
     followUpChain: List[str] = Field(default_factory=list)
     lastInsightChartId: Optional[str] = None
     activeDrillPath: List[str] = Field(default_factory=list)
+    # --- Rich thread memory (client-maintained; domain-agnostic) ---
+    lastAiAnswer: Optional[str] = None
+    lastChartSubtitle: Optional[str] = None
+    lastChartLabelSample: List[str] = Field(default_factory=list)
+    """Semantic roles (product, sales, date, …) → dataframe column names."""
+    columnMapping: Dict[str, str] = Field(default_factory=dict)
+    datasetDomain: Optional[str] = None
+    """Human-readable active explorer filters from the client (current ask)."""
+    activeDashboardFilters: List[str] = Field(default_factory=list)
 
 
 def _pretty_join_dimension_metric(
@@ -6997,6 +7006,23 @@ _FOLLOW_UP_WITH_PRIOR = re.compile(
     re.I,
 )
 
+# Meta / advisory follow-ups: keep prior pandas scope; answer references prior analysis.
+_THREAD_META_FOLLOW_UP = re.compile(
+    r"\b("
+    r"what\s+should\s+we\s+(?:check|do|look|analyze|explore)|"
+    r"what\s+else\s+(?:should\s+we\s+)?(?:check|do|look|try|explore)|"
+    r"what\s+to\s+(?:check|do|look\s+at)\s+next|"
+    r"what\s+do\s+you\s+recommend|"
+    r"where\s+should\s+we\s+(?:look|focus|dig)|"
+    r"next\s+steps?|"
+    r"anything\s+else\s+to\s+(?:check|try|look\s+at)|"
+    r"(?:go|dig)\s+deeper|"
+    r"how\s+should\s+we\s+proceed|"
+    r"what\s+are\s+the\s+next\s+steps"
+    r")\b",
+    re.I,
+)
+
 
 def _looks_like_follow_up_question(q: str, *, has_prior: bool) -> bool:
     s = (q or "").strip()
@@ -7005,12 +7031,21 @@ def _looks_like_follow_up_question(q: str, *, has_prior: bool) -> bool:
     if has_prior:
         if _FOLLOW_UP_WITH_PRIOR.search(s):
             return True
+        if _THREAD_META_FOLLOW_UP.search(s):
+            return True
     else:
         if _FOLLOW_UP_STANDALONE.search(s):
             return True
     if len(s) <= 36 and re.match(r"^\s*(why|explain)\s*\??\s*$", s, re.I):
         return True
     return False
+
+
+def _is_thread_meta_follow_up(q: str) -> bool:
+    s = (q or "").strip()
+    if not s:
+        return False
+    return bool(_THREAD_META_FOLLOW_UP.search(s))
 
 
 def _is_explanation_follow_up(q: str) -> bool:
@@ -7287,7 +7322,8 @@ def resolve_follow_up_turn(
         return out
 
     explanation = _is_explanation_follow_up(rq)
-    if explanation:
+    thread_meta = _is_thread_meta_follow_up(rq)
+    if explanation or thread_meta:
         eff = prior
     else:
         eff = f"{prior} {rq}".strip()
@@ -7298,13 +7334,18 @@ def resolve_follow_up_turn(
     applied_bits: List[str] = []
     if explanation:
         applied_bits.append("Explain / why (same calculation as previous question)")
+    elif thread_meta:
+        applied_bits.append(
+            "Thread guidance (same prior analysis scope; answer references prior results)"
+        )
     else:
         applied_bits.append(f"Continued from previous question ({rq})")
 
+    narrow_ok = not explanation and not thread_meta
     fchart = _parse_forced_chart_mutation(rq)
-    sortd = _parse_sort_direction_follow_up(rq)
-    stn = _extract_top_n(rq.lower()) if not explanation else None
-    sbn = _extract_bottom_n(rq.lower()) if not explanation else None
+    sortd = _parse_sort_direction_follow_up(rq) if narrow_ok else None
+    stn = _extract_top_n(rq.lower()) if narrow_ok else None
+    sbn = _extract_bottom_n(rq.lower()) if narrow_ok else None
 
     ops: Dict[str, Any] = {}
     if fchart:
@@ -7327,14 +7368,50 @@ def resolve_follow_up_turn(
     ctx_used = (
         f"Previous analysis: {prev_summary}\nFollow-up applied: {follow_line}"
     )
+
+    def _clip(s: Optional[str], n: int) -> str:
+        t = (s or "").strip()
+        if not t:
+            return "—"
+        return t if len(t) <= n else t[: n - 1] + "…"
+
+    labs = [x for x in (ctx.lastChartLabelSample or []) if str(x).strip()][:12]
+    lab_line = ", ".join(str(x).strip() for x in labs) if labs else "—"
+    cmap = ctx.columnMapping or {}
+    cmap_lines = "\n".join(
+        f"  - {k}: {v}" for k, v in sorted(cmap.items()) if str(v).strip()
+    )
+    dash_chip = ctx.activeDashboardFilters or []
+    dash_lines = "\n".join(f"  - {ln}" for ln in dash_chip if str(ln).strip())
+    prev_ans = _clip(ctx.lastAiAnswer, 3600)
+
     ai_block = (
-        "Conversation context (follow-up — keep metrics aligned with this thread):\n"
+        "Conversation Context\n"
+        "(Follow-up turn — keep reasoning aligned with this thread. "
+        "The user's latest message may be short; infer missing subjects from the prior turn.)\n"
+        f"- Latest user message: {rq}\n"
         f"- Previous question: {prior}\n"
         f"- Previous chart title: {ctx.lastChartTitle or '—'}\n"
-        f"- Metric column (prior): {ctx.metricColumn or '—'}\n"
-        f"- Category column (prior): {ctx.categoryColumn or '—'}\n"
+        f"- Previous chart subtitle: {ctx.lastChartSubtitle or '—'}\n"
+        f"- Sample category labels (prior chart): {lab_line}\n"
+        f"- Prior chart type: {ctx.chartType or '—'}\n"
+        f"- Metric column (prior focus): {ctx.metricColumn or '—'}\n"
+        f"- Category / grouping column (prior): {ctx.categoryColumn or '—'}\n"
         f"- Aggregation (prior): {ctx.aggregation or '—'}\n"
-        f"- This user message may be a short follow-up; interpret it in light of the above.\n"
+        f"- Dataset domain hint: {ctx.datasetDomain or '—'}\n"
+    )
+    if cmap_lines.strip():
+        ai_block += "- Column mapping (semantic role → column):\n" + cmap_lines + "\n"
+    if dash_lines.strip():
+        ai_block += "- Active dashboard filters (this request):\n" + dash_lines + "\n"
+    if ctx.filtersApplied:
+        ai_block += "- Row-scope notes from prior turns:\n" + "\n".join(
+            f"  - {ln}" for ln in ctx.filtersApplied if str(ln).strip()
+        ) + "\n"
+    ai_block += (
+        "- Previous AI answer (excerpt; cite chart numbers from the authoritative block, "
+        "not from memory if they differ):\n"
+        f"{prev_ans}\n"
     )
     out["ai_context_block"] = ai_block
     out["conversation_sidecar"] = {
