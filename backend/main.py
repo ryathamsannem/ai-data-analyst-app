@@ -12,6 +12,9 @@ import re
 import math
 import json
 import logging
+import uuid
+
+from analytics_metadata import build_metric_label
 
 load_dotenv()
 
@@ -64,6 +67,76 @@ class ConversationContextPayload(BaseModel):
     chartType: Optional[str] = None
     intentBucket: Optional[str] = None
     filtersApplied: List[str] = Field(default_factory=list)
+    """Conversation thread id from the prior server response (for lineage)."""
+    turnId: Optional[str] = None
+    """Ordered user questions in this BI copilot thread (for PDF / UI)."""
+    followUpChain: List[str] = Field(default_factory=list)
+    lastInsightChartId: Optional[str] = None
+    activeDrillPath: List[str] = Field(default_factory=list)
+
+
+def _pretty_join_dimension_metric(
+    cat: Optional[str], met: Optional[str]
+) -> str:
+    parts: List[str] = []
+    if cat:
+        parts.append(_pretty_label_text(str(cat)))
+    if met:
+        parts.append(_pretty_label_text(str(met)))
+    if len(parts) >= 2:
+        return f"{parts[0]} + {parts[1]}"
+    return parts[0] if parts else ""
+
+
+def _format_using_context_summary(ctx: Optional[ConversationContextPayload]) -> str:
+    if not ctx:
+        return ""
+    return _pretty_join_dimension_metric(ctx.categoryColumn, ctx.metricColumn)
+
+
+def _extend_follow_up_chain(
+    prev: Optional[ConversationContextPayload],
+    raw_q: str,
+    is_follow_up: bool,
+) -> List[str]:
+    rq = (raw_q or "").strip()
+    if not rq:
+        return []
+    if is_follow_up and prev:
+        pc = list(prev.followUpChain or [])
+        if pc:
+            return pc + [rq]
+        pq = (prev.lastQuestion or "").strip()
+        return [pq, rq] if pq else [rq]
+    return [rq]
+
+
+def _conversation_meta_payload(
+    *,
+    sidecar: Optional[Dict[str, Any]],
+    filter_added: List[str],
+    turn_id: str,
+    parent_tid: Optional[str],
+    using_summary: str,
+    is_follow_up: bool,
+) -> Dict[str, Any]:
+    inherited = bool(is_follow_up or filter_added)
+    note_parts: List[str] = []
+    if is_follow_up:
+        note_parts.append(
+            "This answer builds on your prior question; inherited metric/dimension selections apply unless you override them."
+        )
+    if filter_added:
+        note_parts.append(
+            "Additional row filters were derived from follow-up wording; confirm they match the cohort you intend."
+        )
+    return {
+        "followUpDetected": bool(is_follow_up),
+        "usingContextSummary": using_summary if is_follow_up else "",
+        "inheritedAssumptionNote": " ".join(note_parts) if inherited else "",
+        "turnId": turn_id,
+        "parentTurnId": parent_tid,
+    }
 
 
 class DashboardFilterEntryModel(BaseModel):
@@ -1664,7 +1737,7 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
                 avg = float(sv.mean(skipna=True))
                 cards.append(
                     {
-                        "title": "Average Salary",
+                        "title": build_metric_label("mean", "average", salary_col),
                         "value": f"{avg:,.0f}",
                         "subtitle": None,
                     }
@@ -1686,10 +1759,27 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
                     }
                 )
             else:
-                cards.append({"title": "Average Salary", "value": "N/A", "subtitle": None})
+                cards.append(
+                    {
+                        "title": build_metric_label("mean", "average", salary_col),
+                        "value": "N/A",
+                        "subtitle": None,
+                    }
+                )
                 cards.append({"title": "Highest Paid Employee", "value": "N/A", "subtitle": None})
         else:
-            cards.append({"title": "Average Salary", "value": "N/A", "subtitle": None})
+            ct_fb = profile.get("column_types", {})
+            numeric_fallback = [c for c in columns if ct_fb.get(c) == "number"]
+            fb_col = numeric_fallback[0] if numeric_fallback else None
+            cards.append(
+                {
+                    "title": build_metric_label("mean", "average", fb_col)
+                    if fb_col
+                    else "Average metric",
+                    "value": "N/A",
+                    "subtitle": None,
+                }
+            )
             cards.append({"title": "Highest Paid Employee", "value": "N/A", "subtitle": None})
 
         dept_col = _find_first_column(columns, ["department", "dept", "team", "division"])
@@ -2469,24 +2559,55 @@ def build_auto_dashboard() -> Dict[str, Any]:
                 hi_val = float(sv.max(skipna=True))
                 cards.append(
                     {
-                        "title": "Average Salary",
+                        "title": build_metric_label("mean", "average", salary_col),
                         "value": f"{avg:,.0f}",
                         "subtitle": None,
                     }
                 )
                 cards.append(
                     {
-                        "title": "Highest Salary",
+                        "title": build_metric_label("max", "maximum", salary_col),
                         "value": f"{hi_val:,.0f}",
                         "subtitle": None,
                     }
                 )
             else:
-                cards.append({"title": "Average Salary", "value": "N/A", "subtitle": None})
-                cards.append({"title": "Highest Salary", "value": "N/A", "subtitle": None})
+                cards.append(
+                    {
+                        "title": build_metric_label("mean", "average", salary_col),
+                        "value": "N/A",
+                        "subtitle": None,
+                    }
+                )
+                cards.append(
+                    {
+                        "title": build_metric_label("max", "maximum", salary_col),
+                        "value": "N/A",
+                        "subtitle": None,
+                    }
+                )
         else:
-            cards.append({"title": "Average Salary", "value": "N/A", "subtitle": None})
-            cards.append({"title": "Highest Salary", "value": "N/A", "subtitle": None})
+            prof_ct = profile.get("column_types", {})
+            num_fb = [c for c in columns if prof_ct.get(c) == "number"]
+            fb_m = num_fb[0] if num_fb else None
+            cards.append(
+                {
+                    "title": build_metric_label("mean", "average", fb_m)
+                    if fb_m
+                    else "Average metric",
+                    "value": "N/A",
+                    "subtitle": None,
+                }
+            )
+            cards.append(
+                {
+                    "title": build_metric_label("max", "maximum", fb_m)
+                    if fb_m
+                    else "Maximum metric",
+                    "value": "N/A",
+                    "subtitle": None,
+                }
+            )
 
         dept_col = _find_first_column(columns, ["department", "dept", "team", "division"])
         if dept_col:
@@ -4281,43 +4402,8 @@ def _business_metric_series_label(
     agg_label: Optional[str],
     value_col: Optional[str],
 ) -> str:
-    """
-    SME-friendly metric phrase for chart titles / axes (not raw column tokens).
-    e.g. count + employee_id → "Employee count".
-    """
-    ak = (str(agg_key or "")).strip().lower()
-    al = (str(agg_label or "")).strip().lower()
-    raw_pretty = _pretty_label_text(value_col) if value_col else "Value"
-
-    if ak == "count" or al == "count":
-        stem = _strip_id_metric_stem(value_col) or (str(value_col or "").strip().lower())
-        ent = _title_case_words(stem)
-        if not ent:
-            return "Count"
-        if ent.lower().endswith(" count"):
-            return ent
-        return f"{ent} count"
-
-    if ak == "mean" or al in ("average", "mean", "avg") or "average" in al:
-        if raw_pretty.lower() in ("average", "mean", "avg", "value"):
-            return "Average"
-        return f"Average {raw_pretty}"
-
-    if ak == "sum" or al in ("total", "sum"):
-        if raw_pretty.lower() in ("total", "sum", "value"):
-            return "Total"
-        return f"Total {raw_pretty}"
-
-    if ak == "min" or al.startswith("min"):
-        return f"Lowest {raw_pretty}" if raw_pretty else "Minimum"
-
-    if ak == "max" or al.startswith("max"):
-        return f"Highest {raw_pretty}" if raw_pretty else "Maximum"
-
-    lab = str(agg_label or "").strip()
-    if lab and value_col:
-        return f"{lab} {raw_pretty}".strip()
-    return raw_pretty or lab or "Value"
+    """Delegates to centralized analytics_metadata.build_metric_label."""
+    return build_metric_label(agg_key, agg_label, value_col)
 
 
 def _business_chart_title(
@@ -6901,7 +6987,7 @@ _FOLLOW_UP_STANDALONE = re.compile(
 
 # Extra tokens when prior analysis exists (continuation / refinement).
 _FOLLOW_UP_WITH_PRIOR = re.compile(
-    r"\bonly\b|\bfilters?\b|"
+    r"\bnow\s+show\b|\bonly\b|\bfilters?\b|"
     r"\btop\s+\d{1,2}\b|\btop\s+(?:three|four|five|six|seven|eight|nine|ten)\b|"
     r"\bbottom\s+\d{1,2}\b|\bbottom\s+(?:three|four|five|ten)\b|"
     r"convert(?:\s+to)?|show\s+as|as\s+a\s+(?:pie|line|bar|donut|area)\b|"
@@ -7034,6 +7120,36 @@ def _try_build_follow_up_filtered_df(
 
     def _norm_series(col: str) -> pd.Series:
         return out[col].astype(str).str.strip().str.lower()
+
+    # --- (now) show only A and B ... (multiple category values on prior dimension) ---
+    m_only_tail = re.search(
+        r"(?:^|\b)(?:now\s+)?(?:show\s+)?only\s+(.+?)\s*$",
+        q.strip(),
+        re.I | re.S,
+    )
+    if m_only_tail and ctx and ctx.categoryColumn:
+        phrase_full = m_only_tail.group(1).strip().strip('"').strip("'")
+        phrases = [
+            p.strip().strip('"').strip("'")
+            for p in re.split(r"\s+and\s+|,\s*", phrase_full)
+            if p.strip()
+        ]
+        cc = str(ctx.categoryColumn)
+        if cc in out.columns and len(phrases) >= 2:
+            try:
+                combined: Optional[pd.Series] = None
+                for ph in phrases:
+                    sub = _norm_series(cc).str.contains(re.escape(ph.lower()), na=False)
+                    combined = sub if combined is None else (combined | sub)
+                if combined is not None:
+                    n0 = len(out)
+                    out = out.loc[combined].copy()
+                    labels.append(
+                        f"Only {cc} in [{', '.join(phrases)}] ({n0} → {len(out)})"
+                    )
+                    return out, labels
+            except Exception:
+                pass
 
     # --- only <phrase> ---
     m_only = re.search(
@@ -7848,12 +7964,21 @@ def ask_question(data: QuestionRequest):
 
     plan = resolve_follow_up_turn(data.question, data.conversation_context)
     if plan.get("blocked"):
-        return {
-            "answer": plan.get("blocked_message")
-            or "Please ask an initial analysis question first.",
-            "visualization": None,
-            "analysis": None,
-        }
+        return _json_safe(
+            {
+                "answer": plan.get("blocked_message")
+                or "Please ask an initial analysis question first.",
+                "visualization": None,
+                "analysis": None,
+                "conversation_meta": {
+                    "followUpDetected": False,
+                    "usingContextSummary": "",
+                    "inheritedAssumptionNote": "",
+                    "turnId": "",
+                    "parentTurnId": None,
+                },
+            }
+        )
 
     prev_filters: List[str] = []
     if data.conversation_context and data.conversation_context.filtersApplied:
@@ -7862,6 +7987,29 @@ def ask_question(data: QuestionRequest):
     eff_q = str(plan.get("effective_question") or data.question).strip()
     sidecar = plan.get("conversation_sidecar")
     filter_added: List[str] = []
+
+    turn_id_session = str(uuid.uuid4())
+    parent_tid_session = (
+        data.conversation_context.turnId if data.conversation_context else None
+    )
+    is_fu_session = bool(
+        sidecar and isinstance(sidecar, dict) and sidecar.get("wasFollowUp")
+    )
+    follow_chain_session = _extend_follow_up_chain(
+        data.conversation_context,
+        data.question.strip(),
+        is_fu_session,
+    )
+    lic_id_session = (
+        data.conversation_context.lastInsightChartId
+        if data.conversation_context
+        else None
+    )
+    drill_path_session = (
+        list(data.conversation_context.activeDrillPath or [])
+        if data.conversation_context
+        else []
+    )
 
     base_profile = dataset_profile or build_profile(df)
     dash_slice, dash_labs = apply_dashboard_filters_to_df(
@@ -7876,23 +8024,41 @@ def ask_question(data: QuestionRequest):
             list(data.dashboard_filters or []),
             data.date_range,
         )
-        return {
-            "answer": NO_RECORDS_FILTERS_MSG,
-            "visualization": None,
-            "analysis": None,
-            "conversation_context": {
-                "lastQuestion": eff_q or data.question.strip(),
-                "lastChartTitle": "",
-                "metricColumn": None,
-                "categoryColumn": None,
-                "aggregation": None,
-                "chartType": "",
-                "intentBucket": "",
-                "filtersApplied": prev_filters,
-            },
-            "dashboard_filter_summary": dash_labs,
-            "filter_breadcrumb": bc_early,
-        }
+        return _json_safe(
+            {
+                "answer": NO_RECORDS_FILTERS_MSG,
+                "visualization": None,
+                "analysis": None,
+                "conversation_context": {
+                    "lastQuestion": eff_q or data.question.strip(),
+                    "lastChartTitle": "",
+                    "metricColumn": None,
+                    "categoryColumn": None,
+                    "aggregation": None,
+                    "chartType": "",
+                    "intentBucket": "",
+                    "filtersApplied": prev_filters,
+                    "turnId": turn_id_session,
+                    "followUpChain": follow_chain_session,
+                    "lastInsightChartId": lic_id_session,
+                    "activeDrillPath": drill_path_session,
+                },
+                "conversation_meta": _conversation_meta_payload(
+                    sidecar=sidecar,
+                    filter_added=[],
+                    turn_id=turn_id_session,
+                    parent_tid=parent_tid_session,
+                    using_summary=(
+                        _format_using_context_summary(data.conversation_context)
+                        if is_fu_session and data.conversation_context
+                        else ""
+                    ),
+                    is_follow_up=is_fu_session,
+                ),
+                "dashboard_filter_summary": dash_labs,
+                "filter_breadcrumb": bc_early,
+            }
+        )
 
     profile_dash = build_profile(dash_slice)
     if sidecar and data.conversation_context:
@@ -7928,23 +8094,41 @@ def ask_question(data: QuestionRequest):
             list(data.dashboard_filters or []),
             data.date_range,
         )
-        return {
-            "answer": NO_RECORDS_FILTERS_MSG,
-            "visualization": None,
-            "analysis": None,
-            "conversation_context": {
-                "lastQuestion": eff_q or data.question.strip(),
-                "lastChartTitle": "",
-                "metricColumn": None,
-                "categoryColumn": None,
-                "aggregation": None,
-                "chartType": "",
-                "intentBucket": "",
-                "filtersApplied": prev_filters + filter_added,
-            },
-            "dashboard_filter_summary": dash_labs + filter_added,
-            "filter_breadcrumb": bc_e,
-        }
+        return _json_safe(
+            {
+                "answer": NO_RECORDS_FILTERS_MSG,
+                "visualization": None,
+                "analysis": None,
+                "conversation_context": {
+                    "lastQuestion": eff_q or data.question.strip(),
+                    "lastChartTitle": "",
+                    "metricColumn": None,
+                    "categoryColumn": None,
+                    "aggregation": None,
+                    "chartType": "",
+                    "intentBucket": "",
+                    "filtersApplied": prev_filters + filter_added,
+                    "turnId": turn_id_session,
+                    "followUpChain": follow_chain_session,
+                    "lastInsightChartId": lic_id_session,
+                    "activeDrillPath": drill_path_session,
+                },
+                "conversation_meta": _conversation_meta_payload(
+                    sidecar=sidecar,
+                    filter_added=filter_added,
+                    turn_id=turn_id_session,
+                    parent_tid=parent_tid_session,
+                    using_summary=(
+                        _format_using_context_summary(data.conversation_context)
+                        if is_fu_session and data.conversation_context
+                        else ""
+                    ),
+                    is_follow_up=is_fu_session,
+                ),
+                "dashboard_filter_summary": dash_labs + filter_added,
+                "filter_breadcrumb": bc_e,
+            }
+        )
 
     bc_full = build_filter_breadcrumb(
         df,
@@ -7963,6 +8147,22 @@ def ask_question(data: QuestionRequest):
             conversation_sidecar=sidecar,
             follow_up_ops=plan.get("follow_up_ops"),
         )
+
+        if isinstance(analysis_ctx, dict):
+            icr_fu = str(analysis_ctx.get("insightConfidenceRationale") or "").strip()
+            extras_fu: List[str] = []
+            if is_fu_session:
+                extras_fu.append(
+                    "Follow-up thread: prior metric/dimension focus carries forward unless overridden."
+                )
+            if filter_added:
+                extras_fu.append(
+                    "Parsed follow-up filters narrow the cohort; confirm labels match your intent."
+                )
+            if extras_fu:
+                analysis_ctx["insightConfidenceRationale"] = (
+                    icr_fu + " " + " ".join(extras_fu)
+                ).strip()
 
         all_row_scope = list(dash_labs) + list(filter_added)
         if visualization and all_row_scope:
@@ -8095,13 +8295,31 @@ Rules:
             "chartType": analysis_ctx.get("chartType"),
             "intentBucket": chart_rec_out.get("detectedIntent"),
             "filtersApplied": prev_filters + filter_added,
+            "turnId": turn_id_session,
+            "followUpChain": follow_chain_session,
+            "lastInsightChartId": lic_id_session,
+            "activeDrillPath": drill_path_session,
         }
+
+        conversation_meta_ok = _conversation_meta_payload(
+            sidecar=sidecar,
+            filter_added=filter_added,
+            turn_id=turn_id_session,
+            parent_tid=parent_tid_session,
+            using_summary=(
+                _format_using_context_summary(data.conversation_context)
+                if is_fu_session and data.conversation_context
+                else ""
+            ),
+            is_follow_up=is_fu_session,
+        )
 
         return _json_safe({
             "answer": response.content[0].text.strip(),
             "visualization": visualization,
             "analysis": analysis_ctx,
             "conversation_context": conv_out,
+            "conversation_meta": conversation_meta_ok,
             "dashboard_filter_summary": dash_labs,
             "filter_breadcrumb": bc_full,
         })
