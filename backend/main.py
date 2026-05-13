@@ -228,6 +228,71 @@ def clean_dataframe(input_df):
     return input_df
 
 
+_DATE_COL_NAME_HINT = re.compile(
+    r"\b(date|dates|datetime|timestamp|time|day|month|year|quarter|week|created|updated|"
+    r"order\s*date|invoice\s*date|transaction\s*date|period)\b",
+    re.I,
+)
+
+
+def _datetime_parse_ratio(series: pd.Series) -> float:
+    """Fraction of non-null values that parse as datetimes (mixed formats)."""
+    non_null = series.dropna()
+    if non_null.empty:
+        return 0.0
+    try:
+        dt = pd.to_datetime(non_null, errors="coerce", format="mixed")
+    except TypeError:
+        dt = pd.to_datetime(non_null, errors="coerce")
+    r1 = float(dt.notna().mean())
+    try:
+        dt2 = pd.to_datetime(
+            non_null.astype(str).str.strip(), errors="coerce", format="mixed"
+        )
+    except TypeError:
+        dt2 = pd.to_datetime(non_null.astype(str).str.strip(), errors="coerce")
+    r2 = float(dt2.notna().mean())
+    return max(r1, r2)
+
+
+def _group_column_is_time_series_eligible(df: pd.DataFrame, group_col: str) -> bool:
+    """True when the column mostly parses as datetimes with at least two distinct times."""
+    if df is None or df.empty or group_col not in df.columns:
+        return False
+    s = df[group_col]
+    if _datetime_parse_ratio(s) < 0.6:
+        return False
+    try:
+        dt = pd.to_datetime(s, errors="coerce", format="mixed")
+    except TypeError:
+        dt = pd.to_datetime(s, errors="coerce")
+    return int(dt.dropna().nunique()) >= 2
+
+
+def _infer_date_like_columns_from_values(df: pd.DataFrame) -> List[str]:
+    """Column names that behave as time axes even if not tagged 'date' in profile."""
+    if df is None or df.empty:
+        return []
+    out: List[str] = []
+    for c in df.columns:
+        if _group_column_is_time_series_eligible(df, str(c)):
+            out.append(str(c))
+    return out
+
+
+def _normalize_internal_chart_type(raw: Optional[str]) -> str:
+    """Map synonyms to internal kinds; unknown kinds fall back to bar (safe render)."""
+    t = (raw or "bar").strip().lower().replace("-", "_")
+    if t in ("timeseries", "time_series"):
+        return "line"
+    known = frozenset(
+        ("bar", "bar_horizontal", "pie", "donut", "line", "area", "scatter")
+    )
+    if t in known:
+        return t
+    return "bar"
+
+
 def detect_column_types(input_df: pd.DataFrame):
     """
     Lightweight type detection for UI.
@@ -253,19 +318,17 @@ def detect_column_types(input_df: pd.DataFrame):
         )
         numeric_ratio = float(numeric.notna().mean()) if len(non_null) else 0.0
 
-        # Date
-        # pandas>=3 removed infer_datetime_format; inference is automatic
-        # Prefer mixed-format parser to avoid noisy per-element fallback warnings.
-        try:
-            dt = pd.to_datetime(non_null, errors="coerce", format="mixed")
-        except TypeError:
-            dt = pd.to_datetime(non_null, errors="coerce")
-        date_ratio = float(dt.notna().mean()) if len(non_null) else 0.0
+        # Date: mixed-format parsing + optional boost when the header looks temporal.
+        date_ratio = _datetime_parse_ratio(s)
+        date_named = bool(_DATE_COL_NAME_HINT.search(str(col)))
 
         if numeric_ratio >= 0.9:
             result[col] = "number"
             continue
         if date_ratio >= 0.9:
+            result[col] = "date"
+            continue
+        if date_named and date_ratio >= 0.72:
             result[col] = "date"
             continue
 
@@ -4737,6 +4800,9 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     ct = profile.get("column_types", {})
     numeric_cols = [c for c in cols if ct.get(c) == "number"]
 
+    if _scatter_pair_from_question(question_str, numeric_cols):
+        return None
+
     cand_dims = [c for c in cols if ct.get(c) in ("category", "text", "date")]
     by_phrases = _extract_all_by_dimension_phrases(ql)
     by_cols_ordered: List[str] = []
@@ -4814,8 +4880,18 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
             "by month",
             "quarter",
             "weekly",
+            "by date",
+            "daily",
+            "yearly",
+            "timeline",
+            "each day",
+            "each month",
+            "each year",
+            "per day",
+            "per month",
+            "per year",
         )
-    ):
+    ) or re.search(r"\b(by|per)\s+(day|date|week|month|year|quarter)\b", ql):
         agg_label, agg_key = "Total", "sum"
     else:
         agg_label, agg_key = "Average", "mean"
@@ -4898,7 +4974,10 @@ def _fallback_aggregate_chart(
         if sub.empty:
             return [], "", "", None
 
-        if ct.get(str(group_col)) == "date" and str(agg_key) in (
+        group_is_ts_axis = ct.get(str(group_col)) == "date" or _group_column_is_time_series_eligible(
+            df, str(group_col)
+        )
+        if group_is_ts_axis and str(agg_key) in (
             "sum",
             "mean",
             "min",
@@ -5346,6 +5425,9 @@ def build_smart_chart(
 
     numeric_cols = [c for c in columns if ct_map.get(c) == "number"]
     date_cols = [c for c in columns if ct_map.get(c) == "date"]
+    for c in columns:
+        if c not in date_cols and _group_column_is_time_series_eligible(df, str(c)):
+            date_cols.append(c)
     cat_cols = [c for c in columns if ct_map.get(c) in ("category", "text")]
     ct: Dict[str, Any] = {"column_types": ct_map}
 
@@ -5356,18 +5438,22 @@ def build_smart_chart(
             tmp = df[[xc, yc]].copy()
             tmp["_x"] = numeric_series(xc)
             tmp["_y"] = numeric_series(yc)
-            tmp = tmp.dropna(subset=["_x", "_y"]).head(450)
-            if len(tmp) >= 3:
-                chart_data: List[Dict[str, Any]] = []
+            tmp = tmp.dropna(subset=["_x", "_y"]).head(450).reset_index(drop=True)
+            if len(tmp) >= 2:
+                point_labels = [f"•{i + 1}" for i in range(len(tmp))]
+                chart_data = []
                 for i, (_, row) in enumerate(tmp.iterrows()):
                     chart_data.append(
                         {
-                            "name": f"•{i + 1}",
+                            "name": point_labels[i],
                             "x": float(row["_x"]),
                             "value": float(row["_y"]),
                         }
                     )
                 title = f"{_pretty_label_text(yc)} vs {_pretty_label_text(xc)}"
+                rel_ins = _compute_scatter_relationship_insights(
+                    tmp, str(xc), str(yc), point_labels
+                )
                 if trace is not None:
                     trace.update(
                         {
@@ -5379,11 +5465,77 @@ def build_smart_chart(
                             "notes": "Scatter: each point is one row (y vs x).",
                             "scatter_x_column": xc,
                             "scatter_y_column": yc,
+                            "relationshipInsights": rel_ins,
+                            "scatterFallback": False,
                         }
                     )
                 return chart_data, "scatter", title, subtitle
+            sx = float(numeric_series(xc).sum(skipna=True))
+            sy = float(numeric_series(yc).sum(skipna=True))
+            fb_rows = [
+                {
+                    "name": _pretty_label_text(str(xc)),
+                    "value": sx,
+                },
+                {
+                    "name": _pretty_label_text(str(yc)),
+                    "value": sy,
+                },
+            ]
+            fb_title = (
+                f"{_pretty_label_text(yc)} vs {_pretty_label_text(xc)} "
+                "(column totals — scatter unavailable)"
+            )
+            if trace is not None:
+                trace.update(
+                    {
+                        "category_column": xc,
+                        "numeric_column": yc,
+                        "aggregation": "sum",
+                        "aggregation_key": "sum",
+                        "rows_analyzed": int(len(df)),
+                        "notes": (
+                            "Scatter fallback: fewer than two rows had both metrics populated."
+                        ),
+                        "scatter_x_column": xc,
+                        "scatter_y_column": yc,
+                        "scatterFallback": True,
+                        "scatter_fallback_reason": "insufficient_joint_pairs",
+                        "relationshipInsights": None,
+                    }
+                )
+            return fb_rows, "bar", fb_title, subtitle
         except Exception:
-            pass
+            try:
+                sx = float(numeric_series(xc).sum(skipna=True))
+                sy = float(numeric_series(yc).sum(skipna=True))
+                fb_rows = [
+                    {"name": _pretty_label_text(str(xc)), "value": sx},
+                    {"name": _pretty_label_text(str(yc)), "value": sy},
+                ]
+                fb_title = (
+                    f"{_pretty_label_text(yc)} vs {_pretty_label_text(xc)} "
+                    "(column totals — scatter build failed)"
+                )
+                if trace is not None:
+                    trace.update(
+                        {
+                            "category_column": xc,
+                            "numeric_column": yc,
+                            "aggregation": "sum",
+                            "aggregation_key": "sum",
+                            "rows_analyzed": int(len(df)),
+                            "notes": "Scatter fallback after processing error; totals shown.",
+                            "scatter_x_column": xc,
+                            "scatter_y_column": yc,
+                            "scatterFallback": True,
+                            "scatter_fallback_reason": "processing_error",
+                            "relationshipInsights": None,
+                        }
+                    )
+                return fb_rows, "bar", fb_title, subtitle
+            except Exception:
+                pass
 
     trend_kw = (
         "trend",
@@ -5391,10 +5543,16 @@ def build_smart_chart(
         "time series",
         "monthly",
         "by month",
+        "by date",
         "quarter",
         "weekly",
+        "daily",
+        "yearly",
+        "timeline",
         "each month",
         "every month",
+        "each day",
+        "each year",
         "joining",
         "join trend",
         "hire trend",
@@ -5851,6 +6009,49 @@ def analyze_data(question: str):
             )
             return exact_result, [], ""
 
+    trend_q = any(
+        k in q
+        for k in (
+            "trend",
+            "over time",
+            "time series",
+            "timeline",
+            "monthly",
+            "yearly",
+            "daily",
+            "weekly",
+            "quarter",
+            "by date",
+        )
+    ) or bool(re.search(r"\b(by|per)\s+(day|date|week|month|year|quarter)\b", q))
+    if trend_q:
+        cols_list = df.columns.tolist()
+        group_col = _resolve_by_column_from_question(q, cols_list, profile)
+        if group_col is None:
+            group_col = _infer_dimension_column_from_question(question, df, profile)
+        target_ts = find_target_numeric_column()
+        if (
+            group_col
+            and target_ts
+            and str(group_col) != str(target_ts)
+            and _group_column_is_time_series_eligible(df, str(group_col))
+        ):
+            try:
+                g_series, _tsm = _adaptive_time_series_grouped(
+                    df[[group_col, target_ts]].copy(),
+                    str(group_col),
+                    str(target_ts),
+                    agg_key="sum",
+                )
+                if g_series is not None and len(g_series) >= 2:
+                    chart_data = _time_series_rows_from_grouped(g_series)
+                    result = pd.DataFrame(chart_data)
+                    exact_result = result.to_string(index=False)
+                    chart_type = "line"
+                    return exact_result, chart_data, chart_type
+            except Exception:
+                pass
+
     if date_col and sales_col and (
         ("monthly" in q and ("sales" in q or "revenue" in q) and "trend" in q)
         or ("revenue trend by month" in q)
@@ -6176,10 +6377,13 @@ def build_visualization_anchor_for_prompt(viz: Dict[str, Any]) -> str:
 
 def _chart_type_for_api(internal: str) -> str:
     """Public chart type names for structured visualization payloads."""
-    if internal == "bar_horizontal":
+    i = (internal or "bar").strip().lower().replace("-", "_")
+    if i == "bar_horizontal":
         return "horizontalBar"
-    if internal in ("pie", "donut", "line", "area", "bar", "scatter"):
-        return internal
+    if i in ("timeseries", "time_series"):
+        return "line"
+    if i in ("pie", "donut", "line", "area", "bar", "scatter"):
+        return i
     return "bar"
 
 
@@ -6368,28 +6572,148 @@ def _chart_selection_question_bucket(ql: str) -> str:
     return "compare"
 
 
-def _scatter_pair_from_question(q: str, numeric_cols: List[str]) -> Optional[Tuple[str, str]]:
-    """Two numeric columns named in a vs / versus / against question."""
-    if not numeric_cols or not re.search(r"\b(vs\.?|versus|against)\b", str(q).lower()):
+def _question_triggers_numeric_relationship_chart(qn: str) -> bool:
+    """Keywords for scatter / numeric relationship intent."""
+    s = _norm_metric_phrase_for_match(qn.lower()).strip()
+    if re.search(r"\bvs\.?\b|\bversus\b|\bagainst\b", s):
+        return True
+    if re.search(
+        r"\b(relationship|correlations?|correlate|correlated|dependency|dependencies)\b",
+        s,
+    ):
+        return True
+    if re.search(r"\bimpact\b", s):
+        return True
+    if "compare numeric relationship" in s:
+        return True
+    if "numeric relationship" in s and "compare" in s:
+        return True
+    return False
+
+
+def _phrase_first_position_in_question(ql_norm: str, col: str) -> Optional[int]:
+    """Start index of the first match of a column's natural phrase in the question."""
+    if not _column_phrase_matches_normalized_question(ql_norm, col):
         return None
-    ql_norm = _norm_metric_phrase_for_match(q)
-    hits: List[str] = []
-    for c in sorted(
+    phrase = _norm_metric_phrase_for_match(str(col)).strip()
+    parts = phrase.split()
+    if len(parts) == 1:
+        token = parts[0]
+        if len(token) <= 3:
+            m = re.search(r"(?<!\w)" + re.escape(token) + r"(?!\w)", ql_norm)
+            return m.start() if m else None
+        idx = ql_norm.find(token)
+        return idx if idx >= 0 else None
+    pat = r"(?<!\w)" + r"\s+".join(re.escape(p) for p in parts) + r"(?!\w)"
+    m = re.search(pat, ql_norm)
+    return m.start() if m else None
+
+
+def _ordered_numeric_columns_in_question(q_text: str, numeric_cols: List[str]) -> List[str]:
+    """Numeric columns whose tokens appear in the question, ordered by first mention (left → right)."""
+    ql_norm = _norm_metric_phrase_for_match(q_text.lower())
+    ranked = sorted(
         numeric_cols,
         key=lambda x: len(_norm_metric_phrase_for_match(str(x))),
         reverse=True,
-    ):
-        if _column_phrase_matches_normalized_question(ql_norm, c):
-            hits.append(c)
+    )
+    hits: List[Tuple[int, int, str]] = []
     seen: set = set()
-    ordered: List[str] = []
-    for h in hits:
-        if h not in seen:
-            seen.add(h)
-            ordered.append(h)
+    for c in ranked:
+        if c in seen:
+            continue
+        pos = _phrase_first_position_in_question(ql_norm, c)
+        if pos is not None:
+            seen.add(c)
+            hits.append((pos, -len(str(c)), str(c)))
+    hits.sort(key=lambda t: (t[0], t[1]))
+    return [t[2] for t in hits]
+
+
+def _scatter_pair_from_question(q: str, numeric_cols: List[str]) -> Optional[Tuple[str, str]]:
+    """
+    Two numeric columns for a scatter (x, y): X = first metric mentioned, Y = second.
+    Triggered by relationship / correlation / versus / impact / compare phrases.
+    """
+    if len(numeric_cols) < 2:
+        return None
+    if not _question_triggers_numeric_relationship_chart(q):
+        return None
+    ordered = _ordered_numeric_columns_in_question(q, numeric_cols)
     if len(ordered) >= 2:
         return ordered[0], ordered[1]
     return None
+
+
+def _compute_scatter_relationship_insights(
+    df_in: pd.DataFrame,
+    xc: str,
+    yc: str,
+    point_names: List[str],
+) -> Dict[str, Any]:
+    """Light-weight Pearson + outlier hints for scatter plots."""
+    out: Dict[str, Any] = {
+        "pearson": None,
+        "direction": None,
+        "summaryLine": None,
+        "strongestOutliers": [],
+    }
+    try:
+        sub = df_in[[xc, yc]].copy()
+        sub["_x"] = numeric_series(xc)
+        sub["_y"] = numeric_series(yc)
+        sub = sub.dropna(subset=["_x", "_y"]).reset_index(drop=True)
+        n = int(len(sub))
+        if n < 2:
+            return out
+        r = float(sub["_x"].corr(sub["_y"]))
+        if r == r:
+            out["pearson"] = round(r, 4)
+            if r > 0.25:
+                out["direction"] = "positive"
+            elif r < -0.25:
+                out["direction"] = "negative"
+            else:
+                out["direction"] = "weak"
+        x_mn = str(_pretty_label_text(xc))
+        y_mn = str(_pretty_label_text(yc))
+        if n >= 3 and r == r:
+            if r > 0.25:
+                out["summaryLine"] = (
+                    f"Correlation is positive (Pearson r ≈ {r:+.2f}): higher {x_mn} "
+                    f"generally aligns with higher {y_mn}."
+                )
+            elif r < -0.25:
+                out["summaryLine"] = (
+                    f"Correlation is negative (Pearson r ≈ {r:+.2f}): higher {x_mn} "
+                    f"generally aligns with lower {y_mn}."
+                )
+            else:
+                out["summaryLine"] = (
+                    f"Linear correlation is weak (Pearson r ≈ {r:+.2f}); the relationship may be "
+                    f"flat, noisy, or non-linear."
+                )
+        std_x = float(sub["_x"].std(ddof=0) or 0.0)
+        std_y = float(sub["_y"].std(ddof=0) or 0.0)
+        if n >= 3 and std_x > 1e-12 and std_y > 1e-12:
+            zx = (sub["_x"] - sub["_x"].mean()) / std_x
+            zy = (sub["_y"] - sub["_y"].mean()) / std_y
+            dist = (zx * zx + zy * zy) ** 0.5
+            sub["_d"] = dist
+            top_idx = sub["_d"].nlargest(min(2, n)).index.astype(int).tolist()
+            olist = []
+            for j in top_idx:
+                label = point_names[j] if j < len(point_names) else f"•{j + 1}"
+                olist.append(
+                    {
+                        "point": str(label),
+                        "note": "Largest joint z-score distance from the series center.",
+                    }
+                )
+            out["strongestOutliers"] = olist
+    except Exception:
+        pass
+    return out
 
 
 def _question_asks_share_or_composition_pie(ql: str) -> bool:
@@ -6424,7 +6748,7 @@ def determine_chart_type_and_reason(
     Deterministic chart selection (no LLM).
     Returns (internal_chart_type, human_reason, selection_confidence High|Medium|Low).
     """
-    base = (chart_type_in or "bar").strip() or "bar"
+    base = _normalize_internal_chart_type(chart_type_in or "bar")
     n = len(chart_data)
     if n == 0:
         return "bar", "No chart points available.", "Low"
@@ -6461,10 +6785,16 @@ def determine_chart_type_and_reason(
             "time series",
             "monthly",
             "by month",
+            "by date",
             "quarter",
             "weekly",
+            "daily",
+            "yearly",
+            "timeline",
             "each month",
             "every month",
+            "each day",
+            "each year",
             "joining",
             "join trend",
             "hire trend",
@@ -6473,7 +6803,12 @@ def determine_chart_type_and_reason(
             "over the year",
             "fiscal year",
         )
-    ) or bool(re.search(r"\b(monthly|quarterly|weekly|annual)\b", ql))
+    ) or bool(
+        re.search(
+            r"\b(monthly|quarterly|weekly|annual|daily|yearly)\b",
+            ql,
+        )
+    ) or bool(re.search(r"\b(by|per)\s+(day|date|week|month|year|quarter)\b", ql))
 
     temporal_all = _chart_series_labels_all_temporal(chart_data)
     date_hint = None
@@ -6483,11 +6818,23 @@ def determine_chart_type_and_reason(
         date_hint = str(intent_debug["group_col"])
     dc_pretty = _pretty_label_text(date_hint) if date_hint else "the time field"
 
+    wants_period_area = (
+        ("monthly" in ql or "yearly" in ql)
+        and n >= 2
+        and (
+            "trend" in ql
+            or "revenue" in ql
+            or "sales" in ql
+            or "profit" in ql
+            or "over time" in ql
+        )
+    )
+
     if base == "line":
-        if n >= 10 and trendish:
+        if wants_period_area:
             return (
                 "area",
-                f"Time-series with {n} periods; area chart emphasizes volume over time (bucketed from {dc_pretty}).",
+                f"Period-based trend ({dc_pretty}); area chart highlights movement between time buckets.",
                 "High",
             )
         return (
@@ -6497,10 +6844,10 @@ def determine_chart_type_and_reason(
         )
 
     if base in ("bar", "bar_horizontal") and temporal_all and trendish:
-        if n >= 10:
+        if wants_period_area:
             return (
                 "area",
-                f"Ordered time buckets on the category axis ({n} points); area chart for dense series.",
+                f"Ordered period labels on the category axis ({n} points); area chart for bucketed trends.",
                 "High",
             )
         return (
@@ -7614,6 +7961,33 @@ def compute_visualization_for_question(
             chart_type = (sm_type or chart_type or "").strip() or "bar"
             chart_title = (sm_title or "").strip()
             chart_subtitle = (sm_sub or chart_subtitle).strip()
+            if smart_trace.get("scatterFallback"):
+                _sfw = (
+                    "Scatter plot was not available for the chosen metrics; "
+                    "the chart shows each column’s total as a simple bar comparison."
+                )
+                partial_visualization_warning = (
+                    f"{(partial_visualization_warning or '').strip()} {_sfw}".strip()
+                    if partial_visualization_warning
+                    else _sfw
+                )
+            if str(smart_trace.get("aggregation", "")).lower() == "scatter":
+                tab_sc = _tabular_exact_from_name_value_rows(
+                    [
+                        {"name": r.get("name"), "value": r.get("value")}
+                        for r in chart_data
+                    ],
+                    max_rows=32,
+                )
+                ri0 = smart_trace.get("relationshipInsights") or {}
+                sl0 = str(ri0.get("summaryLine") or "").strip()
+                extra_sc = "\n\n".join(x for x in (tab_sc, sl0) if x)
+                if extra_sc:
+                    base_er = (exact_result or "").strip()
+                    if not base_er or "No direct chart rule matched" in base_er:
+                        exact_result = extra_sc
+                    else:
+                        exact_result = f"{base_er}\n\n{extra_sc}"
 
     if (
         chart_data
@@ -7687,6 +8061,8 @@ def compute_visualization_for_question(
         )
         return exact_result, None, fin(analysis_empty)
 
+    chart_type = _normalize_internal_chart_type(chart_type)
+
     chart_type, chart_sel_reason, chart_sel_conf = determine_chart_type_and_reason(
         ql,
         chart_type,
@@ -7716,6 +8092,8 @@ def compute_visualization_for_question(
             chart_sel_reason = (
                 f"{chart_sel_reason} {note}".strip() if chart_sel_reason else note
             )
+
+    chart_type = _normalize_internal_chart_type(chart_type)
 
     if chart_type in ("pie", "donut") and chart_data:
         vals_f: List[float] = []
@@ -7764,6 +8142,27 @@ def compute_visualization_for_question(
             "Each bar is a numeric field ranked by relative spread "
             "(IQR ÷ median scale); higher means more dispersed values."
         )
+
+    dbg_ct = profile_live.get("column_types", {})
+    detected_date_columns = [c for c, t in dbg_ct.items() if t == "date"]
+    selected_numeric_column = (
+        (intent_debug or {}).get("value_col")
+        or (smart_trace or {}).get("numeric_column")
+    )
+    generated_chart_type = chart_type
+    grouped_dataset_preview = chart_data[:12] if chart_data else []
+    print("[viz] detected_date_columns:", detected_date_columns, flush=True)
+    print(
+        "[viz] selected_numeric_column:",
+        selected_numeric_column,
+        flush=True,
+    )
+    print("[viz] generated_chart_type:", generated_chart_type, flush=True)
+    print(
+        "[viz] grouped_dataset_preview:",
+        json.dumps(_json_safe(grouped_dataset_preview))[:1600],
+        flush=True,
+    )
 
     print(
         "[viz] finalized_category_col:",
@@ -7988,6 +8387,9 @@ def compute_visualization_for_question(
         visualization["scatterYLabel"] = _pretty_label_text(
             smart_trace.get("scatter_y_column")
         )
+    ri_viz = smart_trace.get("relationshipInsights") if smart_trace else None
+    if is_scatter and isinstance(ri_viz, dict) and ri_viz:
+        visualization["relationshipInsights"] = _json_safe(ri_viz)
 
     if conversation_sidecar and isinstance(
         conversation_sidecar.get("contextUsedLine"), str
