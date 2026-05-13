@@ -3126,6 +3126,10 @@ _BUSINESS_DIMENSION_HINTS = (
     "zone",
     "branch",
     "store",
+    "severity",
+    "plant",
+    "facility",
+    "priority",
 )
 
 
@@ -4905,7 +4909,12 @@ def _infer_dimension_column_from_question(
                 scored.append((len(key), c))
                 break
 
-    return max(scored, key=lambda t: t[0])[1] if scored else None
+    if scored:
+        return max(scored, key=lambda t: t[0])[1]
+    ranked_fb = _rank_category_dimensions(df, cand_dims, profile)
+    if ranked_fb:
+        return ranked_fb[0][0]
+    return None
 
 
 def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[str, Any]]:
@@ -5088,6 +5097,7 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
 
 def _fallback_aggregate_chart(
     intent: Dict[str, Any],
+    question: str = "",
 ) -> Tuple[List[Dict[str, Any]], str, str, Optional[Dict[str, Any]]]:
     """Produce name/value chart rows + internal chart_type + title (+ optional time-series meta)."""
     global df, dataset_profile
@@ -5099,13 +5109,17 @@ def _fallback_aggregate_chart(
     chart_type_internal = "bar"
     profile = dataset_profile or build_profile(df)
     ct = profile.get("column_types", {})
+    q_fb = (question or "").lower()
+    gc = _prefer_lower_cardinality_dimension(
+        df, profile, str(group_col), str(target), q_fb
+    )
 
     if agg_key == "count" and ct.get(target) not in ("number",):
         try:
-            tmp = df[[group_col, target]].dropna(subset=[group_col])
+            tmp = df[[gc, target]].dropna(subset=[gc])
             if tmp.empty:
                 return [], "", "", None
-            g = tmp.groupby(group_col).size()
+            g = tmp.groupby(gc).size()
         except Exception:
             return [], "", "", None
         result = g.reset_index()
@@ -5128,18 +5142,18 @@ def _fallback_aggregate_chart(
             str(intent.get("agg_key") or ""),
             str(intent.get("agg_label") or ""),
             str(target),
-            str(group_col),
+            str(gc),
         )
         return chart_data, chart_type_internal, title, None
     else:
-        sub = df[[group_col, target]].copy()
+        sub = df[[gc, target]].copy()
         sub["_v"] = numeric_series(target)
-        sub = sub.dropna(subset=[group_col, "_v"])
+        sub = sub.dropna(subset=[gc, "_v"])
         if sub.empty:
             return [], "", "", None
 
-        group_is_ts_axis = ct.get(str(group_col)) == "date" or _group_column_is_time_series_eligible(
-            df, str(group_col)
+        group_is_ts_axis = ct.get(str(gc)) == "date" or _group_column_is_time_series_eligible(
+            df, str(gc)
         )
         if group_is_ts_axis and str(agg_key) in (
             "sum",
@@ -5148,8 +5162,8 @@ def _fallback_aggregate_chart(
             "max",
         ):
             g_series, ts_meta = _adaptive_time_series_grouped(
-                df[[group_col, target]].copy(),
-                str(group_col),
+                df[[gc, target]].copy(),
+                str(gc),
                 str(target),
                 agg_key=str(agg_key),
             )
@@ -5160,21 +5174,21 @@ def _fallback_aggregate_chart(
                 return chart_data, "line", title, ts_meta
 
         if agg_key == "sum":
-            g = sub.groupby(group_col)["_v"].sum()
+            g = sub.groupby(gc)["_v"].sum()
         elif agg_key == "mean":
-            g = sub.groupby(group_col)["_v"].mean()
+            g = sub.groupby(gc)["_v"].mean()
         elif agg_key == "min":
-            g = sub.groupby(group_col)["_v"].min()
+            g = sub.groupby(gc)["_v"].min()
         elif agg_key == "max":
-            g = sub.groupby(group_col)["_v"].max()
+            g = sub.groupby(gc)["_v"].max()
         elif agg_key == "count":
-            g = sub.groupby(group_col)["_v"].count()
+            g = sub.groupby(gc)["_v"].count()
         else:
-            g = sub.groupby(group_col)["_v"].mean()
+            g = sub.groupby(gc)["_v"].mean()
 
         result = (
             g.reset_index()
-            .rename(columns={group_col: "name", "_v": "value"})
+            .rename(columns={gc: "name", "_v": "value"})
             .sort_values("value", ascending=False)
         )
         chart_data = [
@@ -5191,7 +5205,7 @@ def _fallback_aggregate_chart(
             str(intent.get("agg_key") or ""),
             str(intent.get("agg_label") or ""),
             str(target),
-            str(group_col),
+            str(gc),
         )
         return chart_data, chart_type_internal, title, None
 
@@ -5335,6 +5349,185 @@ def _looks_like_ranking_question(ql: str) -> bool:
     if re.search(r"\btop\s+(?:\d+|five|ten|three|four|seven|eight)", ql):
         return True
     return any(k in ql for k in ("ranking", "rank ", "rank,", "ranked"))
+
+
+def _question_explicitly_requests_dimension(question_lower: str, col: str) -> bool:
+    """True when the user clearly named this column (including *_id)."""
+    if not col:
+        return False
+    ql = (question_lower or "").lower().replace("-", "_")
+    raw = str(col).strip()
+    variants = {
+        raw.lower(),
+        raw.lower().replace(" ", "_"),
+        raw.lower().replace("_", " "),
+    }
+    for v in variants:
+        if len(v) >= 3 and v in ql:
+            return True
+    toks = [t for t in raw.lower().split("_") if len(t) >= 3]
+    return any(t in ql for t in toks)
+
+
+def _prefer_lower_cardinality_dimension(
+    df,
+    profile: Dict[str, Any],
+    current: str,
+    metric_col: Optional[str],
+    question_lower: str,
+) -> str:
+    """
+    Prefer readable business dimensions (region, channel, …) over *_id columns
+    and over extremely high-cardinality keys when the user did not name them explicitly.
+    """
+    if df is None or df.empty or not current:
+        return current
+    if _question_explicitly_requests_dimension(question_lower, current):
+        return current
+    try:
+        nu_cur = int(df[str(current)].nunique(dropna=True))
+    except Exception:
+        return current
+    id_like = _id_like_column_name(current)
+    if nu_cur <= 15 and not id_like:
+        return current
+
+    pool = [
+        c
+        for c in _dimension_pool_columns(df, profile)
+        if str(c) != str(metric_col) and str(c) != str(current)
+    ]
+    ranked = _rank_category_dimensions(df, pool, profile)
+    best: Optional[str] = None
+    best_nu = nu_cur
+    for c, _sc in ranked:
+        try:
+            nu = int(df[str(c)].nunique(dropna=True))
+        except Exception:
+            continue
+        if nu < 2:
+            continue
+        if nu < best_nu:
+            best = str(c)
+            best_nu = nu
+            if best_nu <= 15 and not _id_like_column_name(best):
+                break
+    if best and best != current:
+        if best_nu < nu_cur or (
+            id_like
+            and not _id_like_column_name(best)
+            and best_nu <= min(nu_cur, 80)
+        ):
+            return best
+    return current
+
+
+def _chart_rows_are_simple_categorical(rows: List[Dict[str, Any]]) -> bool:
+    """True when rows are plain name/value points (not stacked multi-series dicts)."""
+    if not rows:
+        return False
+    for r in rows[:5]:
+        if not isinstance(r, dict):
+            return False
+        for k in r.keys():
+            if k in ("name", "value", "x", "displayValue", "displayX"):
+                continue
+            return False
+    return True
+
+
+def _apply_high_cardinality_cap_to_chart_rows(
+    rows: List[Dict[str, Any]],
+    *,
+    chart_type: str,
+    category_column: Optional[str],
+    question: str,
+) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """
+    Cap unreadable category cardinality: Top 10 + Others, user-facing notice,
+    and never return huge label lists. Line/area: light downsampling only.
+    """
+    if not rows:
+        return rows, None
+    ct = (chart_type or "").strip().lower().replace("-", "_")
+
+    if ct == "scatter":
+        if len(rows) > 400:
+            return rows[:400], (
+                "Many scatter points detected; showing the first 400 points for responsiveness."
+            )
+        return rows, None
+
+    if ct in ("line", "area"):
+        n = len(rows)
+        if n <= 60:
+            return rows, None
+        stride = max(1, int(math.ceil((n - 1) / max(1, 49))))
+        picked: List[Dict[str, Any]] = []
+        last_i = -1
+        for i in range(0, n, stride):
+            picked.append(rows[i])
+            last_i = i
+        if last_i != n - 1:
+            picked.append(rows[-1])
+        dedup: List[Dict[str, Any]] = []
+        seen: set = set()
+        for r in picked:
+            k = str(r.get("name", ""))
+            if k in seen:
+                continue
+            seen.add(k)
+            dedup.append(r)
+        return (
+            dedup,
+            f"Many periods detected ({n}). Showing {len(dedup)} periods for readability.",
+        )
+
+    if ct not in ("bar", "bar_horizontal", "histogram", "pie", "donut"):
+        return rows, None
+
+    n = len(rows)
+    if n <= 15:
+        return rows, None
+
+    SHOW_TOP = 10
+    sorted_rows = sorted(
+        rows,
+        key=lambda r: float(r.get("value") if r.get("value") is not None else 0.0),
+        reverse=True,
+    )
+    top = sorted_rows[:SHOW_TOP]
+    tail = sorted_rows[SHOW_TOP:]
+    others = sum(float(r.get("value") or 0.0) for r in tail)
+    out: List[Dict[str, Any]] = [dict(r) for r in top]
+    if others != 0.0 or len(tail) > 0:
+        out.append({"name": "Others", "value": float(others)})
+
+    if ct in ("pie", "donut"):
+        s = sum(float(r.get("value") or 0.0) for r in out)
+        if s > 0:
+            out = [
+                {
+                    "name": r.get("name"),
+                    "value": 100.0 * float(r.get("value") or 0.0) / s,
+                }
+                for r in out
+            ]
+
+    dim_note = f" on {_pretty_label_text(category_column)}" if category_column else ""
+    msg = (
+        f"Too many unique values detected{dim_note} ({n} groups). "
+        f"Showing Top {SHOW_TOP} groups"
+        + (" plus an “Others” bucket." if (others != 0.0 or len(tail) > 0) else ".")
+    )
+    if category_column and _id_like_column_name(str(category_column)):
+        msg += (
+            " For clearer charts, try grouping by a business field "
+            "(for example region, channel, severity, or category) instead of an ID column."
+        )
+    if len(out) > 35:
+        out = out[:35]
+    return out, msg
 
 
 def _normalize_chart_records(rows: List[Any]) -> List[Dict[str, Any]]:
@@ -6368,7 +6561,23 @@ def build_smart_chart(
     ):
         gcol = _infer_dimension_column_from_question(question, df, profile)
     if not gcol and pie_dims:
-        gcol = pie_dims[0]
+        ranked_pd = _rank_category_dimensions(df, pie_dims, profile)
+        gcol = ranked_pd[0][0] if ranked_pd else pie_dims[0]
+
+    if gcol and numeric_cols:
+        ncol_hint = _numeric_col_mentioned(q, numeric_cols)
+        others_nc = [c for c in numeric_cols if str(c) != str(gcol)]
+        if ncol_hint is None and len(others_nc) == 1:
+            ncol_hint = others_nc[0]
+        if ncol_hint is None:
+            ncol_hint = _pick_default_metric_column(q, numeric_cols, domain)
+        if ncol_hint and str(ncol_hint) != str(gcol):
+            gcol2 = _prefer_lower_cardinality_dimension(
+                df, profile, str(gcol), str(ncol_hint), q
+            )
+            if gcol2 != str(gcol) and trace is not None:
+                trace["dimensionSwap"] = {"from": str(gcol), "to": str(gcol2)}
+            gcol = gcol2
 
     want_incident_row_counts = bool(re.search(r"\bincidents?\b", q)) and not re.search(
         r"\b(downtime|minutes|outage|production\s*loss|repair\s*cost|revenue|sales|loss\s*units)\b",
@@ -8617,7 +8826,7 @@ def compute_visualization_for_question(
             else:
                 intent_one = dict(intent_debug)
                 intent_one["secondary_group_col"] = None
-                fb_rows, fb_type, fb_title, _fb_ts = _fallback_aggregate_chart(intent_one)
+                fb_rows, fb_type, fb_title, _fb_ts = _fallback_aggregate_chart(intent_one, question)
                 er_ana, _, _ = analyze_data(question)
                 if fb_rows:
                     chart_data = list(_normalize_chart_records(fb_rows))
@@ -8684,7 +8893,7 @@ def compute_visualization_for_question(
     print("[viz] after_analyze_chart_points=", len(chart_data), flush=True)
 
     if not chart_data and intent_debug and not suppress_auto_charts:
-        fb_rows, fb_type, fb_title, fb_ts = _fallback_aggregate_chart(intent_debug)
+        fb_rows, fb_type, fb_title, fb_ts = _fallback_aggregate_chart(intent_debug, question)
         if fb_rows:
             chart_data = list(_normalize_chart_records(fb_rows))
             chart_type = (fb_type or "bar").strip() or "bar"
@@ -8784,7 +8993,9 @@ def compute_visualization_for_question(
             and sv != iv
             and str(smart_trace.get("aggregation", "")).lower() != "scatter"
         ):
-            fb_rows, fb_type, fb_title, fb_ts = _fallback_aggregate_chart(intent_debug)
+            fb_rows, fb_type, fb_title, fb_ts = _fallback_aggregate_chart(
+                intent_debug, question
+            )
             if fb_rows:
                 chart_data = list(_normalize_chart_records(fb_rows))
                 chart_type = (fb_type or "bar").strip() or "bar"
@@ -8943,6 +9154,31 @@ def compute_visualization_for_question(
                         }
                         for r in chart_data
                     ]
+
+    if chart_data and _chart_rows_are_simple_categorical(chart_data):
+        cat_col = None
+        st_m = smart_trace if isinstance(smart_trace, dict) else {}
+        cat_col = st_m.get("category_column")
+        if not cat_col and intent_debug:
+            cat_col = intent_debug.get("group_col")
+        chart_data2, hc_msg = _apply_high_cardinality_cap_to_chart_rows(
+            chart_data,
+            chart_type=str(chart_type or ""),
+            category_column=str(cat_col) if cat_col else None,
+            question=question,
+        )
+        if hc_msg:
+            chart_data = chart_data2
+            partial_visualization_warning = (
+                f"{(partial_visualization_warning or '').strip()} {hc_msg}".strip()
+                if partial_visualization_warning
+                else hc_msg
+            )
+            smart_trace = {
+                **(smart_trace if isinstance(smart_trace, dict) else {}),
+                "highCardinalityApplied": True,
+                "highCardinalityNote": hc_msg,
+            }
 
     if not chart_title.strip():
         chart_title = _chart_title_from_question(question)
