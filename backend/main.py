@@ -280,15 +280,17 @@ def _infer_date_like_columns_from_values(df: pd.DataFrame) -> List[str]:
     return out
 
 
+_CANONICAL_INTERNAL_CHART_TYPES = frozenset(
+    ("bar", "bar_horizontal", "pie", "donut", "line", "area", "scatter", "histogram")
+)
+
+
 def _normalize_internal_chart_type(raw: Optional[str]) -> str:
     """Map synonyms to internal kinds; unknown kinds fall back to bar (safe render)."""
     t = (raw or "bar").strip().lower().replace("-", "_")
     if t in ("timeseries", "time_series"):
         return "line"
-    known = frozenset(
-        ("bar", "bar_horizontal", "pie", "donut", "line", "area", "scatter")
-    )
-    if t in known:
+    if t in _CANONICAL_INTERNAL_CHART_TYPES:
         return t
     return "bar"
 
@@ -433,8 +435,19 @@ def _infer_business_domain(columns: List[str]) -> str:
         "shipment", "payment", "channel", "listing", "variant",
         "order_value", "revenue", "line_total", "delivery_days",
     )
+    ops_kw = (
+        "incident", "downtime", "severity", "plant", "machine", "outage",
+        "repair", "production_loss", "mttr", "mtbf",
+    )
+    mkt_kw = ("campaign", "channel", "impression", "click", "conversion", "ad_spend", "spend")
     mfg = sum(1 for k in mfg_kw if k in joined)
     eco = sum(1 for k in ecom_kw if k in joined)
+    ops = sum(1 for k in ops_kw if k in joined)
+    mkt = sum(1 for k in mkt_kw if k in joined)
+    if ops >= 2 and ops >= eco and ops >= mfg:
+        return "operations"
+    if mkt >= 2 and mkt >= eco:
+        return "marketing"
     if mfg >= 3 and mfg >= eco:
         return "manufacturing"
     if eco >= 2:
@@ -512,6 +525,12 @@ def _product_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("model", 12),
         ("description", 6),
         ("title", 8),
+        ("campaign", 40),
+        ("campaign_name", 44),
+        ("channel", 28),
+        ("severity", 26),
+        ("plant", 24),
+        ("machine", 22),
     )
     for kw, w in pairs:
         if kw in n:
@@ -559,6 +578,17 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         ("price", 28),
         ("profit", 28),
         ("margin", 22),
+        ("discount", 32),
+        ("discount_pct", 30),
+        ("downtime", 40),
+        ("downtime_minutes", 44),
+        ("outage_minutes", 40),
+        ("repair_cost", 38),
+        ("maintenance_cost", 34),
+        ("production_loss", 42),
+        ("production_loss_units", 44),
+        ("units_lost", 36),
+        ("incident_count", 28),
     )
     for kw, w in monetary:
         if kw in n:
@@ -628,6 +658,16 @@ def _region_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("location", 16),
         ("market", 14),
         ("geo", 10),
+        ("plant", 36),
+        ("facility", 28),
+        ("site", 20),
+        ("workcenter", 22),
+        ("severity", 24),
+        ("priority", 18),
+        ("machine", 26),
+        ("equipment", 24),
+        ("line", 18),
+        ("shift", 14),
     ):
         if kw in n:
             score += w
@@ -667,6 +707,12 @@ def _date_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("date", 20),
         ("month", 8),
         ("period", 8),
+        ("incident_date", 36),
+        ("campaign_date", 34),
+        ("event_date", 30),
+        ("reported_date", 28),
+        ("start_time", 22),
+        ("end_time", 18),
     ):
         if kw in n:
             score += w
@@ -4721,17 +4767,67 @@ def _match_column_from_phrase(phrase: str, columns: List[str], profile: Dict[str
 
 
 def _resolve_by_column_from_question(q: str, columns: List[str], profile: Dict[str, Any]) -> Optional[str]:
+    global df
     phrase = _extract_after_by(q)
     if phrase:
-        cat_pool = [
-            c
-            for c in columns
-            if profile.get("column_types", {}).get(c) in ("category", "text", "date")
-        ]
+        cat_pool = _dimension_pool_columns(df, profile, columns=columns)
         hit = _match_column_from_phrase(phrase, cat_pool or columns, profile)
         if hit:
             return hit
     return None
+
+
+def _numeric_entity_dimension_columns(df, profile: Dict[str, Any], max_nu: int = 120) -> List[str]:
+    """Numeric columns that are still reasonable group-by keys (machine_id, plant_id, …)."""
+    if df is None or df.empty:
+        return []
+    ct = profile.get("column_types", {})
+    out: List[str] = []
+    for c in df.columns.tolist():
+        if ct.get(c) != "number":
+            continue
+        n = _norm_header_token(str(c))
+        if _id_like_column_name(c) and not re.search(
+            r"(machine|plant|line|equipment|asset|campaign|sku|product|order)_id$",
+            n,
+        ):
+            continue
+        if not re.search(
+            r"(machine|plant|line|equipment|asset|campaign|severity|channel|sku|product)_id$|"
+            r"\b(machine|plant|line|equipment|campaign)\b",
+            n,
+        ):
+            continue
+        try:
+            nu = int(df[c].nunique(dropna=True))
+        except Exception:
+            continue
+        if 2 <= nu <= max_nu:
+            out.append(str(c))
+    return out
+
+
+def _dimension_pool_columns(
+    df,
+    profile: Dict[str, Any],
+    columns: Optional[List[str]] = None,
+) -> List[str]:
+    """Category / text / date columns plus entity-like numeric dimensions."""
+    cols = columns if columns is not None else (df.columns.tolist() if df is not None else [])
+    ct = profile.get("column_types", {})
+    seen: set = set()
+    out: List[str] = []
+    for c in cols:
+        if ct.get(c) in ("category", "text", "date"):
+            if c not in seen:
+                seen.add(c)
+                out.append(c)
+    if df is not None:
+        for c in _numeric_entity_dimension_columns(df, profile):
+            if c not in seen:
+                seen.add(c)
+                out.append(c)
+    return out
 
 
 def _infer_dimension_column_from_question(
@@ -4747,13 +4843,37 @@ def _infer_dimension_column_from_question(
     ct = profile.get("column_types", {})
     columns = df.columns.tolist()
 
-    cand_dims = [
-        c for c in columns if ct.get(c) in ("category", "text", "date")
-    ]
+    cand_dims = _dimension_pool_columns(df, profile)
 
     phrase = _extract_after_by(ql)
     if phrase:
         hit = _match_column_from_phrase(phrase, cand_dims or columns, profile)
+        if hit:
+            return hit
+
+    mm = re.search(
+        r"\bwhich\s+([a-z0-9][a-z0-9_\s]{0,48}?)\s+(?:generated|produced|recorded|saw|had)\b",
+        ql,
+        re.I,
+    )
+    if mm:
+        raw_phrase = mm.group(1).strip().replace("-", "_")
+        hit = _match_column_from_phrase(raw_phrase, cand_dims or columns, profile)
+        if hit:
+            return hit
+        alt = raw_phrase.replace(" ", "_")
+        hit = _match_column_from_phrase(alt, cand_dims or columns, profile)
+        if hit:
+            return hit
+
+    mm_is = re.search(r"\bwhich\s+([a-z0-9][a-z0-9_\s]{0,48}?)\s+is\b", ql, re.I)
+    if mm_is:
+        raw_phrase = mm_is.group(1).strip().replace("-", "_")
+        hit = _match_column_from_phrase(raw_phrase, cand_dims or columns, profile)
+        if hit:
+            return hit
+        alt = raw_phrase.replace(" ", "_")
+        hit = _match_column_from_phrase(alt, cand_dims or columns, profile)
         if hit:
             return hit
 
@@ -4803,7 +4923,8 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     if _scatter_pair_from_question(question_str, numeric_cols):
         return None
 
-    cand_dims = [c for c in cols if ct.get(c) in ("category", "text", "date")]
+    cand_dims = _dimension_pool_columns(df, profile)
+
     by_phrases = _extract_all_by_dimension_phrases(ql)
     by_cols_ordered: List[str] = []
     seen_b: set = set()
@@ -4839,7 +4960,47 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         if not gcol:
             gcol = _infer_dimension_column_from_question(question_str, df, profile)
 
-    ncol = _best_numeric_column_for_question(question_str, numeric_cols)
+    incident_only = bool(re.search(r"\bincidents?\b", ql)) and not re.search(
+        r"\b(downtime|minutes|outage|production\s*loss|repair\s*cost|revenue|sales|loss\s*units)\b",
+        ql,
+    )
+    ncol: Optional[str] = None
+    if incident_only and gcol:
+        icol = _find_first_column(
+            cols,
+            [
+                "incident_count",
+                "incident count",
+                "incidents_count",
+                "num_incidents",
+                "n_incidents",
+            ],
+        )
+        if icol and str(icol) != str(gcol) and icol in numeric_cols:
+            ncol = icol
+        if ncol is None:
+            iid = _find_first_column(
+                cols,
+                [
+                    "incident_id",
+                    "incident id",
+                    "case_id",
+                    "case id",
+                    "ticket_id",
+                    "ticket id",
+                ],
+            )
+            if iid and str(iid) != str(gcol) and iid in cols:
+                ncol = str(iid)
+    if ncol is None:
+        ncol = _best_numeric_column_for_question(question_str, numeric_cols)
+    if incident_only and gcol and ncol is not None:
+        cn_inc = _norm_metric_phrase_for_match(str(ncol))
+        if "downtime" in cn_inc or "outage" in cn_inc:
+            ncol = None
+    if ncol is None and incident_only and gcol:
+        return None
+
     if ncol is None and (
         re.search(r"\b(count|how many|number of)\b", ql)
         or "employee" in ql
@@ -4895,6 +5056,9 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         agg_label, agg_key = "Total", "sum"
     else:
         agg_label, agg_key = "Average", "mean"
+
+    if incident_only and ncol:
+        agg_label, agg_key = "Count", "count"
 
     if agg_key != "count" and ncol not in numeric_cols:
         return None
@@ -5116,6 +5280,26 @@ def _best_numeric_column_for_question(q: str, numeric_cols: List[str]) -> Option
             "attend" in cn or "absent" in cn or "present" in cn
         ):
             score += 140
+        if re.search(r"\bproduction\s+loss\b", ql_raw) or re.search(
+            r"\bproduction[_\s]+loss\b", ql_norm
+        ):
+            if "production" in cn and "loss" in cn:
+                score += 360
+            if "downtime" in cn or "outage" in cn:
+                score -= 280
+        if re.search(r"\bproduction\s+loss\b", ql_raw) is None and re.search(
+            r"\bdowntime\b", ql_raw
+        ):
+            if "downtime" in cn or "outage" in cn:
+                score += 120
+        if re.search(r"\bincidents?\b", ql_raw) and not re.search(
+            r"\b(downtime|minutes|outage|production\s+loss|repair|revenue|sales|loss)\b",
+            ql_raw,
+        ):
+            if re.search(r"incident.*count|count.*incident", cn.replace(" ", "_")):
+                score += 340
+            if "downtime" in cn and "incident" not in cn:
+                score -= 260
         if score > best_score:
             best_score = score
             best = c
@@ -5406,6 +5590,414 @@ def _time_series_rows_from_grouped(g: pd.Series) -> List[Dict[str, Any]]:
     return rows
 
 
+def _pick_default_metric_column(
+    q: str, numeric_cols: List[str], domain: str
+) -> Optional[str]:
+    """When the question names no explicit metric, pick a sensible primary numeric column."""
+    if not numeric_cols:
+        return None
+    hit = _best_numeric_column_for_question(q, numeric_cols)
+    if hit:
+        return hit
+    ql = str(q).lower()
+    scored: List[Tuple[int, str]] = []
+    for c in numeric_cols:
+        if _id_like_column_name(c) and not re.search(
+            r"(revenue|sales|amount|value|downtime|loss|cost|spend|discount)", str(c).lower()
+        ):
+            continue
+        n = _norm_header_token(str(c))
+        sc = 0
+        for kw, pt in (
+            ("revenue", 50),
+            ("sales", 48),
+            ("order_value", 46),
+            ("order_amount", 44),
+            ("amount", 40),
+            ("value", 36),
+            ("downtime", 44),
+            ("production_loss", 42),
+            ("repair_cost", 38),
+            ("spend", 34),
+            ("discount", 32),
+        ):
+            if kw in n:
+                sc += pt
+        if domain == "operations" and "downtime" in n:
+            sc += 28
+        if domain == "marketing" and ("revenue" in n or "conversion" in n):
+            sc += 18
+        if "risk" in ql or "risky" in ql or "riskiest" in ql:
+            if any(k in n for k in ("severity", "incident", "downtime", "loss", "hazard")):
+                sc += 42
+        if "performance" in ql and ("revenue" in n or "sales" in n or "conversion" in n):
+            sc += 35
+        if re.search(r"\bproduction\s+loss\b", ql) or re.search(
+            r"\bproduction[_\s]+loss\b", ql.replace("_", " ")
+        ):
+            if "production" in n and "loss" in n:
+                sc += 120
+            if "downtime" in n or "outage" in n:
+                sc -= 100
+        scored.append((sc, str(c)))
+    scored.sort(key=lambda t: (-t[0], t[1].lower()))
+    if scored and scored[0][0] > 0:
+        return scored[0][1]
+    for c in numeric_cols:
+        if not _id_like_column_name(c):
+            return str(c)
+    return str(numeric_cols[0])
+
+
+def _histogram_bucket_rows(
+    df_in: pd.DataFrame, col: str, bins: int = 12
+) -> Tuple[List[Dict[str, Any]], str]:
+    """Bucket a numeric column for a histogram-style vertical bar chart."""
+    try:
+        s = pd.to_numeric(df_in[col], errors="coerce").dropna()
+    except Exception:
+        return [], ""
+    if len(s) < 4:
+        return [], ""
+    n_bins = int(max(4, min(bins, max(5, int(len(s) ** 0.5)))))
+    try:
+        cuts = pd.cut(s, bins=n_bins, duplicates="drop")
+    except Exception:
+        return [], ""
+    vc = cuts.value_counts().sort_index()
+    rows: List[Dict[str, Any]] = []
+    for interval, cnt in vc.items():
+        try:
+            fv = float(cnt)
+        except (TypeError, ValueError):
+            continue
+        if fv <= 0:
+            continue
+        label = str(interval).replace("(", "[").replace("]", ")")
+        rows.append({"name": _pretty_label_text(label, 48), "value": fv})
+    if len(rows) < 2:
+        return [], ""
+    title = f"Histogram — {_pretty_label_text(str(col))}"
+    return rows, title
+
+
+def _question_asks_numeric_distribution_histogram(ql: str) -> bool:
+    """User wants a numeric value distribution (histogram), not category share."""
+    s = str(ql).lower()
+    if re.search(r"\b(histogram|frequency|binning|bins?)\b", s):
+        return True
+    if re.search(r"\bspread\b", s) or re.search(r"\brange\b", s):
+        return True
+    if "distribution" in s:
+        return True
+    return False
+
+
+def _numeric_column_for_histogram_question(
+    question: str,
+    numeric_cols: List[str],
+    columns: List[str],
+    profile: Dict[str, Any],
+) -> Optional[str]:
+    """Resolve which numeric column to bucket for a distribution / histogram question."""
+    ql = str(question).lower().strip()
+    patterns = (
+        r"\b(?:distribution|histogram|frequency|spread|range)\s+of\s+([a-z0-9][a-z0-9_\s%/\-]{1,64})",
+        r"\b(?:show|analyze)\s+([a-z0-9][a-z0-9_\s]{1,64}?)\s+distribution\b",
+        r"\b([a-z0-9][a-z0-9_\s]{1,64}?)\s+distribution\b",
+    )
+    for pat in patterns:
+        m = re.search(pat, ql, re.I)
+        if m:
+            phrase = m.group(1).strip()
+            hit = _match_column_from_phrase(phrase, numeric_cols, profile)
+            if hit:
+                return str(hit)
+    return _numeric_col_mentioned(question, numeric_cols)
+
+
+def _categorical_share_distribution_phrase(ql: str) -> bool:
+    """True for pie-style 'distribution/share of categories' (status, channel, …)."""
+    s = str(ql).lower()
+    return bool(
+        re.search(
+            r"\b(share|split|breakdown|proportion|percentage|mix|composition)\b",
+            s,
+        )
+        or re.search(
+            r"\b(status|channels?|payment|segment|types?|categories?|customer)\b[^.?\n]{0,48}\bdistribution\b|\bdistribution\b[^.?\n]{0,48}\b(status|channels?|payment|segment|types?|categories?|customer)\b",
+            s,
+        )
+    )
+
+
+def _resolve_histogram_numeric_column_for_question(
+    question: str,
+    q: str,
+    numeric_cols: List[str],
+    columns: List[str],
+    ct: Dict[str, Any],
+    domain: str,
+) -> Optional[str]:
+    """Pick the numeric column to histogram, or None if the question is not numeric-distribution intent."""
+    if not numeric_cols or not _question_asks_numeric_distribution_histogram(q):
+        return None
+    hcol = _numeric_column_for_histogram_question(question, numeric_cols, columns, ct)
+    if hcol:
+        return str(hcol)
+    if re.search(r"\b(histogram|frequency|binning|spread|range)\b", q):
+        pc = _pick_default_metric_column(q, numeric_cols, domain)
+        return str(pc) if pc else None
+    if "distribution" in q:
+        hm = _numeric_col_mentioned(question, numeric_cols)
+        return str(hm) if hm else None
+    return None
+
+
+def _deterministic_viz_last_resort(
+    question: str,
+    smart_trace: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], str, str, str]:
+    """
+    Last-resort charts when analyze_data + intent fallback + build_smart_chart produced nothing.
+    """
+    global df, dataset_profile
+    subtitle = "Deterministic chart from question + schema"
+    if df is None or df.empty:
+        return [], "", "", ""
+    profile = dataset_profile or build_profile(df)
+    q = question.lower().strip()
+    columns = df.columns.tolist()
+    ct_map = profile.get("column_types", {})
+    numeric_cols = [c for c in columns if ct_map.get(c) == "number"]
+    if not numeric_cols:
+        smart_trace["deterministic_fallback_reason"] = "no_numeric_columns"
+        return [], "", "", ""
+
+    date_cols = [c for c in columns if ct_map.get(c) == "date"]
+    for c in columns:
+        if c not in date_cols and _group_column_is_time_series_eligible(df, str(c)):
+            date_cols.append(c)
+
+    domain = _infer_business_domain(columns)
+    trendish = any(
+        k in q
+        for k in (
+            "trend",
+            "over time",
+            "time series",
+            "by date",
+            "daily",
+            "weekly",
+            "monthly",
+            "show trend",
+            "incident trend",
+        )
+    ) or bool(re.search(r"\b(by|per)\s+(day|date|week|month)\b", q))
+
+    if date_cols and trendish:
+        ncol = _numeric_col_mentioned(q, numeric_cols) or _pick_default_metric_column(
+            q, numeric_cols, domain
+        )
+        dcol = date_cols[0]
+        if ncol and str(dcol) != str(ncol):
+            g_series, ts_meta = _adaptive_time_series_grouped(
+                df[[dcol, ncol]].copy(),
+                str(dcol),
+                str(ncol),
+                agg_key="sum",
+            )
+            if g_series is not None and len(g_series) >= 2:
+                chart_data = _time_series_rows_from_grouped(g_series)
+                tb_l = _freq_human_label(str(ts_meta.get("timeBucket") or "M"))
+                title = f"{_pretty_label_text(ncol)} over time ({tb_l})"
+                smart_trace.update(
+                    {
+                        "routing": "deterministic_fallback",
+                        "category_column": dcol,
+                        "numeric_column": ncol,
+                        "aggregation": "sum",
+                        "aggregation_key": "sum",
+                        "rows_analyzed": int(len(df)),
+                        "notes": ts_meta.get("selectionReason")
+                        or "Deterministic time-series fallback",
+                        "timeSeriesAnalysis": ts_meta,
+                        "deterministic_fallback_reason": "time_series_default",
+                    }
+                )
+                return chart_data, "line", title, subtitle
+
+    sp = _scatter_pair_from_question(q, numeric_cols)
+    if sp:
+        xc, yc = sp
+        try:
+            tmp = df[[xc, yc]].copy()
+            tmp["_x"] = numeric_series(xc)
+            tmp["_y"] = numeric_series(yc)
+            tmp = tmp.dropna(subset=["_x", "_y"]).head(450).reset_index(drop=True)
+            if len(tmp) >= 2:
+                point_labels = [f"•{i + 1}" for i in range(len(tmp))]
+                chart_data = []
+                for i, (_, row) in enumerate(tmp.iterrows()):
+                    chart_data.append(
+                        {
+                            "name": point_labels[i],
+                            "x": float(row["_x"]),
+                            "value": float(row["_y"]),
+                        }
+                    )
+                title = f"{_pretty_label_text(yc)} vs {_pretty_label_text(xc)}"
+                rel_ins = _compute_scatter_relationship_insights(
+                    tmp, str(xc), str(yc), point_labels
+                )
+                smart_trace.update(
+                    {
+                        "routing": "deterministic_fallback",
+                        "category_column": xc,
+                        "numeric_column": yc,
+                        "aggregation": "scatter",
+                        "aggregation_key": "mean",
+                        "rows_analyzed": int(len(tmp)),
+                        "notes": "Deterministic scatter (relationship question).",
+                        "scatter_x_column": xc,
+                        "scatter_y_column": yc,
+                        "relationshipInsights": rel_ins,
+                        "scatterFallback": False,
+                        "deterministic_fallback_reason": "scatter_relationship",
+                    }
+                )
+                return chart_data, "scatter", title, subtitle
+        except Exception:
+            pass
+
+    hist_ncol_det = _resolve_histogram_numeric_column_for_question(
+        question, q, numeric_cols, columns, {"column_types": ct_map}, domain
+    )
+    if hist_ncol_det and str(hist_ncol_det) in df.columns:
+        h_rows, h_title = _histogram_bucket_rows(df, str(hist_ncol_det))
+        if h_rows:
+            smart_trace.update(
+                {
+                    "routing": "deterministic_fallback",
+                    "category_column": str(hist_ncol_det),
+                    "numeric_column": str(hist_ncol_det),
+                    "aggregation": "count",
+                    "aggregation_key": "count",
+                    "rows_analyzed": int(len(df)),
+                    "notes": "Histogram: row counts per numeric value range.",
+                    "histogram": True,
+                    "deterministic_fallback_reason": "histogram",
+                }
+            )
+            return h_rows, "histogram", h_title, subtitle
+
+    want_incident_row_counts = bool(re.search(r"\bincidents?\b", q)) and not re.search(
+        r"\b(downtime|minutes|outage|production\s*loss|repair\s*cost|revenue|sales|loss\s*units)\b",
+        q,
+    )
+    if want_incident_row_counts:
+        g_ic = _resolve_by_column_from_question(
+            q, columns, {"column_types": ct_map}
+        ) or _infer_dimension_column_from_question(question, df, profile)
+        pool_ic = _dimension_pool_columns(df, profile, columns)
+        if not g_ic and pool_ic:
+            g_ic = pool_ic[0]
+        if g_ic and str(g_ic) in df.columns:
+            try:
+                cnt = df.groupby(g_ic, dropna=False).size().sort_values(ascending=False)
+                chart_data_ic = [
+                    {"name": _pretty_label_text(str(nm)), "value": float(v)}
+                    for nm, v in cnt.items()
+                ]
+                if len(chart_data_ic) >= 2:
+                    title_ic = f"Incident count by {_pretty_label_text(g_ic)}"
+                    ctype_ic = "bar_horizontal" if len(chart_data_ic) > 8 else "bar"
+                    smart_trace.update(
+                        {
+                            "routing": "deterministic_fallback",
+                            "category_column": g_ic,
+                            "numeric_column": None,
+                            "aggregation": "count",
+                            "aggregation_key": "count",
+                            "rows_analyzed": int(len(df)),
+                            "notes": "Each row treated as one incident; counts by category.",
+                            "deterministic_fallback_reason": "incident_count_by_dimension",
+                        }
+                    )
+                    return chart_data_ic, ctype_ic, title_ic, subtitle
+            except Exception:
+                pass
+
+    ncol = _numeric_col_mentioned(q, numeric_cols) or _pick_default_metric_column(
+        q, numeric_cols, domain
+    )
+    if not ncol:
+        smart_trace["deterministic_fallback_reason"] = "no_metric_column"
+        return [], "", "", ""
+
+    pool = [c for c in _dimension_pool_columns(df, profile, columns) if c != ncol]
+    if not pool:
+        smart_trace["deterministic_fallback_reason"] = "no_dimension_column"
+        return [], "", "", ""
+
+    best_g: Optional[str] = None
+    best_nu = 10**9
+    for c in pool:
+        try:
+            nu = int(df[c].nunique(dropna=True))
+        except Exception:
+            continue
+        if nu < 2:
+            continue
+        if nu < best_nu:
+            best_nu = nu
+            best_g = c
+    gcol = best_g or pool[0]
+
+    try:
+        sub = df[[gcol, ncol]].copy()
+        sub["_v"] = numeric_series(ncol)
+        sub = sub.dropna(subset=[gcol, "_v"])
+        if sub.empty or int(sub[gcol].nunique(dropna=True)) < 2:
+            smart_trace["deterministic_fallback_reason"] = "empty_after_dropna"
+            return [], "", "", ""
+        want_mean = any(k in q for k in ("average", "avg", "mean"))
+        gb = sub.groupby(gcol)["_v"].mean() if want_mean else sub.groupby(gcol)["_v"].sum()
+        out = gb.reset_index()
+        out.columns = ["name", "value"]
+        out = out.sort_values("value", ascending=False).head(24)
+        chart_data = [
+            {"name": _pretty_label_text(r["name"]), "value": float(r["value"])}
+            for _, r in out.iterrows()
+        ]
+        if not chart_data:
+            smart_trace["deterministic_fallback_reason"] = "groupby_empty"
+            return [], "", "", ""
+        want_h = len(chart_data) > 10 or any(
+            k in q for k in ("highest", "lowest", "rank", "which ", "compare")
+        )
+        ctype = "bar_horizontal" if want_h else "bar"
+        op = "Average" if want_mean else "Total"
+        ak = "mean" if want_mean else "sum"
+        title = _business_chart_title(ak, op, str(ncol), str(gcol))
+        smart_trace.update(
+            {
+                "routing": "deterministic_fallback",
+                "category_column": gcol,
+                "numeric_column": ncol,
+                "aggregation": op.lower(),
+                "aggregation_key": ak,
+                "rows_analyzed": int(len(sub)),
+                "notes": "Deterministic aggregate: primary metric by inferred dimension.",
+                "deterministic_fallback_reason": "default_metric_by_dimension",
+            }
+        )
+        return chart_data, ctype, title, subtitle
+    except Exception:
+        smart_trace["deterministic_fallback_reason"] = "groupby_error"
+        return [], "", "", ""
+
+
 def build_smart_chart(
     question: str, trace: Optional[Dict[str, Any]] = None
 ) -> Tuple[List[Dict[str, Any]], str, str, str]:
@@ -5430,7 +6022,11 @@ def build_smart_chart(
             date_cols.append(c)
     cat_cols = [c for c in columns if ct_map.get(c) in ("category", "text")]
     ct: Dict[str, Any] = {"column_types": ct_map}
-
+    domain = _infer_business_domain(columns)
+    pie_dims = _dimension_pool_columns(df, profile, columns)
+    hist_ncol = _resolve_histogram_numeric_column_for_question(
+        question, q, numeric_cols, columns, ct, domain
+    )
     sp = _scatter_pair_from_question(q, numeric_cols)
     if sp:
         xc, yc = sp
@@ -5558,9 +6154,10 @@ def build_smart_chart(
         "hire trend",
         "hiring trend",
         "momentum",
+        "show trend",
+        "incident trend",
     )
     pie_kw = (
-        "distribution",
         "share",
         "split",
         "breakdown",
@@ -5568,6 +6165,7 @@ def build_smart_chart(
         "percentage",
         "mix",
         "composition",
+        "contribution",
         "% of ",
         " percent",
     )
@@ -5577,6 +6175,8 @@ def build_smart_chart(
         ncol = _numeric_col_mentioned(q, numeric_cols)
         if ncol is None and len(numeric_cols) == 1:
             ncol = numeric_cols[0]
+        if ncol is None:
+            ncol = _pick_default_metric_column(q, numeric_cols, domain)
         dcol = date_cols[0]
         if ncol:
             g_series, ts_meta = _adaptive_time_series_grouped(
@@ -5610,8 +6210,9 @@ def build_smart_chart(
                     )
                 return chart_data, "line", title, subtitle
             # Sparse / degenerate time axis: fall back to category totals if possible.
-            if cat_cols:
-                ccol = cat_cols[0]
+            if pie_dims:
+                fb_dims = [c for c in pie_dims if c != ncol and c != dcol]
+                ccol = fb_dims[0] if fb_dims else pie_dims[0]
                 try:
                     sub = df[[ccol, ncol]].copy()
                     sub["_v"] = numeric_series(ncol)
@@ -5651,18 +6252,50 @@ def build_smart_chart(
                 except Exception:
                     pass
 
-    # ---- Pie / donut: category shares ----
-    if cat_cols and any(k in q for k in pie_kw):
-        ccol = _match_column_from_phrase(_extract_after_by(q) or "", cat_cols, ct) if _extract_after_by(
+    # ---- Histogram: numeric value distribution (after time-series routing) ----
+    if hist_ncol and str(hist_ncol) in df.columns:
+        h_rows, h_title = _histogram_bucket_rows(df, str(hist_ncol))
+        if h_rows:
+            if trace is not None:
+                trace.update(
+                    {
+                        "category_column": str(hist_ncol),
+                        "numeric_column": str(hist_ncol),
+                        "aggregation": "count",
+                        "aggregation_key": "count",
+                        "rows_analyzed": int(len(df)),
+                        "notes": "Histogram: row counts per numeric value range.",
+                        "histogram": True,
+                    }
+                )
+            return h_rows, "histogram", h_title, subtitle
+
+    skip_pie_for_metric_share = "contribution" in q and (
+        "revenue" in q or "sales" in q or bool(_numeric_col_mentioned(q, numeric_cols))
+    )
+    want_pie_composition = any(k in q for k in pie_kw) or _categorical_share_distribution_phrase(
+        q
+    )
+    skip_pie_for_numeric_hist_intent = bool(
+        hist_ncol and str(hist_ncol) in df.columns
+    )
+    # ---- Pie / donut: category shares (row counts), not monetary contribution splits ----
+    if (
+        pie_dims
+        and want_pie_composition
+        and not skip_pie_for_numeric_hist_intent
+        and not skip_pie_for_metric_share
+    ):
+        ccol = _match_column_from_phrase(_extract_after_by(q) or "", pie_dims, ct) if _extract_after_by(
             q
         ) else None
         if ccol is None:
-            for c in cat_cols:
+            for c in pie_dims:
                 if str(c).lower() in q:
                     ccol = c
                     break
         if ccol is None:
-            ccol = cat_cols[0]
+            ccol = pie_dims[0]
         vc = df[ccol].astype(str).value_counts(dropna=False).head(14)
         tot = float(vc.sum())
         if tot <= 0:
@@ -5694,7 +6327,10 @@ def build_smart_chart(
         if sort_col is None and len(numeric_cols) == 1:
             sort_col = numeric_cols[0]
         if sort_col and sort_col in df.columns:
-            label_col = _pick_label_column(sort_col, cat_cols, columns)
+            label_candidates = [
+                c for c in _dimension_pool_columns(df, profile, columns) if c != sort_col
+            ]
+            label_col = _pick_label_column(sort_col, label_candidates, columns)
             show = df[[label_col, sort_col]].copy()
             show["_v"] = numeric_series(sort_col)
             show = show.dropna(subset=["_v"]).sort_values("_v", ascending=False)
@@ -5725,11 +6361,51 @@ def build_smart_chart(
 
     # ---- Generic aggregation: metric by category ----
     gcol = _resolve_by_column_from_question(q, columns, ct)
+    if not gcol and numeric_cols and (
+        any(k in q for k in ("compare", "performance", "analyze", "analysis"))
+        or re.search(r"\bwhich\b", q)
+        or "risky" in q
+    ):
+        gcol = _infer_dimension_column_from_question(question, df, profile)
+    if not gcol and pie_dims:
+        gcol = pie_dims[0]
+
+    want_incident_row_counts = bool(re.search(r"\bincidents?\b", q)) and not re.search(
+        r"\b(downtime|minutes|outage|production\s*loss|repair\s*cost|revenue|sales|loss\s*units)\b",
+        q,
+    )
+    if gcol and want_incident_row_counts and str(gcol) in df.columns:
+        try:
+            cnt = df.groupby(gcol, dropna=False).size().sort_values(ascending=False)
+            chart_ic = [
+                {"name": _pretty_label_text(str(nm)), "value": float(v)}
+                for nm, v in cnt.items()
+            ]
+            if len(chart_ic) >= 2:
+                title_ic = f"Incident count by {_pretty_label_text(gcol)}"
+                ctype_ic = "bar_horizontal" if len(chart_ic) > 8 else "bar"
+                if trace is not None:
+                    trace.update(
+                        {
+                            "category_column": gcol,
+                            "numeric_column": None,
+                            "aggregation": "count",
+                            "aggregation_key": "count",
+                            "rows_analyzed": int(len(df)),
+                            "notes": "Each row = one incident record; value is count per category.",
+                        }
+                    )
+                return chart_ic, ctype_ic, title_ic, subtitle
+        except Exception:
+            pass
+
     if gcol and numeric_cols:
         ncol = _numeric_col_mentioned(q, numeric_cols)
         others = [c for c in numeric_cols if c != gcol]
         if ncol is None and len(others) == 1:
             ncol = others[0]
+        if ncol is None:
+            ncol = _pick_default_metric_column(q, numeric_cols, domain)
         if ncol and ncol != gcol:
             sub = df[[gcol, ncol]].copy()
             sub["_v"] = numeric_series(ncol)
@@ -5754,8 +6430,19 @@ def build_smart_chart(
                 ]
                 if chart_data:
                     want_h = bool(topn_b) or len(chart_data) > 10 or any(
-                        k in q for k in ("rank", "ranking", "highest", "lowest")
-                    )
+                        k in q
+                        for k in (
+                            "rank",
+                            "ranking",
+                            "highest",
+                            "lowest",
+                            "which ",
+                            "compare",
+                            "best",
+                            "most risky",
+                            "riskiest",
+                        )
+                    ) or bool(re.search(r"\bwhich\s+\w+", q))
                     op = (
                         "Average"
                         if want_mean
@@ -5838,12 +6525,54 @@ def analyze_data(question: str):
 
     q = question.lower()
 
-    product_col = get_mapped_or_detected_column("product", ["product", "item", "sku"])
+    product_col = get_mapped_or_detected_column(
+        "product",
+        [
+            "product",
+            "item",
+            "sku",
+            "category",
+            "product_category",
+            "subcategory",
+            "campaign",
+            "campaign_name",
+        ],
+    )
     sales_col = get_mapped_or_detected_column(
-        "sales", ["sales", "revenue", "amount", "total", "value"]
+        "sales",
+        [
+            "sales",
+            "revenue",
+            "amount",
+            "total",
+            "value",
+            "order_value",
+            "order value",
+            "order_amount",
+            "order amount",
+            "line_total",
+            "transaction_total",
+            "downtime",
+            "downtime_minutes",
+            "downtime minutes",
+            "production_loss",
+            "production_loss_units",
+            "repair_cost",
+            "repair cost",
+        ],
     )
     region_col = get_mapped_or_detected_column(
-        "region", ["region", "state", "city", "location"]
+        "region",
+        [
+            "region",
+            "state",
+            "city",
+            "location",
+            "plant",
+            "facility",
+            "site",
+            "country",
+        ],
     )
     customer_col = get_mapped_or_detected_column(
         "customer", ["customer", "client", "buyer", "account"]
@@ -5852,7 +6581,23 @@ def analyze_data(question: str):
         "profit", ["profit", "margin", "net profit", "earnings"]
     )
     date_col = get_mapped_or_detected_column(
-        "date", ["date", "order date", "transaction date", "invoice date", "month"]
+        "date",
+        [
+            "date",
+            "order date",
+            "order_date",
+            "transaction date",
+            "transaction_date",
+            "invoice date",
+            "invoice_date",
+            "incident_date",
+            "incident date",
+            "campaign_date",
+            "campaign date",
+            "created_at",
+            "timestamp",
+            "month",
+        ],
     )
 
     chart_data = []
@@ -6264,6 +7009,8 @@ def infer_visualization_rounding_category(
         return "pct_1"
     if chart_type_internal == "scatter":
         return "ratio_1"
+    if chart_type_internal == "histogram":
+        return "int_0"
 
     ak = agg_hint or ""
     if ak == "count":
@@ -6382,7 +7129,7 @@ def _chart_type_for_api(internal: str) -> str:
         return "horizontalBar"
     if i in ("timeseries", "time_series"):
         return "line"
-    if i in ("pie", "donut", "line", "area", "bar", "scatter"):
+    if i in ("pie", "donut", "line", "area", "bar", "scatter", "histogram"):
         return i
     return "bar"
 
@@ -6397,6 +7144,7 @@ def _humanize_chart_type_for_provenance(api_chart_type: str) -> str:
         "pie": "Pie chart",
         "donut": "Donut chart",
         "scatter": "Scatter plot",
+        "histogram": "Histogram",
     }.get(t, t)
 
 
@@ -6730,11 +7478,7 @@ def _question_asks_share_or_composition_pie(ql: str) -> bool:
         )
     ):
         return True
-    if "distribution" in ql and not any(
-        k in ql for k in ("average", "avg", "mean", "median")
-    ):
-        return True
-    return False
+    return _categorical_share_distribution_phrase(ql)
 
 
 def determine_chart_type_and_reason(
@@ -6767,6 +7511,13 @@ def determine_chart_type_and_reason(
         return (
             "scatter",
             "Scatter plot: each point pairs two numeric measurements from the dataset.",
+            "High",
+        )
+
+    if base == "histogram" or smart_trace.get("histogram"):
+        return (
+            "histogram",
+            "Histogram: each category is a value range; bar height is the number of rows in that bucket.",
             "High",
         )
 
@@ -6902,7 +7653,7 @@ def determine_chart_type_and_reason(
             "High",
         )
 
-    if base == "bar" and _question_asks_share_or_composition_pie(ql) and 3 <= n <= 10 and not temporal_all:
+    if base == "bar" and _question_asks_share_or_composition_pie(ql) and 3 <= n <= 10 and not temporal_all and not smart_trace.get("histogram"):
         kind = "donut" if n >= 5 else "pie"
         return (
             kind,
@@ -7989,6 +8740,34 @@ def compute_visualization_for_question(
                     else:
                         exact_result = f"{base_er}\n\n{extra_sc}"
 
+    if not chart_data and not suppress_auto_charts:
+        lr, lt, lti, lsub = _deterministic_viz_last_resort(question, smart_trace)
+        if lr:
+            smart_routing_used = True
+            fallback_used = True
+            chart_data = list(_normalize_chart_records(lr))
+            chart_type = (lt or "bar").strip() or "bar"
+            chart_title = (lti or "").strip()
+            chart_subtitle = (lsub or chart_subtitle).strip()
+            det_note = (
+                "Chart generated from deterministic schema rules (no rule-based path matched earlier)."
+            )
+            partial_visualization_warning = (
+                f"{(partial_visualization_warning or '').strip()} {det_note}".strip()
+                if partial_visualization_warning
+                else det_note
+            )
+            tab_lr = _tabular_exact_from_name_value_rows(
+                [{"name": r.get("name"), "value": r.get("value")} for r in chart_data],
+                max_rows=40,
+            )
+            if tab_lr:
+                base_er = (exact_result or "").strip()
+                if not base_er or "No direct chart rule matched" in base_er:
+                    exact_result = tab_lr
+                elif tab_lr not in base_er:
+                    exact_result = f"{base_er}\n\n{tab_lr}"
+
     if (
         chart_data
         and intent_debug
@@ -8029,10 +8808,44 @@ def compute_visualization_for_question(
                         smart_trace["notes"] = f"{st_line} {extra}".strip()
 
     if not chart_data:
-        print(
-            "[viz] outgoing_visualization= None fallback_used=", fallback_used,
-            flush=True,
+        no_chart_reason = (
+            "suppress_auto_charts"
+            if suppress_auto_charts
+            else (
+                str(smart_trace.get("deterministic_fallback_reason") or "").strip()
+                or str(smart_trace.get("scatter_fallback_reason") or "").strip()
+                or (
+                    "advanced_multi_dim_unavailable"
+                    if chart_suppressed_misleading
+                    else "no_rows_after_pipeline"
+                )
+            )
         )
+        try:
+            dbg_no = {
+                "question": (question or "")[:520],
+                "detected_intent": _chart_selection_question_bucket(ql),
+                "selected_metric": (intent_debug or {}).get("value_col"),
+                "selected_dimension": (intent_debug or {}).get("group_col"),
+                "smart_routing": smart_trace.get("routing"),
+                "smart_metric": smart_trace.get("numeric_column"),
+                "smart_dimension": smart_trace.get("category_column"),
+                "deterministic_reason": smart_trace.get("deterministic_fallback_reason"),
+                "suppress_auto_charts": suppress_auto_charts,
+                "chart_suppressed": chart_suppressed_misleading,
+                "reason_no_chart": no_chart_reason[:800],
+            }
+            print(
+                "[viz_debug] no_chart",
+                json.dumps(_json_safe(dbg_no), default=str)[:2400],
+                flush=True,
+            )
+        except Exception:
+            print(
+                "[viz] outgoing_visualization= None fallback_used=",
+                fallback_used,
+                flush=True,
+            )
         kpi_rec = {
             "detectedIntent": _chart_selection_question_bucket(ql),
             "categoryCount": 0,
@@ -8059,9 +8872,25 @@ def compute_visualization_for_question(
             analysis_validation=av_empty,
             partial_visualization_warning=partial_visualization_warning,
         )
+        if no_chart_reason and str(no_chart_reason) not in str(exact_result or ""):
+            tail = f"\n\n[Chart unavailable] {no_chart_reason}"
+            analysis_empty["insightSummary"] = (
+                str(analysis_empty.get("insightSummary") or "").strip() + tail
+            ).strip()
+            exact_result = (str(exact_result or "").strip() + tail).strip()
         return exact_result, None, fin(analysis_empty)
 
+    chart_type_pre_sl = str(chart_type or "").strip().lower().replace("-", "_")
     chart_type = _normalize_internal_chart_type(chart_type)
+    if chart_type == "bar" and chart_type_pre_sl and chart_type_pre_sl != "bar":
+        try:
+            print(
+                "[viz_debug] unsupported_chart_type_fallback_bar",
+                json.dumps({"requested": chart_type_pre_sl}, default=str)[:500],
+                flush=True,
+            )
+        except Exception:
+            pass
 
     chart_type, chart_sel_reason, chart_sel_conf = determine_chart_type_and_reason(
         ql,
@@ -8077,6 +8906,7 @@ def compute_visualization_for_question(
         "pie",
         "donut",
         "scatter",
+        "histogram",
     ):
         chart_type = "bar"
         extra = "Low confidence in chart pattern; defaulting to a vertical bar chart."
@@ -8163,6 +8993,26 @@ def compute_visualization_for_question(
         json.dumps(_json_safe(grouped_dataset_preview))[:1600],
         flush=True,
     )
+    try:
+        dbg_ok = {
+            "question": (question or "")[:520],
+            "detected_intent": _chart_selection_question_bucket(ql),
+            "selected_metric": selected_numeric_column,
+            "selected_dimension": (
+                (intent_debug or {}).get("group_col")
+                or (smart_trace or {}).get("category_column")
+            ),
+            "selected_chart_type": _chart_type_for_api(str(chart_type or "bar")),
+            "routing": (smart_trace or {}).get("routing"),
+            "chart_selection_reason": chart_sel_reason,
+        }
+        print(
+            "[viz_debug] chart_ok",
+            json.dumps(_json_safe(dbg_ok), default=str)[:2200],
+            flush=True,
+        )
+    except Exception:
+        pass
 
     print(
         "[viz] finalized_category_col:",

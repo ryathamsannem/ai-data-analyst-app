@@ -1,0 +1,8 @@
+incident_date,plant,machine_id,severity,downtime_minutes,production_loss_units,repair_cost
+2024-01-05,East,101,High,120,15,800
+2024-01-06,East,102,Medium,45,5,200
+2024-01-07,West,201,High,200,22,1200
+2024-01-08,West,202,Low,10,1,50
+2024-01-09,North,301,Medium,90,10,400
+2024-01-10,North,302,High,150,18,950
+2024-01-11,South,401,Low,20,2,100
