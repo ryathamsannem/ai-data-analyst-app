@@ -3133,19 +3133,96 @@ _BUSINESS_DIMENSION_HINTS = (
 )
 
 
+_METRIC_NAME_PARTS = frozenset(
+    {
+        "salary",
+        "revenue",
+        "attendance",
+        "score",
+        "amount",
+        "percentage",
+        "bonus",
+        "price",
+        "downtime",
+        "cost",
+        "profit",
+        "margin",
+        "discount",
+        "tax",
+        "fee",
+        "quantity",
+        "qty",
+        "volume",
+        "hours",
+        "rate",
+        "headcount",
+        "turnover",
+        "weight",
+        "height",
+        "width",
+        "depth",
+        "age",
+        "total",
+        "avg",
+        "mean",
+        "median",
+        "cnt",
+        "count",
+        "pct",
+        "percent",
+        "ratio",
+        "share",
+        "payment",
+        "payments",
+        "balance",
+        "accrual",
+        "utilization",
+        "efficiency",
+        "yield",
+        "spend",
+        "budget",
+        "forecast",
+        "actual",
+        "target",
+        "quota",
+        "comp",
+        "compensation",
+        "wage",
+        "pay",
+        "earnings",
+        "income",
+        "expense",
+        "reimbursement",
+        "overtime",
+        "hoursworked",
+        "fte",
+    }
+)
+
+
+def _column_name_contains_metric_token(c: str) -> bool:
+    parts = [p for p in re.split(r"[^a-z0-9]+", c.lower()) if p]
+    return any(p in _METRIC_NAME_PARTS for p in parts)
+
+
 def _id_like_column_name(col: Optional[str]) -> bool:
     """Identifiers / keys that read poorly in business questions."""
     if not col:
         return True
     c = str(col).strip().lower().replace(" ", "_")
+    if _column_name_contains_metric_token(c):
+        return False
     if re.search(r"\b(uuid|guid|row_?id|rowid|index|seq|sequence)\b", c):
         return True
     if re.search(
-        r"(^|_)(transaction|txn|order|customer|client|user|emp|employee|account|invoice|payment)_?id$|^id$|^ids$",
+        r"(^|_)(transaction|txn|order|customer|client|user|emp|employee|account|invoice|payment|shipment|cart|session|visit|incident|case|ticket|claim|policy|member|patient|student|vendor|supplier|partner)_?id$|^id$|^ids$",
         c,
     ):
         return True
     if c.endswith("_id") or c.endswith("_ids"):
+        stem = c[:-3] if c.endswith("_id") else c[:-4]
+        if stem and _column_name_contains_metric_token(stem):
+            return False
         return True
     return False
 
