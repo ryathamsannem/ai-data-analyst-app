@@ -107,6 +107,27 @@ def build_tooltip_label(
     return build_metric_label(agg_key, agg_label, value_col)
 
 
+def build_insight_title(
+    agg_key: Optional[str],
+    metric_col: Optional[str],
+    dim_col: Optional[str],
+    chart_type: str = "bar",
+) -> str:
+    """Chart title with aggregation prefix, e.g. Total production loss by plant."""
+    met = build_metric_label(agg_key, None, metric_col)
+    dim = _pretty_column_label(dim_col) if dim_col else "category"
+    ct = (chart_type or "bar").strip().lower()
+    if ct in ("line", "area"):
+        return f"{met} over time"
+    if ct in ("pie", "donut"):
+        return f"{met} by {dim.lower()}"
+    if ct == "scatter":
+        return f"{met} vs {dim.lower()}"
+    if ct == "histogram":
+        return f"Distribution — {met}"
+    return f"{met} by {dim.lower()}"
+
+
 def build_chart_subtitle(
     *,
     rows_analyzed: Optional[int] = None,

@@ -14,7 +14,7 @@ import json
 import logging
 import uuid
 
-from analytics_metadata import build_metric_label
+from analytics_metadata import build_insight_title, build_metric_label
 
 load_dotenv()
 
@@ -1339,6 +1339,9 @@ def infer_dataset_kind() -> str:
         ["employee", "emp_", "_emp", "department", "attrition", "salary", "attendance", "staff", "workforce"]
     )
     sales_signals = col_has(["sales", "revenue", "product", "order", "sku", "customer", "invoice"])
+    ops_signals = col_has(
+        ["incident", "downtime", "severity", "production_loss", "repair", "plant", "outage", "mttr"]
+    )
 
     product_col = get_mapped_or_detected_column("product", ["product", "item", "sku"])
     sales_col = get_mapped_or_detected_column("sales", ["sales", "revenue", "amount", "total", "value"])
@@ -1348,6 +1351,11 @@ def infer_dataset_kind() -> str:
     )
 
     clear_sales = bool(sales_col and product_col)
+    biz = _infer_business_domain(columns)
+
+    # Operational / incident datasets — before generic sales heuristics.
+    if biz == "operations" or (ops_signals >= 2 and not clear_sales):
+        return "operations"
 
     # Prefer HR when people/org signals exist and we're not clearly a product sales cube.
     if workforce_signals and (salary_col or dept_col or not clear_sales):
@@ -1425,6 +1433,8 @@ def infer_kpi_domain() -> str:
     base = infer_dataset_kind()
     if base == "hr":
         return "hr"
+    if base == "operations":
+        return "operations"
 
     mfg_h = _manufacturing_column_hit(lower)
     eco_h = _ecommerce_column_hit(lower)
@@ -1600,6 +1610,115 @@ def _build_manufacturing_kpi_cards(
                 "subtitle": "Upload operational fields (plant, output, defects) for richer KPIs",
             }
         )
+        return cards[:5]
+
+
+def _build_operations_kpi_cards(
+    columns: List[str], profile: Dict[str, Any], kp: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """Executive operational / incident KPIs from semantic mapping + schema."""
+    global df
+    cards: List[Dict[str, Any]] = []
+    if df is None or df.empty:
+        return cards
+
+    metric_col = get_mapped_or_detected_column(
+        "sales",
+        [
+            "production_loss",
+            "downtime",
+            "repair_cost",
+            "maintenance_cost",
+            "cost",
+            "amount",
+            "units",
+            "loss",
+            "revenue",
+            "sales",
+        ],
+    )
+    dim_col = get_mapped_or_detected_column(
+        "region",
+        ["plant", "site", "facility", "location", "warehouse", "region", "territory"],
+    ) or get_mapped_or_detected_column(
+        "product",
+        ["severity", "issue_type", "issue type", "category", "type", "priority"],
+    )
+
+    cards.append(
+        {"title": "Records in view", "value": f"{int(len(df)):,}", "subtitle": None}
+    )
+
+    if metric_col:
+        sv = numeric_series(metric_col)
+        if sv.notna().any():
+            cards.append(
+                {
+                    "title": build_metric_label("sum", "total", metric_col),
+                    "value": f"{float(sv.sum(skipna=True)):,.0f}",
+                    "subtitle": None,
+                }
+            )
+            if dim_col and dim_col in df.columns:
+                try:
+                    sub = df[[dim_col, metric_col]].copy()
+                    sub["_v"] = numeric_series(metric_col)
+                    sub = sub.dropna(subset=[dim_col, "_v"])
+                    if not sub.empty:
+                        g = sub.groupby(dim_col)["_v"].sum().sort_values(ascending=False)
+                        if not g.empty:
+                            dim_lbl = _pretty_label_text(dim_col)
+                            cards.append(
+                                {
+                                    "title": f"Highest {dim_lbl.lower()}",
+                                    "value": str(g.index[0])[:52],
+                                    "subtitle": (
+                                        f"{build_metric_label('max', 'peak', metric_col)} "
+                                        f"{float(g.iloc[0]):,.0f}"
+                                    ),
+                                }
+                            )
+                except Exception:
+                    pass
+
+    dt_col = _find_first_column(
+        columns, ["downtime", "outage", "minutes_down", "downtime_minutes"]
+    )
+    if dt_col and dt_col != metric_col:
+        dv = numeric_series(dt_col)
+        if dv.notna().any():
+            cards.append(
+                {
+                    "title": build_metric_label("sum", "total", dt_col),
+                    "value": f"{float(dv.sum(skipna=True)):,.0f}",
+                    "subtitle": None,
+                }
+            )
+
+    sev_col = _find_first_column(columns, ["severity", "priority", "risk_level"])
+    if sev_col and sev_col != dim_col:
+        try:
+            vc = df[sev_col].dropna().astype(str).value_counts().head(1)
+            if not vc.empty:
+                cards.append(
+                    {
+                        "title": "Top severity level",
+                        "value": str(vc.index[0])[:52],
+                        "subtitle": f"{int(vc.iloc[0]):,} rows",
+                    }
+                )
+        except Exception:
+            pass
+
+    if len(cards) < 3 and kp.get("total_rows"):
+        cards.append(
+            {
+                "title": "Incident records",
+                "value": f"{int(kp.get('total_rows') or len(df)):,}",
+                "subtitle": "Rows in current filtered view",
+            }
+        )
+
     return cards[:5]
 
 
@@ -1913,6 +2032,10 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
         cards = _build_manufacturing_kpi_cards(columns, profile)
         return (cards[:5] if cards else _build_generic_executive_kpi_cards(columns, profile)), domain
 
+    if domain == "operations":
+        cards = _build_operations_kpi_cards(columns, profile, kp)
+        return (cards[:5] if cards else _build_generic_executive_kpi_cards(columns, profile)), domain
+
     if domain == "ecommerce":
         cards = _build_ecommerce_kpi_cards(columns, profile, kp)
         if not cards:
@@ -2067,6 +2190,14 @@ def infer_auto_dashboard_kind() -> str:
         "batch",
         "routing",
         "downtime",
+        "incident",
+        "severity",
+        "production_loss",
+        "repair",
+        "plant",
+        "outage",
+        "mttr",
+        "mtbf",
     ]
     mkt_kw = [
         "campaign",
@@ -2099,8 +2230,12 @@ def infer_auto_dashboard_kind() -> str:
     sales_col_guess = get_mapped_or_detected_column(
         "sales", ["sales", "revenue", "amount", "total", "value"]
     )
+    biz_domain = _infer_business_domain(columns)
 
-    if product_col and sales_col_guess:
+    if biz_domain == "operations":
+        scores["operations"] += 8
+
+    if product_col and sales_col_guess and biz_domain != "operations":
         scores["sales"] += 6
 
     hr_strong_row = ("salary" in " ".join(lower)) and any(
@@ -2116,6 +2251,8 @@ def infer_auto_dashboard_kind() -> str:
         return "hr"
     if base_kind == "sales":
         return "sales"
+    if base_kind == "operations":
+        return "operations"
 
     best_secondary = max(
         ["sales", "finance", "operations", "marketing"], key=lambda k: scores[k]
@@ -2222,13 +2359,21 @@ def _dash_series_payload(
         return None
     if not labels or not values:
         return None
-    ct_norm = chart_type.strip()
-    if ct_norm.lower() == "horizontalbar":
+    ct_l = chart_type.strip().lower()
+    if ct_l == "horizontalbar":
         ct_norm = "horizontalBar"
-    elif ct_norm.lower() == "donut":
+    elif ct_l == "donut":
         ct_norm = "donut"
-    elif ct_norm.lower() == "pie":
+    elif ct_l == "pie":
         ct_norm = "pie"
+    elif ct_l == "line":
+        ct_norm = "line"
+    elif ct_l == "area":
+        ct_norm = "area"
+    elif ct_l == "scatter":
+        ct_norm = "scatter"
+    elif ct_l == "histogram":
+        ct_norm = "histogram"
     else:
         ct_norm = "bar"
     out: Dict[str, Any] = {
@@ -2358,6 +2503,17 @@ def _dash_hr_dashboard_charts() -> List[Dict[str, Any]]:
     return out_ch[:3]
 
 
+def _dash_chart_title_by_dimension(
+    metric_col: str,
+    dim_col: str,
+    *,
+    agg_key: str = "sum",
+    chart_type: str = "horizontalBar",
+) -> str:
+    """Schema-aware chart title with aggregation, e.g. Total X by plant."""
+    return build_insight_title(agg_key, metric_col, dim_col, chart_type)
+
+
 def _dash_sales_dashboard_charts() -> List[Dict[str, Any]]:
     global df
     out_ch: List[Dict[str, Any]] = []
@@ -2386,14 +2542,7 @@ def _dash_sales_dashboard_charts() -> List[Dict[str, Any]]:
     )
 
     if product_col and product_col in df.columns:
-        title = (
-            "Revenue by category"
-            if any(
-                k in str(product_col).lower()
-                for k in ("category", "segment", "class", "type")
-            )
-            else "Revenue by product"
-        )
+        title = _dash_chart_title_by_dimension(sales_col, product_col)
         try:
             sub = df[[product_col, sales_col]].copy()
             sub["_v"] = numeric_series(sales_col)
@@ -2422,7 +2571,7 @@ def _dash_sales_dashboard_charts() -> List[Dict[str, Any]]:
                 _append_unique_dashboard_chart(
                     out_ch,
                     _dash_series_payload(
-                        "Revenue by region",
+                        _dash_chart_title_by_dimension(sales_col, region_col),
                         g,
                         chart_type="bar",
                         category_column=region_col,
@@ -2438,10 +2587,126 @@ def _dash_sales_dashboard_charts() -> List[Dict[str, Any]]:
             )
             if g_series is not None and len(g_series) >= 2:
                 tb = _freq_human_label(str(_tsm.get("timeBucket") or "M"))
+                metric_lbl = _pretty_label_text(sales_col)
                 _append_unique_dashboard_chart(
                     out_ch,
                     _dash_series_payload(
-                        f"Sales trend ({tb})", g_series, chart_type="line"
+                        f"{metric_lbl} trend ({tb})",
+                        g_series,
+                        chart_type="line",
+                    ),
+                )
+        except Exception:
+            pass
+
+    return out_ch[:3]
+
+
+def _dash_operations_dashboard_charts() -> List[Dict[str, Any]]:
+    """Schema-aware operational / incident mini-charts for Overview auto dashboard."""
+    global df
+    out_ch: List[Dict[str, Any]] = []
+    if df is None or df.empty:
+        return out_ch
+
+    metric_col = get_mapped_or_detected_column(
+        "sales",
+        [
+            "production_loss",
+            "downtime",
+            "repair_cost",
+            "maintenance_cost",
+            "cost",
+            "amount",
+            "units",
+            "loss",
+        ],
+    )
+    if not metric_col or metric_col not in df.columns:
+        return out_ch
+
+    dim_col = get_mapped_or_detected_column(
+        "region",
+        ["plant", "site", "facility", "location", "warehouse", "region"],
+    ) or get_mapped_or_detected_column(
+        "product",
+        ["severity", "issue_type", "issue type", "category", "type", "priority"],
+    )
+
+    date_col = get_mapped_or_detected_column(
+        "date",
+        [
+            "incident_date",
+            "date",
+            "event_date",
+            "occurred",
+            "timestamp",
+            "reported",
+            "month",
+            "period",
+        ],
+    )
+
+    if dim_col and dim_col in df.columns:
+        try:
+            sub = df[[dim_col, metric_col]].copy()
+            sub["_v"] = numeric_series(metric_col)
+            sub = sub.dropna(subset=[dim_col, "_v"])
+            if not sub.empty:
+                g = sub.groupby(dim_col)["_v"].sum()
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(
+                        _dash_chart_title_by_dimension(metric_col, dim_col),
+                        g,
+                        chart_type="horizontalBar",
+                        category_column=dim_col,
+                    ),
+                )
+        except Exception:
+            pass
+
+    alt_dim = get_mapped_or_detected_column(
+        "product", ["severity", "issue_type", "issue type"]
+    )
+    if (
+        alt_dim
+        and alt_dim in df.columns
+        and alt_dim != dim_col
+        and len(out_ch) < 3
+    ):
+        try:
+            sub = df[[alt_dim, metric_col]].copy()
+            sub["_v"] = numeric_series(metric_col)
+            sub = sub.dropna(subset=[alt_dim, "_v"])
+            if not sub.empty:
+                g = sub.groupby(alt_dim)["_v"].sum()
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(
+                        _dash_chart_title_by_dimension(metric_col, alt_dim),
+                        g,
+                        chart_type="bar",
+                        category_column=alt_dim,
+                    ),
+                )
+        except Exception:
+            pass
+
+    if date_col and date_col in df.columns and len(out_ch) < 3:
+        try:
+            g_series, _tsm = _adaptive_time_series_grouped(
+                df, str(date_col), str(metric_col), agg_key="sum"
+            )
+            if g_series is not None and len(g_series) >= 2:
+                tb = _freq_human_label(str(_tsm.get("timeBucket") or "M"))
+                metric_lbl = _pretty_label_text(metric_col)
+                _append_unique_dashboard_chart(
+                    out_ch,
+                    _dash_series_payload(
+                        f"{metric_lbl} trend ({tb})",
+                        g_series,
+                        chart_type="line",
                     ),
                 )
         except Exception:
@@ -2588,6 +2853,10 @@ def build_auto_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
         return _dash_hr_dashboard_charts()
     if kind == "sales":
         return _dash_sales_dashboard_charts()
+    if kind == "operations":
+        ops_ch = _dash_operations_dashboard_charts()
+        if ops_ch:
+            return ops_ch
     return _dash_generic_dashboard_charts(kind)
 
 
@@ -2900,57 +3169,7 @@ def build_auto_dashboard() -> Dict[str, Any]:
         return out
 
     if kind == "operations":
-        cards.append({"title": "Total Records", "value": f"{int(len(df)):,}", "subtitle": None})
-
-        vol_col = _find_first_column(
-            columns,
-            ["quantity", "units", "qty", "volume", "shipped", "produced", "output", "throughput"],
-        )
-        if vol_col:
-            qv = numeric_series(vol_col)
-            if qv.notna().any():
-                cards.append(
-                    {
-                        "title": "Total Volume",
-                        "value": f"{float(qv.sum(skipna=True)):,.0f}",
-                        "subtitle": str(vol_col)[:42],
-                    }
-                )
-
-        sku_like = _find_first_column(columns, ["sku", "item_id", "part", "material"])
-        if sku_like:
-            cards.append(
-                {
-                    "title": "Unique SKUs",
-                    "value": f'{int(df[sku_like].nunique(dropna=True)):,}',
-                    "subtitle": None,
-                }
-            )
-
-        loc_col = _find_first_column(
-            columns, ["warehouse", "site", "location", "plant", "facility"]
-        )
-        if loc_col:
-            cards.append(
-                {
-                    "title": "Sites / Warehouses",
-                    "value": f'{int(df[loc_col].nunique(dropna=True)):,}',
-                    "subtitle": None,
-                }
-            )
-
-        def_col = _find_first_column(columns, ["defect", "scrap", "rework", "downtime"])
-        if def_col:
-            dv = numeric_series(def_col)
-            if dv.notna().any():
-                cards.append(
-                    {
-                        "title": "Total Defects / Events",
-                        "value": f"{float(dv.sum(skipna=True)):,.0f}",
-                        "subtitle": str(def_col)[:38],
-                    }
-                )
-
+        cards = _build_operations_kpi_cards(columns, profile, kp)
         out["cards"] = clamp_cards(cards)
         out["charts"] = build_auto_dashboard_charts(kind)
         return out
@@ -3978,10 +4197,35 @@ def build_suggested_questions() -> List[str]:
         reg_o = region_col or _resolve_dimension(
             columns, ["region", "warehouse", "site", "plant", "location"], ranked_dims
         )
+        sev_o = _resolve_dimension(
+            columns, ["severity", "issue_type", "issue type", "priority"], ranked_dims
+        )
+        loss_m = _resolve_metric(
+            columns,
+            [
+                "production_loss",
+                "production loss",
+                "downtime",
+                "repair_cost",
+                "repair cost",
+                "maintenance",
+            ],
+            ranked_metrics,
+        ) or sales_col
         delay = _resolve_metric(columns, ["delay", "latency", "lead time", "sla breach"], ranked_metrics)
         vol = _resolve_metric(columns, ["volume", "orders", "units", "throughput", "output"], ranked_metrics)
         ship = _find_first_column(columns, ["shipment", "delivery", "dispatch", "fulfillment"])
         sla = _find_first_column(columns, ["sla", "otif", "on time", "service level"])
+        if loss_m and reg_o:
+            qs.append(_tpl_ranking(reg_o, loss_m, 5))
+        if loss_m and sev_o and sev_o != reg_o:
+            qs.append(_tpl_compare_avg_across(loss_m, sev_o))
+        if date_col and loss_m:
+            qs.append(_tpl_trend(loss_m, date_col))
+        elif date_col and delay:
+            qs.append(_tpl_trend(delay, date_col))
+        elif date_col and vol:
+            qs.append(_tpl_trend(vol, date_col))
         if reg_o and ship:
             scope_o = _dim_scope_plural_from_col(reg_o)
             qs.append(
@@ -3989,18 +4233,21 @@ def build_suggested_questions() -> List[str]:
                     f"Compare {_q_label(ship)} outcomes across {scope_o}"
                 )
             )
-        if date_col and delay:
-            qs.append(_tpl_trend(delay, date_col))
-        elif date_col and vol:
-            qs.append(_tpl_trend(vol, date_col))
         if sla:
             qs.append(
                 _clean_question_sentence(
                     f"How does {_q_label(sla)} vary across the operation?"
                 )
             )
-        if vol and reg_o:
+        if vol and reg_o and not loss_m:
             qs.append(_tpl_ranking(reg_o, vol, 5))
+        dt_m = _resolve_metric(columns, ["downtime", "outage", "minutes"], ranked_metrics)
+        if loss_m and dt_m and loss_m != dt_m:
+            qs.append(
+                _clean_question_sentence(
+                    f"Compare {_q_label(loss_m)} with {_q_label(dt_m)}"
+                )
+            )
 
     # ---- Marketing ----
     elif domain == "marketing":
@@ -7909,7 +8156,7 @@ def determine_chart_type_and_reason(
         ):
             return (
                 "bar",
-                "Comparison of one numeric metric across categorical groups; vertical bar chart.",
+                "Grouped comparison across categories — vertical bars make gaps between groups easy to scan.",
                 "High",
             )
         if _looks_like_ranking_question(ql) or _extract_top_n(ql) is not None:
@@ -8140,14 +8387,20 @@ def _build_chart_recommendation_dict(
     ncol_guess: Optional[str],
     chart_type_internal: str,
     selection_explanation: str,
+    metric_phrase: Optional[str] = None,
 ) -> Dict[str, Any]:
+    expl = (selection_explanation or "").strip() or (
+        "Vertical bar chart selected as a stable default."
+    )
+    mp = (metric_phrase or "").strip()
+    if mp and mp.lower() not in expl.lower():
+        expl = f"Measure: {mp}. {expl}"
     return {
         "detectedIntent": _chart_selection_question_bucket(ql),
         "categoryCount": int(ll),
         "metricType": _metric_type_for_chart_recommendation(ncol_guess),
         "recommendedChart": _chart_type_for_api(chart_type_internal or "bar"),
-        "selectionExplanation": (selection_explanation or "").strip()
-        or "Vertical bar chart selected as a stable default.",
+        "selectionExplanation": expl,
     }
 
 
@@ -8256,9 +8509,9 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
         "- Ground every numeric claim in the exact calculated result and/or authoritative chart-values block. "
         "If a claim is not supported there, do not state it.",
         "- Separate your reply into labeled sections (use plain text labels with a colon, no markdown heading symbols):",
-        "  1) Statistical observations — only facts visible from the numbers/table.",
-        "  2) Inferred hypotheses — clearly marked as not proven, tentative, and tied to what would falsify them.",
-        "  3) Recommendations — optional, conservative, and framed as next data to collect or validate (not as facts).",
+        "  1) Key findings — only facts visible from the numbers/table.",
+        "  2) What this may indicate — clearly marked as not proven, tentative, and tied to what would falsify them.",
+        "  3) Suggested next steps — optional, conservative, and framed as next data to collect or validate (not as facts).",
         "- Do not diagnose data quality, customer dissatisfaction, churn, loyalty, or operational failure "
         "unless the calculated result explicitly quantifies those constructs with defined columns. "
         "If unsupported, say there is insufficient evidence in this sample.",
@@ -8288,8 +8541,69 @@ INSIGHT_SAFETY_SYSTEM_PROMPT = (
     "Never invent statistical significance: if no p-values, confidence intervals, or "
     "explicit tests appear in the user message, do not claim significance. "
     "Prefer calibrated, honest uncertainty. Keep answers concise and plain text "
-    "(no markdown # or **)."
+    "(no markdown # or **). "
+    "When the user question uses retail wording (revenue, product, region) but the dataset "
+    "and calculated result reflect different business semantics (e.g. plant, severity, "
+    "production loss, downtime, repair cost), do not refuse with 'I cannot summarize'. "
+    "Briefly note the wording mismatch in one sentence, then interpret the chart using the "
+    "actual metric and dimension names from the dataset context and authoritative numbers."
 )
+
+
+def _semantic_intent_correction_prompt_block(question: str) -> str:
+    """
+    When question vocabulary mismatches inferred domain, steer the model toward
+    auto-corrected business semantics instead of hard refusals.
+    """
+    global df
+    if df is None or df.empty:
+        return ""
+    columns = df.columns.tolist()
+    domain = _infer_business_domain(columns)
+    ql = str(question or "").lower()
+    mentions_retail = bool(
+        re.search(r"\b(revenue|sales|product|sku|order value)\b", ql)
+    )
+    mentions_region_only = bool(re.search(r"\bregion\b", ql)) and domain == "operations"
+
+    if domain not in ("operations", "manufacturing") and not mentions_retail:
+        return ""
+
+    if domain in ("operations", "manufacturing") and (
+        mentions_retail or mentions_region_only
+    ):
+        metric_col = get_mapped_or_detected_column(
+            "sales",
+            [
+                "production_loss",
+                "downtime",
+                "repair_cost",
+                "maintenance_cost",
+                "cost",
+                "amount",
+                "revenue",
+                "sales",
+            ],
+        )
+        dim_col = get_mapped_or_detected_column(
+            "region",
+            ["plant", "site", "facility", "location", "warehouse", "region"],
+        ) or get_mapped_or_detected_column(
+            "product", ["severity", "issue_type", "category", "type", "priority"],
+        )
+        m_lbl = _pretty_label_text(metric_col) if metric_col else "primary metric"
+        d_lbl = _pretty_label_text(dim_col) if dim_col else "breakdown dimension"
+        return (
+            "Semantic intent correction (mandatory when retail wording appears):\n"
+            f"- Inferred dataset domain: {domain}. Prefer operational language "
+            f"({m_lbl}, {d_lbl}, incident, plant, severity) over revenue/product/region.\n"
+            "- Open with a short clarification that the question wording differs from the schema, "
+            "then summarize what the chart values show using the correct labels.\n"
+            "- Use the authoritative chart-values block and exact calculated result; "
+            "do not invent columns.\n"
+        )
+
+    return ""
 
 
 def _build_unified_analysis_payload(
@@ -9494,12 +9808,20 @@ def compute_visualization_for_question(
         chart_suppressed_misleading=chart_suppressed_misleading,
     )
 
+    metric_phrase_rec = None
+    if intent_debug and intent_debug.get("value_col"):
+        metric_phrase_rec = _business_metric_series_label(
+            str(intent_debug.get("agg_key") or ""),
+            str(intent_debug.get("agg_label") or ""),
+            str(intent_debug.get("value_col") or ""),
+        )
     chart_rec = _build_chart_recommendation_dict(
         ql,
         ll,
         ncol_guess,
         str(chart_type or "bar"),
         chart_sel_reason,
+        metric_phrase_rec,
     )
 
     visualization: Dict[str, Any] = {
@@ -9836,11 +10158,18 @@ def ask_question(data: QuestionRequest):
 
         focus_line = ""
         if analysis_ctx.get("metricColumn"):
+            m_disp_line = ""
+            m_disp = analysis_ctx.get("metricColumnDisplay")
+            if isinstance(m_disp, str) and m_disp.strip():
+                m_disp_line = f"- Metric label (use in prose): {m_disp.strip()}\n"
             focus_line = (
                 "\nDetected question focus (do not substitute a different metric or column):\n"
                 f"- Metric column: {analysis_ctx.get('metricColumn')}\n"
+                f"{m_disp_line}"
                 f"- Breakdown dimension: {analysis_ctx.get('categoryColumn')}\n"
                 f"- Aggregation: {analysis_ctx.get('aggregation')} ({analysis_ctx.get('aggregationKey')})\n"
+                "- When stating totals, averages, or counts, use the metric label above — "
+                "do not drop the aggregation word (Total, Average, Count, etc.).\n"
             )
             sec_g = analysis_ctx.get("secondaryGroupColumn")
             if sec_g:
@@ -9882,6 +10211,7 @@ def ask_question(data: QuestionRequest):
                 ),
             }
         )
+        semantic_correction = _semantic_intent_correction_prompt_block(data.question)
         insight_style_line = (
             "- Mention a clear, evidence-backed takeaway if the numbers support it.\n"
             if not bool(analysis_ctx.get("smallSampleCohort"))
@@ -9910,6 +10240,7 @@ Rules:
 - Keep the answer concise but complete enough to include the three labeled sections when asked below.
 {insight_style_line}
 {conf_prompt}
+{semantic_correction}
 {trend_rule}"""
 
         response = client.messages.create(
