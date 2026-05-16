@@ -1,0 +1,133 @@
+"use client";
+
+import { memo, useMemo } from "react";
+import type { ChartKind, ChartRow } from "@/app/chart-types";
+import {
+  balanceHorizontalOuterMargins,
+  balanceVerticalOuterMargins,
+  collectSampleTickStrings,
+  computeCategoryAxisBottomMargin,
+  computeHorizontalBarAxisLayout,
+  computePieChartMargins,
+  computeVerticalValueAxisLayout,
+  type VerticalCategoryAxisPlan,
+} from "@/lib/chart-axis-layout";
+import {
+  computeLineAreaChartBottomMargin,
+  computeLineAreaXAxisInterval,
+  formatTrendXAxisTickLabel,
+  lineAreaTickFontSizePx,
+  lineAreaXAxisHeightPx,
+  temporalTickStringsForChartRows,
+  TREND_X_AXIS_ANGLE_DEG,
+} from "@/lib/chart-time-x-axis";
+import {
+  createHorizontalBottomAxisValueLabel,
+  createVerticalValueAxisLabel,
+} from "@/app/components/chart-value-axis-title";
+import { getInsightLayoutMetrics } from "@/lib/chart-layout-config";
+import {
+  formatAxisTickFromRows,
+  formatAxisTickFromScatterX,
+  formatChartAxisCategoryTick,
+} from "@/lib/chart-axis-formatters";
+import { PIE_COLORS } from "@/lib/chart-palette";
+import { useDevRenderCount } from "@/lib/dev-render-count";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Label,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  CartesianGrid,
+  ScatterChart,
+  Scatter,
+} from "recharts";
+
+/** Disable Recharts enter/exit animation above this point count (main + overview charts). */
+const RECHARTS_ANIMATION_MAX_POINTS = 72;
+
+const GRID_STROKE = "#eef2f7";
+const CHART_AXIS_LINE = "#e2e8f0";
+const AXIS_TICK = "#64748b";
+const CHART_TOOLTIP_FRAME = {
+  contentStyle: {
+    borderRadius: 14,
+    border: "1px solid rgba(226, 232, 240, 0.95)",
+    background: "rgba(255, 255, 255, 0.97)",
+    boxShadow:
+      "0 12px 32px -8px rgba(15, 23, 42, 0.11), 0 0 0 1px rgba(255, 255, 255, 0.75) inset",
+    padding: "10px 14px",
+    fontSize: 12,
+  },
+  labelStyle: {
+    fontWeight: 600,
+    marginBottom: 6,
+    color: "#0f172a",
+    fontSize: 12,
+    letterSpacing: "-0.01em",
+  },
+  itemStyle: {
+    color: "#475569",
+    fontSize: 12,
+    paddingTop: 2,
+  },
+  wrapperStyle: { outline: "none" as const },
+} as const;
+const AXIS_Y_TICK_VAL = { fontSize: 11, fill: AXIS_TICK, dx: 6 } as const;
+
+export type ChartRendererViz = {
+  multiSeries?: {
+    layout?: string;
+    seriesKeys: string[];
+    seriesLabels: Record<string, string>;
+  } | null;
+  interaction?: {
+    drillDimensions?: { role: string; column: string; label: string }[];
+  } | null;
+} | null;
+
+export type ChartRendererProps = {
+  chartHeight: number;
+  compact?: boolean;
+  insightMode?: boolean;
+  chartRows: ChartRow[];
+  visualization: ChartRendererViz;
+  presentationKind: ChartKind;
+  axes: { categoryAxis: string; valueAxis: string; valueAxisCompact: string };
+  viewportW: number;
+  sessionCartesianPlanMain: VerticalCategoryAxisPlan | null;
+  insightCartesianPlanMain: VerticalCategoryAxisPlan | null;
+  tickTruncate: (v: string | number) => string;
+  onInsightDrill: (primaryValue: string, secondaryRaw?: string) => void;
+};
+
+function ChartRendererInner({
+  chartHeight,
+  compact = false,
+  insightMode = false,
+  chartRows,
+  visualization,
+  presentationKind,
+  axes,
+  viewportW,
+  sessionCartesianPlanMain,
+  insightCartesianPlanMain,
+  tickTruncate,
+  onInsightDrill,
+}: ChartRendererProps) {
+  useDevRenderCount("ChartRenderer");
+  const rData = chartRows;
+  const rViz = visualization;
+  const rKind = presentationKind;
+  const rAxes = axes;
