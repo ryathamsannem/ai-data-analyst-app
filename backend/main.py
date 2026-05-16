@@ -2359,13 +2359,21 @@ def _dash_series_payload(
         return None
     if not labels or not values:
         return None
-    ct_norm = chart_type.strip()
-    if ct_norm.lower() == "horizontalbar":
+    ct_l = chart_type.strip().lower()
+    if ct_l == "horizontalbar":
         ct_norm = "horizontalBar"
-    elif ct_norm.lower() == "donut":
+    elif ct_l == "donut":
         ct_norm = "donut"
-    elif ct_norm.lower() == "pie":
+    elif ct_l == "pie":
         ct_norm = "pie"
+    elif ct_l == "line":
+        ct_norm = "line"
+    elif ct_l == "area":
+        ct_norm = "area"
+    elif ct_l == "scatter":
+        ct_norm = "scatter"
+    elif ct_l == "histogram":
+        ct_norm = "histogram"
     else:
         ct_norm = "bar"
     out: Dict[str, Any] = {
@@ -8148,7 +8156,7 @@ def determine_chart_type_and_reason(
         ):
             return (
                 "bar",
-                "Comparison of one numeric metric across categorical groups; vertical bar chart.",
+                "Grouped comparison across categories — vertical bars make gaps between groups easy to scan.",
                 "High",
             )
         if _looks_like_ranking_question(ql) or _extract_top_n(ql) is not None:
