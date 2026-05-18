@@ -112,12 +112,70 @@ export function collectSampleTickStrings(rows: { value: number; displayValue?: s
   return out;
 }
 
-function resolveLayoutMode(
+export function resolveLayoutMode(
   chartLayoutMode: ChartLayoutMode | undefined,
   compactLegacy: boolean | undefined
 ): ChartLayoutMode {
   if (chartLayoutMode) return chartLayoutMode;
   return compactLegacy ? "compact" : "full";
+}
+
+/** Word-wrap long category labels for horizontal-bar Y axes (multi-line ticks). */
+export function wrapCategoryLabelLines(
+  raw: string,
+  options?: { maxCharsPerLine?: number; maxLines?: number }
+): string[] {
+  const maxChars = Math.max(8, options?.maxCharsPerLine ?? 20);
+  const maxLines = Math.max(1, options?.maxLines ?? 3);
+  const text = String(raw ?? "").replace(/\s+/g, " ").trim() || "—";
+  if (text.length <= maxChars) return [text];
+
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let current = "";
+
+  const pushLine = (line: string) => {
+    if (!line) return;
+    if (lines.length < maxLines) lines.push(line);
+  };
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+      continue;
+    }
+    if (current) pushLine(current);
+    if (word.length > maxChars) {
+      let rest = word;
+      while (rest.length > maxChars && lines.length < maxLines - 1) {
+        pushLine(rest.slice(0, maxChars));
+        rest = rest.slice(maxChars);
+      }
+      current = rest;
+    } else {
+      current = word;
+    }
+    if (lines.length >= maxLines) break;
+  }
+  if (lines.length < maxLines && current) pushLine(current);
+
+  if (!lines.length) return [text.slice(0, maxChars)];
+  if (lines.length > maxLines) {
+    const trimmed = lines.slice(0, maxLines);
+    const last = trimmed[maxLines - 1] ?? "";
+    trimmed[maxLines - 1] =
+      last.length > maxChars - 1 ? `${last.slice(0, maxChars - 2)}…` : `${last}…`;
+    return trimmed;
+  }
+  const joined = lines.join("");
+  if (joined.length < text.length && lines.length === maxLines) {
+    const last = lines[maxLines - 1] ?? "";
+    if (!last.endsWith("…") && last.length >= maxChars - 1) {
+      lines[maxLines - 1] = `${last.slice(0, Math.max(1, maxChars - 2))}…`;
+    }
+  }
+  return lines;
 }
 
 export type VerticalValueAxisLayout = {
@@ -261,9 +319,18 @@ export function computeHorizontalBarAxisLayout(args: {
   const tickFs = args.tickFontSizePx ?? AXIS_TICK_FONT_PX;
   const titleFs = args.titleFontSizePx ?? AXIS_TITLE_FONT_PX;
 
-  const catWidths = args.categoryTickStrings.map((t) =>
-    estimateTextWidthPx(t, tickFs, "normal")
-  );
+  const maxLineChars = mode === "compact" ? 16 : 22;
+  const maxLines = mode === "compact" ? 2 : 3;
+  const catWidths = args.categoryTickStrings.map((t) => {
+    const lines = wrapCategoryLabelLines(String(t ?? ""), {
+      maxCharsPerLine: maxLineChars,
+      maxLines,
+    });
+    return Math.max(
+      tickFs * 4,
+      ...lines.map((line) => estimateTextWidthPx(line, tickFs, "normal"))
+    );
+  });
   const maxCatW = Math.max(tickFs * 4, ...catWidths, estimateTextWidthPx("WWWWWWWW", tickFs));
 
   const full = (args.valueAxisFull ?? args.valueAxisLabel).trim() || "Value";
@@ -285,12 +352,12 @@ export function computeHorizontalBarAxisLayout(args: {
     : 0;
 
   const categoryAxisWidth = Math.min(
-    mode === "compact" ? 200 : 440,
-    Math.max(mode === "compact" ? 52 : 64, Math.ceil(maxCatW + (mode === "compact" ? 20 : 28)))
+    mode === "compact" ? 240 : 520,
+    Math.max(mode === "compact" ? 56 : 72, Math.ceil(maxCatW + (mode === "compact" ? 22 : 32)))
   );
   const marginLeft = Math.min(
-    mode === "compact" ? 280 : 520,
-    Math.max(24, Math.ceil(categoryAxisWidth + (mode === "compact" ? 8 : 16)))
+    mode === "compact" ? 320 : 580,
+    Math.max(28, Math.ceil(categoryAxisWidth + (mode === "compact" ? 10 : 18)))
   );
 
   const marginBottom = showValueAxisTitle

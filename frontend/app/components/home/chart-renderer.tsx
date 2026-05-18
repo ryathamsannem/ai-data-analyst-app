@@ -35,6 +35,7 @@ import {
   formatChartAxisCategoryTick,
 } from "@/lib/chart-axis-formatters";
 import { PIE_COLORS } from "@/lib/chart-palette";
+import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   BarChart,
@@ -594,9 +595,13 @@ function ChartRendererInner({
             type="category"
             dataKey="name"
             width={hb.categoryAxisWidth}
-            tick={{ fontSize: 11, fill: AXIS_TICK }}
             interval={compact ? 0 : rData.length > 18 ? 1 : 0}
-            tickFormatter={(v) => String(v)}
+            tick={
+              <WrappedCategoryYAxisTick
+                chartLayoutMode={chartLayoutMode}
+                compact={compact}
+              />
+            }
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
           />
@@ -608,7 +613,7 @@ function ChartRendererInner({
               const shown = d ?? (v == null ? "—" : v);
               return [shown, metricTooltipName];
             }}
-            labelFormatter={(l) => tickTruncate(String(l ?? ""))}
+            labelFormatter={(l) => String(l ?? "").trim() || "—"}
           />
           <Bar
             dataKey="value"

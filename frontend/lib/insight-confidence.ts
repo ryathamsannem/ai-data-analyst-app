@@ -72,12 +72,30 @@ export function computeUnifiedInsightConfidence(
   const mappingWeak =
     mappingLevel === "low" && !signals.mappingConfirmedByUser;
 
+  const thinCohort = rows > 0 && rows < 100;
+  const fewCategories = pts > 0 && pts <= 5;
+
   if (rows <= 0) {
     level = "low";
     score = Math.min(score, 14);
   } else if (rows < 30 || pts < 2) {
     level = "low";
     score = Math.min(score, 44);
+  } else if (thinCohort) {
+    if (level === "high") level = "medium";
+    score = Math.min(score, 58);
+    if (score >= 60) level = "medium";
+    else level = "low";
+  }
+
+  if (fewCategories && rows >= 20) {
+    if (level === "high") level = "medium";
+    score = Math.min(score, 64);
+  }
+
+  if (mappingWeak && rows >= 15) {
+    if (level === "high") level = "medium";
+    score = Math.min(score, 62);
   }
 
   if (inferenceRisk) {
@@ -98,13 +116,17 @@ export function computeUnifiedInsightConfidence(
   const strongEvidence =
     rows >= 100 &&
     pts >= 2 &&
+    !fewCategories &&
     structured &&
     hasAgg &&
     prov !== "low" &&
-    !inferenceRisk;
+    !inferenceRisk &&
+    !mappingWeak;
 
   const eligibleHigh =
-    strongEvidence && (mappingLevel === "high" || signals.mappingConfirmedByUser);
+    strongEvidence &&
+    (mappingLevel === "high" || signals.mappingConfirmedByUser) &&
+    !thinCohort;
 
   if (eligibleHigh) {
     level = "high";
@@ -136,10 +158,16 @@ export function computeUnifiedInsightConfidence(
   } else if (mappingLevel === "medium" && structured) {
     rationale =
       "Moderate read: core metric and breakdown were inferred sensibly — treat rankings as directional until you confirm field mapping.";
-  } else if (mappingWeak && rows >= 30) {
+  } else if (mappingWeak && rows >= 15) {
     rationale =
       "Mapping still looks inferred — validate the metric and grouping columns before acting on small gaps between categories.";
-  } else if (rows < 100 || pts < 3) {
+  } else if (fewCategories) {
+    rationale =
+      "Few comparison groups in the chart — treat leader vs laggard gaps as directional, not proof of structural advantage.";
+  } else if (thinCohort) {
+    rationale =
+      "Under 100 filtered rows — avoid definitive business conclusions; phrase findings as exploratory and widen the cohort when possible.";
+  } else if (pts < 3) {
     rationale =
       "Thin evidence in view — use these figures as directional signals and widen filters or refresh data before firm conclusions.";
   } else if (inferenceRisk) {

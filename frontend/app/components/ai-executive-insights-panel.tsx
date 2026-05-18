@@ -29,8 +29,8 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
   const brief = narrativeBrief?.replace(/\s+/g, " ").trim();
 
   return (
-    <div className="mt-4 rounded-2xl border border-slate-200/60 bg-[color:var(--surface-subtle)] p-3.5 sm:p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
-      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+    <div className="mt-3 rounded-2xl border border-slate-200/60 bg-[color:var(--surface-subtle)] p-3 sm:p-3.5 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
+      <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
             Executive insights

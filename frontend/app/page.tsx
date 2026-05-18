@@ -39,6 +39,7 @@ import {
   collectSampleTickStrings,
   computeCategoryAxisBottomMargin,
   computeHorizontalBarAxisLayout,
+  wrapCategoryLabelLines,
   computePieChartMargins,
   computeVerticalCategoryAxisPlan,
   computeVerticalValueAxisLayout,
@@ -53,6 +54,7 @@ import {
   lineAreaTickFontSizePx,
   lineAreaXAxisHeightPx,
   temporalTickStringsForChartRows,
+  sortChartRowsChronologically,
   TREND_X_AXIS_ANGLE_DEG,
 } from "@/lib/chart-time-x-axis";
 import {
@@ -94,7 +96,17 @@ import { mergeInsightAxesWithAlignedAnalysis } from "@/lib/insight-aligned-axis-
 import {
   computeUnifiedInsightConfidence,
   confidenceBadgeLabel,
+  type ConfidenceLevel as InsightConfidenceLevel,
 } from "@/lib/insight-confidence";
+import {
+  isCautiousNarrativeTone,
+  mappingConfidenceFromRoleMetadata,
+  narrativeToneDisclaimer,
+  resolveNarrativeTone,
+  softenAssertiveProse,
+  softenExecutiveTakeaway,
+  type NarrativeTone,
+} from "@/lib/insight-narrative-tone";
 import {
   buildFollowupQuestion,
   fromAlignedAnalysis,
@@ -119,6 +131,14 @@ import type {
   DashboardFilterEntry,
 } from "./dashboard-filter-types";
 import { AiExecutiveInsightsPanel } from "./components/ai-executive-insights-panel";
+import { WrappedCategoryYAxisTick } from "./components/chart-category-axis-tick";
+import {
+  btnExport,
+  btnExportSm,
+  btnPrimary,
+  btnPrimarySm,
+  btnSecondary,
+} from "@/lib/ui-buttons";
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
 import { FilterPanel } from "./components/home/filter-panel";
@@ -1073,6 +1093,16 @@ function applyBarChartSort(
     return ascending ? va - vb : vb - va;
   });
   return copy;
+}
+
+function sortRowsForPresentation(
+  rows: ChartRow[],
+  kind: ChartKind,
+  ascending: boolean | null,
+  trendMode: boolean
+): ChartRow[] {
+  if (trendMode) return sortChartRowsChronologically(rows);
+  return applyBarChartSort(rows, kind, ascending);
 }
 
 /** Same numeric ranking as key-figure cards: argmax by `value` on chart rows (deduped by category), display strings match the chart. */
@@ -2540,12 +2570,18 @@ function buildExecutiveVizInsights(
       hint:
         kind === "line" || kind === "area"
           ? `Peak value: ${maxR.formatted}`
-          : `Peak: ${maxR.formatted}`,
+          : `Highest: ${maxR.formatted}`,
       dotClass: nextDot(),
     },
     {
       key: "cmp-peak-met",
-      title: met.trim() ? `Peak ${met.trim()}` : "Peak value",
+      title: met.trim()
+        ? kind === "line" || kind === "area"
+          ? `Peak ${met.trim()}`
+          : `Highest ${met.trim()}`
+        : kind === "line" || kind === "area"
+          ? "Peak value"
+          : "Highest value",
       value: maxR.formatted,
       dotClass: nextDot(),
     },
@@ -2783,6 +2819,8 @@ type AlignedAnalysisContext = {
   insightConfidenceScore: number;
   insightConfidenceLevel: string;
   smallSampleCohort: boolean;
+  cautiousNarrativeRequired?: boolean;
+  mappingConfidenceLevel?: string | null;
   insightConfidenceRationale: string;
   evidenceSummaryLine: string;
 };
@@ -2918,6 +2956,12 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
         ? o.insightConfidenceLevel.trim().toLowerCase()
         : "low",
     smallSampleCohort: Boolean(o.smallSampleCohort),
+    cautiousNarrativeRequired: Boolean(o.cautiousNarrativeRequired),
+    mappingConfidenceLevel:
+      typeof o.mappingConfidenceLevel === "string" &&
+      o.mappingConfidenceLevel.trim()
+        ? o.mappingConfidenceLevel.trim().toLowerCase()
+        : null,
     insightConfidenceRationale:
       typeof o.insightConfidenceRationale === "string"
         ? o.insightConfidenceRationale.trim()
@@ -3560,7 +3604,8 @@ function buildAutoDashboardKpiContextLine(args: {
           : datasetKind === "sales" || datasetKind === "ecommerce"
             ? "orders or transactions"
             : "records";
-      const line = `Average for ${humanizeColumnName(primaryMetricColumn)} sits near ${formatNumberForExecutiveSummary(mean)} across ${label} in this extract.`;
+      const metricPhrase = humanizeColumnName(primaryMetricColumn);
+      const line = `Average ${metricPhrase.toLowerCase()} per time bucket is approximately ${formatNumberForExecutiveSummary(mean)} in this extract.`;
       if (!redundantWithSubtitle(line)) return line;
     }
   }
@@ -3694,10 +3739,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         : displayKind === "bar_horizontal"
           ? "bar_horizontal"
           : "bar";
-    return baseChartRows.map((r) => ({
+    const mapped = baseChartRows.map((r) => ({
       ...r,
       displayValue: fallbackChartNumericDisplay(fmt, r.value),
     }));
+    if (displayKind === "line" || displayKind === "area") {
+      return sortChartRowsChronologically(mapped);
+    }
+    return mapped;
   }, [baseChartRows, displayKind]);
 
   const valueAxisTitle = useMemo(
@@ -3765,16 +3814,22 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 
   const horizontalDashLayout = useMemo(() => {
     if (!renderBarAsHorizontal) return null;
-    return computeHorizontalBarAxisLayout({
+    const base = computeHorizontalBarAxisLayout({
       categoryTickStrings: chartRows.map((r) => String(r.name ?? "")),
       valueAxisLabel: valueAxisTitle,
       valueAxisFull: valueAxisTitle,
       categoryAxisLabel: "",
       chartLayoutMode: "compact",
-      tickFontSizePx: 10,
+      tickFontSizePx: 9,
       titleFontSizePx: 10,
       maxValueAxisTitleWidthPx: compactHeight > 200 ? 280 : 200,
     });
+    const catW = Math.min(300, Math.max(base.categoryAxisWidth, 88));
+    return {
+      ...base,
+      categoryAxisWidth: catW,
+      marginLeft: Math.min(340, Math.max(base.marginLeft, catW + 14)),
+    };
   }, [renderBarAsHorizontal, chartRows, valueAxisTitle, compactHeight]);
 
   const dashboardBarCatBottom = useMemo(
@@ -3940,8 +3995,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             type="category"
             dataKey="name"
             width={hb.categoryAxisWidth}
-            tick={{ fontSize: 10, fill: AXIS_TICK }}
-            tickFormatter={(v) => String(v)}
+            tick={<WrappedCategoryYAxisTick chartLayoutMode="compact" compact />}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
           />
@@ -3953,7 +4007,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               const shown = d ?? (v == null ? "—" : String(v));
               return [shown, shortenLabel(chart.title, 22)];
             }}
-            labelFormatter={(l) => tickTruncateLocal(String(l ?? ""))}
+            labelFormatter={(l) => String(l ?? "").trim() || "—"}
           />
           <Bar
             dataKey="value"
@@ -3962,7 +4016,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             maxBarSize={26}
             isAnimationActive={overviewChartAnimOn}
             cursor={drillable ? "pointer" : "default"}
-            onClick={(entry: unknown) => {
+            onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
+              e?.stopPropagation?.();
               if (!drillPrimary || !onDashboardDrill) return;
               const pl = entry as ChartRow & { name?: string };
               const nm = String(pl?.name ?? "").trim();
@@ -4176,7 +4231,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             maxBarSize={isHist ? 40 : 38}
             isAnimationActive={overviewChartAnimOn}
             cursor={drillable ? "pointer" : "default"}
-            onClick={(entry: unknown) => {
+            onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
+              e?.stopPropagation?.();
               if (!drillPrimary || !onDashboardDrill) return;
               const pl = entry as ChartRow & { name?: string };
               const nm = String(pl?.name ?? "").trim();
@@ -4263,8 +4319,29 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       </div>
       <div
         ref={chartCaptureRef}
-        className="w-full shrink-0"
+        role={onViewInChartsTab && snapshotId ? "button" : undefined}
+        tabIndex={onViewInChartsTab && snapshotId ? 0 : undefined}
+        onClick={() => {
+          if (snapshotId && onViewInChartsTab) onViewInChartsTab(snapshotId);
+        }}
+        onKeyDown={(e) => {
+          if (!snapshotId || !onViewInChartsTab) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onViewInChartsTab(snapshotId);
+          }
+        }}
+        className={`w-full shrink-0 ${
+          onViewInChartsTab && snapshotId
+            ? "cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50"
+            : ""
+        }`}
         style={{ height: compactHeight }}
+        title={
+          onViewInChartsTab && snapshotId
+            ? "Open this chart in the Charts tab"
+            : undefined
+        }
       >
         {chartBody}
       </div>
@@ -5829,7 +5906,12 @@ function HomeInner() {
 
   const pinnedInsightChartIdRef = useRef<string | null>(null);
   const chartsPreviewRef = useRef<HTMLDivElement | null>(null);
+  const chartsSessionHeadingRef = useRef<HTMLDivElement | null>(null);
   const pendingChartsPreviewScrollRef = useRef(false);
+  const pendingInsightAutoAskRef = useRef<string | null>(null);
+  const askAIImplRef = useRef<(overrideQuestion?: string) => Promise<void>>(
+    async () => {}
+  );
 
   const applyInsightBundleToLiveState = useCallback(
     (
@@ -5897,23 +5979,45 @@ function HomeInner() {
       return;
     }
     pendingChartsPreviewScrollRef.current = false;
-    chartsPreviewRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
+    const scrollToChart = () => {
+      const target = chartsSessionHeadingRef.current ?? chartsPreviewRef.current;
+      target?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToChart);
     });
   }, [activeTab, activeChartId]);
+
+  useEffect(() => {
+    const q = pendingInsightAutoAskRef.current;
+    if (activeTab !== "insights" || !q?.trim() || loading) return;
+    const chartId = pinnedInsightChartIdRef.current ?? insightChartId;
+    const stored = getChartInsightAnswer(aiAnswerByChartId, chartId);
+    if (stored?.hasValidAIAnswer && stored.answer.trim()) {
+      pendingInsightAutoAskRef.current = null;
+      return;
+    }
+    pendingInsightAutoAskRef.current = null;
+    void askAIImplRef.current(q);
+  }, [activeTab, loading, insightChartId, aiAnswerByChartId]);
 
   const openDashboardChartInChartsTab = useCallback(
     (snapshotId: string) => {
       const hit = chartHistory.find((h) => h.id === snapshotId);
       if (hit) {
         pinnedInsightChartIdRef.current = hit.id;
-        selectChart(hit.id);
+        selectChartWithInsightState(hit.id, {
+          restoreFromStore: true,
+          clearAnswerWhenMissing: true,
+        });
         pendingChartsPreviewScrollRef.current = true;
         setActiveTab("charts");
       }
     },
-    [chartHistory, selectChart]
+    [chartHistory, selectChartWithInsightState]
   );
 
   const dashboardSnapshotByKey = useMemo(() => {
@@ -6004,30 +6108,46 @@ function HomeInner() {
     ]
   );
 
+  const buildOverviewChartAskQuestion = useCallback((hit: ChartSnapshot) => {
+    const exportTitle = getCanonicalChartTitle({
+      rawTitle: hit.title,
+      chartType: hit.chartKind,
+      contract: hit.contract ?? null,
+      labels: hit.chartData.map((r) => String(r.name ?? "")),
+      values: hit.chartData.map((r) => r.value),
+      aggregationKey: hit.contract?.aggregation ?? "sum",
+    });
+    return `Summarize what the chart "${exportTitle}" shows and the sharpest takeaway for this dataset.`;
+  }, []);
+
   const askAiAboutDashboardChart = useCallback(
     (snapshotId: string) => {
       const hit = chartHistory.find((h) => h.id === snapshotId);
       if (!hit) return;
       pinnedInsightChartIdRef.current = hit.id;
-      selectChart(hit.id);
-      const exportTitle = getCanonicalChartTitle({
-        rawTitle: hit.title,
-        chartType: hit.chartKind,
-        contract: hit.contract ?? null,
-        labels: hit.chartData.map((r) => String(r.name ?? "")),
-        values: hit.chartData.map((r) => r.value),
-        aggregationKey: hit.contract?.aggregation ?? "sum",
+      const q = buildOverviewChartAskQuestion(hit);
+      selectChartWithInsightState(hit.id, {
+        restoreFromStore: true,
+        clearAnswerWhenMissing: true,
       });
-      setQuestion(
-        `Summarize what the chart "${exportTitle}" shows and the sharpest takeaway for this dataset.`
-      );
-      setAnswer("");
-      setHasValidAIAnswer(false);
-      setLastAskedQuestion("");
-      setAlignedAnalysis(null);
+      setQuestion(q);
+
+      const stored = getChartInsightAnswer(aiAnswerByChartId, hit.id);
+      if (stored?.hasValidAIAnswer && stored.answer.trim()) {
+        pendingInsightAutoAskRef.current = null;
+        setActiveTab("insights");
+        return;
+      }
+
+      pendingInsightAutoAskRef.current = q;
       setActiveTab("insights");
     },
-    [chartHistory, selectChart]
+    [
+      chartHistory,
+      selectChartWithInsightState,
+      aiAnswerByChartId,
+      buildOverviewChartAskQuestion,
+    ]
   );
 
   const fetchPreviewRows = async (limit: number | "all") => {
@@ -6642,6 +6762,7 @@ function HomeInner() {
       setLoading(false);
     }
   };
+  askAIImplRef.current = askAI;
 
   const saveColumnMapping = async () => {
     if (columns.length === 0) {
@@ -6754,9 +6875,13 @@ function HomeInner() {
     ]
   );
 
-  let mappingConfidence: ConfidenceLevel = "Low";
+  let mappingConfidence: "High" | "Medium" | "Low" = "Low";
   if (mappingConfirmedByUser) {
     mappingConfidence = "High";
+  } else if (mappingMetadata?.roles) {
+    const fromRoles = mappingConfidenceFromRoleMetadata(mappingMetadata.roles);
+    mappingConfidence =
+      fromRoles === "high" ? "High" : fromRoles === "medium" ? "Medium" : "Low";
   } else {
     const resolvedCount = [effectiveSales, effectiveDate, effectiveProduct].filter(
       Boolean
@@ -6789,6 +6914,55 @@ function HomeInner() {
     insightVisualization?.provenance,
     mappingConfidence,
     mappingConfirmedByUser,
+  ]);
+
+  const insightNarrativeTone = useMemo((): NarrativeTone => {
+    if (!alignedAnalysis) return "balanced";
+    const backendMap =
+      alignedAnalysis.mappingConfidenceLevel?.trim().toLowerCase() || null;
+    const mapForTone: InsightConfidenceLevel =
+      backendMap === "high" || backendMap === "medium" || backendMap === "low"
+        ? backendMap
+        : mappingMetadata?.roles
+          ? mappingConfidenceFromRoleMetadata(mappingMetadata.roles)
+          : mappingConfidence === "High"
+            ? "high"
+            : mappingConfidence === "Medium"
+              ? "medium"
+              : "low";
+    return resolveNarrativeTone({
+      analysisRowCount: alignedAnalysis.analysisRowCount,
+      chartSeriesPointCount: alignedAnalysis.chartSeriesPointCount,
+      mappingConfidence: mapForTone,
+      mappingConfirmedByUser,
+      unifiedConfidenceLevel: insightUnifiedConfidence?.level,
+    });
+  }, [
+    alignedAnalysis,
+    insightUnifiedConfidence?.level,
+    mappingConfirmedByUser,
+    mappingMetadata?.roles,
+    mappingConfidence,
+  ]);
+
+  const insightNarrativeDisclaimer = useMemo(() => {
+    if (!alignedAnalysis) return null;
+    return narrativeToneDisclaimer(insightNarrativeTone, {
+      analysisRowCount: alignedAnalysis.analysisRowCount,
+      chartSeriesPointCount: alignedAnalysis.chartSeriesPointCount,
+      mappingConfidence:
+        alignedAnalysis.mappingConfidenceLevel ??
+        (mappingMetadata?.roles
+          ? mappingConfidenceFromRoleMetadata(mappingMetadata.roles)
+          : mappingConfidence),
+      mappingConfirmedByUser,
+    });
+  }, [
+    alignedAnalysis,
+    insightNarrativeTone,
+    mappingConfirmedByUser,
+    mappingMetadata?.roles,
+    mappingConfidence,
   ]);
 
   const overviewAiSummaryBullets = useMemo(
@@ -7125,8 +7299,11 @@ function HomeInner() {
   );
 
   const tickTruncate = useCallback((v: string | number) => {
-    const s = String(v);
-    return s.length > 36 ? `${s.slice(0, 34)}…` : s;
+    const s = String(v).trim();
+    if (!s) return "—";
+    if (s.length <= 40) return s;
+    const [first] = wrapCategoryLabelLines(s, { maxCharsPerLine: 38, maxLines: 1 });
+    return first && first.length <= 40 ? first : `${s.slice(0, 38)}…`;
   }, []);
 
   const presentationChartKind = useMemo((): ChartKind => {
@@ -7178,8 +7355,18 @@ function HomeInner() {
 
   const sortedChartData = useMemo(
     () =>
-      applyBarChartSort(chartData, presentationChartKind, chartSortAscending),
-    [chartData, presentationChartKind, chartSortAscending]
+      sortRowsForPresentation(
+        chartData,
+        presentationChartKind,
+        chartSortAscending,
+        isTrendMode(activeSnapshot?.contract)
+      ),
+    [
+      chartData,
+      presentationChartKind,
+      chartSortAscending,
+      activeSnapshot?.contract,
+    ]
   );
 
   const sessionChartAxisPresentation = useMemo(
@@ -7521,15 +7708,17 @@ function HomeInner() {
 
   const sortedInsightChartData = useMemo(
     () =>
-      applyBarChartSort(
+      sortRowsForPresentation(
         insightChartData,
         insightPresentationChartKind,
-        insightChartSortAscending
+        insightChartSortAscending,
+        isTrendMode(insightSnapshot?.contract)
       ),
     [
       insightChartData,
       insightPresentationChartKind,
       insightChartSortAscending,
+      insightSnapshot?.contract,
     ]
   );
 
@@ -7949,34 +8138,53 @@ function HomeInner() {
       alignedAnalysis?.insightSummary ?? undefined
     );
     const c = insightSnapshot?.contract;
-    if (!isTrendMode(c)) return parsed;
-    const sanitize = (t?: string) =>
-      t?.trim()
-        ? sanitizeNarrativeForTrendContract(t, c)
-        : t;
+    const tone = insightNarrativeTone;
+    const soften = (t?: string) => {
+      const raw = t?.trim() ? t.trim() : "";
+      if (!raw) return t;
+      const sanitized = isTrendMode(c)
+        ? sanitizeNarrativeForTrendContract(raw, c)
+        : raw;
+      return softenAssertiveProse(sanitized, tone);
+    };
     return {
       ...parsed,
-      summary: sanitize(parsed.summary) ?? "",
-      statistical: sanitize(parsed.statistical),
-      hypotheses: sanitize(parsed.hypotheses),
-      recommendations: sanitize(parsed.recommendations),
-      methodology: sanitize(parsed.methodology),
-      moreDetail: sanitize(parsed.moreDetail),
+      summary: soften(parsed.summary) ?? "",
+      statistical: soften(parsed.statistical),
+      hypotheses: soften(parsed.hypotheses),
+      recommendations: soften(parsed.recommendations),
+      methodology: soften(parsed.methodology),
+      moreDetail: soften(parsed.moreDetail),
     };
-  }, [answer, alignedAnalysis?.insightSummary, insightSnapshot?.contract]);
+  }, [
+    answer,
+    alignedAnalysis?.insightSummary,
+    insightSnapshot?.contract,
+    insightNarrativeTone,
+  ]);
 
   const insightExecutiveBrief = useMemo(() => {
     if (isTrendMode(insightSnapshot?.contract)) {
       const pinned = narrativeCopyForContract(insightSnapshot?.contract);
-      if (pinned) return firstSentenceForExecutiveSummary(pinned, 168);
+      if (pinned) {
+        const brief = firstSentenceForExecutiveSummary(pinned, 168);
+        return softenExecutiveTakeaway(brief, insightNarrativeTone);
+      }
     }
     const s = sanitizeNarrativeForTrendContract(
       parsedInsightAnswer.summary?.trim() ?? "",
       insightSnapshot?.contract
     );
     if (!s) return "";
-    return firstSentenceForExecutiveSummary(s, 168);
-  }, [parsedInsightAnswer.summary, insightSnapshot?.contract]);
+    return softenExecutiveTakeaway(
+      firstSentenceForExecutiveSummary(s, 168),
+      insightNarrativeTone
+    );
+  }, [
+    parsedInsightAnswer.summary,
+    insightSnapshot?.contract,
+    insightNarrativeTone,
+  ]);
 
   const exportExecutiveInsightsPreview = useMemo(() => {
     if (!exportOptions.includeChart || !exportOptions.includeAIInsight) return null;
@@ -8098,13 +8306,14 @@ function HomeInner() {
                 insightSnapshot?.source !== "auto_dashboard"
               ? pdfAlignedAnalysis
               : null;
-      const pdfChartData = pdfTrendMode
-        ? pdfChartDataRaw
-        : applyBarChartSort(
-            pdfChartDataRaw,
-            pdfPresentationKind,
-            isAscendingValueIntent(pdfAnalysisForSort, pdfViz)
-          );
+      const pdfChartData = sortRowsForPresentation(
+        pdfChartDataRaw,
+        pdfPresentationKind,
+        pdfTrendMode
+          ? null
+          : isAscendingValueIntent(pdfAnalysisForSort, pdfViz),
+        pdfTrendMode
+      );
       const pdfRankedSignals =
         resolved.includeChart &&
         pdfChartData.length > 0 &&
@@ -8231,28 +8440,34 @@ function HomeInner() {
         }
 
         const mainTakeaway = (() => {
+          const tone = insightNarrativeTone;
+          const wrap = (raw: string) =>
+            softenExecutiveTakeaway(
+              firstSentenceForExecutiveSummary(raw, 200),
+              tone
+            );
           if (pdfSnap?.source === "auto_dashboard" || pdfTrendMode) {
             const sem = semanticContextFromContract(pdfContract);
             if (sem) {
-              return firstSentenceForExecutiveSummary(
-                buildChartNarrative(sem),
-                200
-              );
+              return wrap(buildChartNarrative(sem));
             }
             return "";
           }
           const fromAligned = alignedAnalysis?.insightSummary?.trim();
           if (fromAligned) {
-            return firstSentenceForExecutiveSummary(fromAligned, 200);
+            return wrap(fromAligned);
           }
           const fromParsed = parsedInsightAnswer.summary?.trim();
           if (fromParsed) {
-            return firstSentenceForExecutiveSummary(fromParsed, 200);
+            return wrap(fromParsed);
           }
           return "";
         })();
         if (mainTakeaway) {
           lines.push(`Main takeaway: ${mainTakeaway}`);
+        }
+        if (insightNarrativeDisclaimer) {
+          lines.push(insightNarrativeDisclaimer);
         }
 
         const execKpiCards =
@@ -9087,7 +9302,7 @@ function HomeInner() {
                     <button
                       type="button"
                       onClick={() => setMappingModalOpen(true)}
-                      className="shrink-0 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-[0_1px_2px_rgba(15,23,42,0.12)] transition duration-200 hover:bg-slate-800 hover:shadow-md active:scale-[0.99]"
+                      className={`shrink-0 ${btnPrimarySm}`}
                     >
                       Review mapping
                     </button>
@@ -9616,9 +9831,9 @@ function HomeInner() {
             >
               <div
                 ref={dataPreviewTableScrollRef}
-                className="overflow-x-auto [overscroll-behavior-x:contain] [overscroll-behavior-y:auto]"
+                className="max-h-[min(70vh,42rem)] overflow-auto [overscroll-behavior-x:contain] [overscroll-behavior-y:auto]"
               >
-                <table className="min-w-max w-full border-separate border-spacing-0">
+                <table className="data-preview-table min-w-max w-full border-separate border-spacing-0 text-sm">
                   <thead>
                     <tr>
                       {columns.map((col, colIdx) => {
@@ -9732,9 +9947,12 @@ function HomeInner() {
                           return (
                             <td
                               key={col}
-                              className={`border-b border-slate-100/80 px-3 py-2.5 text-sm whitespace-nowrap transition-[background-color,color] duration-300 ease-out ${bgClass} ${stickyFirst} ${
-                                emptyCell ? "font-medium" : ""
-                              }`}
+                              title={emptyCell ? undefined : displayText}
+                              className={`border-b border-slate-200/45 px-2.5 py-2 text-sm transition-[background-color,color] duration-200 ease-out ${bgClass} ${stickyFirst} ${
+                                isFirstCol
+                                  ? "max-w-[11rem] sm:max-w-[13rem] truncate whitespace-nowrap font-medium"
+                                  : "max-w-[10rem] sm:max-w-[14rem] truncate whitespace-nowrap"
+                              } ${emptyCell ? "font-medium" : ""}`}
                             >
                               {emptyCell ? (
                                 <span className="inline-flex items-center rounded-md border border-rose-200/35 bg-rose-50/50 px-1.5 py-0.5 font-medium text-rose-800/85 tabular-nums">
@@ -9808,7 +10026,7 @@ function HomeInner() {
               <button
                 onClick={downloadChartPng}
                 disabled={chartData.length === 0}
-                className="shrink-0 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-[0_1px_2px_rgba(15,23,42,0.12)] transition duration-200 hover:bg-slate-800 hover:shadow-md active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                className={`shrink-0 ${btnPrimary} disabled:shadow-none`}
               >
                 Download Chart PNG
               </button>
@@ -9826,7 +10044,10 @@ function HomeInner() {
               <div ref={chartsPreviewRef} className="flex min-w-0 w-full flex-1 flex-col scroll-mt-24">
                 {chartData.length > 0 ? (
                   <div className="group relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-slate-200/45 bg-gradient-to-br from-white via-white to-slate-50/35 p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_22px_52px_-22px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.025] transition-all duration-500 ease-out hover:border-slate-200/70 hover:shadow-[0_1px_2px_rgba(15,23,42,0.045),0_26px_60px_-20px_rgba(79,70,229,0.11)] sm:p-4 md:p-5">
-                    <div className="mb-1 w-full min-w-0 text-center lg:mb-2">
+                    <div
+                      ref={chartsSessionHeadingRef}
+                      className="mb-1 w-full min-w-0 scroll-mt-28 text-center lg:mb-2"
+                    >
                       <div className="mx-auto min-w-0 max-w-4xl">
                         {chartHeadingBlock ?? (
                           <div className="px-2 sm:px-4">
@@ -9925,15 +10146,15 @@ function HomeInner() {
 
         {activeTab === "insights" && (
           <section className="mb-8 w-full min-w-0 rounded-[1.25rem] border border-[color:var(--border-default)] bg-gradient-to-b from-[var(--surface-subtle)] via-[color:var(--surface-elevated)] to-[var(--surface-accent-wash)] p-4 shadow-[var(--shadow-card)] ring-1 ring-slate-900/[0.02] sm:p-5">
-            <div className="grid w-full min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(14rem,36%)_minmax(0,1fr)] lg:gap-5">
-              <div className="min-w-0 w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
+            <div className="grid w-full min-w-0 grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)] lg:gap-4 xl:gap-5">
+              <div className="min-w-0 w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3.5 sm:p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)] lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:overscroll-contain">
                 <h2 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
                   Suggested Questions
                 </h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
                   Click to prefill, then ask.
                 </p>
-                <div className="mt-4 flex flex-col gap-2">
+                <div className="mt-3 flex flex-col gap-2">
                   {visibleSuggestedQuestions.map((q, i) => (
                     <button
                       key={`sq-${i}-${suggestionTokenMultisetKey(q)}`}
@@ -9968,15 +10189,15 @@ function HomeInner() {
                 ) : null}
               </div>
 
-              <div className="min-w-0 w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
-                <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+              <div className="min-w-0 w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3.5 sm:p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
+                <div className="flex flex-wrap items-start justify-between gap-3 mb-1.5">
                   <h2 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
                     Ask AI
                   </h2>
                   <button
                     type="button"
                     onClick={resetAiConversation}
-                    className="rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-slate-300/80 hover:text-[var(--foreground)] hover:shadow-[var(--shadow-md)]"
+                    className={btnSecondary}
                     title="Clears the question, answer, insight cards, AI chart, follow-up chips, and thread memory. Your file, filters, auto-dashboard, and non-AI chart history stay."
                   >
                     Reset conversation
@@ -10024,7 +10245,7 @@ function HomeInner() {
                   <button
                     onClick={() => void askAI()}
                     disabled={loading}
-                    className="shrink-0 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(15,23,42,0.12)] transition duration-200 hover:bg-slate-800 hover:shadow-md active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                    className={`shrink-0 ${btnPrimary} px-6 py-3 text-sm font-semibold disabled:shadow-none`}
                   >
                     {loading ? "Thinking..." : "Ask AI"}
                   </button>
@@ -10053,17 +10274,31 @@ function HomeInner() {
                   </p>
                 ) : null}
 
-                {insightVisualization && insightExecutiveVizInsights.length > 0 ? (
+                {insightSnapshot &&
+                !hasValidAIAnswer &&
+                !loading &&
+                !answer.trim() ? (
+                  <div className="mt-3 rounded-xl border border-indigo-100/70 bg-indigo-50/35 px-3.5 py-3 text-sm text-slate-700 leading-snug">
+                    This chart is selected. Click{" "}
+                    <span className="font-semibold text-slate-900">Ask AI</span> to
+                    generate an insight.
+                  </div>
+                ) : null}
+
+                {hasValidAIAnswer &&
+                insightVisualization &&
+                insightExecutiveVizInsights.length > 0 ? (
                   <AiExecutiveInsightsPanel
                     cards={insightExecutiveVizInsights}
                     narrativeBrief={insightExecutiveBrief}
                   />
                 ) : null}
 
-                {alignedAnalysis ? (
+                {hasValidAIAnswer && alignedAnalysis ? (
                   <div
                     className={`mt-4 rounded-xl border px-4 py-3 transition-shadow duration-300 hover:shadow-[var(--shadow-sm)] ${
-                      alignedAnalysis.smallSampleCohort
+                      alignedAnalysis.smallSampleCohort ||
+                      isCautiousNarrativeTone(insightNarrativeTone)
                         ? "border-amber-200/90 bg-amber-50/40"
                         : "border-slate-200/90 bg-slate-50/60"
                     }`}
@@ -10078,8 +10313,14 @@ function HomeInner() {
                             alignedAnalysis.evidenceSummaryLine ||
                             `Chart uses ${alignedAnalysis.chartSeriesPointCount.toLocaleString()} series point(s).`}
                         </p>
+                        {insightNarrativeDisclaimer ? (
+                          <p className="text-xs text-amber-950/90 mt-2 leading-relaxed">
+                            {insightNarrativeDisclaimer}
+                          </p>
+                        ) : null}
                         {(alignedAnalysis.insightConfidenceRationale ||
-                          alignedAnalysis.smallSampleCohort) && (
+                          alignedAnalysis.smallSampleCohort ||
+                          isCautiousNarrativeTone(insightNarrativeTone)) && (
                           <p className="text-[11px] text-slate-500 mt-1.5">
                             Details on scoring and sample cautions are under{" "}
                             <span className="font-medium text-slate-700">
@@ -10092,25 +10333,33 @@ function HomeInner() {
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         <span
                           className={insightEngineConfidenceBadgeClass(
-                            alignedAnalysis.insightConfidenceLevel
+                            insightUnifiedConfidence?.level ??
+                              alignedAnalysis.insightConfidenceLevel
                           )}
                         >
-                          {alignedAnalysis.insightConfidenceLevel}
+                          {confidenceBadgeLabel(
+                            insightUnifiedConfidence?.level ??
+                              (alignedAnalysis.insightConfidenceLevel as InsightConfidenceLevel)
+                          )}
                         </span>
                         <span className="text-[11px] tabular-nums text-slate-600">
-                          Score {alignedAnalysis.insightConfidenceScore}/100
+                          Score{" "}
+                          {insightUnifiedConfidence?.score ??
+                            alignedAnalysis.insightConfidenceScore}
+                          /100
                         </span>
                       </div>
                     </div>
                   </div>
                 ) : null}
 
+                {(hasValidAIAnswer || loading || answer.trim()) ? (
                 <div
-                  className={`rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-4 transition-shadow duration-300 hover:shadow-[var(--shadow-md)] ${insightVisualization && insightExecutiveVizInsights.length > 0 ? "mt-4" : "mt-4"}`}
+                  className="rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-3.5 sm:p-4 transition-shadow duration-300 hover:shadow-[var(--shadow-md)] mt-3"
                 >
-                  <h3 className="text-base font-semibold mb-3">AI Answer</h3>
-                  {answer.trim() ? (
-                    <div className="space-y-3 text-slate-800">
+                  <h3 className="text-base font-semibold mb-2">AI Answer</h3>
+                  {answer.trim() || loading ? (
+                    <div className="space-y-2 text-slate-800">
                       {(() => {
                         const lead = aiAnswerLeadIn(
                           datasetKind || "",
@@ -10127,66 +10376,69 @@ function HomeInner() {
                           "Summary unavailable — see detail sections."}
                       </div>
                       {parsedInsightAnswer.statistical ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-2">
-                          <summary className="cursor-pointer text-sm font-semibold text-slate-900 select-none">
+                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
+                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
                             {AI_INSIGHT_SECTION_LABELS.statistical}
                           </summary>
-                          <div className="mt-2 text-sm whitespace-pre-line leading-relaxed text-slate-700">
+                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
                             {parsedInsightAnswer.statistical}
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.hypotheses ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-2">
-                          <summary className="cursor-pointer text-sm font-semibold text-slate-900 select-none">
+                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
+                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
                             {AI_INSIGHT_SECTION_LABELS.hypotheses}
                           </summary>
-                          <div className="mt-2 text-sm whitespace-pre-line leading-relaxed text-slate-700">
+                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
                             {parsedInsightAnswer.hypotheses}
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.recommendations ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-2">
-                          <summary className="cursor-pointer text-sm font-semibold text-slate-900 select-none">
+                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
+                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
                             {AI_INSIGHT_SECTION_LABELS.recommendations}
                           </summary>
-                          <div className="mt-2 text-sm whitespace-pre-line leading-relaxed text-slate-700">
+                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
                             {parsedInsightAnswer.recommendations}
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.methodology ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-2">
-                          <summary className="cursor-pointer text-sm font-semibold text-slate-900 select-none">
+                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
+                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
                             {AI_INSIGHT_SECTION_LABELS.methodology}
                           </summary>
-                          <div className="mt-2 text-sm whitespace-pre-line leading-relaxed text-slate-700">
+                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
                             {parsedInsightAnswer.methodology}
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.moreDetail ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-2">
-                          <summary className="cursor-pointer text-sm font-semibold text-slate-900 select-none">
+                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
+                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
                             Additional detail
                           </summary>
-                          <div className="mt-2 text-sm whitespace-pre-line leading-relaxed text-slate-700">
+                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
                             {parsedInsightAnswer.moreDetail}
                           </div>
                         </details>
                       ) : null}
                     </div>
+                  ) : loading ? (
+                    <p className="text-slate-600 text-sm">Generating insight…</p>
                   ) : (
                     <p className="text-slate-600 text-sm">
                       AI answer will appear here.
                     </p>
                   )}
                 </div>
+                ) : null}
 
-                {insightFollowUpChips.length > 0 ? (
-                  <div className="mt-4 rounded-2xl border border-indigo-100/70 bg-indigo-50/35 p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
-                    <p className="text-xs font-semibold text-slate-700 mb-2">
+                {hasValidAIAnswer && insightFollowUpChips.length > 0 ? (
+                  <div className="mt-3 rounded-2xl border border-indigo-100/70 bg-indigo-50/35 p-3 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
+                    <p className="text-xs font-semibold text-slate-700 mb-1.5">
                       Suggested follow-ups
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -10207,16 +10459,17 @@ function HomeInner() {
                   </div>
                 ) : null}
 
-                {insightVisualization?.provenance ||
+                {hasValidAIAnswer &&
+                (insightVisualization?.provenance ||
                 insightChartRoutingRecommendation ||
                 insightVisualization?.contextUsed ||
                 insightVisualization?.partialVisualizationWarning ||
-                alignedAnalysis?.conversationFollowUp ? (
-                  <div className="mt-5 rounded-xl border border-slate-200/90 bg-slate-50/80 overflow-hidden">
+                alignedAnalysis?.conversationFollowUp) ? (
+                  <div className="mt-3 rounded-xl border border-slate-200/90 bg-slate-50/80 overflow-hidden">
                     <button
                       type="button"
                       onClick={() => setHowCalculatedOpen((o) => !o)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-100/80 transition-colors"
+                      className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-slate-100/80 transition-colors"
                     >
                       <span className="text-sm font-semibold text-slate-800">
                         How this insight was generated
@@ -10245,9 +10498,9 @@ function HomeInner() {
                       </span>
                     </button>
                     {howCalculatedOpen ? (
-                      <div className="border-t border-slate-200/80 px-4 py-3 bg-white/60">
+                      <div className="border-t border-slate-200/80 px-3.5 py-2.5 bg-white/60">
                         {insightVisualization?.partialVisualizationWarning ? (
-                          <div className="mb-4 pb-4 border-b border-slate-200/80">
+                          <div className="mb-3 pb-3 border-b border-slate-200/80">
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
                               Visualization caution (full)
                             </p>
@@ -10257,17 +10510,21 @@ function HomeInner() {
                           </div>
                         ) : null}
                         {alignedAnalysis?.insightConfidenceRationale ||
-                        alignedAnalysis?.smallSampleCohort ? (
-                          <div className="mb-4 pb-4 border-b border-slate-200/80">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                        alignedAnalysis?.smallSampleCohort ||
+                        isCautiousNarrativeTone(insightNarrativeTone) ? (
+                          <div className="mb-3 pb-3 border-b border-slate-200/80">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
                               Confidence &amp; sample methodology
                             </p>
-                            {alignedAnalysis.insightConfidenceRationale ? (
-                              <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">
-                                {alignedAnalysis.insightConfidenceRationale}
+                            <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                              {insightUnifiedConfidence?.rationale ||
+                                alignedAnalysis?.insightConfidenceRationale}
+                            </p>
+                            {insightNarrativeDisclaimer ? (
+                              <p className="text-xs text-amber-950/90 mt-2 leading-relaxed">
+                                {insightNarrativeDisclaimer}
                               </p>
-                            ) : null}
-                            {alignedAnalysis.smallSampleCohort ? (
+                            ) : alignedAnalysis?.smallSampleCohort ? (
                               <p className="text-xs text-amber-950/90 mt-2 leading-relaxed">
                                 Under 100 rows in this cohort: the assistant is instructed
                                 to separate facts from hypotheses, use hedging language,
@@ -10593,7 +10850,7 @@ function HomeInner() {
                 ) : null}
 
                 {insightChartData.length > 0 ? (
-                  <div className="group/chart mt-4 w-full min-w-0 overflow-hidden rounded-[1.25rem] border border-[color:var(--border-default)] bg-gradient-to-br from-[color:var(--surface-elevated)] via-[color:var(--surface-elevated)] to-[var(--surface-accent-wash)] p-4 shadow-[var(--shadow-card)] ring-1 ring-slate-900/[0.025] transition-all duration-500 ease-out hover:shadow-[0_22px_56px_-22px_rgba(15,23,42,0.14)] sm:p-5">
+                  <div className="group/chart mt-3 w-full min-w-0 overflow-hidden rounded-[1.25rem] border border-[color:var(--border-default)] bg-gradient-to-br from-[color:var(--surface-elevated)] via-[color:var(--surface-elevated)] to-[var(--surface-accent-wash)] p-3.5 shadow-[var(--shadow-card)] ring-1 ring-slate-900/[0.025] transition-all duration-500 ease-out hover:shadow-[0_22px_56px_-22px_rgba(15,23,42,0.14)] sm:p-4">
                     <div className="mb-1.5 w-full min-w-0 text-center">
                       <div className="mx-auto min-w-0 max-w-5xl">
                         <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
@@ -10651,7 +10908,7 @@ function HomeInner() {
                   </div>
                 ) : null}
 
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() =>
@@ -10666,12 +10923,12 @@ function HomeInner() {
                       })
                     }
                     disabled={!canExportInsight}
-                    className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-[0_1px_2px_rgba(5,150,105,0.25)] transition duration-200 hover:bg-emerald-700 hover:shadow-md active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                    className={btnExportSm}
                   >
                     Export this insight (PDF)
                   </button>
                 </div>
-                <details className="mt-2 text-xs text-slate-600">
+                <details className="mt-1.5 text-xs text-slate-600">
                   <summary className="cursor-pointer font-medium text-slate-700 select-none">
                     Export / chart debug
                   </summary>
@@ -10701,7 +10958,7 @@ function HomeInner() {
 
         {activeTab === "export" && (
           <section className="mb-6">
-            <div className="bg-white border rounded-2xl p-6 space-y-6">
+            <div className="bg-white border rounded-2xl p-4 sm:p-5 space-y-4">
               <div>
                 <h2 className="text-xl font-semibold">Export</h2>
                 <p className="text-sm text-slate-600 mt-1">
@@ -10837,7 +11094,7 @@ function HomeInner() {
                       <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
                         <input
                           type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
                           checked={exportOptions.includeKPIs}
                           onChange={(e) =>
                             setExportOptions((prev) => ({
@@ -10851,7 +11108,7 @@ function HomeInner() {
                       <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
                         <input
                           type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
                           checked={exportOptions.includeAIInsight}
                           onChange={(e) =>
                             setExportOptions((prev) => ({
@@ -10865,7 +11122,7 @@ function HomeInner() {
                       <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
                         <input
                           type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
                           checked={exportOptions.includeChart}
                           onChange={(e) =>
                             setExportOptions((prev) => ({
@@ -10879,7 +11136,7 @@ function HomeInner() {
                       <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
                         <input
                           type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
                           checked={exportOptions.includeDataPreview}
                           onChange={(e) =>
                             setExportOptions((prev) => ({
@@ -10893,7 +11150,7 @@ function HomeInner() {
                       <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90 sm:col-span-2">
                         <input
                           type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
                           checked={exportOptions.includeDataQuality}
                           onChange={(e) =>
                             setExportOptions((prev) => ({
@@ -10918,7 +11175,7 @@ function HomeInner() {
                       <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
                         <input
                           type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
                           checked={exportOptions.includeConversationContext ?? false}
                           onChange={(e) =>
                             setExportOptions((prev) => ({
@@ -10935,7 +11192,7 @@ function HomeInner() {
                       <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
                         <input
                           type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
                           checked={exportOptions.includeTechnicalAppendix === true}
                           onChange={(e) =>
                             setExportOptions((prev) => ({
@@ -10955,10 +11212,7 @@ function HomeInner() {
               </div>
 
               <div className="flex justify-end">
-                <button
-                  onClick={() => downloadReport()}
-                  className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(5,150,105,0.25)] transition duration-200 hover:bg-emerald-700 hover:shadow-md active:scale-[0.99]"
-                >
+                <button type="button" onClick={() => downloadReport()} className={btnExport}>
                   Download Report PDF
                 </button>
               </div>
@@ -11113,7 +11367,7 @@ function HomeInner() {
                     type="button"
                     onClick={saveColumnMapping}
                     disabled={loading}
-                    className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-[0_1px_2px_rgba(67,56,202,0.25)] transition duration-200 hover:bg-indigo-700 hover:shadow-md active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                    className={`${btnPrimarySm} disabled:shadow-none`}
                   >
                     {loading ? "Saving…" : "Save mapping"}
                   </button>
