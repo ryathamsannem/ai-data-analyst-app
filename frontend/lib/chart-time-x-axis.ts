@@ -3,6 +3,7 @@
  * Keeps tick density and date copy readable on dense dashboards.
  */
 
+import type { ChartRow } from "@/app/chart-types";
 import {
   computeCategoryAxisBottomMargin,
   type ChartLayoutMode,
@@ -82,6 +83,74 @@ export function temporalTickStringsForChartRows(
   rows: { name?: unknown }[]
 ): string[] {
   return rows.map((r) => formatTrendXAxisTickLabel(String(r.name ?? "")));
+}
+
+/** Chronological sort key for bucket labels (ISO, weekly ranges, quarters, months). */
+export function bucketLabelChronologicalSortKey(label: string): [number, number, string] {
+  const s = label.trim();
+  if (!s) return [2, 0, ""];
+
+  const iso = parseIsoDate(s);
+  if (iso) {
+    const ts = Date.UTC(iso.y, iso.m - 1, iso.d);
+    if (!Number.isNaN(ts)) return [0, ts, s];
+  }
+
+  if (s.includes("/")) {
+    const left = s.split("/")[0]?.trim() ?? "";
+    const dl = parseIsoDate(left);
+    if (dl) {
+      const ts = Date.UTC(dl.y, dl.m - 1, dl.d);
+      if (!Number.isNaN(ts)) return [0, ts, s];
+    }
+  }
+
+  const qy = /^Q([1-4])\s*['\u2019]?\s*(\d{2,4})$/i.exec(s);
+  if (qy) {
+    const qn = Number(qy[1]);
+    let yr = Number(qy[2]);
+    if (yr < 100) yr += 2000;
+    return [0, yr * 10 + qn, s];
+  }
+
+  const yq = /^(\d{4})[-\s]?Q([1-4])$/i.exec(s);
+  if (yq) {
+    return [0, Number(yq[1]) * 10 + Number(yq[2]), s];
+  }
+
+  const ym = /^(\d{4})-(\d{2})$/.exec(s);
+  if (ym) {
+    const ts = Date.UTC(Number(ym[1]), Number(ym[2]) - 1, 1);
+    if (!Number.isNaN(ts)) return [0, ts, s];
+  }
+
+  const ymw = /^(\d{4})-(\d{2})-(\d{2})\//.exec(s);
+  if (ymw) {
+    const ts = Date.UTC(Number(ymw[1]), Number(ymw[2]) - 1, Number(ymw[3]));
+    if (!Number.isNaN(ts)) return [0, ts, s];
+  }
+
+  const parsed = Date.parse(s);
+  if (!Number.isNaN(parsed)) return [0, parsed, s];
+
+  return [1, 0, s];
+}
+
+/** Preserve left-to-right chronological order for trend / time-series charts. */
+export function sortChartRowsChronologically(rows: ChartRow[]): ChartRow[] {
+  if (!rows.length || rows.length <= 1) return rows;
+  const indexed = rows.map((row, i) => ({
+    row,
+    i,
+    key: bucketLabelChronologicalSortKey(String(row.name ?? "")),
+  }));
+  indexed.sort((a, b) => {
+    if (a.key[0] !== b.key[0]) return a.key[0] - b.key[0];
+    if (a.key[1] !== b.key[1]) return a.key[1] - b.key[1];
+    if (a.key[2] !== b.key[2]) return a.key[2].localeCompare(b.key[2]);
+    return a.i - b.i;
+  });
+  return indexed.map((x) => x.row);
 }
 
 /**

@@ -112,3 +112,8 @@ body {
 .timeline-scroll-fine::-webkit-scrollbar-thumb:hover {
   background-color: rgba(100, 116, 139, 0.55);
 }
+
+/* Data Preview — row hover polish (zebra/sticky handled in component). */
+.data-preview-table tbody tr:hover td {
+  filter: brightness(0.985);
+}

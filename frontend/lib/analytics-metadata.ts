@@ -192,12 +192,17 @@ export function remapLegacyKpiTitle(
 ): string {
   const raw = title.replace(/\s+/g, " ").trim();
   if (!raw) return raw;
-  const dk = (domain || "").trim().toLowerCase();
-  if (dk !== "operations" && dk !== "manufacturing") return raw;
-
   const tl = raw.toLowerCase();
   const metricCol = opts?.metricColumn?.trim() || null;
   const breakdownCol = opts?.breakdownColumn?.trim() || null;
+  const dk = (domain || "").trim().toLowerCase();
+
+  const dimensionPhrase = (col: string | null | undefined): string => {
+    if (!col?.trim()) return "category";
+    let p = humanizeColumnName(col).trim();
+    p = p.replace(/\s+names?$/i, "").replace(/\s+ids?$/i, "").trim();
+    return p.toLowerCase() || "category";
+  };
 
   if (
     metricCol &&
@@ -212,24 +217,27 @@ export function remapLegacyKpiTitle(
   }
 
   if (tl === "top product" || tl === "highest product") {
-    const br = breakdownCol?.toLowerCase() ?? "";
-    if (/plant|site|facility|location|warehouse/.test(br)) return "Highest plant";
-    if (/severity|issue|priority|risk/.test(br)) return "Highest severity";
-    if (breakdownCol) return `Top ${humanizeColumnName(breakdownCol).toLowerCase()}`;
+    if (breakdownCol) return `Top ${dimensionPhrase(breakdownCol)}`;
+    if (dk === "operations" || dk === "manufacturing") {
+      return "Top category";
+    }
     return "Top category";
   }
 
-  if (tl === "products" || tl === "product count") {
+  if (tl === "products" || tl === "product count" || tl.endsWith(" count")) {
     if (breakdownCol) return `${humanizeColumnName(breakdownCol)} count`;
     return "Categories tracked";
   }
 
-  if (tl === "best region" && breakdownCol) {
-    return `Top ${humanizeColumnName(breakdownCol).toLowerCase()}`;
+  if (tl === "best region") {
+    if (breakdownCol) return `Top ${dimensionPhrase(breakdownCol)}`;
+    return "Top category";
   }
 
-  if (tl === "revenue gap" && metricCol) {
-    return `${humanizeColumnName(metricCol)} gap`;
+  if (dk === "operations" || dk === "manufacturing") {
+    if (tl === "revenue gap" && metricCol) {
+      return `${humanizeColumnName(metricCol)} gap`;
+    }
   }
 
   return raw;

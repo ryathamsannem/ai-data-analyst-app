@@ -720,6 +720,260 @@ def _date_role_keyword_score(col: str) -> Tuple[int, List[str]]:
     return score, reasons
 
 
+# Minimum semantic score to auto-assign geography / region role (matches medium-confidence bar).
+REGION_ROLE_MIN_SCORE = 18.0
+
+_ADDITIVE_METRIC_SUBSTRINGS = (
+    "revenue",
+    "sales",
+    "profit",
+    "spend",
+    "cost",
+    "impression",
+    "click",
+    "conversion",
+    "order_value",
+    "amount",
+    "budget",
+    "gmv",
+    "turnover",
+    "units",
+    "quantity",
+    "volume",
+    "margin",
+    "subtotal",
+    "gross",
+    "net_revenue",
+)
+
+_GEOGRAPHY_NAME_KEYWORDS = (
+    "region",
+    "state",
+    "country",
+    "city",
+    "territory",
+    "province",
+    "county",
+    "postal",
+    "zipcode",
+    "zip_code",
+    "geo",
+    "location",
+    "latitude",
+    "longitude",
+    "metro",
+    "district",
+    "warehouse",
+    "plant",
+    "facility",
+    "site",
+)
+
+
+def _column_profile_type(col: str, profile: Optional[Dict[str, Any]]) -> Optional[str]:
+    return (profile or {}).get("column_types", {}).get(col)
+
+
+def _column_name_implies_temporal(col: str) -> bool:
+    n = _norm_header_token(col)
+    return any(
+        tok in n
+        for tok in (
+            "date",
+            "datetime",
+            "timestamp",
+            "time_stamp",
+            "month",
+            "year",
+            "day",
+            "period",
+            "week",
+            "fiscal_period",
+        )
+    )
+
+
+def _column_is_temporal_for_mapping(col: str, profile: Optional[Dict[str, Any]]) -> bool:
+    if _column_profile_type(col, profile) == "date":
+        return True
+    return _column_name_implies_temporal(col)
+
+
+def _column_name_implies_geography(col: str) -> bool:
+    n = _norm_header_token(col)
+    if _column_name_implies_temporal(col):
+        return False
+    for kw in _GEOGRAPHY_NAME_KEYWORDS:
+        if kw in n:
+            if kw == "market" and "marketing" in n:
+                continue
+            return True
+    return False
+
+
+def _region_role_candidate_allowed(
+    col: str, profile: Optional[Dict[str, Any]], score: float
+) -> bool:
+    if not col or score < REGION_ROLE_MIN_SCORE:
+        return False
+    if _column_is_temporal_for_mapping(col, profile):
+        return False
+    if _column_profile_type(col, profile) == "number":
+        return False
+    return _column_name_implies_geography(col)
+
+
+def _pick_region_column_from_candidates(
+    cands: List[Dict[str, Any]], profile: Optional[Dict[str, Any]]
+) -> Optional[str]:
+    for row in cands or []:
+        col = str(row.get("column", "")).strip()
+        score = float(row.get("score", 0) or 0)
+        if _region_role_candidate_allowed(col, profile, score):
+            return col
+    return None
+
+
+def _region_column_usable(
+    col: Optional[str], profile: Optional[Dict[str, Any]] = None
+) -> bool:
+    if not col:
+        return False
+    global dataset_profile
+    prof = profile if profile is not None else dataset_profile
+    # User-confirmed mapping may omit score metadata; still require geography semantics.
+    return _region_role_candidate_allowed(
+        str(col), prof, REGION_ROLE_MIN_SCORE
+    ) or (
+        _column_name_implies_geography(str(col))
+        and not _column_is_temporal_for_mapping(str(col), prof)
+        and _column_profile_type(str(col), prof) != "number"
+    )
+
+
+def _column_looks_ratio_only_metric(col_name: Optional[str]) -> bool:
+    if not col_name:
+        return False
+    cn = str(col_name).lower().replace("_", " ")
+    return bool(
+        re.search(
+            r"\b(pct|percent(?:age)?|ratio|rates?|probability|score|ctr|spread)\b",
+            cn,
+            re.I,
+        )
+    )
+
+
+def _column_looks_additive_metric(col_name: Optional[str]) -> bool:
+    if not col_name:
+        return False
+    n = _norm_header_token(str(col_name))
+    if _column_looks_ratio_only_metric(col_name) and not any(
+        k in n for k in ("revenue", "sales", "profit", "spend", "cost", "amount")
+    ):
+        return False
+    return any(sub in n for sub in _ADDITIVE_METRIC_SUBSTRINGS)
+
+
+def _ranking_or_leaderboard_intent(ql: str) -> bool:
+    q = (ql or "").lower()
+    if re.search(r"\btop\s+(?:\d+|five|ten|three|four|seven|eight)\b", q):
+        return True
+    if any(k in q for k in ("ranking", "rank ", "rank,", "ranked")):
+        return True
+    if re.search(r"\b(which|top\b|best\b|leading|drives?|drive\b|most\b|bottom\b)\b", q):
+        return True
+    if re.search(r"\bby\s+[a-z0-9_][a-z0-9_\s]{0,40}\b", q):
+        return True
+    if re.search(r"\b(revenue|sales|profit|spend)\s+by\s+", q):
+        return True
+    return False
+
+
+def _explicit_max_aggregation_intent(ql: str) -> bool:
+    """True only when the user asks for a peak / single-row maximum — not leaderboard 'highest'."""
+    q = (ql or "").lower()
+    if re.search(
+        r"\b(maximum|max\b|peak|largest\s+(?:single|transaction|order|day|value|record))\b",
+        q,
+    ):
+        return True
+    if re.search(
+        r"\bhighest\s+(?:single|transaction|order|day|value|record|ever|reading)\b",
+        q,
+    ):
+        return True
+    if "largest transaction" in q or "single-day" in q or "single day" in q:
+        return True
+    if ("highest" in q or "maximum" in q or "largest" in q) and _ranking_or_leaderboard_intent(
+        q
+    ):
+        return False
+    if "highest" in q or "maximum" in q:
+        if re.search(r"\b(which|top\b|by\s+|per\s+|compare|drives?)\b", q):
+            return False
+        return True
+    return False
+
+
+def _resolve_agg_label_and_key(
+    ql: str,
+    *,
+    value_col: Optional[str] = None,
+    incident_only: bool = False,
+) -> Tuple[str, str]:
+    """Map question wording + metric column to (agg_label, agg_key) for grouped charts."""
+    q = (ql or "").lower()
+    if incident_only:
+        return "Count", "count"
+    if any(k in q for k in ["average", "avg", "mean"]):
+        return "Average", "mean"
+    if (
+        "count" in q
+        or "how many" in q
+        or "number of" in q
+        or "headcount" in q
+    ):
+        return "Count", "count"
+    if re.search(r"\b(sum|total)\b", q) and (
+        "average" not in q and "mean" not in q and "avg" not in q
+    ):
+        return "Total", "sum"
+    if "minimum" in q or "lowest" in q or re.search(r"\bmin\b", q):
+        return "Minimum", "min"
+    if _explicit_max_aggregation_intent(q):
+        return "Maximum", "max"
+    if any(
+        k in q
+        for k in (
+            "trend",
+            "over time",
+            "monthly",
+            "by month",
+            "quarter",
+            "weekly",
+            "by date",
+            "daily",
+            "yearly",
+            "timeline",
+            "each day",
+            "each month",
+            "each year",
+            "per day",
+            "per month",
+            "per year",
+        )
+    ) or re.search(r"\b(by|per)\s+(day|date|week|month|year|quarter)\b", q):
+        return "Total", "sum"
+    if _ranking_or_leaderboard_intent(q) or _column_looks_additive_metric(value_col):
+        return "Total", "sum"
+    if any(k in q for k in ("compare", "versus", " vs ")):
+        if _column_looks_additive_metric(value_col):
+            return "Total", "sum"
+        return "Average", "mean"
+    return "Average", "mean"
+
+
 def _cardinality_profile_score(
     df_in: pd.DataFrame, col: str, role: str, domain: str = "generic"
 ) -> Tuple[float, List[str]]:
@@ -977,6 +1231,10 @@ def _score_role_candidates(
             continue
         if role == "region" and _id_like_column_name(col):
             continue
+        if role == "region" and _column_is_temporal_for_mapping(col, profile):
+            continue
+        if role == "region" and profile.get("column_types", {}).get(col) == "number":
+            continue
         if role == "customer":
             n = _norm_header_token(col)
             if _id_like_column_name(col) and not re.search(
@@ -1082,6 +1340,8 @@ def compute_semantic_column_mapping(
     )
 
     def pick(cands: List[Dict[str, Any]], role_key: str) -> Optional[str]:
+        if role_key == "region":
+            return _pick_region_column_from_candidates(cands, profile)
         if cands and float(cands[0].get("score", 0)) > 0:
             return str(cands[0]["column"])
         if role_key == "date":
@@ -1110,13 +1370,11 @@ def compute_semantic_column_mapping(
         proposed["customer"] = alt
 
     if proposed.get("region") and proposed["region"] == proposed.get("product"):
-        alt_r = None
-        for row in region_cands[1:]:
-            c = str(row["column"])
-            if c and c not in (proposed.get("product"), proposed.get("customer")):
-                alt_r = c
-                break
-        proposed["region"] = alt_r
+        skip = {proposed.get("product"), proposed.get("customer")}
+        proposed["region"] = _pick_region_column_from_candidates(
+            [r for r in region_cands if str(r.get("column", "")) not in skip],
+            profile,
+        )
 
     roles_meta: Dict[str, Any] = {}
     for key, cands in (
@@ -1246,13 +1504,22 @@ def find_column(possible_names):
 
 
 def get_mapped_or_detected_column(mapping_key, possible_names):
-    global df, column_mapping
+    global df, column_mapping, dataset_profile
 
     mapped = column_mapping.get(mapping_key)
     if mapped and mapped in df.columns:
+        if mapping_key == "region" and not _region_column_usable(
+            mapped, dataset_profile
+        ):
+            return None
         return mapped
 
-    return find_column(possible_names)
+    detected = find_column(possible_names)
+    if mapping_key == "region":
+        if detected and _region_column_usable(detected, dataset_profile):
+            return detected
+        return None
+    return detected
 
 
 def numeric_series(column_name):
@@ -1938,6 +2205,142 @@ def _build_generic_executive_kpi_cards(
     return cards[:5]
 
 
+def _dimension_label_for_kpi(col: Optional[str]) -> str:
+    """Short dimension noun for KPI titles (Campaign, Channel, Category)."""
+    if not col or not str(col).strip():
+        return "Category"
+    phrase = _pretty_label_text(str(col).strip())
+    phrase = re.sub(r"\s+names?$", "", phrase, flags=re.I)
+    phrase = re.sub(r"\s+ids?$", "", phrase, flags=re.I)
+    phrase = re.sub(r"\s+codes?$", "", phrase, flags=re.I)
+    phrase = phrase.strip()
+    if not phrase:
+        return "Category"
+    return " ".join(w[:1].upper() + w[1:].lower() for w in phrase.split())
+
+
+def _kpi_title_top_dimension(col: Optional[str]) -> str:
+    return f"Top {_dimension_label_for_kpi(col)}"
+
+
+def _kpi_title_dimension_count(col: Optional[str]) -> str:
+    if not col or not str(col).strip():
+        return "Categories tracked"
+    return f"{_dimension_label_for_kpi(col)} count"
+
+
+def _kpi_title_total_sales_metric(sales_col: Optional[str]) -> str:
+    if sales_col and "revenue" in str(sales_col).lower():
+        return "Total Revenue"
+    if sales_col:
+        return build_metric_label("sum", "total", str(sales_col))
+    return "Total Sales"
+
+
+def _append_sales_domain_kpi_cards(
+    cards: List[Dict[str, Any]],
+    kp: Dict[str, Any],
+    profile: Dict[str, Any],
+    columns: List[str],
+) -> None:
+    """Sales / marketing-adjacent KPI row labels driven by semantic column mapping."""
+    product_col = get_mapped_or_detected_column(
+        "product",
+        ["product", "item", "sku", "category", "campaign", "campaign_name"],
+    )
+    sales_col = get_mapped_or_detected_column(
+        "sales", ["sales", "revenue", "amount", "total", "value"]
+    )
+    rev_label = _kpi_title_total_sales_metric(sales_col)
+    top_dim_title = _kpi_title_top_dimension(product_col)
+    count_title = _kpi_title_dimension_count(product_col)
+
+    if kp.get("total_sales") is not None:
+        cards.append(
+            {
+                "title": rev_label,
+                "value": f'{float(kp["total_sales"]):,.0f}',
+                "subtitle": None,
+            }
+        )
+    else:
+        cards.append({"title": rev_label, "value": "N/A", "subtitle": None})
+
+    if kp.get("top_product"):
+        tp = kp["top_product"]
+        cards.append(
+            {
+                "title": top_dim_title,
+                "value": str(tp.get("name", "—"))[:60],
+                "subtitle": f'{float(tp.get("value", 0)):,.0f}',
+            }
+        )
+    else:
+        cards.append({"title": top_dim_title, "value": "N/A", "subtitle": None})
+
+    if kp.get("unique_products") is not None:
+        cards.append(
+            {
+                "title": count_title,
+                "value": f'{int(kp["unique_products"]):,}',
+                "subtitle": None,
+            }
+        )
+    else:
+        cards.append({"title": count_title, "value": "N/A", "subtitle": None})
+
+    region_col = get_mapped_or_detected_column(
+        "region", ["region", "state", "city", "location", "country", "territory"]
+    )
+    if (
+        region_col
+        and sales_col
+        and _region_column_usable(region_col, profile)
+    ):
+        temp = df[[region_col, sales_col]].copy()
+        temp["_v"] = numeric_series(sales_col)
+        g = temp.groupby(region_col, dropna=True)["_v"].sum().sort_values(ascending=False)
+        if not g.empty:
+            top_reg = str(g.index[0])[:42]
+            top_val = float(g.iloc[0])
+            geo_title = _kpi_title_top_dimension(region_col)
+            cards.append(
+                {
+                    "title": geo_title,
+                    "value": top_reg,
+                    "subtitle": rev_label.replace("Total ", "") + f" {top_val:,.0f}",
+                }
+            )
+
+    order_col = _find_order_id_column(columns)
+    if order_col and sales_col and kp.get("total_sales") is not None:
+        sub_o = df[[order_col, sales_col]].dropna(subset=[order_col])
+        sub_o["_v"] = numeric_series(sales_col)
+        uniq_orders = sub_o[order_col].nunique(dropna=True)
+        if uniq_orders > 1:
+            aov = float(kp["total_sales"]) / float(uniq_orders)
+            cards.append(
+                {
+                    "title": "Average Order Value",
+                    "value": f"{aov:,.0f}",
+                    "subtitle": f"{int(uniq_orders):,} orders",
+                }
+            )
+    elif not order_col:
+        date_col = get_mapped_or_detected_column(
+            "date",
+            ["date", "order date", "transaction date", "invoice date", "month", "period"],
+        )
+        if date_col and sales_col:
+            cards.append(
+                {
+                    "title": "Trend-ready",
+                    "value": "Yes",
+                    "subtitle": "Date + revenue fields detected for time-series questions",
+                }
+            )
+
+
 def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
     """UI + PDF KPI cards with human-facing labels."""
     global df, dataset_profile
@@ -2043,71 +2446,7 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
         return cards[:5], domain
 
     if domain == "sales":
-        if kp.get("total_sales") is not None:
-            cards.append(
-                {
-                    "title": "Total Sales",
-                    "value": f'{float(kp["total_sales"]):,.0f}',
-                    "subtitle": None,
-                }
-            )
-        else:
-            cards.append({"title": "Total Sales", "value": "N/A", "subtitle": None})
-
-        if kp.get("top_product"):
-            tp = kp["top_product"]
-            cards.append(
-                {
-                    "title": "Top Product",
-                    "value": str(tp.get("name", "—"))[:60],
-                    "subtitle": f'{float(tp.get("value", 0)):,.0f}',
-                }
-            )
-        else:
-            cards.append({"title": "Top Product", "value": "N/A", "subtitle": None})
-
-        if kp.get("unique_products") is not None:
-            cards.append(
-                {
-                    "title": "Products",
-                    "value": f'{int(kp["unique_products"]):,}',
-                    "subtitle": None,
-                }
-            )
-        else:
-            cards.append({"title": "Products", "value": "N/A", "subtitle": None})
-
-        date_col = get_mapped_or_detected_column(
-            "date",
-            ["date", "order date", "transaction date", "invoice date", "month", "period"],
-        )
-        sales_col = get_mapped_or_detected_column(
-            "sales",
-            ["sales", "revenue", "amount", "total", "value"],
-        )
-        order_col = _find_order_id_column(columns)
-        if order_col:
-            try:
-                uo = int(df[order_col].nunique(dropna=True))
-                if uo > 0:
-                    cards.append(
-                        {
-                            "title": "Distinct orders / transactions",
-                            "value": f"{uo:,}",
-                            "subtitle": "Count of unique order keys in this file",
-                        }
-                    )
-            except Exception:
-                pass
-        elif date_col and sales_col:
-            cards.append(
-                {
-                    "title": "Trend-ready",
-                    "value": "Yes",
-                    "subtitle": "Date + revenue fields detected for time-series questions",
-                }
-            )
-
+        _append_sales_domain_kpi_cards(cards, kp, profile, columns)
         return cards[:5], domain
 
     cards = _build_generic_executive_kpi_cards(columns, profile)
@@ -2344,10 +2683,9 @@ def _dash_series_payload(
     if series is None or series.empty:
         return None
     ct_in = chart_type.strip().lower()
-    if ct_in == "line":
+    if ct_in in ("line", "area"):
         try:
-            order = sorted(series.index.tolist(), key=lambda x: str(x))
-            series = series.reindex(order).dropna(how="all").head(max_points)
+            series = _sort_chronologically_by_bucket_labels(series).head(max_points)
         except Exception:
             series = series.head(max_points)
     else:
@@ -3021,81 +3359,7 @@ def build_auto_dashboard() -> Dict[str, Any]:
         return out
 
     if kind == "sales":
-        sales_col_inner = get_mapped_or_detected_column(
-            "sales", ["sales", "revenue", "amount", "total", "value"]
-        )
-        rev_label = "Total Revenue"
-        if sales_col_inner and "revenue" not in str(sales_col_inner).lower():
-            rev_label = "Total Sales"
-
-        if kp.get("total_sales") is not None:
-            cards.append(
-                {
-                    "title": rev_label,
-                    "value": f'{float(kp["total_sales"]):,.0f}',
-                    "subtitle": None,
-                }
-            )
-        else:
-            cards.append({"title": rev_label, "value": "N/A", "subtitle": None})
-
-        if kp.get("top_product"):
-            tp = kp["top_product"]
-            cards.append(
-                {
-                    "title": "Top Product",
-                    "value": str(tp.get("name", "—"))[:60],
-                    "subtitle": f'{float(tp.get("value", 0)):,.0f}',
-                }
-            )
-        else:
-            cards.append({"title": "Top Product", "value": "N/A", "subtitle": None})
-
-        if kp.get("unique_products") is not None:
-            cards.append(
-                {
-                    "title": "Product Count",
-                    "value": f'{int(kp["unique_products"]):,}',
-                    "subtitle": None,
-                }
-            )
-        else:
-            cards.append({"title": "Product Count", "value": "N/A", "subtitle": None})
-
-        region_col = get_mapped_or_detected_column(
-            "region", ["region", "state", "city", "location", "country", "territory"]
-        )
-        sales_col_eff = sales_col_inner
-        if region_col and sales_col_eff:
-            temp = df[[region_col, sales_col_eff]].copy()
-            temp["_v"] = numeric_series(sales_col_eff)
-            g = temp.groupby(region_col, dropna=True)["_v"].sum().sort_values(ascending=False)
-            if not g.empty:
-                top_reg = str(g.index[0])[:42]
-                top_val = float(g.iloc[0])
-                cards.append(
-                    {
-                        "title": "Best Region",
-                        "value": top_reg,
-                        "subtitle": rev_label.replace("Total ", "") + f" {top_val:,.0f}",
-                    }
-                )
-
-        order_col = _find_order_id_column(columns)
-        if order_col and sales_col_eff and kp.get("total_sales") is not None:
-            sub_o = df[[order_col, sales_col_eff]].dropna(subset=[order_col])
-            sub_o["_v"] = numeric_series(sales_col_eff)
-            uniq_orders = sub_o[order_col].nunique(dropna=True)
-            if uniq_orders > 1:
-                aov = float(kp["total_sales"]) / float(uniq_orders)
-                cards.append(
-                    {
-                        "title": "Average Order Value",
-                        "value": f"{aov:,.0f}",
-                        "subtitle": f"{int(uniq_orders):,} orders",
-                    }
-                )
-
+        _append_sales_domain_kpi_cards(cards, kp, profile, columns)
         out["cards"] = clamp_cards(cards)
         out["charts"] = build_auto_dashboard_charts(kind)
         return out
@@ -5351,47 +5615,9 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     if not ncol or not gcol or ncol == gcol:
         return None
 
-    if any(k in ql for k in ["average", "avg", "mean"]):
-        agg_label, agg_key = "Average", "mean"
-    elif "count" in ql or "how many" in ql or "number of" in ql or "headcount" in ql:
-        agg_label, agg_key = "Count", "count"
-    elif (re.search(r"\b(sum|total)\b", ql)) and (
-        "average" not in ql and "mean" not in ql and "avg" not in ql
-    ):
-        agg_label, agg_key = "Total", "sum"
-    elif "minimum" in ql or "lowest" in ql or re.search(r"\bmin\b", ql):
-        agg_label, agg_key = "Minimum", "min"
-    elif "maximum" in ql or "highest" in ql or re.search(r"\bmax\b", ql):
-        agg_label, agg_key = "Maximum", "max"
-    elif any(k in ql for k in ("compare", "versus", " vs ")):
-        agg_label, agg_key = "Average", "mean"
-    elif any(
-        k in ql
-        for k in (
-            "trend",
-            "over time",
-            "monthly",
-            "by month",
-            "quarter",
-            "weekly",
-            "by date",
-            "daily",
-            "yearly",
-            "timeline",
-            "each day",
-            "each month",
-            "each year",
-            "per day",
-            "per month",
-            "per year",
-        )
-    ) or re.search(r"\b(by|per)\s+(day|date|week|month|year|quarter)\b", ql):
-        agg_label, agg_key = "Total", "sum"
-    else:
-        agg_label, agg_key = "Average", "mean"
-
-    if incident_only and ncol:
-        agg_label, agg_key = "Count", "count"
+    agg_label, agg_key = _resolve_agg_label_and_key(
+        ql, value_col=ncol, incident_only=incident_only
+    )
 
     if agg_key != "count" and ncol not in numeric_cols:
         return None
@@ -5958,14 +6184,65 @@ def _freq_human_label(freq: str) -> str:
 def _bucket_label_sort_key(label: str) -> Tuple[int, float, str]:
     """Stable ordering for bucket labels (ISO dates, pandas weekly period strings, etc.)."""
     s = str(label).strip()
+    if not s:
+        return (2, 0.0, "")
+
     t = pd.to_datetime(s, errors="coerce")
     if pd.notna(t):
         return (0, float(t.value), s)
+
     if "/" in s:
         left = s.split("/", 1)[0].strip()
         t2 = pd.to_datetime(left, errors="coerce")
         if pd.notna(t2):
             return (0, float(t2.value), s)
+
+    qy = re.match(r"^Q([1-4])\s*['\u2019]?\s*(\d{2,4})$", s, re.I)
+    if qy:
+        qn = int(qy.group(1))
+        yr = int(qy.group(2))
+        if yr < 100:
+            yr += 2000
+        return (0, float(yr * 10 + qn), s)
+
+    yq = re.match(r"^(\d{4})[-\s]?Q([1-4])$", s, re.I)
+    if yq:
+        yr = int(yq.group(1))
+        qn = int(yq.group(2))
+        return (0, float(yr * 10 + qn), s)
+
+    per = re.match(r"^(\d{4})-(\d{2})$", s)
+    if per:
+        try:
+            t3 = pd.Timestamp(year=int(per.group(1)), month=int(per.group(2)), day=1)
+            return (0, float(t3.value), s)
+        except Exception:
+            pass
+
+    per_w = re.match(r"^(\d{4})-(\d{2})-(\d{2})/", s)
+    if per_w:
+        try:
+            t4 = pd.Timestamp(
+                year=int(per_w.group(1)),
+                month=int(per_w.group(2)),
+                day=int(per_w.group(3)),
+            )
+            return (0, float(t4.value), s)
+        except Exception:
+            pass
+
+  # Pandas weekly period e.g. 2026-03-02/2026-03-08
+    try:
+        tp = pd.Period(s, freq="W")
+        return (0, float(tp.start_time.value), s)
+    except Exception:
+        pass
+    try:
+        tp_m = pd.Period(s, freq="M")
+        return (0, float(tp_m.start_time.value), s)
+    except Exception:
+        pass
+
     return (1, 0.0, s)
 
 
@@ -6864,12 +7141,19 @@ def build_smart_chart(
                 tn = top_n
                 title = f"Top {tn} — {_pretty_label_text(sort_col)}"
                 if trace is not None:
+                    top_agg_key = (
+                        "sum"
+                        if _column_looks_additive_metric(sort_col)
+                        else "max"
+                    )
                     trace.update(
                         {
                             "category_column": label_col,
                             "numeric_column": sort_col,
-                            "aggregation": "value",
-                            "aggregation_key": "max",
+                            "aggregation": "total"
+                            if top_agg_key == "sum"
+                            else "value",
+                            "aggregation_key": top_agg_key,
                             "rows_analyzed": ranked_n,
                             "notes": f"Top {tn} rows by numeric column",
                         }
@@ -7177,17 +7461,11 @@ def analyze_data(question: str):
             return numeric_cols[0]
         return None
 
-    metric = None
-    if any(k in q for k in ["average", "avg", "mean"]):
-        metric = "mean"
-    elif any(k in q for k in ["total", "sum"]):
-        metric = "sum"
-    elif "min" in q or "minimum" in q or "lowest" in q:
-        metric = "min"
-    elif "max" in q or "maximum" in q or "highest" in q:
-        metric = "max"
-    elif "count" in q or "how many" in q or "number of" in q:
-        metric = "count"
+    target_for_agg = find_target_numeric_column()
+    _agg_label_legacy, agg_key_legacy = _resolve_agg_label_and_key(
+        q, value_col=target_for_agg
+    )
+    metric = agg_key_legacy if agg_key_legacy else None
 
     if metric:
         cols_list = df.columns.tolist()
@@ -7516,18 +7794,9 @@ def _looks_like_ratio_metric_column(col_name: Optional[str]) -> bool:
     )
 
 
-def _infer_agg_hint_from_question(q_lower: str) -> Optional[str]:
-    if any(k in q_lower for k in ("average", "avg", "mean")):
-        return "mean"
-    if "count" in q_lower or "how many" in q_lower or "number of" in q_lower:
-        return "count"
-    if re.search(r"\b(sum|total)\b", q_lower):
-        return "sum"
-    if "minimum" in q_lower or "lowest" in q_lower or re.search(r"\bmin\b", q_lower):
-        return "min"
-    if "maximum" in q_lower or "highest" in q_lower or re.search(r"\bmax\b", q_lower):
-        return "max"
-    return None
+def _infer_agg_hint_from_question(q_lower: str, value_col: Optional[str] = None) -> Optional[str]:
+    _label, key = _resolve_agg_label_and_key(q_lower, value_col=value_col)
+    return key
 
 
 def infer_visualization_rounding_category(
@@ -8324,7 +8593,13 @@ def _assemble_visualization_provenance(
 def _detect_intent_tags(question: str) -> List[str]:
     ql = str(question).lower()
     tags: List[str] = []
-    if any(k in ql for k in ("highest", "maximum", "largest", "peak")) or re.search(
+    if _explicit_max_aggregation_intent(ql):
+        tags.append("maximum")
+    elif _ranking_or_leaderboard_intent(ql) and any(
+        k in ql for k in ("highest", "top", "best", "leading", "most")
+    ):
+        tags.append("ranking")
+    elif any(k in ql for k in ("highest", "maximum", "largest", "peak")) or re.search(
         r"\bmax\b", ql
     ):
         tags.append("highest")
@@ -8440,7 +8715,29 @@ def _build_focus_kpis_from_intent(
     ]
 
 
-def _insight_confidence_meta(n_rows: int, chart_pts: int) -> Dict[str, Any]:
+def _aggregate_mapping_confidence_from_meta() -> Optional[str]:
+    """Worst-case role confidence from persisted column-mapping metadata."""
+    global column_mapping_metadata
+    meta = column_mapping_metadata or {}
+    roles = meta.get("roles") if isinstance(meta.get("roles"), dict) else {}
+    if not roles:
+        return None
+    worst = "high"
+    for key in ("sales", "product", "date", "region", "customer"):
+        role = roles.get(key) if isinstance(roles.get(key), dict) else {}
+        conf = str((role or {}).get("confidence") or "").strip().lower()
+        if conf == "low":
+            return "low"
+        if conf == "medium":
+            worst = "medium"
+    return worst
+
+
+def _insight_confidence_meta(
+    n_rows: int,
+    chart_pts: int,
+    mapping_confidence: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Evidence / sample-size metadata for API clients and prompt contracts.
     chart_pts = number of points in the returned chart series (may differ from n_rows).
@@ -8448,6 +8745,12 @@ def _insight_confidence_meta(n_rows: int, chart_pts: int) -> Dict[str, Any]:
     n = max(0, int(n_rows))
     cp = max(0, int(chart_pts))
     small = n < 100
+    map_conf = str(mapping_confidence or "").strip().lower() or None
+    if map_conf not in ("low", "medium", "high"):
+        map_conf = _aggregate_mapping_confidence_from_meta()
+    few_categories = cp > 0 and cp <= 5
+    mapping_weak = map_conf == "low"
+
     if n <= 0:
         return {
             "analysisRowCount": 0,
@@ -8455,6 +8758,8 @@ def _insight_confidence_meta(n_rows: int, chart_pts: int) -> Dict[str, Any]:
             "insightConfidenceScore": 0,
             "insightConfidenceLevel": "low",
             "smallSampleCohort": True,
+            "cautiousNarrativeRequired": True,
+            "mappingConfidenceLevel": map_conf,
             "insightConfidenceRationale": "No rows in scope for this analysis.",
             "evidenceSummaryLine": "No filtered rows; do not infer business outcomes.",
         }
@@ -8482,12 +8787,33 @@ def _insight_confidence_meta(n_rows: int, chart_pts: int) -> Dict[str, Any]:
         score = min(score, 35)
         level = "low"
 
+    if mapping_weak and n >= 15:
+        score = min(score, 48)
+        if level == "high":
+            level = "medium"
+        rationale = (
+            "Column mapping confidence is low — treat rankings as exploratory "
+            "until metric and breakdown fields are confirmed."
+        )
+    elif few_categories and n >= 20:
+        score = min(score, 55)
+        if level == "high":
+            level = "medium"
+        rationale = (
+            "Few comparison groups in the chart — avoid over-interpreting small "
+            "gaps between categories."
+        )
+
+    cautious = bool(small or mapping_weak or few_categories)
+
     return {
         "analysisRowCount": n,
         "chartSeriesPointCount": cp,
         "insightConfidenceScore": int(score),
         "insightConfidenceLevel": level,
         "smallSampleCohort": bool(small),
+        "cautiousNarrativeRequired": cautious,
+        "mappingConfidenceLevel": map_conf,
         "insightConfidenceRationale": rationale,
         "evidenceSummaryLine": (
             f"Aggregations and chart are based on {n:,} filtered row(s) "
@@ -8501,6 +8827,9 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
     n = int(conf.get("analysisRowCount") or 0)
     cp = int(conf.get("chartSeriesPointCount") or 0)
     small = bool(conf.get("smallSampleCohort"))
+    cautious = bool(conf.get("cautiousNarrativeRequired")) or small
+    map_low = str(conf.get("mappingConfidenceLevel") or "").lower() == "low"
+    few_cats = cp > 0 and cp <= 5
     level = str(conf.get("insightConfidenceLevel") or "low")
     lines: List[str] = [
         "Confidence-aware reasoning (mandatory):",
@@ -8518,6 +8847,13 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
         "- Avoid words like proves, definitively, clearly indicates, obviously, must be, always when the sample is small "
         "or when no statistical test output is provided.",
     ]
+    if cautious:
+        lines.extend(
+            [
+                "- **Cautious narrative required** — use hedging language (may indicate, could suggest, "
+                "appears to rank highest in this cohort) and avoid definitive business conclusions.",
+            ]
+        )
     if small:
         lines.extend(
             [
@@ -8527,9 +8863,19 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
                 "- Do not present strong business conclusions; prefer exploratory language.",
             ]
         )
-    else:
+    if map_low:
         lines.append(
-            "- You may be somewhat more direct than for tiny samples, but still avoid claims "
+            "- **Low mapping confidence** — metric/breakdown columns were inferred; "
+            "do not state that a leader is structurally best without confirming field mapping."
+        )
+    if few_cats:
+        lines.append(
+            f"- **Few chart categories ({cp})** — compare groups directionally; "
+            "do not over-interpret small value gaps as proof of dominance."
+        )
+    if not cautious:
+        lines.append(
+            "- You may be somewhat more direct than for thin-evidence cohorts, but still avoid claims "
             "not evidenced by the calculated result."
         )
     return "\n".join(lines)
@@ -10206,16 +10552,25 @@ def ask_question(data: QuestionRequest):
                     or 0
                 ),
                 "smallSampleCohort": bool(analysis_ctx.get("smallSampleCohort")),
+                "cautiousNarrativeRequired": bool(
+                    analysis_ctx.get("cautiousNarrativeRequired")
+                ),
+                "mappingConfidenceLevel": analysis_ctx.get("mappingConfidenceLevel"),
                 "insightConfidenceLevel": str(
                     analysis_ctx.get("insightConfidenceLevel") or "low"
                 ),
             }
         )
         semantic_correction = _semantic_intent_correction_prompt_block(data.question)
+        needs_cautious = bool(
+            analysis_ctx.get("cautiousNarrativeRequired")
+            or analysis_ctx.get("smallSampleCohort")
+        )
         insight_style_line = (
-            "- Mention a clear, evidence-backed takeaway if the numbers support it.\n"
-            if not bool(analysis_ctx.get("smallSampleCohort"))
-            else "- Favor cautious, exploratory language over definitive business claims.\n"
+            "- Favor cautious, exploratory language over definitive business claims; "
+            "lead with what the numbers show, then what they may suggest.\n"
+            if needs_cautious
+            else "- Mention a clear, evidence-backed takeaway if the numbers support it.\n"
         )
 
         prompt = f"""
