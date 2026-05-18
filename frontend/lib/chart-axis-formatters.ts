@@ -1,4 +1,5 @@
 import type { ChartRow } from "@/app/chart-types";
+import { wrapCategoryLabelLines } from "@/lib/chart-axis-layout";
 
 export function formatAxisTickFromRows(chartData: ChartRow[], tick: number): string {
   const row = chartData.find((r) => Math.abs(r.value - tick) < 1e-6);
@@ -20,6 +21,14 @@ export function formatAxisTickFromScatterX(chartData: ChartRow[], tick: number):
 export function formatChartAxisCategoryTick(raw: string, compact: boolean): string {
   const t = raw.trim();
   if (!t) return "—";
+  const maxChars = compact ? 18 : 26;
+  if (t.length > maxChars && !/^\d{4}-\d{2}-\d{2}/.test(t)) {
+    const [first] = wrapCategoryLabelLines(t, {
+      maxCharsPerLine: maxChars,
+      maxLines: 1,
+    });
+    if (first && first.length <= maxChars + 1) return first;
+  }
   if (compact) {
     return t.length > 36 ? `${t.slice(0, 34)}…` : t;
   }
