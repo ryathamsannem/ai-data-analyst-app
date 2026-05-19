@@ -1,224 +1,399 @@
 # AI Insights — Stable Baseline Summary
 
-Reference for work **after** `git reset --hard` to the last stable version. Documents the **current** AI Insights implementation as observed in the restored tree. **No behavior changes** are implied by this file.
+Reference for the **restored stable codebase**. Documents the current AI Insights implementation as observed in the tree. **No behavior, UI, CSS, or component changes** are implied by this file.
 
-**Product baseline:** see [`AGENTS.md`](AGENTS.md) and [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md).
+**Product baseline:** [`AGENTS.md`](AGENTS.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md)
 
 ---
 
-## 1. Current AI Insights tab structure
+## 1. AI Insights — current layout
 
-### Shell and navigation
+### Navigation and shell
 
-| Piece | Behavior |
-|-------|----------|
+| Piece | Detail |
+|-------|--------|
 | Tab id | `insights` (`MainNavTabId` in `frontend/app/components/home/main-nav-tabs.tsx`) |
-| Tab state | In-memory in `frontend/app/page.tsx` (`activeTab`) — no URL route per tab |
-| App shell | `AppShell` + sidebar (`frontend/components/app-shell/`) |
-| Filters | `FilterPanel` shown when `activeTab === "overview" \|\| activeTab === "insights"` and dataset loaded (`appearance`: `"legacy"` on Insights vs `"dashboard"` on Overview) |
+| Label | "AI Insights" |
+| Routing | **None** — single home page `frontend/app/page.tsx`; `activeTab` state switches views |
+| App chrome | `AppShell` + sidebar (`frontend/components/app-shell/`) |
+| Filters | `FilterPanel` when `activeTab === "overview" \|\| activeTab === "insights"` and columns exist; `appearance="legacy"` on Insights vs `"dashboard"` on Overview |
 
-### Page layout (desktop)
+### Desktop page structure
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  FilterPanel (shared with Overview)                                      │
-├─────────────────────────────────────────────────────────────────────────┤
-│  <section> AI Insights outer shell (gradient card, ~10370 in page.tsx)   │
-│  ┌──────────────────────┬──────────────────────────────────────────────┐ │
-│  │ 30% — Suggested Qs   │ 70% — Ask AI column                          │ │
-│  │ • Suggested buttons  │ • Reset conversation                         │ │
-│  │ • Recent questions   │ • Follow-up context badges (optional)        │ │
-│  │   (last 3)           │ • Question textarea + Ask AI                 │ │
-│  │                      │ • Status / warnings                          │ │
-│  │                      │ • Executive insights (gated)                 │ │
-│  │                      │ • Confidence card (gated)                    │ │
-│  │                      │ • AI Answer (gated)                          │ │
-│  │                      │ • Suggested follow-up chips (gated)          │ │
-│  │                      │ • “How this insight was generated” (details) │ │
-│  │                      │ • Visualization card + chart                 │ │
-│  │                      │ • Export this insight (PDF) + debug details  │ │
-│  └──────────────────────┴──────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
+AppShell
+└─ page.tsx
+   ├─ FilterPanel (shared Overview + Insights)
+   ├─ Off-screen capture: chartCaptureInsightRef (fixed left:-10000px, w-[860px])
+   └─ activeTab === "insights"  (~lines 10370–11180)
+      └─ <section> outer Insights shell
+         └─ grid lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]  (30% / 70%)
+            ├─ Left card: Suggested Questions + Recent (last 3)
+            └─ Right card: Ask AI column (vertical stack)
 ```
 
-Grid: `lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]` with `gap-3` / `xl:gap-5`.
+**Outer shell** (`page.tsx` ~10371): gradient card, `rounded-[1.25rem]`, theme borders/shadows (`--surface-*`, `--border-default`, `--shadow-card`), `p-4 sm:p-5`.
+
+**Left panel** (~10373): `rounded-2xl`, `lg:max-h-[calc(100vh-12rem)]`, `lg:overflow-y-auto`, `lg:overscroll-contain`.
+
+**Right panel** (~10415): same card chrome; scrolls with content (no max-height on panel).
+
+**Grid:** `lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]`, `gap-3` / `xl:gap-5`.
 
 ### Right column — render order (top → bottom)
 
-Sections appear **in this order** inside the Ask AI panel. Conditional gates matter for polish and regression.
-
-| # | Block | Typical gate |
-|---|--------|----------------|
-| 1 | Ask AI title + **Reset conversation** | Always |
-| 2 | Follow-up badges (“Using previous insight context”, etc.) | `lastConversationMeta?.followUpDetected` |
-| 3 | Question textarea + **Ask AI** button + loading copy | Always |
-| 4 | Alignment repaired warning | `alignedAnalysis?.alignmentRepaired` |
+| # | Block | Gate |
+|---|--------|------|
+| 1 | Ask AI title + **Reset conversation** (`btnSecondary`) | Always |
+| 2 | Follow-up badges (emerald / violet pills) | `lastConversationMeta?.followUpDetected` |
+| 3 | Question textarea + **Ask AI** (`btnPrimary`) + loading copy | Always |
+| 4 | Alignment repaired warning (amber) | `alignedAnalysis?.alignmentRepaired` |
 | 5 | Visualization caution (short) | `insightVisualization?.partialVisualizationWarning` |
-| 6 | “This chart is selected…” prompt | Pinned snapshot, no valid answer yet |
-| 7 | **Executive insights** (`AiExecutiveInsightsPanel`) | `hasValidAIAnswer` + visualization + executive cards |
+| 6 | “This chart is selected…” prompt | Pinned snapshot, no valid answer |
+| 7 | **AiExecutiveInsightsPanel** | `hasValidAIAnswer` + viz + executive cards |
 | 8 | **Insight confidence** card | `hasValidAIAnswer` + `alignedAnalysis` |
-| 9 | **AI Answer** (summary + `<details>` sections) | `hasValidAIAnswer` \|\| loading \|\| draft answer |
-| 10 | **Suggested follow-ups** (chip buttons → `askAI(chip)`) | `hasValidAIAnswer` + chips |
-| 11 | **How this insight was generated** (collapsible) | Provenance / routing / context / follow-up |
-| 12 | **Visualization** (title, heading, `ChartContextSummary`, chart) | `insightChartData.length > 0` |
-| 13 | No visualization placeholder | Valid AI answer, `source === "ai"`, empty chart |
-| 14 | **Export this insight (PDF)** + export debug `<details>` | Export button always; enabled via `canExportInsight` |
+| 9 | **AI Answer** + `<details>` sections | `hasValidAIAnswer` \|\| `loading` \|\| `answer.trim()` |
+| 10 | **Suggested follow-ups** (chip buttons → `askAI`) | `hasValidAIAnswer` + chips |
+| 11 | **How this insight was generated** (`<details>`) | Provenance / routing / context |
+| 12 | **Visualization** card + chart | `insightChartData.length > 0` |
+| 13 | No-viz placeholder | Valid answer, `source === "ai"`, empty chart |
+| 14 | **Export this insight (PDF)** + export debug `<details>` | Button always; `canExportInsight` enables |
 
-### Chart rendering path (Insights only)
+### Visualization card — chart stack
 
-1. API `/ask` → `hydrateVisualizationFromApi` → session via `ChartSessionProvider` (`pushAIChart`, `selectChart`, etc.).
-2. Presentation: `insightPresentationChartKind` from contract / `computeFinalChartPresentation` (shared with Charts/PDF — **not** Overview mini-chart rules).
-3. Plot height: `insightShellPlotHeight` from `getInsightLayoutMetrics` + row-count heuristics (`page.tsx` ~8163–8201).
-4. Render: `renderDatasetChart(..., insightMode: true)` → **`ChartRenderer`** with `insightMode: true`, `insightCartesianPlanMain`.
-5. Layout shell: **`AiInsightChartShell`** → **`ChartInsightViewportWrapper`** (centered, max-width by chart kind).
+```
+Visualization card (Tailwind group/chart)
+├─ "Visualization" kicker (uppercase, --text-subtle)
+├─ insightChartHeadingBlock (title/subtitle)
+├─ ChartContextSummary (inline memo in page.tsx)
+└─ AiInsightChartShell (max-w-[960px], minOuterHeight from insightLayoutMetrics)
+   └─ ChartInsightViewportWrapper (min-h-[420px], centered, max-w by kind)
+      └─ plot div (animate-chart-surface-in, height: insightShellPlotHeight)
+         └─ ChartRenderer (insightMode: true, insightCartesianPlanMain)
+└─ SmartChartInsightPanel? (if insightSmartChartIntel?.active)
+```
 
-### Off-screen DOM (PDF / capture — not visible on tab)
+### Off-screen DOM (PDF capture — not visible on tab)
 
-| Ref | Role |
-|-----|------|
-| `chartCaptureInsightRef` | Fixed `left: -10000px`, `w-[860px]`, mirrors insight chart + heading for export capture |
-| `chartCaptureSessionRef` | Session chart capture (Charts scope — separate from insight) |
+| Ref | Location | Role |
+|-----|----------|------|
+| `chartCaptureInsightRef` | `page.tsx` ~9314–9332 | Fixed `left: -10000px`, `w-[860px]`; mirrors insight heading + `AiInsightChartShell` + `renderDatasetChart(..., insightMode: true)` |
 
-Insight capture uses the **same** `AiInsightChartShell` + `insightShellPlotHeight` as the on-screen Visualization card.
+Capture uses the **same** shell, plot height, and `insightMode` path as the on-screen Visualization card.
 
 ### Cross-tab entry points
 
 | From | Mechanism |
 |------|-----------|
-| Overview Auto Dashboard | **Charts** / **Ask AI** → `openDashboardChartInChartsTab`, `askAiAboutDashboardChart` + `pendingInsightAutoAskRef` |
-| Charts timeline | Select snapshot → pins insight chart via `selectChartWithInsightState` |
-| Data Preview | Suggested questions strip → `setActiveTab("insights")` + prefill |
+| Overview Auto Dashboard | `askAiAboutDashboardChart` → `setActiveTab("insights")` + `pendingInsightAutoAskRef` |
+| Overview | `openDashboardChartInChartsTab` → Charts tab (not Insights) |
+| Charts timeline | `selectChart` / `selectChartWithInsightState` → pins `insightChartId` |
+| Data Preview | Suggested questions → `setActiveTab("insights")` + prefill (~10036) |
+
+### Chart kinds on Insights
+
+All `ChartKind` values from `frontend/app/chart-types.ts` can appear via API + presentation pipeline:
+
+`bar` · `line` · `area` · `bar_horizontal` · `pie` · `donut` · `scatter` · `histogram` · `""`
+
+Resolution: frozen `VisualizationContract` → `resolvePresentationKindFromContract` → snapshot fields → `computeFinalChartPresentation` (shared with Charts/PDF, **not** Overview mini-chart rules).
+
+**Product rule:** horizontal bars stay horizontal; trend mode respected (`isTrendMode`, `chart-time-x-axis.ts`).
 
 ---
 
-## 2. Important files involved
+## 2. Exact files, classes, and components
 
-### Primary UI (stable: inline Tailwind in `page.tsx`)
+### Component hierarchy
+
+```
+page.tsx (Home)
+├── ChartSessionProvider (frontend/contexts/chart-session-context.tsx)
+│   └── AppShell
+│       ├── FilterPanel
+│       ├── chartCaptureInsightRef (hidden)
+│       │   └── AiInsightChartShell → ChartInsightViewportWrapper → ChartRenderer(insightMode)
+│       └── activeTab === "insights"
+│           └── <section> outer shell
+│               └── grid 30/70
+│                   ├── Left: suggested + recent questions
+│                   └── Right: Ask AI panel
+│                       ├── AiExecutiveInsightsPanel?
+│                       ├── confidence card
+│                       ├── AI Answer + <details>
+│                       ├── follow-up chips
+│                       ├── how calculated accordion
+│                       ├── Visualization card (group/chart)
+│                       │   ├── ChartContextSummary
+│                       │   ├── AiInsightChartShell
+│                       │   │   └── ChartInsightViewportWrapper
+│                       │   │       └── ChartRenderer
+│                       │   └── SmartChartInsightPanel?
+│                       └── Export insight PDF
+```
+
+### Exported components and symbols
+
+| Symbol | File | Notes |
+|--------|------|-------|
+| `AiInsightChartShell` | `frontend/app/components/ai-insight-chart-shell.tsx` | `max-w-[960px]`, `minOuterHeight` |
+| `ChartInsightViewportWrapper` | `frontend/app/components/home/chart-insight-viewport-wrapper.tsx` | Insights + PDF capture only |
+| `ChartRenderer` | `frontend/app/components/home/chart-renderer.tsx` | `insightMode?: boolean` |
+| `AiExecutiveInsightsPanel` | `frontend/app/components/ai-executive-insights-panel.tsx` | `memo`; type `AiExecutiveInsightFact` |
+| `SmartChartInsightPanel` | `frontend/app/components/SmartChartInsightPanel.tsx` | Under viz when intel active |
+| `MainNavTabs`, `MAIN_NAV_TABS`, `MainNavTabId` | `frontend/app/components/home/main-nav-tabs.tsx` | Tab id `insights` |
+| `FilterPanel` | `frontend/app/components/home/filter-panel.tsx` | Shared Overview + Insights |
+| `useChartSession` | `frontend/contexts/chart-session-context.tsx` | `insightSnapshot`, `insightChartId`, `pushAIChart`, `clearAiInsightSession` |
+| `ChartContextSummary` | **`page.tsx` only** (~542) | Inline `memo`; not exported |
+| `renderDatasetChart` | `page.tsx` | Bridge to `ChartRenderer`; 3rd arg `insightMode` |
+
+### Inline helpers in `page.tsx` (Insights-critical)
+
+| Symbol | Purpose |
+|--------|---------|
+| `askAI` | POST `/ask`, session push, bundle save, pinned chart preservation |
+| `resetAiConversation` | Clears answer, chips, insight chart, thread; keeps file/filters/history |
+| `hasValidAIAnswer` | Gates executive, confidence, answer, chips, export |
+| `insightPresentationChartKind` | Resolved chart kind for insight snapshot |
+| `insightShellPlotHeight` | Plot height heuristics (~8168–8201) |
+| `insightCartesianPlanMain` | Category plan with `insightMode: true` |
+| `insightLayoutMetrics` | From `getInsightLayoutMetrics` |
+| `chartCaptureInsightRef` | PDF DOM capture |
+| `canExportInsight` / `exportEnabledReason` | Export guards |
+| `provenanceConfidenceBadgeClass` | Badge styling (~2058) |
+| `insightEngineConfidenceBadgeClass` | Badge styling (~2069) |
+
+### File inventory
+
+#### Primary UI
 
 | File | Role |
 |------|------|
-| [`frontend/app/page.tsx`](frontend/app/page.tsx) | **Hub:** `activeTab === "insights"` block (~10370–11180), `askAI`, insight state, `renderDatasetChart`, capture refs, export button |
-| [`frontend/app/components/ai-executive-insights-panel.tsx`](frontend/app/components/ai-executive-insights-panel.tsx) | Executive insight fact grid + optional narrative brief |
-| [`frontend/app/components/ai-insight-chart-shell.tsx`](frontend/app/components/ai-insight-chart-shell.tsx) | Max-width shell + min outer height for insight charts |
-| [`frontend/app/components/home/chart-insight-viewport-wrapper.tsx`](frontend/app/components/home/chart-insight-viewport-wrapper.tsx) | Centers plot; `min-h-[420px]`, vertical padding — **also used by PDF capture** |
-| [`frontend/app/components/home/chart-renderer.tsx`](frontend/app/components/home/chart-renderer.tsx) | Shared Recharts renderer; `insightMode` branch for AI Insights + capture |
-| [`frontend/app/components/SmartChartInsightPanel.tsx`](frontend/app/components/SmartChartInsightPanel.tsx) | Optional panel under chart when `insightSmartChartIntel?.active` |
-| [`frontend/components/app-shell/`](frontend/components/app-shell/) | Sidebar, header, workspace scroll |
-| [`frontend/app/components/home/filter-panel.tsx`](frontend/app/components/home/filter-panel.tsx) | Global filters on Overview + Insights |
+| [`frontend/app/page.tsx`](frontend/app/page.tsx) | Hub: Insights block ~10370–11180, ask flow, capture, export |
+| [`frontend/app/components/ai-executive-insights-panel.tsx`](frontend/app/components/ai-executive-insights-panel.tsx) | Executive fact grid + narrative brief |
+| [`frontend/app/components/ai-insight-chart-shell.tsx`](frontend/app/components/ai-insight-chart-shell.tsx) | Insight-only chart shell |
+| [`frontend/app/components/home/chart-insight-viewport-wrapper.tsx`](frontend/app/components/home/chart-insight-viewport-wrapper.tsx) | Centered viewport; shared with capture |
+| [`frontend/app/components/home/chart-renderer.tsx`](frontend/app/components/home/chart-renderer.tsx) | Recharts; `insightMode` branch |
+| [`frontend/app/components/SmartChartInsightPanel.tsx`](frontend/app/components/SmartChartInsightPanel.tsx) | Optional “AI read on this chart” |
+| [`frontend/app/components/home/filter-panel.tsx`](frontend/app/components/home/filter-panel.tsx) | Global filters |
+| [`frontend/components/app-shell/`](frontend/components/app-shell/) | Sidebar, header, workspace |
 
-### Session, API, and intelligence
+#### Session, presentation, intelligence
 
 | File | Role |
 |------|------|
-| [`frontend/contexts/chart-session-context.tsx`](frontend/contexts/chart-session-context.tsx) | `ChartSnapshot`, `pushAIChart`, `insightChartId`, `dashboardChartKey`, dedupe keys |
-| [`frontend/lib/final-chart-presentation.ts`](frontend/lib/final-chart-presentation.ts) | `computeFinalChartPresentation` — chart kind for AI / Charts / PDF |
+| [`frontend/contexts/chart-session-context.tsx`](frontend/contexts/chart-session-context.tsx) | Snapshots, `insightChartId`, dedupe |
+| [`frontend/lib/final-chart-presentation.ts`](frontend/lib/final-chart-presentation.ts) | `computeFinalChartPresentation` |
 | [`frontend/lib/selected-visualization.ts`](frontend/lib/selected-visualization.ts) | `freezeVisualizationContract`, `isTrendMode` |
 | [`frontend/lib/chart-layout-config.ts`](frontend/lib/chart-layout-config.ts) | `getInsightLayoutMetrics`, `insightViewportMaxClassForChartKind`, `insightCartesianOuterMargins` |
-| [`frontend/lib/chart-axis-layout.ts`](frontend/lib/chart-axis-layout.ts) | Category plans, margins (`computeCartesianCategoryPlanForRender` with `insightMode: true`) |
-| [`frontend/lib/chart-time-x-axis.ts`](frontend/lib/chart-time-x-axis.ts) | Trend ticks, chronological sort |
-| [`frontend/lib/insight-confidence.ts`](frontend/lib/insight-confidence.ts) | Unified confidence scoring (UI consumes in `page.tsx`) |
-| [`frontend/lib/insight-narrative-tone.ts`](frontend/lib/insight-narrative-tone.ts) | Cautious tone / disclaimer copy |
-| [`frontend/lib/chart-insight-answers.ts`](frontend/lib/chart-insight-answers.ts) | Per-chart answer bundle restore (`aiAnswerByChartId`) |
-| [`frontend/app/pdf-report.ts`](frontend/app/pdf-report.ts) | Executive PDF; insight scope uses captured DOM + narrative sections |
+| [`frontend/lib/chart-axis-layout.ts`](frontend/lib/chart-axis-layout.ts) | Plans; `insightMode` in render helper |
+| [`frontend/lib/chart-time-x-axis.ts`](frontend/lib/chart-time-x-axis.ts) | Trend ticks/sort |
+| [`frontend/lib/insight-aligned-axis-merge.ts`](frontend/lib/insight-aligned-axis-merge.ts) | Axis merge when alignment repaired |
+| [`frontend/lib/insight-confidence.ts`](frontend/lib/insight-confidence.ts) | Confidence scoring |
+| [`frontend/lib/insight-narrative-tone.ts`](frontend/lib/insight-narrative-tone.ts) | Cautious tone / disclaimers |
+| [`frontend/lib/chart-insight-answers.ts`](frontend/lib/chart-insight-answers.ts) | Per-chart answer bundles |
+| [`frontend/lib/smart-chart-intelligence.ts`](frontend/lib/smart-chart-intelligence.ts) | Smart chart intel panel |
+| [`frontend/lib/ux-narrative.ts`](frontend/lib/ux-narrative.ts) | `AI_INSIGHT_SECTION_LABELS`, copy |
+| [`frontend/app/chart-types.ts`](frontend/app/chart-types.ts) | `ChartKind`, `ChartRow` |
+| [`frontend/app/pdf-report.ts`](frontend/app/pdf-report.ts) | PDF; `chartScope: "insight"` |
 
-### Styling tokens (shared)
+#### Styling tokens (shared app-wide)
 
 | File | Role |
 |------|------|
-| [`frontend/app/globals.css`](frontend/app/globals.css) | Theme variables (`:root` / `.dark`), SaaS buttons, chart axis tokens |
-| [`frontend/lib/ui-buttons.ts`](frontend/lib/ui-buttons.ts) | `btnPrimary`, `btnSecondary`, `btnExportSm` (Insights export button) |
+| [`frontend/app/globals.css`](frontend/app/globals.css) | Theme variables, `.saas-btn-premium`, `.animate-chart-surface-in` |
+| [`frontend/lib/ui-buttons.ts`](frontend/lib/ui-buttons.ts) | `btnPrimary`, `btnSecondary`, `btnExportSm` |
 | [`frontend/lib/theme.ts`](frontend/lib/theme.ts) | Light/dark persistence |
 
-### Optional / unused in stable UI
+#### Planned but unwired (stable tree)
 
-| File | Note |
+| File | Role |
 |------|------|
-| [`frontend/lib/ai-insights-ui.ts`](frontend/lib/ai-insights-ui.ts) | Class tokens + comments for a **dedicated** Insights CSS layer — **not imported** by `page.tsx` in the stable tree; **no** matching `.ai-insights-*` rules in `globals.css` after reset. Safe to wire in a future polish pass or remove if unused. |
+| [`frontend/lib/ai-insights-ui.ts`](frontend/lib/ai-insights-ui.ts) | BEM-style class name constants — **not imported** anywhere; **no** `.ai-insights-*` rules in `globals.css` |
 
-### Backend (do not change for UI-only work)
+#### Backend (behavior — out of scope for UI-only work)
 
 | Endpoint | Role |
 |----------|------|
 | `POST /ask` | Question → visualization + narrative + `analysis` |
-| `POST /filtered-dashboard` | Filtered cohort (feeds filter context on ask) |
+| `POST /filtered-dashboard` | Filtered cohort for ask context |
+
+**No dedicated Insights route, page folder, or CSS module** — Insights UI is inline Tailwind in `page.tsx` plus shared components above.
+
+### Class names and styling hooks in use
+
+#### Tailwind / structural (active in JSX)
+
+| Hook | Where | Purpose |
+|------|-------|---------|
+| `group/chart` | Visualization card ~11076 | Hover gradient on plot surface |
+| `group-hover/chart:from-slate-50/55` | Plot div ~11102 | Chart surface hover |
+| `animate-chart-surface-in` | Plot divs (Insights + Charts) | Reveal animation |
+| `motion-reduce:animate-none` | Plot divs | A11y |
+| `[&_.recharts-responsive-container]:mx-auto` | `ChartInsightViewportWrapper` | Center Recharts |
+| `lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]` | Insights grid | 30/70 layout |
+
+#### CSS variables (Insights shell uses heavily)
+
+`--surface-elevated` · `--surface-subtle` · `--surface-accent-wash` · `--border-default` · `--foreground` · `--text-muted` · `--text-subtle` · `--shadow-card` · `--shadow-sm` · `--shadow-md` · `--accent` · `--btn-primary-*`
+
+#### Planned BEM tokens (`ai-insights-ui.ts`) — not on DOM today
+
+```
+ai-insights-page
+ai-insights-grid
+ai-insights-side-panel
+ai-insights-ask-panel
+ai-insights-section (+ --answer, --viz, --confidence, --confidence-caution, --followup)
+ai-insights-executive (+ __brief, __card)
+ai-insights-section__title | __kicker | __desc
+ai-insights-followup-chip
+ai-insights-btn-export
+ai-insights-suggested-q
+ai-insights-chart-plot
+```
+
+#### `data-*` attributes
+
+Insights UI uses **almost no** `data-*` hooks. Data Preview on the same page uses `data-preview-*`; Insights does not.
 
 ---
 
-## 3. What is working well now (stable)
+## 3. What must NOT be changed
 
-- **End-to-end ask flow:** Upload → filter → ask → narrative + chart + session snapshot; loading and error surfaces behave predictably.
-- **Pinned chart / follow-up context:** `preservePinnedChart`, `lineageParentChartId`, conversation payload, and follow-up badges keep thread continuity without breaking chart contracts.
-- **Executive insights gating:** Facts and brief only show when `hasValidAIAnswer` and visualization data exist — avoids empty executive blocks.
-- **Shared chart intelligence:** AI Insights uses the same `ChartRenderer` + `computeFinalChartPresentation` path as Charts tab and PDF capture (horizontal bars stay horizontal, trend mode respected).
-- **Insight layout metrics:** `getInsightLayoutMetrics` + `insightShellPlotHeight` adapt plot height by chart kind and point count.
-- **Export insight scope:** `downloadReport({ chartScope: "insight", ... })` with `canExportInsight` guards and off-screen `chartCaptureInsightRef` aligned to on-screen shell.
-- **Overview integration:** Drill from dashboard charts into Insights with prefill / auto-ask refs works without URL routing changes.
-- **Performance patterns:** Heavy memoization on insight-derived data (`insightCartesianPlanMain`, executive cards, parsed answer); `AiExecutiveInsightsPanel` is `memo`’d.
-- **30/70 layout:** Suggested questions column scrolls independently on large viewports (`lg:max-h`, `overflow-y-auto`).
-
----
-
-## 4. What should NOT be changed (unless explicitly requested)
+Unless the user explicitly requests it:
 
 | Area | Why |
 |------|-----|
-| **`askAI` implementation** | `preservePinnedChart`, bundle save to `aiAnswerByChartId`, narrative sanitization for pinned contracts, `/ask` payload shape |
-| **`hydrateVisualizationFromApi` / API parsing** | Breaks chart data, provenance, stacked series |
-| **`ChartSessionProvider` snapshot shape** | `pushAIChart`, `selectChart`, `insightChartId`, `dashboardChartKey`, dedupe keys |
-| **`computeFinalChartPresentation`** (shared path) | Charts tab, AI Insights, and PDF must stay aligned |
-| **`ChartRenderer` chart-type semantics** | Do not force horizontal → vertical or change trend detection for Insights only without explicit product sign-off |
-| **PDF pipeline** | `downloadReport`, `pdf-report.ts`, `validateExportMatchesContract`, capture ref wiring |
-| **`chartCaptureInsightRef` structure** | DOM used for export image capture; must stay in sync with on-screen insight chart |
-| **`insightShellPlotHeight` / `getInsightLayoutMetrics`** | Changing math regresses readability and PDF framing |
-| **Overview Auto Dashboard chart path** | Separate from Insights (`OverviewAutoDashboardChartCard` in `page.tsx`) |
-| **Navigation / tab ids** | Sidebar `insights` id, `pendingInsightAutoAskRef`, `openDashboardChartInChartsTab` |
-| **Filter application on ask** | `dashboard_filters`, `date_range`, `conversation_context` in `askAI` |
+| **`askAI`** | `preservePinnedChart`, `aiAnswerByChartId` bundles, narrative sanitization, `/ask` payload (`dashboard_filters`, `date_range`, `conversation_context`) |
+| **`hydrateVisualizationFromApi` / API parsing** | Chart rows, provenance, stacked series |
+| **`ChartSessionProvider` snapshot shape** | `pushAIChart`, `selectChart`, `insightChartId`, dedupe keys |
+| **`computeFinalChartPresentation`** | Shared with Charts tab and PDF |
+| **`ChartRenderer` chart-type semantics** | Do not force horizontal → vertical or change trend rules for Insights only |
+| **`insightShellPlotHeight` / `getInsightLayoutMetrics`** | Readability + PDF framing |
+| **`insightCartesianPlanMain` inputs** | `viewportWidthPx`, `chartHeight`, `insightMode: true` |
+| **`ChartRenderer` `insightMode` + `insightCartesianOuterMargins`** | On-screen + capture margins |
+| **`chartCaptureInsightRef` DOM structure** | Must match on-screen insight shell for PDF |
+| **PDF pipeline** | `downloadReport`, `pdf-report.ts`, `chartScope: "insight"` |
+| **Section render order and gates** | `hasValidAIAnswer`, executive/confidence gating |
+| **Navigation / tab ids** | `insights`, `pendingInsightAutoAskRef`, Overview drill helpers |
+| **Overview Auto Dashboard chart path** | Separate presentation (`computeOverviewDashboardChartPresentation`) |
+| **Filter application on ask** | Filter state passed into `askAI` |
 
 ---
 
-## 5. Safe areas for future UI polish
+## 4. Safe scoped selectors for styling
 
-These can be changed **without** touching business logic if handlers and gates are preserved.
+Use these for **visual-only** polish without touching logic, gates, or chart math.
 
-| Area | Location | Notes |
-|------|----------|--------|
-| **Outer Insights shell** | `page.tsx` ~10371 | Gradient, border, shadow, padding |
-| **Left / right panel cards** | `page.tsx` ~10373–10415 | Surface elevation, hover, dark-mode slate → CSS variables |
-| **Suggested / recent question buttons** | `page.tsx` ~10385–10408 | Hover, focus, typography |
-| **Confidence card** | `page.tsx` ~10520–10576 | Background opacity in dark mode; caution vs normal variants |
-| **AI Answer card + `<details>`** | `page.tsx` ~10579–10659 | `bg-white` → theme tokens; section title hierarchy |
-| **Follow-up chips** | `page.tsx` ~10662–10682 | Hover, focus ring, accent border |
-| **“How calculated” accordion** | `page.tsx` ~10685–11073 | Borders, dark surfaces |
-| **Visualization card chrome** | `page.tsx` ~11075–11121 | Padding around chart (not plot height math) |
-| **Export button styling** | `btnExportSm` usage ~11149 | Prefer Insights-only class so Export tab unchanged |
-| **`AiExecutiveInsightsPanel`** | Component file | Card gradients, kicker typography, dark mode |
-| **Dedicated CSS layer** | Wire `ai-insights-ui.ts` + `globals.css` `.ai-insights-*` | Replace long inline Tailwind incrementally; **do not** change JSX structure on first pass |
+### A. Future dedicated layer (recommended path)
 
-**Preferred approach:** visual-only diffs; same conditional renders and same `onClick` handlers.
+Wire [`frontend/lib/ai-insights-ui.ts`](frontend/lib/ai-insights-ui.ts) into JSX incrementally, then add matching rules in `globals.css`:
+
+```css
+/* Example — scope all rules under page root */
+.ai-insights-page .ai-insights-section--answer { ... }
+.ai-insights-page .ai-insights-followup-chip { ... }
+```
+
+**Safe tokens to adopt first:** `ai-insights-page`, `ai-insights-side-panel`, `ai-insights-ask-panel`, `ai-insights-section--*`, `ai-insights-followup-chip`, `ai-insights-suggested-q`, `ai-insights-btn-export` (Insights-only export variant without changing global `btnExportSm`).
+
+### B. Component-scoped files (edit in isolation)
+
+| Target | File | Safe to change |
+|--------|------|----------------|
+| Executive cards / brief | `ai-executive-insights-panel.tsx` | Borders, gradients, typography, dark mode (`slate-*` → tokens) |
+| Smart chart panel | `SmartChartInsightPanel.tsx` | Card chrome only (panel is Insights-adjacent) |
+| Insight shell max-width box | `ai-insight-chart-shell.tsx` | **Avoid** changing `max-w-[960px]` or `minOuterHeight` prop contract without PDF check |
+
+### C. Inline regions in `page.tsx` (visual only)
+
+| Region | Approx. lines | Safe changes |
+|--------|---------------|--------------|
+| Outer Insights `<section>` | ~10371 | Gradient, border, shadow, padding |
+| Left suggested-questions card | ~10373–10413 | Button hover, typography, `slate-*` → CSS variables |
+| Right Ask AI panel chrome | ~10415–10428 | Surface, header spacing |
+| Follow-up badges | ~10430–10448 | Pill colors (keep copy/handlers) |
+| Confidence card | ~10520–10576 | Background, caution vs normal variant styling |
+| AI Answer + `<details>` | ~10579–10659 | Card elevation; replace `bg-white` with tokens |
+| Follow-up chips | ~10662–10682 | Hover, focus ring |
+| “How calculated” accordion | ~10685–11073 | Borders, dark surfaces |
+| Visualization **card chrome** (not plot) | ~11076–11095 | Padding around header/summary |
+| Export button wrapper | ~11134–11176 | Add Insights-only class alongside `btnExportSm` |
+
+### D. CSS variables (global but safe for Insights if used consistently)
+
+Tune in `globals.css` `:root` / `.dark` — affects whole app but improves Insights when replacing hardcoded `slate-*`:
+
+`--surface-elevated` · `--surface-subtle` · `--text-muted` · `--border-default` · `--shadow-card`
+
+### E. Do NOT treat as “safe” without PDF + chart regression
+
+- `ChartInsightViewportWrapper` — `min-h-[420px]`, `py-4 sm:py-5`
+- `insightViewportMaxClassForChartKind` — `max-w-[900px]` / `[850px]` / `[760px]`
+- `insightShellPlotHeight` heuristics
+- Plot `style={{ height: insightShellPlotHeight }}`
+- `animate-chart-surface-in` timing (shared with Charts tab)
+- `chartCaptureInsightRef` dimensions (`w-[860px]`, padding)
 
 ---
 
-## 6. Risky areas that can break layout
+## 5. Risky shared / global classes
 
-| Risk | What goes wrong |
-|------|------------------|
-| **`ChartInsightViewportWrapper` `min-h` / padding** | Affects **both** on-screen Insights **and** `chartCaptureInsightRef` PDF capture |
-| **`AiInsightChartShell` `max-w` / `minOuterHeight`** | Plot centering and export parity |
-| **`insightShellPlotHeight` heuristics** | Cramped or overflowing axes; PDF clip |
-| **`insightCartesianPlanMain` inputs** | `viewportWidthPx`, `chartHeight`, `insightMode` — overlap, wrong horizontal fallback |
-| **`ChartRenderer` `insightMode` margins** | Shared with capture; can crush cartesian width (see `insightCartesianOuterMargins` in `chart-layout-config.ts`) |
-| **Reordering gated sections** | UX confusion; export narrative order in PDF is separate but user mental model follows UI order |
-| **Moving chart above answer** | May conflict with “answer first” product flow and PDF section expectations |
-| **Removing off-screen capture duplicate** | Broken or blank PDF charts |
-| **Hardcoding pixel widths on outer grid** | Breaks `lg:grid-cols-[3fr_7fr]` responsiveness |
-| **Global `btnExportSm` changes** | Unintended Export tab button changes |
-| **Refactoring `page.tsx` insights block into many files** | Easy to miss gates or refs unless done mechanically |
+Changing these can break **Charts**, **Export**, **Overview**, or **PDF capture** — not only Insights.
+
+### Global CSS classes (`frontend/app/globals.css`)
+
+| Class | Used on Insights | Also affects |
+|-------|------------------|--------------|
+| `.saas-btn-premium` | Via `btnSecondary` (Reset) | Overview (`overview-ui.ts`), many secondary actions |
+| `.saas-btn-accent` | Via `btnPrimarySm` (elsewhere on page) | Primary small actions app-wide |
+| `.animate-chart-surface-in` | Insight + Charts plot surfaces | Charts tab session chart |
+| `:root` / `.dark` CSS variables | All Insights theme-aware surfaces | Entire dashboard |
+
+### Shared button tokens (`frontend/lib/ui-buttons.ts`)
+
+| Token | Insights usage | Risk |
+|-------|----------------|------|
+| `btnPrimary` | Ask AI button ~10471 | Other tabs / upload flows on same page |
+| `btnSecondary` | Reset conversation ~10423 | Export tab, filter actions |
+| `btnExportSm` | Export this insight ~11149 | **Export tab** full-report buttons |
+
+**Mitigation:** For Insights-only export styling, add `ai-insights-btn-export` (or similar) **in addition to** `btnExportSm`, not by editing `btnExportSm` globally.
+
+### Shared chart pipeline
+
+| Module | Risk if changed |
+|--------|-----------------|
+| `chart-renderer.tsx` (`insightMode`) | Insights on-screen + off-screen capture |
+| `chart-layout-config.ts` (`insightCartesianOuterMargins`, `getInsightLayoutMetrics`) | Axis overlap, centering, PDF clip |
+| `chart-axis-layout.ts` (`insightMode` plans) | Category tick angles, horizontal bar layout |
+| `final-chart-presentation.ts` | Charts tab + PDF kind resolution |
+| `ChartInsightViewportWrapper` | **Insights + `chartCaptureInsightRef`** |
+
+### Tailwind groups and Recharts hooks
+
+| Selector | Risk |
+|----------|------|
+| `group/chart` + `group-hover/chart:*` | Visualization card hover only — low cross-tab risk |
+| `[&_.recharts-responsive-container]:*` in viewport wrapper | All insight/capture renders |
+
+### Overview-specific (do not conflate)
+
+| Class source | Note |
+|--------------|------|
+| `overview-ui.ts` (`ov*`, `ovCard`, `ovMuted`) | Overview only — not used in Insights block |
+| `computeOverviewDashboardChartPresentation` | Must not replace Insights presentation path |
+
+### Hardcoded palette in Insights block
+
+Many `slate-*`, `indigo-*`, `emerald-*`, `amber-*`, `violet-*` utilities in `page.tsx` ~10370–11180 are **Insights-local** but inconsistent in dark mode — safe to replace with variables **within the Insights block** without touching other tabs.
 
 ---
 
-## 7. Exact regression checklist for AI Insights
+## 6. Regression checklist
 
-Run after **any** Insights UI change. Use a dataset with categories, a metric, and a date column (e.g. operations or HR sample).
+Run after **any** AI Insights change (UI or chart layout). Use a dataset with categories, a metric, and a date column.
 
 ### Setup
 
@@ -230,47 +405,46 @@ Run after **any** Insights UI change. Use a dataset with categories, a metric, a
 
 - [ ] Suggested question prefills textarea (does not auto-send unless designed)
 - [ ] **Ask AI** returns narrative + chart (or explicit no-viz message)
-- [ ] Loading states: “Thinking…”, “Generating answer…”, “Generating visualization…”
-- [ ] Invalid empty question shows error
+- [ ] Loading: “Thinking…”, “Generating answer…”, “Generating visualization…”
+- [ ] Empty question shows error
 - [ ] **Reset conversation** clears answer, chips, insight chart, thread badges; **keeps** file, filters, dashboard, non-AI chart history
 
 ### Gating and content
 
 - [ ] Executive insights **hidden** until valid answer + chart facts exist
 - [ ] Confidence card shows level + score; caution styling on small sample / cautious tone
-- [ ] AI Answer summary + expandable sections (statistical, hypotheses, etc.) when present
-- [ ] Follow-up chips call `askAI` with chip text; disabled while loading
-- [ ] “How this insight was generated” expands; provenance fields readable
+- [ ] AI Answer summary + expandable sections when present
+- [ ] Follow-up chips call `askAI`; disabled while loading
+- [ ] “How this insight was generated” expands; provenance readable
 
 ### Chart and visualization
 
 - [ ] Chart renders (no Recharts `width(-1)` / `height(-1)` in console)
-- [ ] Horizontal bar remains horizontal; trend charts readable
+- [ ] Horizontal bar stays horizontal; trend charts readable
 - [ ] `ChartContextSummary` chips and title/subtitle present
-- [ ] Smart chart panel appears only when intel active
-- [ ] Chart drill (if enabled for insight) does not throw
+- [ ] `SmartChartInsightPanel` only when `insightSmartChartIntel?.active`
+- [ ] Chart centered in card; no axis label overlap at 100% zoom
 
 ### Session and navigation
 
-- [ ] New ask adds/updates timeline entry (`chartHistory`)
-- [ ] Switching timeline chart restores pinned insight + stored answer when available
+- [ ] New ask updates timeline (`chartHistory`)
+- [ ] Timeline chart switch restores pinned insight + stored answer when available
 - [ ] Overview → **Ask AI** on dashboard chart: tab switch + prefill/auto-ask
 - [ ] Overview → **Charts** opens correct snapshot
-- [ ] Filter change + re-ask respects dashboard filters in provenance
+- [ ] Filter change + re-ask respects filters in provenance
 
 ### Follow-up / pinned chart
 
-- [ ] Follow-up question shows context badges when applicable
-- [ ] Pinned chart follow-up preserves contract where expected (`preservePinnedChart`)
-- [ ] Narrative stays aligned with pinned trend contract when applicable
+- [ ] Follow-up badges when `followUpDetected`
+- [ ] Pinned chart follow-up preserves contract (`preservePinnedChart`)
+- [ ] Narrative aligned with pinned trend contract when applicable
 
 ### Export
 
-- [ ] **Export this insight (PDF)** enabled only when `canExportInsight` (valid AI ask, chart, narrative)
-- [ ] Disabled helper text matches reason (`exportEnabledReason`)
-- [ ] PDF includes chart image (centered, not clipped)
-- [ ] PDF narrative sections match answer content
-- [ ] Export debug `<details>` still optional (dev-facing)
+- [ ] **Export this insight (PDF)** enabled only when `canExportInsight`
+- [ ] Disabled helper text matches `exportEnabledReason`
+- [ ] PDF chart image centered, not clipped
+- [ ] PDF narrative matches answer content
 
 ### Non-regression (other tabs)
 
@@ -281,66 +455,32 @@ Run after **any** Insights UI change. Use a dataset with categories, a metric, a
 
 ---
 
-## 8. Current known improvement opportunities
-
-Visual / UX only — stable function is good; polish targets below.
-
-### Light mode depth
-
-- Outer and inner panels rely on similar `--surface-elevated` tones; can feel **flat white** in light mode.
-- Confidence block uses `bg-slate-50/60`; AI Answer uses `bg-[var(--surface-subtle)]`; details use **`bg-white`** — weak separation between layers.
-- Executive panel cards use white gradients; opportunity for consistent **card elevation** (border + shadow tokens).
-
-### Dark mode cleanup
-
-- Many **hardcoded `slate-*`** classes in the Insights block (questions, confidence, details, “How calculated”) do not adapt to `.dark`.
-- Confidence / follow-up areas use **light-tinted** `amber-50`, `indigo-50` overlays that can look foggy in dark mode.
-- Executive panel brief uses `bg-white/80` — poor contrast in dark theme.
-
-### Visualization whitespace
-
-- `ChartInsightViewportWrapper`: `min-h-[420px]` + `py-4 sm:py-5` leaves **empty vertical band** around the plot.
-- Visualization card adds header + `ChartContextSummary` + shell padding before plot — chart uses less than half of perceived card height on some kinds.
-- **Improvement:** reduce **shell padding** only; keep `insightShellPlotHeight` math unless measured otherwise.
-
-### Typography hierarchy
-
-- “Ask AI” and “Suggested Questions” both `text-lg font-semibold` — weak distinction from section kickers inside the column.
-- “AI Answer” is `text-base` — should be stronger vs body and vs “Visualization” uppercase label.
-- Muted copy mixes `text-slate-500`, `text-slate-600`, and `var(--text-muted)` inconsistently.
-
-### Follow-up chips and buttons
-
-- Follow-up chips: basic indigo border; opportunity for **hover/focus/active** (accent glow) without size changes.
-- Export uses generic `btnExportSm` — opportunity for Insights-only premium purple variant.
-- Suggested questions: same hover as recent questions — could align with SaaS button tokens (`.saas-btn-premium`).
-
-### Consistency and maintainability
-
-- Large inline Tailwind block in `page.tsx` (~800 lines) is hard to tune consistently.
-- **`ai-insights-ui.ts` exists but is unwired** — future polish can adopt it + `.ai-insights-*` in `globals.css` to centralize spacing (`1rem` padding, `1rem` radius) without a redesign.
-
-### Not bugs — product constraints
-
-- Insights chart path is **intentionally separate** from Overview mini-charts (`computeOverviewDashboardChartPresentation` does not apply here).
-- PDF capture **must** stay aligned with on-screen insight shell — any polish must verify export after viewport/shell tweaks.
-
----
-
-## Quick file index (search strings in `page.tsx`)
+## Quick reference — `page.tsx` search strings
 
 | Search | Purpose |
 |--------|---------|
-| `activeTab === "insights"` | Tab root |
+| `activeTab === "insights"` | Tab root (~10370) |
 | `const askAI` | Ask handler |
 | `hasValidAIAnswer` | Content gates |
-| `insightShellPlotHeight` | Plot sizing |
+| `insightShellPlotHeight` | Plot sizing (~8168) |
 | `renderDatasetChart` | ChartRenderer bridge |
-| `chartCaptureInsightRef` | PDF capture |
+| `chartCaptureInsightRef` | PDF capture (~9314) |
 | `canExportInsight` | Export guard |
 | `AiExecutiveInsightsPanel` | Executive block |
 | `pendingInsightAutoAskRef` | Overview → Insights auto-ask |
 
 ---
 
-*Last updated: reflects post–`git reset --hard` stable tree with inline Insights Tailwind in `page.tsx`; `ai-insights-ui.ts` present but not wired.*
+## Appendix — stable strengths (no change needed)
+
+- End-to-end ask → narrative + chart + session snapshot
+- Pinned chart / follow-up context and badges
+- Executive insights gated on valid answer + visualization
+- Shared `ChartRenderer` + `computeFinalChartPresentation` with Charts/PDF
+- `insightShellPlotHeight` + `getInsightLayoutMetrics` by chart kind
+- Export insight scope with off-screen capture aligned to on-screen shell
+- 30/70 layout with independent left-column scroll on large viewports
+
+---
+
+*Last updated: stable tree analysis — Insights inline in `page.tsx` (~10370–11180); `ai-insights-ui.ts` present but unwired; no Insights CSS module.*
