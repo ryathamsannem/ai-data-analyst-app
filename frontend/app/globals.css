@@ -747,10 +747,22 @@ body {
 @media (min-width: 768px) {
   :root {
     --overview-chart-plot-min-h: 340px;
+    --overview-chart-solo-row-width: min(70%, 1240px);
   }
 
   .overview-chart-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /*
+   * Lone card in the last row (1, 3, 5, … charts): widen slightly, stay left-aligned.
+   * Does not affect pairs or mobile single-column layout.
+   */
+  .overview-chart-grid__cell:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    width: var(--overview-chart-solo-row-width);
+    max-width: 1240px;
+    justify-self: start;
   }
 }
 

@@ -60,7 +60,9 @@ export const ovChartGrid = "overview-chart-grid";
 
 export const ovChartCell = "overview-chart-grid__cell";
 
-export const ovChartCellWide = "overview-chart-grid__cell overview-chart-grid__cell--wide";
+/** Optional manual override; desktop solo-row widening is automatic in globals.css */
+export const ovChartCellSoloRow =
+  "overview-chart-grid__cell overview-chart-grid__cell--solo-row";
 
 export const ovChartInner = "overview-chart-grid__inner";
 
