@@ -48,8 +48,10 @@ import {
   type VerticalCategoryAxisPlan,
 } from "@/lib/chart-axis-layout";
 import {
+  computeLineAreaChartBottomMargin,
   computeLineAreaXAxisInterval,
   formatTrendXAxisTickLabel,
+  lineAreaXAxisHeightPx,
   sortChartRowsChronologically,
   TREND_X_AXIS_ANGLE_DEG,
 } from "@/lib/chart-time-x-axis";
@@ -151,7 +153,9 @@ import {
   ovChartInner,
   ovChartsWrap,
   ovDashChartCard,
-  ovDashChartAction,
+  ovDashChartActionAskAi,
+  ovDashChartActionCharts,
+  ovDashChartActionPng,
   ovDashChartActions,
   ovDashChartFooter,
   ovDashChartHead,
@@ -3743,15 +3747,71 @@ async function exportDashboardMiniChartAsPng(
   a.click();
 }
 
-/** Minimum plot band height (CSS `--overview-chart-plot-min-h` should match). */
-const OVERVIEW_DASH_PLOT_MIN_HEIGHT = 360;
+/** Plot band heights — keep in sync with `--overview-chart-plot-min-h` in globals.css */
+const OVERVIEW_DASH_PLOT_HEIGHT_MOBILE = 300;
+const OVERVIEW_DASH_PLOT_HEIGHT_DESKTOP = 340;
+const OVERVIEW_DASH_PLOT_BREAKPOINT_PX = 768;
+
+function useOverviewDashPlotHeight(): number {
+  const [height, setHeight] = useState(OVERVIEW_DASH_PLOT_HEIGHT_MOBILE);
+  useEffect(() => {
+    const mq = window.matchMedia(
+      `(min-width: ${OVERVIEW_DASH_PLOT_BREAKPOINT_PX}px)`
+    );
+    const apply = () => {
+      setHeight(
+        mq.matches
+          ? OVERVIEW_DASH_PLOT_HEIGHT_DESKTOP
+          : OVERVIEW_DASH_PLOT_HEIGHT_MOBILE
+      );
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return height;
+}
+
+/** Overview mini-chart grid only — reads theme tokens from globals.css. */
+function useOverviewDashGridStyle(): { stroke: string; opacity: number } {
+  const read = (): { stroke: string; opacity: number } => {
+    if (typeof document === "undefined") {
+      return { stroke: "#e2e8f0", opacity: 0.28 };
+    }
+    const cs = getComputedStyle(document.documentElement);
+    const stroke =
+      cs.getPropertyValue("--overview-dash-grid-stroke").trim() || "#e2e8f0";
+    const opacityRaw = cs
+      .getPropertyValue("--overview-dash-grid-opacity")
+      .trim();
+    const opacity = opacityRaw ? parseFloat(opacityRaw) : 0.28;
+    return {
+      stroke,
+      opacity: Number.isFinite(opacity) ? opacity : 0.28,
+    };
+  };
+  const [grid, setGrid] = useState(() => read());
+  useEffect(() => {
+    const sync = () => setGrid(read());
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
+  return grid;
+}
 
 const OV_DASH_CHART_MARGIN = {
-  top: 24,
-  right: 32,
-  bottom: 48,
-  left: 32,
+  top: 16,
+  right: 24,
+  bottom: 36,
+  left: 24,
 } as const;
+
+const OV_DASH_GRID_DASHARRAY = "3 10";
 
 const OV_AXIS_TICK = "var(--chart-axis-tick)";
 const OV_AXIS_LINE = "var(--chart-axis-line)";
@@ -3886,6 +3946,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   canonicalTitle,
   snapshotId,
   viewportWidthPx,
+  plotHeightPx,
   loadingPulse,
   onDashboardDrill,
   onViewInChartsTab,
@@ -3897,6 +3958,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   snapshotId: string | null;
   /** Used to estimate category tick overlap for vertical bars / lines. */
   viewportWidthPx: number;
+  /** Matches CSS `--overview-chart-plot-min-h` for Recharts explicit height. */
+  plotHeightPx: number;
   /** Subtle busy state when dataset refresh is in flight. */
   loadingPulse?: boolean;
   /** Click a chart category (or slice) to tighten global dashboard filters. */
@@ -3914,6 +3977,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 }) {
   const chartCaptureRef = useRef<HTMLDivElement | null>(null);
   const [exportingPng, setExportingPng] = useState(false);
+  const dashGrid = useOverviewDashGridStyle();
   const drillPrimary = chart.interaction?.drillDimensions.find(
     (d) => d.role === "primary"
   )
@@ -4006,15 +4070,15 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       rows: chartRows,
       kind: rowKind,
       stackedBar: false,
-      chartHeight: OVERVIEW_DASH_PLOT_MIN_HEIGHT,
+      chartHeight: plotHeightPx,
       compact: true,
       insightMode: false,
       viewportWidthPx: Math.max(viewportWidthPx, 200),
       axes: miniAxes,
-      layoutVariant: "default",
+      layoutVariant: "overview_half",
       allowHorizontalBarFallback: rowKind === "bar",
     });
-  }, [displayKind, chartRows, miniAxes, viewportWidthPx]);
+  }, [displayKind, chartRows, miniAxes, viewportWidthPx, plotHeightPx]);
 
   const renderBarAsHorizontal =
     displayKind === "bar_horizontal" ||
@@ -4034,9 +4098,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       chartLayoutMode: "compact",
       tickFontSizePx: OV_DASH_AXIS_LABEL_STYLE.fontSize,
       titleFontSizePx: OV_DASH_AXIS_LABEL_STYLE.fontSize,
-      plotInnerHeightPx: Math.max(200, Math.floor(OVERVIEW_DASH_PLOT_MIN_HEIGHT * 0.72)),
+      plotInnerHeightPx: Math.max(180, Math.floor(plotHeightPx * 0.72)),
     });
-  }, [displayKind, valueAxisTitle, dashTickSamples]);
+  }, [displayKind, valueAxisTitle, dashTickSamples, plotHeightPx]);
 
   const horizontalDashLayout = useMemo(() => {
     if (!renderBarAsHorizontal) return null;
@@ -4050,13 +4114,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       titleFontSizePx: 10,
       maxValueAxisTitleWidthPx: Math.max(120, viewportWidthPx - 72),
     });
-    const catCap = Math.max(72, Math.floor(viewportWidthPx * 0.4));
+    const catCap = Math.max(72, Math.floor(viewportWidthPx * 0.34));
     const catW = Math.min(catCap, Math.max(base.categoryAxisWidth, 72));
-    const marginCap = Math.max(catW + 16, Math.floor(viewportWidthPx * 0.44));
+    const marginCap = Math.max(catW + 12, Math.floor(viewportWidthPx * 0.36));
     return {
       ...base,
       categoryAxisWidth: catW,
-      marginLeft: Math.min(marginCap, Math.max(base.marginLeft, catW + 12)),
+      marginLeft: Math.min(marginCap, Math.max(base.marginLeft, catW + 10)),
     };
   }, [renderBarAsHorizontal, chartRows, valueAxisTitle, categoryAxisLabel, viewportWidthPx]);
 
@@ -4104,9 +4168,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     chartBody = (
       <ResponsiveContainer
         width="100%"
-        height={OVERVIEW_DASH_PLOT_MIN_HEIGHT}
+        height={plotHeightPx}
         minWidth={0}
-        minHeight={OVERVIEW_DASH_PLOT_MIN_HEIGHT}
+        minHeight={plotHeightPx}
       >
         <PieChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
           <Pie
@@ -4116,7 +4180,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             cx="50%"
             cy="50%"
             innerRadius={innerR}
-            outerRadius={Math.floor(OVERVIEW_DASH_PLOT_MIN_HEIGHT * 0.34)}
+            outerRadius={Math.floor(plotHeightPx * 0.34)}
             paddingAngle={1.5}
             stroke="#fff"
             strokeWidth={1}
@@ -4166,33 +4230,36 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   } else if (renderBarAsHorizontal) {
     const hb = horizontalDashLayout;
     if (!hb) return null;
-    const hbLeft = Math.min(
-      Math.floor(viewportWidthPx * 0.42),
-      Math.max(OV_DASH_CHART_MARGIN.left, hb.marginLeft)
-    );
+    const hbBalanced = balanceVerticalOuterMargins({
+      marginLeft: Math.min(
+        Math.floor(viewportWidthPx * 0.36),
+        Math.max(OV_DASH_CHART_MARGIN.left, hb.marginLeft)
+      ),
+      chartLayoutMode: "compact",
+    });
     chartBody = (
       <ResponsiveContainer
         width="100%"
-        height={OVERVIEW_DASH_PLOT_MIN_HEIGHT}
+        height={plotHeightPx}
         minWidth={0}
-        minHeight={OVERVIEW_DASH_PLOT_MIN_HEIGHT}
+        minHeight={plotHeightPx}
       >
         <BarChart
           layout="vertical"
           data={chartRows}
           margin={{
-            left: hbLeft,
-            right: OV_DASH_CHART_MARGIN.right,
+            left: hbBalanced.marginLeft,
+            right: hbBalanced.marginRight,
             top: OV_DASH_CHART_MARGIN.top,
-            bottom: OV_DASH_CHART_MARGIN.bottom,
+            bottom: 32,
           }}
         >
           <CartesianGrid
             horizontal={false}
             vertical
-            stroke={GRID_STROKE}
-            strokeDasharray="4 12"
-            strokeOpacity={0.38}
+            stroke={dashGrid.stroke}
+            strokeDasharray={OV_DASH_GRID_DASHARRAY}
+            strokeOpacity={dashGrid.opacity}
           />
           <XAxis
             type="number"
@@ -4247,38 +4314,53 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     if (!vLay) return null;
     const ChartWrap = displayKind === "area" ? AreaChart : LineChart;
     const trendTickFs = OV_DASH_AXIS_LABEL_STYLE.fontSize;
-    const trendInterval = computeLineAreaXAxisInterval(chartRows.length, {
-      compact: false,
-      viewportWidthPx,
-    });
+    const trendCompact = viewportWidthPx < 640;
     const trendTickMini = (v: string | number) =>
       formatOverviewTrendTickLabel(String(v ?? ""));
-    const trendLabelLens = chartRows.map((r) =>
-      trendTickMini(String(r.name ?? "")).length
+    const temporalTickStrings = chartRows.map((r) =>
+      trendTickMini(String(r.name ?? ""))
     );
+    const trendInterval = computeLineAreaXAxisInterval(chartRows.length, {
+      compact: trendCompact,
+      viewportWidthPx,
+    });
+    const trendLabelLens = temporalTickStrings.map((s) => s.length);
     const maxTrendLabelLen = Math.max(6, ...trendLabelLens, 0);
     const needsTrendAngle =
-      chartRows.length > 10 || maxTrendLabelLen > 9;
+      chartRows.length > 6 || maxTrendLabelLen > 9;
     const trendAngle = needsTrendAngle ? TREND_X_AXIS_ANGLE_DEG : 0;
-    const trendXHeight = needsTrendAngle ? 52 : 34;
+    const trendXHeight = lineAreaXAxisHeightPx(true);
+    const trendBottomRaw = computeLineAreaChartBottomMargin({
+      temporalTickStrings,
+      tickFontSizePx: trendTickFs,
+      chartLayoutMode: "compact",
+    });
+    const trendBottom = Math.min(
+      trendBottomRaw,
+      needsTrendAngle ? 54 : 44
+    );
+    const trendMargins = balanceVerticalOuterMargins({
+      marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
+      chartLayoutMode: "compact",
+    });
     const plotMargin = {
       top: OV_DASH_CHART_MARGIN.top,
-      right: OV_DASH_CHART_MARGIN.right,
-      bottom: OV_DASH_CHART_MARGIN.bottom,
-      left: overviewDashPlotMarginLeft(vLay.yAxisWidth),
+      right: trendMargins.marginRight,
+      bottom: trendBottom,
+      left: trendMargins.marginLeft,
     };
     chartBody = (
       <ResponsiveContainer
         width="100%"
-        height={OVERVIEW_DASH_PLOT_MIN_HEIGHT}
+        height={plotHeightPx}
         minWidth={0}
-        minHeight={OVERVIEW_DASH_PLOT_MIN_HEIGHT}
+        minHeight={plotHeightPx}
       >
         <ChartWrap data={chartRows} margin={plotMargin}>
           <CartesianGrid
-            stroke={GRID_STROKE}
-            strokeDasharray="4 12"
-            strokeOpacity={0.38}
+            stroke={dashGrid.stroke}
+            strokeDasharray={OV_DASH_GRID_DASHARRAY}
+            strokeOpacity={dashGrid.opacity}
             vertical={false}
           />
           <XAxis
@@ -4293,13 +4375,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             height={trendXHeight}
             interval={trendInterval}
             tickMargin={6}
+            minTickGap={trendCompact ? 6 : 12}
             axisLine={{ stroke: OV_AXIS_LINE }}
             tickLine={{ stroke: OV_AXIS_LINE }}
           >
             <Label
               value={categoryAxisLabel}
               position="insideBottom"
-              offset={-4}
+              offset={-6}
               style={OV_DASH_AXIS_LABEL_STYLE}
             />
           </XAxis>
@@ -4356,20 +4439,24 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     const vLay = verticalDashLayout;
     if (!vLay) return null;
     const isHist = displayKind === "histogram";
+    const barMargins = balanceVerticalOuterMargins({
+      marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
+      chartLayoutMode: "compact",
+    });
     const plotMargin = {
       top: OV_DASH_CHART_MARGIN.top,
-      right: OV_DASH_CHART_MARGIN.right,
+      right: barMargins.marginRight,
       bottom:
         OV_DASH_CHART_MARGIN.bottom +
-        (miniCategoryPlan?.angled ? Math.min(16, dashboardBarCatBottom * 0.35) : 0),
-      left: overviewDashPlotMarginLeft(vLay.yAxisWidth),
+        (miniCategoryPlan?.angled ? Math.min(12, dashboardBarCatBottom * 0.28) : 0),
+      left: barMargins.marginLeft,
     };
     chartBody = (
       <ResponsiveContainer
         width="100%"
-        height={OVERVIEW_DASH_PLOT_MIN_HEIGHT}
+        height={plotHeightPx}
         minWidth={0}
-        minHeight={OVERVIEW_DASH_PLOT_MIN_HEIGHT}
+        minHeight={plotHeightPx}
       >
         <BarChart
           data={chartRows}
@@ -4379,9 +4466,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           <CartesianGrid
             vertical={false}
             horizontal
-            stroke={GRID_STROKE}
-            strokeDasharray="4 12"
-            strokeOpacity={0.38}
+            stroke={dashGrid.stroke}
+            strokeDasharray={OV_DASH_GRID_DASHARRAY}
+            strokeOpacity={dashGrid.opacity}
           />
           <XAxis
             dataKey="name"
@@ -4465,7 +4552,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             <button
               type="button"
               onClick={() => onViewInChartsTab(snapshotId)}
-              className={ovDashChartAction}
+              className={ovDashChartActionCharts}
               title="Open this chart in the Charts tab"
               aria-label="Open this chart in the Charts tab"
             >
@@ -4476,7 +4563,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             <button
               type="button"
               onClick={() => onAskAiAboutChart(snapshotId)}
-              className={ovDashChartAction}
+              className={ovDashChartActionAskAi}
               title="Switch to AI Insights with a starter question about this chart"
               aria-label="Ask AI about this chart in AI Insights"
             >
@@ -4501,7 +4588,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 setExportingPng(false);
               }
             }}
-            className={`${ovDashChartAction} disabled:cursor-not-allowed disabled:opacity-50`}
+            className={`${ovDashChartActionPng} disabled:cursor-not-allowed disabled:opacity-50`}
             title="Download this chart as PNG"
             aria-label="Export this chart as a PNG image"
           >
@@ -4597,6 +4684,8 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
     [plotWidth],
   );
 
+  const plotHeightPx = useOverviewDashPlotHeight();
+
   const handleViewInChartsTab = useCallback(() => {
     if (snapshotId) onOpenDashboardChartInChartsTab(snapshotId);
   }, [snapshotId, onOpenDashboardChartInChartsTab]);
@@ -4615,6 +4704,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
         canonicalTitle={canonicalTitle}
         snapshotId={snapshotId}
         viewportWidthPx={layoutWidthPx}
+        plotHeightPx={plotHeightPx}
         loadingPulse={loadingPulse}
         onDashboardDrill={onDashboardDrill}
         onViewInChartsTab={snapshotId ? handleViewInChartsTab : undefined}

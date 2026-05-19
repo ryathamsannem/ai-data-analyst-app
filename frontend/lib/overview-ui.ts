@@ -52,8 +52,10 @@ export const ovDataHint = "text-xs font-normal text-[color:var(--text-subtle)]";
 export const ovFilterClearBtn =
   "saas-btn-premium h-[52px] w-full text-sm font-semibold";
 
+/** Centered section shell — max 1600px; pairs with `.overview-chart-grid` in globals.css */
 export const ovChartsWrap = "overview-charts-wrap";
 
+/** 1 col below 768px; max 2 cols desktop (never 3). Plot height via `--overview-chart-plot-min-h`. */
 export const ovChartGrid = "overview-chart-grid";
 
 export const ovChartCell = "overview-chart-grid__cell";
@@ -71,6 +73,15 @@ export const ovDashChartHead = "overview-dash-chart-card__head";
 export const ovDashChartActions = "overview-dash-chart-card__actions";
 
 export const ovDashChartAction = "overview-dash-chart-action";
+
+export const ovDashChartActionCharts =
+  "overview-dash-chart-action overview-dash-chart-action--charts";
+
+export const ovDashChartActionAskAi =
+  "overview-dash-chart-action overview-dash-chart-action--ask-ai";
+
+export const ovDashChartActionPng =
+  "overview-dash-chart-action overview-dash-chart-action--png";
 
 export const ovDashChartFooter = "overview-dash-chart-card__footer";
 
