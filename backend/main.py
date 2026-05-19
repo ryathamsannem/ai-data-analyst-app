@@ -2,7 +2,13 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 import pandas as pd
-from anthropic import Anthropic
+from anthropic import (
+    Anthropic,
+    APIConnectionError,
+    APIStatusError,
+    AuthenticationError,
+    RateLimitError,
+)
 from dotenv import load_dotenv
 import os
 from io import BytesIO
@@ -12,6 +18,7 @@ import re
 import math
 import json
 import logging
+import time
 import uuid
 
 from analytics_metadata import build_insight_title, build_metric_label
@@ -8895,6 +8902,95 @@ INSIGHT_SAFETY_SYSTEM_PROMPT = (
     "actual metric and dimension names from the dataset context and authoritative numbers."
 )
 
+_CLAUDE_NARRATIVE_RETRY_DELAYS_S = (1.0, 2.5, 5.0)
+_CLAUDE_TRANSIENT_STATUS_CODES = frozenset({408, 429, 500, 502, 503, 504, 529})
+
+
+def _anthropic_http_status(exc: BaseException) -> Optional[int]:
+    if isinstance(exc, APIStatusError):
+        return exc.status_code
+    return None
+
+
+def _is_transient_anthropic_error(exc: BaseException) -> bool:
+    if isinstance(exc, (RateLimitError, APIConnectionError)):
+        return True
+    code = _anthropic_http_status(exc)
+    return code is not None and code in _CLAUDE_TRANSIENT_STATUS_CODES
+
+
+def _generate_insight_narrative(prompt: str) -> str:
+    """Call Claude for insight prose; retry transient overload / rate-limit errors."""
+    attempts = len(_CLAUDE_NARRATIVE_RETRY_DELAYS_S) + 1
+    last_exc: Optional[BaseException] = None
+    for attempt in range(attempts):
+        try:
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=520,
+                system=INSIGHT_SAFETY_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.content[0].text.strip()
+        except APIStatusError as exc:
+            if not _is_transient_anthropic_error(exc):
+                raise
+            last_exc = exc
+            if attempt < attempts - 1:
+                logger.warning(
+                    "Claude API transient error (attempt %s/%s): %s",
+                    attempt + 1,
+                    attempts,
+                    exc,
+                )
+                time.sleep(_CLAUDE_NARRATIVE_RETRY_DELAYS_S[attempt])
+                continue
+            raise
+        except (RateLimitError, APIConnectionError) as exc:
+            last_exc = exc
+            if attempt < attempts - 1:
+                logger.warning(
+                    "Claude API transient error (attempt %s/%s): %s",
+                    attempt + 1,
+                    attempts,
+                    exc,
+                )
+                time.sleep(_CLAUDE_NARRATIVE_RETRY_DELAYS_S[attempt])
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Claude narrative call failed without exception")
+
+
+def _claude_narrative_fallback_answer(exc: BaseException) -> str:
+    code = _anthropic_http_status(exc)
+    if code == 529 or isinstance(exc, RateLimitError) or code == 429:
+        return (
+            "The AI narrative service is temporarily overloaded. "
+            "Please wait a moment and ask again — your chart and calculated metrics "
+            "below are still available."
+        )
+    if isinstance(exc, APIConnectionError):
+        return (
+            "Could not reach the AI service. Check your network connection and try again. "
+            "Your chart and calculated metrics below are still available."
+        )
+    if isinstance(exc, AuthenticationError):
+        return (
+            "The AI service could not authenticate. "
+            "Verify ANTHROPIC_API_KEY is configured on the server."
+        )
+    if isinstance(exc, APIStatusError):
+        return (
+            "The AI service returned an error. Please try again shortly. "
+            "Your chart and calculated metrics below are still available."
+        )
+    return (
+        "Unable to generate an AI narrative right now. Please try again. "
+        "Your chart and calculated metrics below are still available."
+    )
+
 
 def _semantic_intent_correction_prompt_block(question: str) -> str:
     """
@@ -10598,12 +10694,11 @@ Rules:
 {semantic_correction}
 {trend_rule}"""
 
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=520,
-            system=INSIGHT_SAFETY_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        try:
+            answer_text = _generate_insight_narrative(prompt)
+        except Exception as exc:
+            logger.warning("Claude narrative unavailable: %s", exc, exc_info=True)
+            answer_text = _claude_narrative_fallback_answer(exc)
 
         chart_rec_out = (
             analysis_ctx.get("chartRecommendation")
@@ -10643,7 +10738,7 @@ Rules:
         )
 
         return _json_safe({
-            "answer": response.content[0].text.strip(),
+            "answer": answer_text,
             "visualization": visualization,
             "analysis": analysis_ctx,
             "conversation_context": conv_out,

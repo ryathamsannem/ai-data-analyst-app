@@ -6,6 +6,15 @@ import {
   type DashboardFilterEntry,
 } from "@/app/dashboard-filter-types";
 import { useDevRenderCount } from "@/lib/dev-render-count";
+import {
+  ovCard,
+  ovFilterClearBtn,
+  ovFilterControl,
+  ovFilterLabel,
+  ovMuted,
+  ovSectionDesc,
+  ovSectionTitle,
+} from "@/lib/overview-ui";
 
 function FilterPanelInner({
   dashboardFilters,
@@ -19,6 +28,7 @@ function FilterPanelInner({
   onClearAll,
   onDateStart,
   onDateEnd,
+  appearance = "legacy",
 }: {
   dashboardFilters: DashboardFilterEntry[];
   dimensionOptions: DashboardDimensionOptions;
@@ -31,24 +41,31 @@ function FilterPanelInner({
   onClearAll: () => void;
   onDateStart: (v: string) => void;
   onDateEnd: (v: string) => void;
+  appearance?: "legacy" | "dashboard";
 }) {
   useDevRenderCount("FilterPanel");
+  const isDashboard = appearance === "dashboard";
   /** Shared control chrome: 52px desktop, one bar system. */
   const controlH = "h-[52px]";
-  const controlBase =
+  const controlBase = isDashboard
+    ? `${ovFilterControl} ${controlH} cursor-pointer`
+    :
     "w-full min-w-0 rounded-xl border border-slate-200/80 bg-white px-3 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition " +
-    "focus:border-indigo-300/90 focus:ring-2 focus:ring-indigo-200/55 [color-scheme:light]";
+      "focus:border-indigo-300/90 focus:ring-2 focus:ring-indigo-200/55 [color-scheme:light]";
   const selectChevron =
     "appearance-none bg-[length:0.75rem] bg-[position:right_0.75rem_center] bg-no-repeat pr-10 " +
     "bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%3E%3Cpath%20d%3D%22M1%202l5%204%205-4%22%20stroke%3D%22%2394a3b8%22%20fill%3D%22none%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')]";
   /** Native date picker only (no duplicate custom calendar icon). */
-  const dateInputInner =
+  const dateInputInner = isDashboard
+    ? "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-foreground outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80"
+    :
     "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-slate-900 outline-none " +
-    "[color-scheme:light] cursor-pointer " +
-    "[&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100";
+      "[color-scheme:light] cursor-pointer " +
+      "[&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100";
 
-  const labelCls =
-    "block min-h-[18px] text-[11px] font-semibold uppercase tracking-wide text-slate-500";
+  const labelCls = isDashboard
+    ? `block min-h-[18px] ${ovFilterLabel}`
+    : "block min-h-[18px] text-[11px] font-semibold uppercase tracking-wide text-slate-500";
 
   const breadcrumbSegments = useMemo(
     () =>
@@ -122,20 +139,48 @@ function FilterPanelInner({
       ? "lg:grid-cols-6"
       : "lg:grid-cols-4";
 
+  const shellCls = isDashboard
+    ? `space-y-4 p-4 sm:p-5 ${ovCard}`
+    : "space-y-4 rounded-2xl border border-slate-200/55 bg-white/95 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.045)] backdrop-blur-[2px] sm:p-5";
+
+  const dateBarCls = isDashboard
+    ? `${controlH} flex w-full min-w-0 items-center overflow-hidden rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] px-1 shadow-[var(--shadow-sm)] transition focus-within:border-[color:var(--accent-muted)] focus-within:ring-2 focus-within:ring-[color:var(--accent)]/25`
+    :
+      `${controlH} flex w-full min-w-0 items-center overflow-hidden rounded-xl border border-slate-200/80 bg-white px-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ` +
+      "focus-within:border-indigo-300/90 focus-within:ring-2 focus-within:ring-indigo-200/55";
+
+  const clearBtnCls = isDashboard ? ovFilterClearBtn : `${controlH} ${ovFilterClearBtn}`;
+
+  const filterChipCls = isDashboard
+    ? "inline-flex items-center gap-1.5 rounded-full border border-[color:var(--accent-muted)] bg-[color:var(--accent-wash)] px-3 py-1 text-xs font-medium text-foreground transition duration-150 hover:border-[color:var(--accent)] hover:bg-[color:var(--accent-wash)]"
+    : "inline-flex items-center gap-1.5 rounded-full border border-indigo-200/70 bg-indigo-50/90 px-3 py-1 text-xs font-medium text-indigo-900 shadow-[0_1px_2px_rgba(67,56,202,0.06)] transition duration-150 hover:border-indigo-300/80 hover:bg-indigo-100/90";
+
   return (
-    <div className="space-y-4 rounded-2xl border border-slate-200/55 bg-white/95 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.045)] backdrop-blur-[2px] sm:p-5">
+    <div className={shellCls}>
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold tracking-tight text-slate-900">
+        <h3
+          className={
+            isDashboard
+              ? `${ovSectionTitle} text-base`
+              : "text-sm font-semibold tracking-tight text-slate-900"
+          }
+        >
           Interactive filters
         </h3>
-        <p className="text-xs leading-relaxed text-slate-500">
+        <p
+          className={
+            isDashboard
+              ? `${ovSectionDesc} text-xs`
+              : "text-xs leading-relaxed text-slate-500"
+          }
+        >
           Slice KPIs and charts; filters apply to AI analysis for this session.
         </p>
       </div>
 
       {/* One SaaS filter bar: same row on xl; wrap on smaller screens; date full width when stacked */}
       <div
-        className={`grid grid-cols-1 items-end gap-x-3 gap-y-3 sm:grid-cols-2 ${lgGridCols} lg:gap-x-4`}
+        className={`grid grid-cols-1 items-end gap-x-3 gap-y-3 sm:grid-cols-2 ${lgGridCols} lg:gap-x-3 xl:gap-x-4`}
       >
         {deptNode ? (
           <div className="min-w-0 lg:col-span-1">{deptNode}</div>
@@ -150,13 +195,8 @@ function FilterPanelInner({
         {hasDateDim && dateCfg?.column !== undefined ? (
           <div className="min-w-0 sm:col-span-2 lg:col-span-2">
             <span className={labelCls}>Date range</span>
-            <div
-              className={
-                `${controlH} flex w-full min-w-0 items-center overflow-hidden rounded-xl border border-slate-200/80 bg-white px-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ` +
-                "focus-within:border-indigo-300/90 focus-within:ring-2 focus-within:ring-indigo-200/55"
-              }
-            >
-              <label className="flex min-h-0 min-w-0 flex-1 cursor-pointer items-center border-r border-slate-200/70 px-2 py-2">
+            <div className={dateBarCls}>
+              <label className="flex min-h-0 min-w-0 flex-1 cursor-pointer items-center border-r border-[color:var(--border-default)] px-2 py-2">
                 <input
                   type="date"
                   value={dateStart}
@@ -182,14 +222,7 @@ function FilterPanelInner({
           <span className={`${labelCls} max-lg:invisible lg:select-none`} aria-hidden>
             &nbsp;
           </span>
-          <button
-            type="button"
-            onClick={onClearAll}
-            className={
-              `${controlH} inline-flex w-full items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/95 px-4 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ` +
-              "hover:border-slate-300/85 hover:bg-slate-100/95 focus-visible:border-indigo-300/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-200/55 active:scale-[0.99]"
-            }
-          >
+          <button type="button" onClick={onClearAll} className={clearBtnCls}>
             Clear filters
           </button>
         </div>
@@ -197,7 +230,7 @@ function FilterPanelInner({
 
       {(dashboardFilters.length > 0 || dateActive) && (
         <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <p className={`text-[11px] font-semibold uppercase tracking-wide ${isDashboard ? ovFilterLabel : "text-slate-500"}`}>
             Filters active
           </p>
           <div className="flex flex-wrap gap-2">
@@ -206,7 +239,7 @@ function FilterPanelInner({
                 key={f.column}
                 type="button"
                 onClick={() => onRemoveFilter(f.column)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200/70 bg-indigo-50/90 px-3 py-1 text-xs font-medium text-indigo-900 shadow-[0_1px_2px_rgba(67,56,202,0.06)] transition duration-150 hover:border-indigo-300/80 hover:bg-indigo-100/90"
+                className={filterChipCls}
               >
                 <span>
                   {f.label}: {f.value}
@@ -262,8 +295,6 @@ function FilterPanelInner({
     </div>
   );
 }
-
-
 
 export const FilterPanel = memo(FilterPanelInner);
 FilterPanel.displayName = "FilterPanel";
