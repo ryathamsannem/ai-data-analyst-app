@@ -42,7 +42,7 @@ export function createVerticalValueAxisLabel(fullText: string, displayText: stri
         transform={`rotate(-90 ${cx} ${cy})`}
         textAnchor="middle"
         dominantBaseline="middle"
-        fill="#475569"
+        fill="var(--chart-axis-label, #475569)"
         fontSize={11}
         fontWeight={600}
         style={{ userSelect: "none" }}
@@ -78,7 +78,7 @@ export function createHorizontalBottomAxisValueLabel(
         x={x}
         y={y}
         textAnchor="middle"
-        fill="#475569"
+        fill="var(--chart-axis-label, #475569)"
         fontSize={11}
         fontWeight={600}
         style={{ userSelect: "none" }}

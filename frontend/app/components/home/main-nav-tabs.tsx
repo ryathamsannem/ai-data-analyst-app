@@ -13,6 +13,14 @@ export const MAIN_NAV_TABS: readonly { id: MainNavTabId; label: string }[] = [
   { id: "export", label: "Export" },
 ];
 
+export const MAIN_NAV_PAGE_TITLES: Record<MainNavTabId, string> = {
+  overview: "Overview",
+  preview: "Data Preview",
+  insights: "AI Insights",
+  charts: "Charts",
+  export: "Export",
+};
+
 export const MainNavTabs = memo(function MainNavTabs({
   activeTab,
   onTabClick,
@@ -24,7 +32,7 @@ export const MainNavTabs = memo(function MainNavTabs({
   return (
     <div className="mt-8">
       <nav
-        className="flex flex-wrap gap-1 rounded-2xl border border-slate-200/50 bg-slate-100/50 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
+        className="flex flex-wrap gap-1 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--nav-track)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
         aria-label="Primary"
       >
         {MAIN_NAV_TABS.map((t) => {
@@ -38,8 +46,8 @@ export const MainNavTabs = memo(function MainNavTabs({
               onClick={() => onTabClick(t.id)}
               className={`rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? "bg-white text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.04]"
-                  : "text-slate-600 hover:bg-white/70 hover:text-slate-900"
+                  ? "bg-[color:var(--nav-active-bg)] text-[color:var(--nav-active-fg)] shadow-[var(--shadow-sm)] ring-1 ring-[color:var(--shell-card-ring)]"
+                  : "text-[color:var(--nav-inactive-fg)] hover:bg-[color:var(--nav-hover-bg)] hover:text-[color:var(--foreground)]"
               }`}
             >
               {t.label}

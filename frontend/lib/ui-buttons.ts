@@ -1,25 +1,22 @@
 /**
- * Shared SaaS button variants — keep export/primary/success visually distinct.
+ * Shared SaaS button variants — semantic theme tokens (light/dark via globals.css).
  */
 
 const btnBase =
-  "inline-flex items-center justify-center rounded-xl font-medium transition duration-200 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+  "inline-flex items-center justify-center rounded-[0.85rem] font-medium transition-all duration-200 ease-out active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-[color:var(--btn-disabled-bg)] disabled:text-[color:var(--btn-disabled-fg)] disabled:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--background)]";
 
-export const btnPrimary =
-  `${btnBase} bg-slate-900 px-5 py-2.5 text-sm text-white shadow-[0_1px_2px_rgba(15,23,42,0.12)] hover:bg-slate-800 hover:shadow-md focus-visible:ring-slate-400/40`;
+export const btnPrimary = `${btnBase} bg-[color:var(--btn-primary-bg)] px-5 py-2.5 text-sm text-[color:var(--btn-primary-fg)] shadow-[var(--shadow-sm)] hover:bg-[color:var(--btn-primary-hover)] hover:shadow-[var(--shadow-md)]`;
 
-export const btnPrimarySm =
-  `${btnBase} bg-slate-900 px-4 py-2 text-sm text-white shadow-[0_1px_2px_rgba(15,23,42,0.12)] hover:bg-slate-800 hover:shadow-md focus-visible:ring-slate-400/40`;
+export const btnPrimarySm = "saas-btn-accent";
 
-export const btnSecondary =
-  `${btnBase} border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)] shadow-[var(--shadow-sm)] hover:border-slate-300/80 hover:text-[var(--foreground)] hover:shadow-[var(--shadow-md)] focus-visible:ring-slate-300/50`;
+export const btnSecondary = "saas-btn-premium saas-btn-premium--sm";
 
 export const btnExport =
-  `${btnBase} bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(67,56,202,0.25)] hover:bg-indigo-700 hover:shadow-md focus-visible:ring-indigo-400/45`;
+  `${btnBase} bg-[color:var(--accent)] px-6 py-3 text-sm font-semibold text-[color:var(--accent-fg)] shadow-[var(--shadow-sm)] hover:bg-[color:var(--accent-hover)] hover:shadow-[var(--shadow-md)]`;
 
 export const btnExportSm =
-  `${btnBase} bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-[0_1px_2px_rgba(67,56,202,0.25)] hover:bg-indigo-700 hover:shadow-md focus-visible:ring-indigo-400/45`;
+  `${btnBase} bg-[color:var(--accent)] px-4 py-2.5 text-sm font-medium text-[color:var(--accent-fg)] shadow-[var(--shadow-sm)] hover:bg-[color:var(--accent-hover)] hover:shadow-[var(--shadow-md)]`;
 
-/** Success confirmations only (mapping saved, upload OK banners use separate styles). */
+/** Success confirmations only (mapping saved, upload OK banners). */
 export const btnSuccess =
   `${btnBase} bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-[0_1px_2px_rgba(5,150,105,0.25)] hover:bg-emerald-700 hover:shadow-md focus-visible:ring-emerald-400/40`;
