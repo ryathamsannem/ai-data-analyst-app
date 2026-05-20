@@ -98,7 +98,10 @@ const ChartTimelineCard = memo(function ChartTimelineCard({
         </div>
         <p className={chartsTabTimelineCardMeta}>{whenLabel}</p>
         {snap.question && variant === "ai" ? (
-          <p className={chartsTabTimelineCardPrompt} title={snap.question}>
+          <p
+            className={`${chartsTabTimelineCardPrompt} line-clamp-1`}
+            title={snap.question}
+          >
             <span className="text-[color:var(--text-subtle)]">Prompt · </span>
             {snap.question}
           </p>

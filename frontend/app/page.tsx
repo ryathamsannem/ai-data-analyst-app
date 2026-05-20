@@ -85,8 +85,10 @@ import {
   chartsTabVizHeaderZone,
   chartsTabVizKicker,
 } from "@/lib/charts-tab-ui";
+import { ChartsTabChartReason } from "@/app/components/home/charts-tab-chart-reason";
 import { ChartsTabIntelligenceStrip } from "@/app/components/home/charts-tab-intelligence-strip";
 import { ChartsTabPlotTransition } from "@/app/components/home/charts-tab-plot-transition";
+import { generateChartReason } from "@/lib/generate-chart-reason";
 import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
 import {
   formatAxisTickFromRows,
@@ -9592,6 +9594,42 @@ function HomeInner() {
     return w.length > 160 ? `${w.slice(0, 157)}…` : w;
   }, [visualization?.partialVisualizationWarning]);
 
+  const sessionChartReason = useMemo(
+    () =>
+      generateChartReason(
+        {
+          chartType: sessionRenderedChartKind,
+          measure: chartAxisLabels.valueAxis,
+          category: chartAxisLabels.categoryAxis,
+          question: lastAskedQuestion,
+          metadata: {
+            groupCount: sortedChartData.length,
+            stackedOrMultiSeries:
+              visualization?.multiSeries?.layout === "stacked_bar",
+            histogramStyle: sessionSmartChartIntel?.histogramStyle ?? false,
+            routingExplanation:
+              chartRoutingRecommendation?.selectionExplanation ?? null,
+            detectedIntent: chartRoutingRecommendation?.detectedIntent ?? null,
+            recommendationHint:
+              sessionSmartChartIntel?.recommendationBlurb ?? null,
+          },
+        },
+        sortedChartData
+      ),
+    [
+      sessionRenderedChartKind,
+      chartAxisLabels.valueAxis,
+      chartAxisLabels.categoryAxis,
+      lastAskedQuestion,
+      sortedChartData,
+      visualization?.multiSeries?.layout,
+      sessionSmartChartIntel?.histogramStyle,
+      sessionSmartChartIntel?.recommendationBlurb,
+      chartRoutingRecommendation?.selectionExplanation,
+      chartRoutingRecommendation?.detectedIntent,
+    ]
+  );
+
   const chartHeadingBlock =
     sessionDisplayChartTitle || chartSubtitle ? (
       <div className={chartsTabVizHeaderZone}>
@@ -10762,6 +10800,10 @@ function HomeInner() {
                         axisLabel={sessionChartIntelAxisLabel}
                         highlight={chartInsightBadge ?? null}
                         note={sessionChartIntelNote}
+                      />
+                      <ChartsTabChartReason
+                        chartId={activeChartId}
+                        reason={sessionChartReason}
                       />
                     </div>
                     <ChartsTabPlotTransition
