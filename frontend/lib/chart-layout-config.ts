@@ -27,6 +27,36 @@ export type InsightChartLayoutMetrics = {
 };
 
 /** AI Insight + PDF off-screen capture: dimensions by presentation kind. */
+/**
+ * Charts tab session preview — responsive height with less vertical dead space than legacy 300–500px floor.
+ */
+export function resolveChartsTabPreviewPlotHeight(
+  pointCount: number,
+  kind: ChartKind,
+  viewportInnerH: number
+): number {
+  const n = Math.max(1, pointCount);
+  const cap = Math.round(Math.min(Math.max(viewportInnerH, 320) * 0.42, 440));
+  const floor = 196;
+
+  if (kind === "bar_horizontal") {
+    const slot = 26;
+    const extra = Math.max(0, n - 3) * slot;
+    return Math.min(cap, Math.max(240, 248 + extra));
+  }
+  if (kind === "pie" || kind === "donut" || kind === "scatter") {
+    return Math.min(cap, Math.max(260, 292));
+  }
+  if (kind === "line" || kind === "area") {
+    return Math.min(cap, Math.max(272, 300));
+  }
+  if (kind === "bar" || kind === "histogram") {
+    const extra = Math.min(28, Math.max(0, n - 5) * 5);
+    return Math.min(cap, Math.max(228, 252 + extra));
+  }
+  return Math.min(cap, Math.max(floor, 268));
+}
+
 export function getInsightLayoutMetrics(kind: ChartKind): InsightChartLayoutMetrics {
   const t = chartKindToTimelineType(kind);
   if (t === "horizontalBar") {
@@ -63,38 +93,125 @@ export function insightViewportMaxClassForChartKind(kind: ChartKind): string {
 
 type VmBalanced = { marginLeft: number; marginRight: number };
 
+export type ChartPlotMarginOpts = {
+  /** AI Insights / PDF insight layout — slightly tighter optical centering. */
+  insightUi?: boolean;
+};
+
+function cartesianSideMargin(vmBalanced: VmBalanced, kind: ChartKind): number {
+  if (kind === "line" || kind === "area") {
+    return Math.max(
+      26,
+      Math.min(36, Math.round((vmBalanced.marginLeft + vmBalanced.marginRight) / 2))
+    );
+  }
+  return Math.max(26, Math.min(36, vmBalanced.marginLeft));
+}
+
 /**
- * AI Insights + PDF capture: symmetric Recharts outer margins so the plot reads centered
- * (avoids heavy left gutter + plot drifting right). Vertical bars get extra bottom room for labels.
+ * Vertical Cartesian Recharts margins — optical centering (plot sits slightly above geometric center).
+ * Separate presets for bar, histogram, and line/area. Does not shrink tick font sizes.
+ */
+export function verticalCartesianOuterMargins(
+  kind: ChartKind,
+  vmBalanced: VmBalanced,
+  computedBottom: number,
+  opts?: ChartPlotMarginOpts
+): { top: number; left: number; right: number; bottom: number } {
+  const insightUi = opts?.insightUi ?? false;
+  const side = cartesianSideMargin(vmBalanced, kind);
+
+  if (kind === "histogram") {
+    const bottomTrim = insightUi ? 5 : 3;
+    const bottom = Math.max(computedBottom - bottomTrim, insightUi ? 20 : 24);
+    const top = insightUi ? 5 : 9;
+    return { top, left: side, right: side, bottom };
+  }
+
+  if (kind === "bar") {
+    const bottomTrim = insightUi ? 6 : 4;
+    const bottom = Math.max(computedBottom - bottomTrim, insightUi ? 18 : 22);
+    const top = insightUi ? 5 : 10;
+    return { top, left: side, right: side, bottom };
+  }
+
+  if (kind === "line" || kind === "area") {
+    const bottomTrim = insightUi ? 4 : 2;
+    const bottom = Math.max(
+      computedBottom - bottomTrim,
+      insightUi ? 48 : computedBottom
+    );
+    const top = insightUi ? 6 : 11;
+    return { top, left: side, right: side, bottom };
+  }
+
+  const sideFallback = Math.max(
+    vmBalanced.marginLeft,
+    Math.round((vmBalanced.marginLeft + vmBalanced.marginRight) / 2)
+  );
+  return {
+    top: insightUi ? 10 : 14,
+    left: sideFallback,
+    right: sideFallback,
+    bottom: computedBottom,
+  };
+}
+
+/** Bottom margin passed to Recharts before outer margin preset (bar / histogram). */
+export function resolveVerticalBarPlotBottomPad(args: {
+  kind: "bar" | "histogram";
+  categoryAxisBottomMargin: number;
+  xAxisHeightPx: number;
+  angled: boolean;
+  hasCategoryLabel: boolean;
+  insightUi: boolean;
+  denseCategories: boolean;
+}): number {
+  if (!args.insightUi) {
+    const trim = args.denseCategories ? 4 : 6;
+    const floor = args.kind === "histogram" ? 22 : 20;
+    return Math.max(
+      floor,
+      args.categoryAxisBottomMargin - trim + (args.denseCategories ? 2 : 0)
+    );
+  }
+
+  const labelPad = args.hasCategoryLabel ? 5 : 2;
+  const angledExtra = args.angled ? 4 : 0;
+  const tight = args.xAxisHeightPx + labelPad + angledExtra;
+  const trim = args.angled ? 12 : 8;
+  return Math.max(tight, args.categoryAxisBottomMargin - trim);
+}
+
+/** Pie / donut — radial layout; keep legend room without excess vertical dead space. */
+export function radialChartOuterMargins(
+  kind: "pie" | "donut",
+  compact: boolean,
+  piePad: { marginHorizontal: number; marginBottom: number }
+): { top: number; left: number; right: number; bottom: number } {
+  const top = compact ? 7 : 8;
+  const horizontal = 8 + piePad.marginHorizontal;
+  const bottom = Math.max(
+    10,
+    6 + Math.ceil(piePad.marginBottom * (kind === "donut" ? 0.88 : 0.82))
+  );
+  return {
+    top,
+    right: horizontal,
+    left: Math.max(6, horizontal - 2),
+    bottom,
+  };
+}
+
+/**
+ * AI Insights + PDF capture — insight UI preset for vertical Cartesian charts.
  */
 export function insightCartesianOuterMargins(
   kind: ChartKind,
   vmBalanced: VmBalanced,
   computedBottom: number
 ): { top: number; left: number; right: number; bottom: number } {
-  if (kind === "bar" || kind === "histogram") {
-    const side = Math.max(26, Math.min(36, vmBalanced.marginLeft));
-    const bottom = Math.max(computedBottom, 28);
-    const top = Math.max(8, Math.min(14, Math.round(bottom * 0.24)));
-    return { top, left: side, right: side, bottom };
-  }
-  if (kind === "line" || kind === "area") {
-    const side = Math.max(
-      26,
-      Math.min(36, Math.round((vmBalanced.marginLeft + vmBalanced.marginRight) / 2))
-    );
-    const bottom = computedBottom;
-    const top = Math.max(10, Math.min(14, Math.round(bottom * 0.22)));
-    return { top, left: side, right: side, bottom };
-  }
-  const side = Math.max(
-    vmBalanced.marginLeft,
-    Math.round((vmBalanced.marginLeft + vmBalanced.marginRight) / 2)
-  );
-  return {
-    top: 16,
-    left: side,
-    right: side,
-    bottom: computedBottom,
-  };
+  return verticalCartesianOuterMargins(kind, vmBalanced, computedBottom, {
+    insightUi: true,
+  });
 }

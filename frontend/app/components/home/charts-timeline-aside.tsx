@@ -3,6 +3,22 @@
 import { forwardRef, memo, useCallback, useMemo } from "react";
 import type { ChartSnapshot } from "@/contexts/chart-session-context";
 import { getCanonicalChartTitle } from "@/lib/canonical-chart-title";
+import {
+  chartsTabTimelineAside,
+  chartsTabTimelineBadgeAi,
+  chartsTabTimelineBadgeAuto,
+  chartsTabTimelineCardBase,
+  chartsTabTimelineCardIdle,
+  chartsTabTimelineCardMeta,
+  chartsTabTimelineCardPrompt,
+  chartsTabTimelineCardSelected,
+  chartsTabTimelineCardTitle,
+  chartsTabTimelineDesc,
+  chartsTabTimelineHeader,
+  chartsTabTimelineScrollBody,
+  chartsTabTimelineSectionLabel,
+  chartsTabTimelineTitle,
+} from "@/lib/charts-tab-ui";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 
 export type ChartHistorySections = {
@@ -57,49 +73,35 @@ const ChartTimelineCard = memo(function ChartTimelineCard({
 
   const badge =
     variant === "ai" ? (
-      <span className="shrink-0 rounded-full border border-emerald-200/50 bg-emerald-50/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-900/85">
-        AI
-      </span>
+      <span className={chartsTabTimelineBadgeAi}>AI</span>
     ) : (
-      <span className="shrink-0 rounded-full border border-slate-200/60 bg-slate-100/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-700">
-        Auto
-      </span>
+      <span className={chartsTabTimelineBadgeAuto}>Auto</span>
     );
 
   return (
-    <li className="min-h-[118px]">
+    <li className="min-h-[108px]">
       <button
         type="button"
         onClick={handleClick}
         aria-current={isSelected ? "true" : undefined}
-        className={`flex h-full min-h-[118px] w-full flex-col rounded-xl border p-3 text-left transition-all duration-500 ease-out ${
-          isSelected
-            ? "border-indigo-300/75 bg-gradient-to-br from-indigo-50/95 via-white to-slate-50/25 shadow-[0_6px_26px_-8px_rgba(79,70,229,0.26),0_0_0_1px_rgba(165,180,252,0.35)] ring-1 ring-indigo-400/22"
-            : "border-slate-200/55 bg-white/40 shadow-[0_1px_2px_rgba(15,23,42,0.035)] hover:border-indigo-200/50 hover:bg-white hover:shadow-[0_12px_32px_-14px_rgba(15,23,42,0.11),0_0_28px_-14px_rgba(99,102,241,0.14)]"
+        className={`${chartsTabTimelineCardBase} ${
+          isSelected ? chartsTabTimelineCardSelected : chartsTabTimelineCardIdle
         }`}
       >
-        <div className="flex items-start justify-between gap-2">
-          <span
-            className="min-w-0 flex-1 break-words text-sm font-medium leading-snug text-slate-900 line-clamp-2"
-            title={displayTitle}
-          >
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <span className={chartsTabTimelineCardTitle} title={displayTitle}>
             {displayTitle}
           </span>
           {badge}
         </div>
-        <p className="mt-2 text-[11px] font-medium tabular-nums text-slate-500">
-          {whenLabel}
-        </p>
+        <p className={chartsTabTimelineCardMeta}>{whenLabel}</p>
         {snap.question && variant === "ai" ? (
-          <p
-            className="mt-1 line-clamp-2 text-[11px] leading-snug text-slate-600"
-            title={snap.question}
-          >
-            <span className="text-slate-400">Prompt · </span>
+          <p className={chartsTabTimelineCardPrompt} title={snap.question}>
+            <span className="text-[color:var(--text-subtle)]">Prompt · </span>
             {snap.question}
           </p>
         ) : (
-          <span className="flex-1" aria-hidden />
+          <span className="flex-1 min-h-[1.25rem]" aria-hidden />
         )}
       </button>
     </li>
@@ -138,65 +140,61 @@ export const ChartsTimelineAside = memo(
     }, [sections.autoSorted]);
 
     return (
-      <aside
-        ref={ref}
-        className="timeline-scroll-fine min-w-0 w-full max-w-full shrink-0 rounded-2xl border border-slate-200/45 bg-gradient-to-b from-white/95 to-slate-50/40 p-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ring-1 ring-slate-900/[0.025] backdrop-blur-[2px] transition-shadow duration-500 ease-out hover:border-slate-300/50 hover:shadow-[0_8px_28px_-14px_rgba(15,23,42,0.08)] sm:p-5 max-h-[min(72vh,540px)] overflow-y-auto overscroll-y-contain lg:max-w-none"
-      >
-        <h3 className="text-sm font-semibold tracking-tight text-slate-900">
-          Timeline
-        </h3>
-        <p className="mb-4 mt-1 text-[11px] leading-relaxed text-slate-500">
-          Newest AI charts first. Timestamps use your local time.
-        </p>
-        {historyEmpty ? (
-          <p className="text-sm leading-relaxed text-slate-600">
-            No charts yet. Open{" "}
-            <span className="font-medium text-slate-800">Overview</span> for auto charts or{" "}
-            <span className="font-medium text-slate-800">AI Insights</span> for question-driven
-            visuals.
+      <aside ref={ref} className={chartsTabTimelineAside}>
+        <div className={chartsTabTimelineHeader}>
+          <h3 className={chartsTabTimelineTitle}>Timeline</h3>
+          <p className={chartsTabTimelineDesc}>
+            Newest AI charts first. Timestamps use your local time.
           </p>
-        ) : (
-          <div className="flex flex-col gap-5">
-            {sections.aiSorted.length > 0 ? (
-              <div>
-                <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  From AI
-                </h4>
-                <ul className="flex flex-col gap-2.5">
-                  {sections.aiSorted.map((snap) => (
-                    <ChartTimelineCard
-                      key={snap.id}
-                      snap={snap}
-                      isSelected={activeChartId === snap.id}
-                      whenLabel={aiWhenById.get(snap.id) ?? ""}
-                      variant="ai"
-                      onSelect={onSelectChart}
-                    />
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {sections.autoSorted.length > 0 ? (
-              <div>
-                <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Auto dashboard
-                </h4>
-                <ul className="flex flex-col gap-2.5">
-                  {sections.autoSorted.map((snap) => (
-                    <ChartTimelineCard
-                      key={snap.id}
-                      snap={snap}
-                      isSelected={activeChartId === snap.id}
-                      whenLabel={autoWhenById.get(snap.id) ?? ""}
-                      variant="auto"
-                      onSelect={onSelectChart}
-                    />
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-        )}
+        </div>
+        <div className={chartsTabTimelineScrollBody}>
+          {historyEmpty ? (
+            <p className="text-sm leading-relaxed text-[color:var(--text-muted)]">
+              No charts yet. Open{" "}
+              <span className="font-medium text-[var(--foreground)]">Overview</span> for
+              auto charts or{" "}
+              <span className="font-medium text-[var(--foreground)]">AI Insights</span>{" "}
+              for question-driven visuals.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-5">
+              {sections.aiSorted.length > 0 ? (
+                <div>
+                  <h4 className={chartsTabTimelineSectionLabel}>From AI</h4>
+                  <ul className="flex flex-col gap-2.5">
+                    {sections.aiSorted.map((snap) => (
+                      <ChartTimelineCard
+                        key={snap.id}
+                        snap={snap}
+                        isSelected={activeChartId === snap.id}
+                        whenLabel={aiWhenById.get(snap.id) ?? ""}
+                        variant="ai"
+                        onSelect={onSelectChart}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {sections.autoSorted.length > 0 ? (
+                <div>
+                  <h4 className={chartsTabTimelineSectionLabel}>Auto dashboard</h4>
+                  <ul className="flex flex-col gap-2.5">
+                    {sections.autoSorted.map((snap) => (
+                      <ChartTimelineCard
+                        key={snap.id}
+                        snap={snap}
+                        isSelected={activeChartId === snap.id}
+                        whenLabel={autoWhenById.get(snap.id) ?? ""}
+                        variant="auto"
+                        onSelect={onSelectChart}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
       </aside>
     );
   })

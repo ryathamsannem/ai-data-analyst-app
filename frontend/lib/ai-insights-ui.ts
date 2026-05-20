@@ -260,7 +260,7 @@ export const chartVizThemeScope = "chart-viz-theme";
 
 /** Charts tab session preview card — same viz surface tokens as AI Insights; layout padding unchanged. */
 export const chartsTabVizPreviewCard =
-  `${chartVizThemeScope} ai-insights-viz group/chart relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-[color:var(--border-default)]/75 bg-[color:var(--surface-elevated)] p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_22px_52px_-22px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.025] transition-[border-color,box-shadow] duration-500 ease-out hover:border-[color:color-mix(in_srgb,var(--accent)_14%,var(--border-default))] sm:p-4 md:p-5 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-none dark:ring-white/[0.03] dark:hover:border-[color:var(--insights-border-medium)]`;
+  `${chartVizThemeScope} charts-tab-viz-preview ai-insights-viz group/chart relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-[color:var(--border-default)]/75 bg-[color:var(--surface-elevated)] p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_22px_52px_-22px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.025] transition-[border-color,box-shadow] duration-300 ease-out hover:border-[color:color-mix(in_srgb,var(--accent)_14%,var(--border-default))] sm:p-4 md:pb-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-none dark:ring-white/[0.03] dark:hover:border-[color:var(--insights-border-medium)]`;
 
 /** Session chart frame (full width; no 960px insight cap). */
 export const chartsTabVizSessionFrame =

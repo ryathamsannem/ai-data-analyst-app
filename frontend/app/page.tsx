@@ -66,8 +66,27 @@ import {
 } from "@/lib/final-chart-presentation";
 import {
   getInsightLayoutMetrics,
+  resolveChartsTabPreviewPlotHeight,
   timelineTypeToChartKind,
 } from "@/lib/chart-layout-config";
+import {
+  chartsTabDesc,
+  chartsTabDescEmphasis,
+  chartsTabDownloadBtn,
+  chartsTabEmptyState,
+  chartsTabEmptyTitle,
+  chartsTabHeaderRow,
+  chartsTabPage,
+  chartsTabSmartReadWrap,
+  chartsTabTitle,
+  chartsTabTimelineColumn,
+  chartsTabVizHeaderZone,
+  chartsTabVizKicker,
+  chartsTabVizPlotSlot,
+  chartsTabVizPlotStage,
+} from "@/lib/charts-tab-ui";
+import { ChartsTabIntelligenceStrip } from "@/app/components/home/charts-tab-intelligence-strip";
+import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
 import {
   formatAxisTickFromRows,
   formatAxisTickFromScatterX,
@@ -8093,12 +8112,9 @@ function HomeInner() {
 
   const chartHeightMain = useMemo(
     () =>
-      clampChartHeightToViewport(
-        resolveChartDisplayHeight(
-          chartData.length,
-          presentationChartKind,
-          false
-        ),
+      resolveChartsTabPreviewPlotHeight(
+        chartData.length,
+        presentationChartKind,
         viewportH
       ),
     [chartData.length, presentationChartKind, viewportH]
@@ -9554,20 +9570,35 @@ function HomeInner() {
     />
   );
 
+  const sessionChartIntelAxisLabel = useMemo(() => {
+    const h = sessionChartSemanticHeader;
+    if (h.mode === "scatter") {
+      return `${h.xLabel} · ${h.yLabel}`;
+    }
+    return h.detailLabel?.trim() || h.roleLabel?.trim() || null;
+  }, [sessionChartSemanticHeader]);
+
+  const sessionChartIntelSourceLabel = useMemo(() => {
+    const src = activeSnapshot?.source;
+    if (src === "ai") return "AI";
+    if (src === "auto_dashboard") return "Auto Dashboard";
+    return null;
+  }, [activeSnapshot?.source]);
+
+  const sessionChartIntelNote = useMemo(() => {
+    const w = visualization?.partialVisualizationWarning?.trim();
+    if (!w) return null;
+    return w.length > 160 ? `${w.slice(0, 157)}…` : w;
+  }, [visualization?.partialVisualizationWarning]);
+
   const chartHeadingBlock =
     sessionDisplayChartTitle || chartSubtitle ? (
-      <div
-        className={`text-center px-2 sm:px-4 ${chartSubtitle ? "mb-4 mt-1" : "mb-4 mt-0.5"}`}
-      >
+      <div className={chartsTabVizHeaderZone}>
         {sessionDisplayChartTitle ? (
-          <h3 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-slate-900 sm:text-2xl sm:leading-tight">
-            {sessionDisplayChartTitle}
-          </h3>
+          <h3 className={aiInsightsVizTitle}>{sessionDisplayChartTitle}</h3>
         ) : null}
         {chartSubtitle ? (
-          <p className="mx-auto mt-2 max-w-3xl text-sm leading-relaxed text-slate-500 sm:text-[15px]">
-            {chartSubtitle}
-          </p>
+          <p className={aiInsightsVizSubtitle}>{chartSubtitle}</p>
         ) : null}
       </div>
     ) : null;
@@ -10649,48 +10680,54 @@ function HomeInner() {
         )}
 
         {activeTab === "charts" && (
-          <section className="mb-10 rounded-[1.35rem] border border-slate-200/40 bg-gradient-to-b from-slate-50/55 via-white/50 to-slate-100/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_1px_3px_rgba(15,23,42,0.04)] sm:p-5">
-            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <section className={chartsTabPage}>
+            <div className={chartsTabHeaderRow}>
               <div className="min-w-0 max-w-2xl">
-                <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                  Charts
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+                <h2 className={chartsTabTitle}>Charts</h2>
+                <p className={chartsTabDesc}>
                   Session visualizations from{" "}
-                  <span className="font-medium text-slate-800">Overview</span> and{" "}
-                  <span className="font-medium text-slate-800">AI Insights</span>. Select a
+                  <span className={chartsTabDescEmphasis}>Overview</span> and{" "}
+                  <span className={chartsTabDescEmphasis}>AI Insights</span>. Select a
                   run in the timeline to preview, export PNG, or attach to the Export tab
                   PDF. History resets when the dataset or mapping changes.
                 </p>
               </div>
-              <button
-                onClick={downloadChartPng}
-                disabled={chartData.length === 0}
-                className={`shrink-0 ${btnPrimary} disabled:shadow-none`}
-              >
-                Download Chart PNG
-              </button>
+              {chartData.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={downloadChartPng}
+                  className={chartsTabDownloadBtn}
+                >
+                  Download Chart PNG
+                </button>
+              ) : null}
             </div>
 
-            <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-5 lg:grid-cols-[minmax(10.5rem,23%)_minmax(0,1fr)] lg:gap-6">
-              <ChartsTimelineAside
-                ref={chartHistoryAsideRef}
-                sections={chartHistorySections}
-                activeChartId={activeChartId}
-                onSelectChart={selectChartPreserveScroll}
-                historyEmpty={chartHistory.length === 0}
-              />
+            <div className="grid w-full min-h-0 min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(10.5rem,23%)_minmax(0,1fr)] lg:items-start lg:gap-6">
+              <div className={chartsTabTimelineColumn}>
+                <ChartsTimelineAside
+                  ref={chartHistoryAsideRef}
+                  sections={chartHistorySections}
+                  activeChartId={activeChartId}
+                  onSelectChart={selectChartPreserveScroll}
+                  historyEmpty={chartHistory.length === 0}
+                />
+              </div>
 
-              <div ref={chartsPreviewRef} className="flex min-w-0 w-full flex-1 flex-col scroll-mt-24">
+              <div
+                ref={chartsPreviewRef}
+                className="flex min-h-0 min-w-0 w-full flex-1 flex-col scroll-mt-24"
+              >
                 {chartData.length > 0 ? (
                   <div className={chartsTabVizPreviewCard}>
                     <div
                       ref={chartsSessionHeadingRef}
-                      className="mb-1 w-full min-w-0 scroll-mt-28 text-center lg:mb-2"
+                      className="w-full min-w-0 scroll-mt-28"
                     >
                       <div className="mx-auto min-w-0 max-w-4xl">
                         {chartHeadingBlock ?? (
-                          <div className={`${aiInsightsVizHeadingWrap} px-0`}>
+                          <div className={chartsTabVizHeaderZone}>
+                            <p className={chartsTabVizKicker}>Chart preview</p>
                             <h3 className={aiInsightsVizTitle}>Visualization</h3>
                             {chartSubtitle ? (
                               <p className={aiInsightsVizSubtitle}>{chartSubtitle}</p>
@@ -10701,7 +10738,7 @@ function HomeInner() {
                     </div>
                     <div
                       title={sessionChartMetadataLine}
-                      className={aiInsightsVizChipsWrap}
+                      className={`${aiInsightsVizChipsWrap} mt-1`}
                     >
                       <ChartContextSummary
                         renderedKind={sessionRenderedChartKind}
@@ -10709,22 +10746,29 @@ function HomeInner() {
                         semanticHeader={sessionChartSemanticHeader}
                         badgeCompact={sessionChartMetadataBadgeCompact}
                         leadInsight={chartInsightBadge ?? undefined}
+                        compactChips
                       />
                     </div>
-                    {visualization?.partialVisualizationWarning ? (
-                      <p className="mb-3 mt-1 rounded-xl border border-amber-200/55 bg-amber-50/50 px-3 py-2 text-xs leading-snug text-amber-950/90 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-wash-caution)] dark:text-[color:var(--insights-text-secondary)]">
-                        <span className="font-semibold text-amber-900/95 dark:text-[color:var(--insights-answer-emphasis)]">Note · </span>
-                        {visualization.partialVisualizationWarning.length > 220
-                          ? `${visualization.partialVisualizationWarning.slice(0, 217)}…`
-                          : visualization.partialVisualizationWarning}
-                      </p>
-                    ) : null}
-
-                    <div className="flex w-full min-w-0 flex-col gap-2.5 sm:gap-3">
+                    <ChartsTabIntelligenceStrip
+                      sourceLabel={sessionChartIntelSourceLabel}
+                      chartTypeLabel={presentationKindUiLabel(
+                        sessionRenderedChartKind
+                      )}
+                      measureLabel={chartAxisLabels.valueAxis}
+                      axisLabel={sessionChartIntelAxisLabel}
+                      highlight={chartInsightBadge ?? null}
+                      note={sessionChartIntelNote}
+                    />
+                    <div className={chartsTabVizPlotStage}>
                       <div
                         key={activeChartId ?? "session-chart"}
-                        className="w-full min-h-0 min-w-0"
-                        style={{ height: chartHeightMain }}
+                        className={chartsTabVizPlotSlot}
+                        style={
+                          {
+                            "--charts-tab-plot-h": `${chartHeightMain}px`,
+                            "--insights-viz-plot-h": `${chartHeightMain}px`,
+                          } as CSSProperties
+                        }
                       >
                         <div
                           className={chartsTabVizSessionFrame}
@@ -10734,11 +10778,22 @@ function HomeInner() {
                             } as CSSProperties
                           }
                         >
-                          <div className={aiInsightsVizPlotSurface}>
-                            {renderDatasetChart(chartHeightMain, false, false)}
-                          </div>
+                          <ChartInsightViewportWrapper
+                            chartKind={sessionRenderedChartKind}
+                            sessionMode
+                          >
+                            <div className={aiInsightsVizPlotSurface}>
+                              {renderDatasetChart(
+                                chartHeightMain,
+                                false,
+                                false
+                              )}
+                            </div>
+                          </ChartInsightViewportWrapper>
                         </div>
                       </div>
+                    </div>
+                    <div className={chartsTabSmartReadWrap}>
                       <SmartChartInsightPanel
                         intel={sessionSmartChartIntel}
                         cards={executiveVizInsights.slice(0, 3)}
@@ -10746,24 +10801,22 @@ function HomeInner() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4 rounded-[1.35rem] border border-slate-200/50 bg-white/90 p-10 text-center text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ring-1 ring-slate-900/[0.02]">
+                  <div className={chartsTabEmptyState}>
                     {chartHistory.length > 0 ? (
                       <>
-                        <p className="text-base font-semibold tracking-tight text-slate-900">
-                          Select a chart
-                        </p>
-                        <p className="mx-auto max-w-lg text-sm leading-relaxed text-slate-600">
-                          Pick an <span className="font-medium text-slate-800">Auto</span> or{" "}
-                          <span className="font-medium text-slate-800">AI</span> card in the
+                        <p className={chartsTabEmptyTitle}>Select a chart</p>
+                        <p className="mx-auto max-w-lg text-sm leading-relaxed text-[color:var(--text-muted)]">
+                          Pick an <span className={chartsTabDescEmphasis}>Auto</span> or{" "}
+                          <span className={chartsTabDescEmphasis}>AI</span> card in the
                           timeline to load it here for PNG export or the session PDF.
                         </p>
                       </>
                     ) : (
                       <>
-                        <p className="text-base font-semibold tracking-tight text-slate-900">
+                        <p className={chartsTabEmptyTitle}>
                           Ask something analytical
                         </p>
-                        <ul className="mx-auto inline-block max-w-lg space-y-2 text-left text-sm text-slate-600">
+                        <ul className="mx-auto inline-block max-w-lg space-y-2 text-left text-sm text-[color:var(--text-muted)]">
                           <li className="flex gap-2">
                             <span className="select-none text-slate-400">—</span>
                             <span>sales by region</span>

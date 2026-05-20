@@ -10,11 +10,16 @@ import { insightViewportMaxClassForChartKind } from "@/lib/chart-layout-config";
 export function ChartInsightViewportWrapper({
   chartKind,
   children,
+  /** Charts tab session preview — full width centering without insight max-width cap. */
+  sessionMode,
 }: {
   chartKind: ChartKind;
   children: React.ReactNode;
+  sessionMode?: boolean;
 }) {
-  const innerMax = insightViewportMaxClassForChartKind(chartKind);
+  const innerMax = sessionMode
+    ? "max-w-full"
+    : insightViewportMaxClassForChartKind(chartKind);
   return (
     <div
       className={`ai-insights-viz-plot-host grid w-full min-w-0 place-items-center ${innerMax}`}
