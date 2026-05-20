@@ -19,7 +19,7 @@ export function AiInsightChartShell({
 }) {
   return (
     <div
-      className="mx-auto w-full max-w-[960px] min-w-0"
+      className="ai-insights-viz-chart-frame mx-auto w-full max-w-[960px] min-w-0 rounded-[1.1rem] border border-[color:var(--border-default)]/50 p-1.5 sm:p-2 lg:max-w-[min(960px,100%)]"
       style={{ minHeight: minOuterHeight }}
     >
       <ChartInsightViewportWrapper chartKind={chartKind}>
