@@ -66,6 +66,7 @@ function classifyQuestion(q: string): {
   share: boolean;
   correlate: boolean;
   rank: boolean;
+  outlier: boolean;
 } {
   const t = norm(q);
   return {
@@ -84,6 +85,13 @@ function classifyQuestion(q: string): {
     rank: /\b(rank|ranking|top\s*\d|bottom|sorted|ordered|highest|lowest|leading|trailing)\b/i.test(
       t
     ),
+    outlier:
+      /\b(outliers?|anomal(?:y|ies)|unusually\s+(?:high|low)|extreme\s+values?)\b/i.test(
+        t
+      ) ||
+      /\bwhere\s+are\b.*\boutliers?\b/i.test(t) ||
+      (/\b(?:largest|smallest|max|min)\b/i.test(t) &&
+        /\b(?:outliers?|distribution|spread|range)\b/i.test(t)),
   };
 }
 
@@ -227,6 +235,23 @@ function recommendCore(args: RecommendArgs): {
   const apiKind = apiChartStringToKind(args.apiChartType);
   const met = (args.valueAxis ?? "").trim() || "your metric";
   const dim = (args.categoryAxis ?? "").trim() || "each category";
+
+  if (q.outlier && !/\bby\s+[a-z0-9]/i.test(norm(question))) {
+    if (apiKind === "histogram") {
+      return {
+        kind: "histogram",
+        histogramStyle: false,
+        blurb:
+          `Bins ${met} values so extreme salaries or records stand out in the tails — not department averages.`,
+      };
+    }
+    return {
+      kind: "bar_horizontal",
+      histogramStyle: false,
+      blurb:
+        `Ranks individual ${met} values to highlight outliers. Grouped department averages hide extreme records.`,
+    };
+  }
 
   if (apiKind === "histogram") {
     return {

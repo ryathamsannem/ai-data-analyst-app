@@ -129,6 +129,41 @@ export function pickMetricParts(
   };
 }
 
+/** Strip aligned-analysis aggregation prefixes from a humanized column phrase. */
+function stripLeadingAggFromMetricPhrase(phrase: string): string {
+  return phrase
+    .replace(/^(average|mean|avg|total|sum|maximum|minimum|max|min)\s+/i, "")
+    .trim();
+}
+
+/**
+ * Histogram measure chip: the numeric column being distributed (e.g. Salary),
+ * not a stale aligned "Average salary" from a prior grouped chart.
+ */
+export function resolveHistogramMeasureChipLabel(
+  viz: ChartSemanticVizLike,
+  analysis: ChartSemanticAnalysisLike,
+  preferAnalysis: boolean
+): string {
+  const p = viz?.provenance;
+  const provDisp = p?.numericColumnDisplay?.trim();
+  const provCol = p?.numericColumn?.trim();
+  if (provDisp) {
+    return (
+      polishMetricDisplay(stripLeadingAggFromMetricPhrase(provDisp)) || "Value"
+    );
+  }
+  if (provCol) {
+    return polishMetricDisplay(humanizeColumnName(provCol)) || "Value";
+  }
+
+  const { col, display } = pickMetricParts(viz, analysis, preferAnalysis);
+  const raw =
+    display?.trim() || (col ? humanizeColumnName(col) : "").trim();
+  if (!raw) return "Value";
+  return polishMetricDisplay(stripLeadingAggFromMetricPhrase(raw)) || "Value";
+}
+
 function formatTimeAxisCaption(
   columnDisplay: string,
   columnRaw: string | null,
@@ -312,15 +347,12 @@ export function buildChartSemanticHeader(args: {
   });
 
   if (args.presentationKind === "histogram") {
-    const { col, display } = pickMetricParts(
-      args.viz,
-      args.analysis,
-      args.preferAnalysisForCategory
-    );
     const detail =
-      polishMetricDisplay(
-        display?.trim() || (col ? humanizeColumnName(col) : "") || ""
-      ).trim() || args.refinedMetricLabel;
+      resolveHistogramMeasureChipLabel(
+        args.viz,
+        args.analysis,
+        args.preferAnalysisForCategory
+      ) || args.refinedMetricLabel;
     return { mode: "mono", roleLabel: "Bucket range", detailLabel: detail };
   }
 

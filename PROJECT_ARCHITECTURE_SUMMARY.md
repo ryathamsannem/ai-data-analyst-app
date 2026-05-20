@@ -1,306 +1,291 @@
 # AI Data Analyst App — Project Architecture Summary
 
-Reference for development continuity and regression prevention. Documents the **current** codebase; update this file when architecture changes materially.
+Reference for onboarding and **fresh Cursor chats**. Describes the **current stable implementation** (May 2026) across all tabs.
+
+**Product baseline:** [`AGENTS.md`](AGENTS.md)  
+**Tab deep-dives:** [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`CHARTS_TAB_BASELINE.md`](CHARTS_TAB_BASELINE.md) (legacy) · [`LATEST_STABLE_UI_SNAPSHOT.md`](LATEST_STABLE_UI_SNAPSHOT.md)
 
 ---
 
-## 1. High-level architecture
+## 1. Application architecture
 
-### Frontend structure
+### Stack
 
-| Area | Location | Notes |
-|------|----------|--------|
-| **App shell** | `frontend/app/page.tsx` (~11k lines) | Single client page: upload, filters, all tabs, `/ask`, export orchestration |
-| **Provider** | `frontend/contexts/chart-session-context.tsx` | Wraps `HomeInner` via `ChartSessionProvider` in `page.tsx` default export |
-| **Rendering** | `frontend/app/components/home/chart-renderer.tsx` | Shared Recharts path for Charts, AI Insights, off-screen PDF capture |
-| **Tab chrome** | `frontend/app/components/home/main-nav-tabs.tsx` | `overview` \| `preview` \| `insights` \| `charts` \| `export` |
-| **Libs** | `frontend/lib/*` | Presentation, semantics, axes, trend copy, PDF helpers, follow-ups |
-| **PDF** | `frontend/app/pdf-report.ts` | jsPDF + Canvg SVG rasterization |
-| **Types** | `frontend/app/chart-types.ts`, `dashboard-filter-types.ts` | Chart rows, filter models |
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js App Router, React 19, Tailwind CSS v4, Recharts |
+| Backend | FastAPI, pandas (in-memory `df` per process) |
+| AI | Claude via `POST /ask` for narrative; chart series are **deterministic** (pandas) |
+| Persistence | Client-only session (no per-user DB on frontend) |
 
-**Stack:** Next.js (App Router) + Tailwind + Recharts. Most business logic lives in `page.tsx`.
+### Repository layout
 
-### Backend structure
+```
+frontend/app/layout.tsx          → fonts, ThemeScript, globals.css
+frontend/app/page.tsx            → single client app (~12k lines): all tabs + business logic
+frontend/components/app-shell/   → sidebar + header + main scroll region
+frontend/contexts/               → chart session store
+frontend/lib/                    → chart contracts, axes, narrative, theme, tab tokens
+backend/main.py                  → upload, filters, dashboard, preview, /ask
+```
 
-| Area | Location | Notes |
-|------|----------|--------|
-| **API monolith** | `backend/main.py` | FastAPI: in-memory `df`, upload, sheet select, filtered dashboard, column mapping, `/ask` |
-| **Label helpers** | `backend/analytics_metadata.py` | Domain-agnostic metric/axis phrasing (pandas side) |
-| **Session state** | Global `df`, `dataset_profile` | One dataset per server process (no per-user DB) |
+### Navigation model
 
-**Key endpoints:** `/upload`, `/select-sheet`, `/filtered-dashboard`, `/preview`, `/update-column-mapping`, `POST /ask`.
+| Tab id | Label | Primary backend |
+|--------|--------|-----------------|
+| `overview` | Overview | `/upload`, `/filtered-dashboard` |
+| `preview` | Data Preview | `/preview` |
+| `insights` | AI Insights | `/ask` |
+| `charts` | Charts | Session only (snapshots from Overview + AI) |
+| `export` | Export | Client PDF (`pdf-report.ts`) |
 
-### AI integration flow
+**No URL routes per tab** — `activeTab` state in `page.tsx` inside `AppShell`.
 
-1. UI (`askAI` in `page.tsx`) sends `question`, `conversation_context`, `dashboard_filters`, `date_range` to `POST /ask`.
-2. Backend: `resolve_follow_up_turn` → filtered pandas slice → viz builder → Claude prompt → narrative.
-3. Response: `answer`, `visualization`, `analysis`, `conversation_context`, `conversation_meta`, `filter_breadcrumb`.
-4. Frontend: `hydrateVisualizationFromApi`, `parseAlignedAnalysis` → `pushAIChart` **or** `preservePinnedChart` + per-chart answer bundle.
+### App shell (stable)
 
-**Split responsibility:** chart **series** are deterministic (pandas/backend); prose is generative (Claude).
+| File | Role |
+|------|------|
+| `frontend/components/app-shell/app-shell.tsx` | Sidebar + workspace; collapse via `sidebar-prefs` |
+| `frontend/components/app-shell/app-sidebar.tsx` | Nav → `MainNavTabId` |
+| `frontend/components/app-shell/app-header.tsx` | Title, search placeholder, **ThemeToggle** |
+| `frontend/app/components/home/main-nav-tabs.tsx` | Tab ids + page titles |
 
----
-
-## 2. Current state management flow
-
-### `selectedVisualization` (intended source of truth)
-
-| Type | File | Role |
-|------|------|------|
-| **`VisualizationContract`** | `frontend/lib/selected-visualization.ts` | Frozen contract: `mode` (trend/category/comparison/distribution), `chartType`, titles, aggregation labels, `semanticContext` |
-| **`ChartSnapshot`** | `frontend/contexts/chart-session-context.tsx` | Session record: `id`, `source` (`ai` \| `auto_dashboard`), `chartData`, `visualization`, `contract`, lineage |
-
-**Aliases:** `SelectedVisualization` = `ChartSnapshot` (session) or `VisualizationContract` (contract module).
-
-**Practical rendering SoT:** `ChartSnapshot.contract` + `chartData` + `visualization`. Some presentation fields are still recomputed in `page.tsx` memos.
-
-Contracts are created via `freezeVisualizationContract()` on push/replace.
-
-### Chart selection lifecycle
-
-| Action | Function | Effect |
-|--------|----------|--------|
-| Dashboard refresh | `replaceAutoDashboardCharts` | Rebuilds `auto_dashboard` snapshots; keeps `ai` entries |
-| User picks chart | `selectChart(id)` | Sets **`activeId` + `insightChartId`** together |
-| New AI chart | `pushAIChart` | Upsert by dedupe key; pins active + insight |
-| Dataset change | `invalidateForDatasetChange` | Clears history, bumps `datasetEpoch` |
-
-- **Charts tab:** `activeSnapshot` (`activeChartId`).
-- **Overview:** renders `autoDashboard` API payload; linked to session via `dashboardChartKeyFromTitle(title)` → `snapshotId`.
-
-### AI Insights lifecycle
-
-| State | Scope | Purpose |
-|-------|--------|---------|
-| `question`, `answer`, `hasValidAIAnswer`, `lastAskedQuestion` | Global live | Current UI |
-| `alignedAnalysis` | Global live | Parsed `/ask` `analysis` |
-| `aiAnswerByChartId` | Per `chartId` | Persisted Q&A when asking about a pinned chart |
-| `insightSnapshot` | Session | Pinned chart for Insights + export (`insight` scope) |
-| `conversationSnapshot`, `aiConversationState`, `lastConversationMeta` | Global | Thread, follow-ups, turn ids |
-
-**`askAI` highlights:**
-
-1. Clears live answer/analysis; sets `lastAskedQuestion`.
-2. Uses `insightChartId` as lineage parent in conversation payload.
-3. **`preservePinnedChart`** (parent has data): no `pushAIChart`; re-`selectChart(parent)`; sanitize narrative vs contract; save bundle on **parent** chart id.
-4. Else: hydrate viz → `pushAIChart` → pin insight.
-
-**Overview → Ask AI** (`askAiAboutDashboardChart`): `selectChart`, prefill question, clear answer/analysis, tab → `insights` (user must run Ask).
-
-**Chart switch** (`selectChartWithInsightState`): restores `aiAnswerByChartId` into live fields.
-
-**Reset** (`resetAiConversation`): clears thread + `clearAiInsightSession` (removes AI snapshots from history).
-
-### Follow-up lifecycle
-
-| Layer | Mechanism |
-|-------|-----------|
-| **Backend** | `resolve_follow_up_turn`, follow-up filters, `conversation_sidecar`, `followUpChain` |
-| **Frontend** | `conversationSnapshot` on each `/ask`; `aiConversationState.followUpChain`; chips via `buildAiFollowUpQuestionChips` / `schemaAwareFollowUpSeeds` |
-| **UI** | `lastConversationMeta.followUpDetected`, `alignedAnalysis.conversationFollowUp` |
-
-### Export / PDF lifecycle
-
-| Step | Behavior |
-|------|----------|
-| **Scope** | `exportOptions.chartScope`: `session` (Charts) or `insight` (pinned insight) |
-| **Snapshot** | `pdfSnap` = `activeSnapshot` or `insightSnapshot` |
-| **Validation** | `validateExportMatchesContract` — blocks on id/type/dimension mismatch |
-| **Narrative** | `insightAnswerForExport`, `insightAnalysisForExport` (live or per-chart store) |
-| **Capture** | Hidden `ChartRenderer` via `chartCaptureSessionRef` / `chartCaptureInsightRef` |
-| **Build** | `downloadReportImplRef` → `runExecutivePdfExport` (`pdf-report.ts`) |
-
-AI charts need valid answer + question alignment for insight export; auto-dashboard charts can export chart-only.
+**Layout:** `app-workspace` → `app-main-scroll` → `app-main-inner app-page-gutter` (max-width ~100rem). Content scrolls in main region — no nested floating panel gutter.
 
 ---
 
-## 3. Source-of-truth objects
+## 2. Integration hub (`page.tsx`)
 
-### Visualization rendering
+`HomeInner` wrapped in **`ChartSessionProvider`**. Owns:
 
-| Priority | Object | Used by |
-|----------|--------|---------|
-| 1 | `ChartSnapshot.contract` | Kind, mode, display titles, trend vs category |
-| 2 | `chartData` + `visualization` | Series, stacked/scatter, provenance |
-| 3 | Fallback memos in `page.tsx` | `computeFinalChartPresentation`, axis bundles |
+| Concern | State / handlers |
+|---------|------------------|
+| Tabs | `activeTab`, `useTransition` for switches |
+| Data | Upload, mapping modal, filters, `autoDashboard` |
+| AI Insights | `askAI`, `resetAiConversation`, `aiAnswerByChartId`, insight gates |
+| Charts | `chartHistory`, `activeSnapshot`, timeline selection |
+| Export | `downloadReport`, `downloadChartPng`, capture refs |
+| Viewport | `viewportH` / `viewportW` (resize debounce 140ms) |
 
-**Entry point:** `renderDatasetChart` → `ChartRenderer`.
-
-**Exception:** Overview mini cards (`OverviewAutoDashboardChartCard`) render from raw `autoDashboard.charts[]` locally; session syncs in parallel via `replaceAutoDashboardCharts`.
-
-### AI answer state
-
-| Concern | Source of truth |
-|---------|-----------------|
-| Answer text | Live `answer`; durable `aiAnswerByChartId[chartId]` |
-| Structured analysis | Live `alignedAnalysis`; durable in same bundle |
-| Thread | `conversationSnapshot` + `aiConversationState` |
-| Chart scope for Q&A | `insightChartId` / lineage / bundle keyed by parent id when preserving pin |
-
-### Metadata flow across surfaces
-
-| Surface | Chart data | Titles / aggregation | Axes / semantics |
-|---------|------------|----------------------|------------------|
-| **Overview** | `autoDashboard` payload | `getCanonicalChartTitle` + snapshot `contract` for title | Local mini-card heuristics |
-| **Charts** | `activeSnapshot` | `contract` / `contractDisplayTitle` | `buildChartAxisPresentationBundle` + viz |
-| **AI Insights** | `insightSnapshot` | Same + `alignedAnalysis` (non-dashboard) | Insight pipeline (mirrors session) |
-| **PDF** | `pdfSnap` by scope | Contract + `buildNormalizedVizMetadata` + trend sanitization | PDF axis merge + capture refs |
+**Performance patterns (preserve):** `React.memo` on heavy subtrees, `useMemo` / `useCallback`, `useDeferredValue` on Data Preview search.
 
 ---
 
-## 4. Semantic engine overview
+## 3. Chart rendering — two paths
 
-### Aggregation-aware titles
+### Path A — Shared `ChartRenderer` (Charts, AI Insights, PDF/PNG)
 
-- `normalizeAggregationKey` / `formatAggregationLabel` (`semantic-metric-engine.ts`)
-- `freezeVisualizationContract` — metric labels, trend/comparison display titles
-- `getCanonicalChartTitle` (`canonical-chart-title.ts`)
-- Backend provenance + `analysis` fields
+| File | Role |
+|------|------|
+| `frontend/app/components/home/chart-renderer.tsx` | Recharts; `insightMode` flag |
+| `frontend/lib/final-chart-presentation.ts` | **`computeFinalChartPresentation`** — single deterministic kind |
+| `frontend/lib/selected-visualization.ts` | Contract freeze, trend mode, row sort |
+| `frontend/lib/chart-axis-layout.ts` | Category plans, margins |
+| `frontend/lib/chart-time-x-axis.ts` | Line/area X ticks and bottom margin |
+| `frontend/lib/chart-layout-config.ts` | Insight plan widths, `insightCartesianOuterMargins` |
+| `frontend/app/components/ai-insight-chart-shell.tsx` | Insights + PDF capture frame |
+| `frontend/app/components/home/chart-insight-viewport-wrapper.tsx` | Insight plot centering |
 
-### Semantic metadata
+| Mode | Viewport | Margins | Shell |
+|------|----------|---------|-------|
+| Session (`insightMode=false`) | Live `viewportEffective` ≤ 860px | Session cartesian plan | Fixed `chartHeightMain` |
+| Insight (`insightMode=true`) | Fixed 760/850/900px plan | `insightCartesianOuterMargins` | `AiInsightChartShell` + plot height var |
 
-- **`SemanticMetricContext`:** metric, dimension, aggregation, chart type — from columns/keys, not vertical nouns
-- **`chart-semantic-metadata.ts`:** axis headers, category resolution
-- **`normalized-viz-metadata.ts`:** title harmonization with aligned analysis
-- **`fromAlignedAnalysis` / `fromAutoDashboardChart`:** API ↔ UI bridge
+### Path B — Overview auto-dashboard mini charts only
 
-### Trend vs category
+| File | Role |
+|------|------|
+| `page.tsx` — `OverviewAutoDashboardChartCard` | Local Recharts, 360px height |
+| `computeOverviewDashboardChartPresentation` | Stricter than shared presentation (≤4 categories for vertical bar, etc.) |
+| `frontend/lib/overview-ui.ts` | `ovCard`, `ovChartGrid`, dashboard tokens |
 
-| | Trend | Category / comparison |
-|--|--------|------------------------|
-| **Detection** | Temporal labels, line/area, title “trend”, `inferVisualizationMode` | Bar/pie, “by dimension” |
-| **Sort** | Disabled (`isTrendMode`) | `applyBarChartSort` |
-| **Narrative** | `sanitizeNarrativeForTrendContract` | `buildChartNarrative` |
-| **PDF** | Trend ranked signals; dimension validation | Category ranked signals |
-
-Bar + temporal labels may upgrade to **line** in `freezeVisualizationContract`.
-
-### Dynamic domain support
-
-- Backend: `infer_dataset_kind`, domain-specific + generic auto-dashboard builders
-- Semantic column mapping (product/sales/region/date scores)
-- Frontend: `datasetKind` for KPIs/seeds; UI wording stays column/aggregation-based
+**Do not assume** `ChartRenderer` changes fix Overview cards (or vice versa) unless intentionally shared.
 
 ---
 
-## 5. Important shared helpers
+## 4. AI Insights — stable behaviors (summary)
 
-| Module | Responsibility |
-|--------|----------------|
-| `selected-visualization.ts` | Freeze contract, trend mode, export validation, narrative sanitization |
-| `final-chart-presentation.ts` | Deterministic chart kind/orientation |
-| `semantic-metric-engine.ts` | Semantic context, aggregation labels, follow-up templates |
-| `canonical-chart-title.ts` | Display titles, trend grain |
-| `chart-semantic-metadata.ts` | Axis labels, PDF axis helpers |
-| `normalized-viz-metadata.ts` | Title inference, analysis alignment |
-| `insight-aligned-axis-merge.ts` | Viz axes + `/ask` analysis merge |
-| `trend-visualization.ts` | Trend axes, executive facts, PDF signals |
-| `chart-axis-layout.ts`, `chart-time-x-axis.ts` | Margins, temporal ticks |
-| `chart-layout-config.ts` | Heights, timeline ↔ kind |
-| `smart-chart-intelligence.ts` | Routing, API string ↔ kind |
-| `ux-narrative.ts`, `ai-follow-up-suggestions.ts` | Narrative sections, follow-up chips |
-| `chart-insight-answers.ts` | Per-chart answer store |
-| `insight-confidence.ts` | Confidence from analysis |
-| `pdf-report.ts` | Executive PDF generation |
-| `hydrateVisualizationFromApi` (`page.tsx`) | API viz → stored viz + rows |
+Full detail: [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md)
+
+| Area | Implementation |
+|------|----------------|
+| Layout | `ai-insights-ui.ts` tokens; `268px` + `1fr` grid |
+| Filters | `appearance="dashboard"` (same as Overview) |
+| Viz gate | `insightHasRenderableVisualization` + question + intent match |
+| Outlier sync | `chart-question-intent.ts` + backend `_try_outlier_visualization` |
+| Metadata chips | `ChartContextSummary` + `resolveHistogramMeasureChipLabel` |
+| Dark chips | `--insights-answer-label` / `--insights-answer-body` |
+| AI Read | `SmartChartInsightPanel` gated on question match |
+| Export | `showInsightExportButton` → `chartScope: "insight"` |
+| Reset | `clearAiInsightSession`; disabled until conversation exists |
+| Suggested Q | Scroll body; click prefills only |
 
 ---
 
-## 6. Risky areas / regression-prone flows
+## 5. Charts tab — stable behaviors (summary)
 
-### Overview → Ask AI
+Full detail: [`CHARTS_TAB_BASELINE.md`](CHARTS_TAB_BASELINE.md)
 
-- Clears `alignedAnalysis` until user runs Ask; export narrative incomplete beforehand.
-- `preservePinnedChart` must not call `pushAIChart` and replace series.
-- Trend narrative sanitization must not leak category dimension wording.
-
-### Chart synchronization
-
-- Dual path: Overview (`autoDashboard`) vs session (`replaceAutoDashboardCharts`).
-- Filter refresh replaces auto-dashboard snapshot ids (title-keyed linking).
-- `selectChart` syncs active + insight; `setActiveChart` exists but is unused — do not use alone.
-
-### AI answer persistence
-
-- Global `alignedAnalysis` vs `aiAnswerByChartId` — chart switch must restore bundle.
-- Question edit without re-ask invalidates export unless text matches stored question.
-- Bundle saved on **lineage parent** id, not always new AI chart id.
-
-### PDF export consistency
-
-- Third axis/title pipeline in `downloadReportImplRef`.
-- `validateExportMatchesContract` blocks on presentation drift.
-- Requires mounted off-screen chart; wrong `chartScope` pairs wrong chart/answer.
-
-### Trend chart preservation
-
-- Contract `mode: "trend"` must drive sort, axes, and PDF branches consistently.
-- `preservePinnedChart` must not reintroduce category axis semantics into analysis overlay.
+| Area | Implementation |
+|------|----------------|
+| Layout | Timeline ~23% + preview card |
+| Render | `renderDatasetChart(..., insightMode=false)` |
+| Metadata | `ChartContextSummary` (non-compact) |
+| Smart panel | No Insights question gate |
+| PNG | `downloadChartPng` + `chartCaptureSessionRef` |
+| Presentation | Same `computeFinalChartPresentation` as Insights |
 
 ---
 
-## 7. Architectural decisions already implemented
+## 6. Backend chart intelligence
 
-| Decision | Implementation |
-|----------|----------------|
-| Pinned visualization / contract | `freezeVisualizationContract`; `validateExportMatchesContract` on export |
-| Unified chart pin | `selectChart` sets active + insight together |
-| Dynamic aggregation labels | `formatAggregationLabel`, trend metric labels, `analytics_metadata` |
-| Metadata-driven charts | Backend viz from mapped columns; frontend hydrates |
-| Domain-agnostic wording | Semantic engine; no dataset literals in follow-up chips |
-| Deterministic presentation | `computeFinalChartPresentation` (Overview has parallel local path) |
-| Follow-up support | `conversation_context`, backend routing, UI chips/meta |
-| Ask without rebuild | `preservePinnedChart` + per-chart answer store |
-| Performance | Memoized overview slots, `useTransition` for tabs, dev render counts |
-| Horizontal bar preservation | Kind locked in presentation layer |
+| Area | `backend/main.py` |
+|------|-------------------|
+| Ask | `POST /ask` → visualization + Claude narrative + `analysis` |
+| Chart types | `bar`, `bar_horizontal`, `pie`, `donut`, `line`, `area`, `scatter`, `histogram` |
+| Outlier routing | `_try_outlier_visualization` — histogram or ranked horizontal bar |
+| Histogram | `_histogram_bucket_rows`, `_resolve_histogram_numeric_column_for_question` |
+| Recommendation | `_build_chart_recommendation_dict` on viz payload |
+
+Frontend mirrors intent in `smart-chart-intelligence.ts`, `chart-question-intent.ts`, `final-chart-presentation.ts`.
 
 ---
 
-## 8. Key files for debugging
+## 7. Session store
 
-| File | Controls |
-|------|----------|
-| `frontend/app/page.tsx` | Tabs, `askAI`, filters, session/insight memos, export, hydration/parsing |
-| `frontend/contexts/chart-session-context.tsx` | History, active/insight ids, `pushAIChart`, contracts |
-| `frontend/lib/selected-visualization.ts` | `VisualizationContract`, freeze/validate/trend narrative |
-| `frontend/lib/final-chart-presentation.ts` | Chart kind/orientation |
-| `frontend/lib/semantic-metric-engine.ts` | Semantic context, aggregation, follow-ups |
-| `frontend/lib/chart-semantic-metadata.ts` | Axis labels, headers |
-| `frontend/lib/trend-visualization.ts` | Trend UX and PDF signals |
-| `frontend/lib/chart-insight-answers.ts` | Per-chart Q&A persistence |
-| `frontend/app/components/home/chart-renderer.tsx` | Recharts + capture target |
-| `frontend/app/pdf-report.ts` | PDF document |
-| `frontend/app/components/home/charts-timeline-aside.tsx` | Chart history selection |
-| `frontend/app/components/ai-insight-chart-shell.tsx` | Insights chart chrome |
-| `frontend/app/components/home/filter-panel.tsx` | Dashboard filters |
-| `backend/main.py` | Upload, dashboard, `/ask`, viz, follow-ups, Claude |
-| `backend/analytics_metadata.py` | Server-side label rules |
-| `AGENTS.md` (repo root) | Product baseline: charts, filters, PDF alignment constraints |
+**File:** `frontend/contexts/chart-session-context.tsx`
+
+| API | Behavior |
+|-----|----------|
+| `pushAIChart` | Dedupe by intent; freeze contract; set `insightChartId` |
+| `selectChart` | Sets `activeId` **and** `insightChartId` |
+| `clearAiInsightSession` | Removes AI-sourced charts only |
+| `replaceAutoDashboardCharts` | Sync Overview dashboard into timeline |
 
 ---
 
-## Quick reference: tab → state → API
+## 8. Theme and design system
 
-| Tab | Primary state | Backend |
-|-----|---------------|---------|
-| Overview | `autoDashboard`, filters, linked `chartHistory` | `/upload`, `/filtered-dashboard` |
-| Preview | `preview`, `columns` | `/preview` |
-| AI Insights | `question`, `answer`, `insightSnapshot`, conversation | `/ask` |
-| Charts | `activeSnapshot`, `chartHistory` | (session only) |
-| Export | `exportOptions`, capture refs | (client PDF) |
+| Piece | Location |
+|-------|----------|
+| Global tokens | `globals.css` `:root` / `.dark` |
+| Theme persistence | `frontend/lib/theme.ts` |
+| FOUC guard | `frontend/components/theme-script.tsx` |
+| Overview UI | `frontend/lib/overview-ui.ts` |
+| AI Insights UI | `frontend/lib/ai-insights-ui.ts` (**wired**) |
+| Buttons | `frontend/lib/ui-buttons.ts`, `.saas-btn-*` |
 
----
+**Insights dark layers** (scoped `.ai-insights-page`): `--insights-layer-*`, `--insights-answer-*`, viz metadata chip overrides.
 
-## Change checklist (regression prevention)
-
-When changing chart behavior, verify **all** of:
-
-- [ ] `freezeVisualizationContract` / `computeFinalChartPresentation`
-- [ ] Overview link (title key) + Charts + AI Insights memos
-- [ ] `preservePinnedChart` and per-chart bundles
-- [ ] PDF export (`chartScope`, contract validation, capture)
-- [ ] Trend vs category branches (sort, axes, narrative, ranked signals)
+**Charts tab:** primarily slate Tailwind on preview card; inherits global dark via `<html class="dark">`.
 
 ---
 
-*Last documented from codebase inspection. No application code changes implied by this file.*
+## 9. Export pipeline
+
+| Scope | Capture ref | Chart mode |
+|-------|-------------|------------|
+| Session | `chartCaptureSessionRef` | `insightMode=false` |
+| Insight | `chartCaptureInsightRef` (860px) | `insightMode=true` |
+
+**File:** `frontend/app/pdf-report.ts` — `runExecutivePdfExport`, SVG-first chart image, lazy `html2canvas` fallback.
+
+**Validation:** `validateExportMatchesContract` in `page.tsx` before export.
+
+---
+
+## 10. Question ↔ chart synchronization (cross-cutting)
+
+```
+User asks → /ask → viz + analysis
+       ↓
+pushAIChart (session) + insight pin
+       ↓
+insightChartMatchesQuestionIntent (outlier guard)
+       ↓
+insightChartMatchesCurrentQuestion (text / turnId / analysis)
+       ↓
+Viz + AI Read + Export enabled
+```
+
+**Preserve pinned chart** only when `shouldPreservePinnedInsightChart()` — same question, follow-up, or aligned metrics.
+
+**Typing** a new question clears insight thread when text diverges (`setQuestionAndResetInsightState`).
+
+---
+
+## 11. Responsive and zoom (cross-cutting)
+
+| Surface | Width model | Height model |
+|---------|-------------|--------------|
+| Overview mini | `ResizeObserver` on card | Fixed 360px |
+| Charts session | `viewportEffective` ≤ 860px | `chartHeightMain` + viewport cap |
+| AI Insights | Fixed plan 760–900px | `insightShellPlotHeight` + viewport cap |
+| Browser zoom | Resize events only | No `visualViewport` |
+
+**Stable QA target:** 90% and 100% zoom in light and dark for Insights viz and Charts preview.
+
+---
+
+## 12. Overview — current status
+
+Overview is **stable** for KPI grid, filters, dataset card, and auto-dashboard charts. Some **grid polish** items remain documented as optional follow-ups (e.g. `.overview-charts-wrap` max-width 1600px, strict 2-column desktop cap) — see architecture notes in older commits; verify against `globals.css` before changing.
+
+Overview-specific presentation: **`computeOverviewDashboardChartPresentation`** — do not route Overview mini charts through `computeFinalChartPresentation` without explicit approval.
+
+---
+
+## 13. Known limitations (project-wide)
+
+| Area | Limitation |
+|------|------------|
+| Architecture | Monolithic `page.tsx` |
+| Routing | No deep links per tab |
+| Zoom | No explicit browser zoom handling |
+| PDF | Static import; white fallback capture in dark mode |
+| Docs | Prefer this file + tab baselines over stale line-number references in `page.tsx` |
+
+---
+
+## 14. What must NOT change without explicit request
+
+| Area | Why |
+|------|-----|
+| `askAI` + preserve-pin logic | Conversation continuity |
+| `computeFinalChartPresentation` (non-Overview) | Charts / Insights / PDF parity |
+| Horizontal bar semantics | Product rule in `AGENTS.md` |
+| Insight question–chart gates | Trust and export integrity |
+| Outlier routing (BE + FE) | Fixed misleading chart class |
+| `ChartSessionProvider` snapshot shape | Timeline + export contracts |
+| Export validation + capture refs | PDF integrity |
+| Working layout shells | `AiInsightChartShell`, filter bar, card hierarchy |
+
+**Safe:** narrow bug fixes, token contrast tweaks, axis margin tuning, Overview-only grid CSS, incremental Charts tab polish aligned with [`CHARTS_TAB_BASELINE.md`](CHARTS_TAB_BASELINE.md).
+
+---
+
+## 15. Recommended next work (incremental only)
+
+Per product direction, treat the current UI as **production baseline**:
+
+1. **Charts tab enhancements** — polish timeline/preview tokens toward Overview chrome **without** replacing `ChartRenderer` or presentation logic ([`CHARTS_TAB_BASELINE.md`](CHARTS_TAB_BASELINE.md)).
+2. **Overview chart grid** — optional max-width / 2-column enforcement if still needed on target viewports.
+3. **Regression pass** after any change: upload → filter → Insights ask (outlier + grouped) → Charts timeline → PDF export (session + insight).
+
+---
+
+## 16. Quick file index
+
+| Need | Open first |
+|------|------------|
+| AI Insights UI | `frontend/lib/ai-insights-ui.ts`, `AI_INSIGHTS_STABLE_SUMMARY.md` |
+| Charts tab | `CHARTS_TAB_BASELINE.md`, `page.tsx` search `activeTab === "charts"` |
+| Chart semantics | `final-chart-presentation.ts`, `chart-semantic-metadata.ts` |
+| Outlier guards | `chart-question-intent.ts`, `backend/main.py` |
+| Session | `chart-session-context.tsx` |
+| PDF | `pdf-report.ts` |
+| Agent rules | `AGENTS.md` |
+
+---
+
+*Last updated: May 2026 — stable SaaS baseline snapshot before Charts tab enhancements.*

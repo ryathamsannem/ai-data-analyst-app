@@ -2,7 +2,13 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 import pandas as pd
-from anthropic import Anthropic
+from anthropic import (
+    Anthropic,
+    APIConnectionError,
+    APIStatusError,
+    AuthenticationError,
+    RateLimitError,
+)
 from dotenv import load_dotenv
 import os
 from io import BytesIO
@@ -12,6 +18,7 @@ import re
 import math
 import json
 import logging
+import time
 import uuid
 
 from analytics_metadata import build_insight_title, build_metric_label
@@ -6475,9 +6482,40 @@ def _histogram_bucket_rows(
     return rows, title
 
 
+def _question_asks_outlier_analysis(ql: str) -> bool:
+    """Individual outlier / extreme-value questions — not department averages."""
+    s = str(ql).lower().strip()
+    if not s:
+        return False
+    if re.search(
+        r"\b(outliers?|anomal(?:y|ies)|unusually\s+(?:high|low)|extreme\s+values?)\b",
+        s,
+    ):
+        return True
+    if re.search(
+        r"\b(?:above|below)\s+(?:the\s+)?\d+(?:st|nd|rd|th)?\s+percentile\b",
+        s,
+    ):
+        return True
+    if re.search(r"\bwhere\s+are\b.*\boutliers?\b", s):
+        return True
+    if re.search(r"\b(?:largest|smallest|highest|lowest|max|min)\b", s) and re.search(
+        r"\b(?:outliers?|distribution|spread|range)\b", s
+    ):
+        return True
+    return False
+
+
+def _question_explicitly_groups_by_dimension(ql: str) -> bool:
+    """User named a breakdown dimension (by department, by region, …)."""
+    return bool(re.search(r"\bby\s+[a-z0-9]", str(ql).lower()))
+
+
 def _question_asks_numeric_distribution_histogram(ql: str) -> bool:
     """User wants a numeric value distribution (histogram), not category share."""
     s = str(ql).lower()
+    if _question_asks_outlier_analysis(s) and not _question_explicitly_groups_by_dimension(s):
+        return True
     if re.search(r"\b(histogram|frequency|binning|bins?)\b", s):
         return True
     if re.search(r"\bspread\b", s) or re.search(r"\brange\b", s):
@@ -6485,6 +6523,157 @@ def _question_asks_numeric_distribution_histogram(ql: str) -> bool:
     if "distribution" in s:
         return True
     return False
+
+
+def _pick_individual_label_column(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    columns: List[str],
+    metric_col: str,
+) -> Optional[str]:
+    """Prefer employee/name/id labels over department for outlier-ranked views."""
+    pool = [c for c in _dimension_pool_columns(df, profile, columns) if c != metric_col]
+    if not pool:
+        return None
+    preferred: List[str] = []
+    for c in pool:
+        cl = str(c).lower().replace(" ", "_")
+        if any(
+            tok in cl
+            for tok in (
+                "employee",
+                "emp_name",
+                "staff",
+                "worker",
+                "name",
+                "full_name",
+                "record",
+            )
+        ):
+            preferred.append(c)
+        elif cl.endswith("_id") or cl == "id" or "employee_id" in cl or "emp_id" in cl:
+            preferred.append(c)
+    if preferred:
+        return preferred[0]
+    for c in pool:
+        cl = str(c).lower()
+        if "department" in cl or cl == "dept":
+            continue
+        return c
+    return pool[0]
+
+
+def _try_outlier_visualization(
+    question: str, trace: Optional[Dict[str, Any]] = None
+) -> Tuple[List[Dict[str, Any]], str, str, str]:
+    """
+    Outlier-focused charts: histogram or ranked individuals — never department averages
+    unless the question explicitly says "by department".
+    """
+    global df, dataset_profile
+    subtitle = "Outlier-focused view"
+    q = question.lower().strip()
+    if not _question_asks_outlier_analysis(q):
+        return [], "", "", ""
+    if _question_explicitly_groups_by_dimension(q):
+        return [], "", "", ""
+    if df is None or df.empty:
+        return [], "", "", ""
+
+    profile = dataset_profile or build_profile(df)
+    ct_map = profile.get("column_types", {})
+    columns = df.columns.tolist()
+    numeric_cols = [c for c in columns if ct_map.get(c) == "number"]
+    domain = _infer_business_domain(columns)
+    ncol = _numeric_col_mentioned(q, numeric_cols) or _pick_default_metric_column(
+        q, numeric_cols, domain
+    )
+    if not ncol or str(ncol) not in df.columns:
+        return [], "", "", ""
+
+    metric_label = _pretty_label_text(str(ncol))
+
+    h_rows, _h_title = _histogram_bucket_rows(df, str(ncol))
+    if h_rows and len(h_rows) >= 3:
+        title = f"{metric_label} outliers — value distribution"
+        if trace is not None:
+            trace.update(
+                {
+                    "routing": "outlier_histogram",
+                    "category_column": str(ncol),
+                    "numeric_column": str(ncol),
+                    "aggregation": "count",
+                    "aggregation_key": "count",
+                    "rows_analyzed": int(len(df)),
+                    "notes": "Histogram of metric values to surface outliers.",
+                    "histogram": True,
+                    "outlier_view": True,
+                }
+            )
+        return h_rows, "histogram", title, subtitle
+
+    label_col = _pick_individual_label_column(df, profile, columns, str(ncol))
+    if not label_col or str(label_col) not in df.columns:
+        return [], "", "", ""
+
+    try:
+        sub = df[[label_col, ncol]].copy()
+        sub["_v"] = numeric_series(ncol)
+        sub = sub.dropna(subset=["_v"])
+        if len(sub) < 2:
+            return [], "", "", ""
+
+        label_lower = str(label_col).lower().replace(" ", "_")
+        dept_like = "department" in label_lower or label_lower == "dept"
+        n_cat = int(sub[label_col].nunique(dropna=True))
+
+        if dept_like and n_cat < 40:
+            sub = df[[ncol]].copy()
+            sub["_v"] = numeric_series(ncol)
+            sub = sub.dropna(subset=["_v"]).sort_values("_v", ascending=False)
+            ranked_n = int(len(sub))
+            show = sub.head(24)
+            chart_data = [
+                {
+                    "name": f"Record {i + 1}",
+                    "value": float(row["_v"]),
+                }
+                for i, (_, row) in enumerate(show.iterrows())
+            ]
+            label_human = "Record"
+        else:
+            show = sub.sort_values("_v", ascending=False).head(24)
+            ranked_n = int(len(show))
+            chart_data = [
+                {
+                    "name": _pretty_label_text(row[label_col]),
+                    "value": float(row["_v"]),
+                }
+                for _, row in show.iterrows()
+            ]
+            label_human = _pretty_label_text(label_col)
+
+        if len(chart_data) < 2:
+            return [], "", "", ""
+
+        ctype = "bar_horizontal" if len(chart_data) > 6 else "bar"
+        title = f"{metric_label} outliers — ranked by {label_human}"
+        if trace is not None:
+            trace.update(
+                {
+                    "routing": "outlier_ranked",
+                    "category_column": label_col,
+                    "numeric_column": str(ncol),
+                    "aggregation": "value",
+                    "aggregation_key": "max",
+                    "rows_analyzed": ranked_n,
+                    "notes": "Ranked individual metric values to highlight outliers.",
+                    "outlier_view": True,
+                }
+            )
+        return chart_data, ctype, title, subtitle
+    except Exception:
+        return [], "", "", ""
 
 
 def _numeric_column_for_histogram_question(
@@ -6663,6 +6852,10 @@ def _deterministic_viz_last_resort(
                 return chart_data, "scatter", title, subtitle
         except Exception:
             pass
+
+    ol_rows, ol_type, ol_title, ol_sub = _try_outlier_visualization(question, smart_trace)
+    if ol_rows:
+        return ol_rows, ol_type, ol_title, ol_sub
 
     hist_ncol_det = _resolve_histogram_numeric_column_for_question(
         question, q, numeric_cols, columns, {"column_types": ct_map}, domain
@@ -7045,6 +7238,10 @@ def build_smart_chart(
                             return chart_data, "bar", title, subtitle
                 except Exception:
                     pass
+
+    ol_rows, ol_type, ol_title, ol_sub = _try_outlier_visualization(question, trace)
+    if ol_rows:
+        return ol_rows, ol_type, ol_title, ol_sub
 
     # ---- Histogram: numeric value distribution (after time-series routing) ----
     if hist_ncol and str(hist_ncol) in df.columns:
@@ -8083,6 +8280,8 @@ def _chart_selection_question_bucket(ql: str) -> str:
     High-level intent bucket for chart selection (deterministic, no LLM).
     """
     q = str(ql).lower()
+    if _question_asks_outlier_analysis(q) and not _question_explicitly_groups_by_dimension(q):
+        return "outlier"
     if re.search(r"\b(vs\.?|versus|against)\b", q):
         return "relationship"
     if any(
@@ -8895,6 +9094,95 @@ INSIGHT_SAFETY_SYSTEM_PROMPT = (
     "actual metric and dimension names from the dataset context and authoritative numbers."
 )
 
+_CLAUDE_NARRATIVE_RETRY_DELAYS_S = (1.0, 2.5, 5.0)
+_CLAUDE_TRANSIENT_STATUS_CODES = frozenset({408, 429, 500, 502, 503, 504, 529})
+
+
+def _anthropic_http_status(exc: BaseException) -> Optional[int]:
+    if isinstance(exc, APIStatusError):
+        return exc.status_code
+    return None
+
+
+def _is_transient_anthropic_error(exc: BaseException) -> bool:
+    if isinstance(exc, (RateLimitError, APIConnectionError)):
+        return True
+    code = _anthropic_http_status(exc)
+    return code is not None and code in _CLAUDE_TRANSIENT_STATUS_CODES
+
+
+def _generate_insight_narrative(prompt: str) -> str:
+    """Call Claude for insight prose; retry transient overload / rate-limit errors."""
+    attempts = len(_CLAUDE_NARRATIVE_RETRY_DELAYS_S) + 1
+    last_exc: Optional[BaseException] = None
+    for attempt in range(attempts):
+        try:
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=520,
+                system=INSIGHT_SAFETY_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.content[0].text.strip()
+        except APIStatusError as exc:
+            if not _is_transient_anthropic_error(exc):
+                raise
+            last_exc = exc
+            if attempt < attempts - 1:
+                logger.warning(
+                    "Claude API transient error (attempt %s/%s): %s",
+                    attempt + 1,
+                    attempts,
+                    exc,
+                )
+                time.sleep(_CLAUDE_NARRATIVE_RETRY_DELAYS_S[attempt])
+                continue
+            raise
+        except (RateLimitError, APIConnectionError) as exc:
+            last_exc = exc
+            if attempt < attempts - 1:
+                logger.warning(
+                    "Claude API transient error (attempt %s/%s): %s",
+                    attempt + 1,
+                    attempts,
+                    exc,
+                )
+                time.sleep(_CLAUDE_NARRATIVE_RETRY_DELAYS_S[attempt])
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Claude narrative call failed without exception")
+
+
+def _claude_narrative_fallback_answer(exc: BaseException) -> str:
+    code = _anthropic_http_status(exc)
+    if code == 529 or isinstance(exc, RateLimitError) or code == 429:
+        return (
+            "The AI narrative service is temporarily overloaded. "
+            "Please wait a moment and ask again — your chart and calculated metrics "
+            "below are still available."
+        )
+    if isinstance(exc, APIConnectionError):
+        return (
+            "Could not reach the AI service. Check your network connection and try again. "
+            "Your chart and calculated metrics below are still available."
+        )
+    if isinstance(exc, AuthenticationError):
+        return (
+            "The AI service could not authenticate. "
+            "Verify ANTHROPIC_API_KEY is configured on the server."
+        )
+    if isinstance(exc, APIStatusError):
+        return (
+            "The AI service returned an error. Please try again shortly. "
+            "Your chart and calculated metrics below are still available."
+        )
+    return (
+        "Unable to generate an AI narrative right now. Please try again. "
+        "Your chart and calculated metrics below are still available."
+    )
+
 
 def _semantic_intent_correction_prompt_block(question: str) -> str:
     """
@@ -9606,7 +9894,32 @@ def compute_visualization_for_question(
             chart_path_handled = True
 
     if not chart_path_handled:
-        exact_result, chart_data, chart_type = analyze_data(question)
+        if _question_asks_outlier_analysis(ql) and not _question_explicitly_groups_by_dimension(
+            ql
+        ):
+            ol_rows, ol_type, ol_title, ol_sub = _try_outlier_visualization(
+                question, smart_trace
+            )
+            if ol_rows:
+                chart_path_handled = True
+                chart_data = list(_normalize_chart_records(ol_rows))
+                chart_type = (ol_type or "bar").strip() or "bar"
+                chart_title = (ol_title or "").strip()
+                chart_subtitle = (ol_sub or chart_subtitle).strip()
+                smart_routing_used = True
+                exact_result, _, _ = analyze_data(question)
+            else:
+                suppress_auto_charts = True
+                exact_result, _, _ = analyze_data(question)
+                chart_data = []
+                chart_type = ""
+                chart_path_handled = True
+                partial_visualization_warning = (
+                    "No suitable outlier visualization available for this dataset. "
+                    "The narrative above still describes individual outliers in the metric."
+                )
+        if not chart_path_handled:
+            exact_result, chart_data, chart_type = analyze_data(question)
 
     chart_data = list(_normalize_chart_records(chart_data))
     print(
@@ -9649,6 +9962,42 @@ def compute_visualization_for_question(
                     "timeSeriesAnalysis": fb_ts,
                 }
             print("[viz] used_intent_aggregate_fallback rows=", len(chart_data), flush=True)
+
+    if (
+        chart_data
+        and _question_asks_outlier_analysis(ql)
+        and not _question_explicitly_groups_by_dimension(ql)
+        and intent_debug
+    ):
+        gcol = str(intent_debug.get("group_col") or "").lower()
+        agg_k = str(intent_debug.get("agg_key") or "").lower()
+        title_l = (chart_title or "").lower()
+        if (
+            ("department" in gcol or "dept" in gcol)
+            and agg_k in ("mean", "avg", "average")
+        ) or re.search(r"\bby\s+department\b", title_l):
+            ol_rows, ol_type, ol_title, ol_sub = _try_outlier_visualization(
+                question, smart_trace
+            )
+            if ol_rows:
+                chart_data = list(_normalize_chart_records(ol_rows))
+                chart_type = (ol_type or "bar").strip() or "bar"
+                chart_title = (ol_title or "").strip()
+                chart_subtitle = (ol_sub or chart_subtitle).strip()
+                smart_routing_used = True
+                alignment_repaired = True
+                partial_visualization_warning = (
+                    "Replaced a department-average chart with an outlier-focused view."
+                )
+            else:
+                chart_data = []
+                chart_type = ""
+                chart_title = ""
+                chart_suppressed_misleading = True
+                partial_visualization_warning = (
+                    "No suitable outlier visualization available. "
+                    "Department averages do not show individual outliers."
+                )
 
     if not chart_data and not suppress_auto_charts:
         sm_data, sm_type, sm_title, sm_sub = build_smart_chart(question, smart_trace)
@@ -10598,12 +10947,11 @@ Rules:
 {semantic_correction}
 {trend_rule}"""
 
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=520,
-            system=INSIGHT_SAFETY_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        try:
+            answer_text = _generate_insight_narrative(prompt)
+        except Exception as exc:
+            logger.warning("Claude narrative unavailable: %s", exc, exc_info=True)
+            answer_text = _claude_narrative_fallback_answer(exc)
 
         chart_rec_out = (
             analysis_ctx.get("chartRecommendation")
@@ -10643,7 +10991,7 @@ Rules:
         )
 
         return _json_safe({
-            "answer": response.content[0].text.strip(),
+            "answer": answer_text,
             "visualization": visualization,
             "analysis": analysis_ctx,
             "conversation_context": conv_out,

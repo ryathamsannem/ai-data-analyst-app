@@ -51,9 +51,7 @@ import {
   computeLineAreaChartBottomMargin,
   computeLineAreaXAxisInterval,
   formatTrendXAxisTickLabel,
-  lineAreaTickFontSizePx,
   lineAreaXAxisHeightPx,
-  temporalTickStringsForChartRows,
   sortChartRowsChronologically,
   TREND_X_AXIS_ANGLE_DEG,
 } from "@/lib/chart-time-x-axis";
@@ -68,8 +66,30 @@ import {
 } from "@/lib/final-chart-presentation";
 import {
   getInsightLayoutMetrics,
+  resolveChartsTabPreviewPlotHeight,
   timelineTypeToChartKind,
 } from "@/lib/chart-layout-config";
+import {
+  chartsTabDesc,
+  chartsTabDescEmphasis,
+  chartsTabDownloadBtn,
+  chartsTabEmptyState,
+  chartsTabEmptyTitle,
+  chartsTabHeaderRow,
+  chartsTabPage,
+  chartsTabSmartReadWrap,
+  chartsTabTitle,
+  chartsTabTimelineColumn,
+  chartsTabPreviewHeaderSticky,
+  chartsTabSessionPlotSurface,
+  chartsTabVizHeaderZone,
+  chartsTabVizKicker,
+} from "@/lib/charts-tab-ui";
+import { ChartsTabChartReason } from "@/app/components/home/charts-tab-chart-reason";
+import { ChartsTabIntelligenceStrip } from "@/app/components/home/charts-tab-intelligence-strip";
+import { ChartsTabPlotTransition } from "@/app/components/home/charts-tab-plot-transition";
+import { generateChartReason } from "@/lib/generate-chart-reason";
+import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
 import {
   formatAxisTickFromRows,
   formatAxisTickFromScatterX,
@@ -84,6 +104,7 @@ import {
   buildChartSemanticHeader,
   pdfXAxisLineTitle,
   pdfYAxisLineTitle,
+  resolveHistogramMeasureChipLabel,
   resolveSemanticCategoryAxisForCharts,
 } from "@/lib/chart-semantic-metadata";
 import {
@@ -131,10 +152,108 @@ import type {
   DashboardFilterEntry,
 } from "./dashboard-filter-types";
 import { AiExecutiveInsightsPanel } from "./components/ai-executive-insights-panel";
+import {
+  AiInsightAnswerBody,
+  formatInsightSummary,
+} from "./components/ai-insight-answer-body";
 import { WrappedCategoryYAxisTick } from "./components/chart-category-axis-tick";
 import {
+  aiInsightsAnswerCard,
+  aiInsightsAnswerDetail,
+  aiInsightsAnswerDetailBody,
+  aiInsightsAnswerDetailFindings,
+  aiInsightsAnswerDetailSummaryBadge,
+  aiInsightsAnswerDetailSummaryFindings,
+  aiInsightsAnswerDetailSummaryHypotheses,
+  aiInsightsAnswerDetailSummaryLabel,
+  aiInsightsAnswerDetailSummaryMethodology,
+  aiInsightsAnswerDetailSummaryMore,
+  aiInsightsAnswerDetailSummaryRecommendations,
+  aiInsightsAnswerDetailsGroup,
+  aiInsightsAnswerDetailsLabel,
+  aiInsightsAnswerHeader,
+  aiInsightsAnswerKicker,
+  aiInsightsAnswerLead,
+  aiInsightsAnswerStack,
+  aiInsightsAnswerSummary,
+  aiInsightsAnswerSummaryPanel,
+  aiInsightsAnswerTitle,
+  aiInsightsBodyText,
+  aiInsightsConfidenceCaution,
+  aiInsightsConfidenceDisclaimer,
+  aiInsightsConfidenceNormal,
+  aiInsightsConfidenceShell,
+  aiInsightsFollowupChip,
+  aiInsightsFollowupList,
+  aiInsightsFollowupSection,
+  aiInsightsFollowupTitle,
+  aiInsightsAskActionsRow,
+  aiInsightsAskAssumptionNote,
+  aiInsightsAskComposer,
+  aiInsightsAskHeading,
+  aiInsightsAskHeaderRow,
+  aiInsightsAskInputBlock,
+  aiInsightsAskMetaRow,
+  aiInsightsAskQuestionLabel,
+  aiInsightsAskResetBtn,
+  aiInsightsAskSubmitBtn,
+  aiInsightsAskTextarea,
+  aiInsightsBtnExport,
+  aiInsightsSuggestedDesc,
+  aiInsightsSuggestedHeading,
+  aiInsightsSuggestedList,
+  aiInsightsSuggestedQ,
+  aiInsightsSuggestedRecentDesc,
+  aiInsightsSuggestedRecentItem,
+  aiInsightsSuggestedRecentList,
+  aiInsightsSuggestedRecentSection,
+  aiInsightsSuggestedRecentTitle,
+  aiInsightsMutedLabel,
+  aiInsightsAskPanel,
+  aiInsightsGrid,
+  aiInsightsOuterShell,
+  aiInsightsPage,
+  aiInsightsPanelShell,
+  aiInsightsSuggestedScrollBody,
+  aiInsightsProvenanceBody,
+  aiInsightsProvenanceDivider,
+  aiInsightsProvenanceMetaLabel,
+  aiInsightsProvenanceMetaValue,
+  aiInsightsProvenanceSectionBody,
+  aiInsightsProvenanceSectionBodyEmphasis,
+  aiInsightsProvenanceSectionLabel,
+  aiInsightsProvenanceShell,
+  aiInsightsProvenanceToggle,
+  aiInsightsProvenanceToggleTitle,
+  aiInsightsSmartPanelDivider,
+  aiInsightsStrongText,
+  aiInsightsSubtleText,
+  aiInsightsVizCard,
+  aiInsightsVizChartStage,
+  aiInsightsVizChipsWrap,
+  chartsTabVizPreviewCard,
+  chartsTabVizSessionFrame,
+  aiInsightsVizMetaChipBase,
+  aiInsightsVizMetaChipCompactSize,
+  aiInsightsVizMetaChipLabel,
+  aiInsightsVizMetaChipLabelCompact,
+  aiInsightsVizMetaChipLead,
+  aiInsightsVizMetaChipLeadCompactSize,
+  aiInsightsVizMetaChipLeadSize,
+  aiInsightsVizMetaChipMono,
+  aiInsightsVizMetaChipMonoCompactSize,
+  aiInsightsVizMetaChipMonoSize,
+  aiInsightsVizMetaChipSize,
+  aiInsightsVizMetaChipValue,
+  aiInsightsVizHeaderZone,
+  aiInsightsVizHeadingWrap,
+  aiInsightsVizKicker,
+  aiInsightsVizPlotSurface,
+  aiInsightsVizSubtitle,
+  aiInsightsVizTitle,
+} from "@/lib/ai-insights-ui";
+import {
   btnExport,
-  btnExportSm,
   btnPrimary,
   btnPrimarySm,
   btnSecondary,
@@ -142,14 +261,84 @@ import {
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
 import { FilterPanel } from "./components/home/filter-panel";
-import {
-  MainNavTabs,
-  type MainNavTabId,
-} from "./components/home/main-nav-tabs";
+import { type MainNavTabId } from "./components/home/main-nav-tabs";
+import { AppShell } from "@/components/app-shell/app-shell";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
+import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-summary";
+import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
+import {
+  ovBtnPrimaryAccent,
+  ovBtnSecondary,
+  ovChartCell,
+  ovChartGrid,
+  ovChartInner,
+  ovChartsWrap,
+  ovDashChartCard,
+  ovDashChartActionAskAi,
+  ovDashChartActionCharts,
+  ovDashChartActionPng,
+  ovDashChartActions,
+  ovDashChartFooter,
+  ovDashChartHead,
+  ovDashChartPlot,
+  ovDashChartPlotInner,
+  ovDashChartTitle,
+  ovDashInsightChip,
+  ovDashInsightChips,
+  ovDataHint,
+  ovDataLabel,
+  ovDataValue,
+  ovDataValueMono,
+  ovFilterControl,
+  ovCard,
+  ovCardElevated,
+  ovCardInteractive,
+  ovInset,
+  ovLabel,
+  ovModalInput,
+  ovModalOverlay,
+  ovModalPanel,
+  ovMuted,
+  ovSectionDesc,
+  ovSectionTitle,
+} from "@/lib/overview-ui";
+import {
+  dpBadgeClean,
+  dpBadgeId,
+  dpBadgeMissing,
+  dpBadgeType,
+  dpBadgeUnique,
+  dpBtnGhost,
+  dpCell,
+  dpCellNull,
+  dpCellSticky,
+  dpControl,
+  dpEmptySearch,
+  dpEmptyState,
+  dpInsightsPanel,
+  dpNullPill,
+  dpSearchInput,
+  dpSectionDesc,
+  dpSectionTitle,
+  dpSuggestionChip,
+  dpSuggestionMore,
+  dpSuggestionsPanel,
+  dpTable,
+  dpTableScroll,
+  dpTableShell,
+  dpThBtn,
+  dpThMeta,
+  dpThName,
+  dpSearchWrap,
+  dpToolbarRow,
+} from "@/lib/data-preview-ui";
 import { SmartChartInsightPanel } from "./components/SmartChartInsightPanel";
 import { ChartsTimelineAside } from "./components/home/charts-timeline-aside";
-import { computeSmartChartIntel } from "@/lib/smart-chart-intelligence";
+import {
+  apiChartStringToKind,
+  computeSmartChartIntel,
+} from "@/lib/smart-chart-intelligence";
+import { chartSnapshotMatchesQuestionIntent } from "@/lib/chart-question-intent";
 import { getCanonicalChartTitle } from "@/lib/canonical-chart-title";
 import {
   apiChartTypeFromContract,
@@ -216,6 +405,7 @@ const CHART_AXIS_LINE = "#e2e8f0";
 const AXIS_TICK = "#64748b";
 /** Shared Recharts tooltip frame (session + overview mini charts). */
 const CHART_TOOLTIP_FRAME = {
+  cursor: false,
   contentStyle: {
     borderRadius: 14,
     border: "1px solid rgba(226, 232, 240, 0.95)",
@@ -486,27 +676,25 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
 }) {
   const typeLbl = presentationKindUiLabel(props.renderedKind);
   const c = props.compactChips;
-  const chip =
-    "inline-flex items-center rounded-full border border-slate-200/50 bg-white/90 font-medium text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.04)] " +
-    (c ? "gap-1 px-2 py-0.5 text-[9px]" : "gap-1.5 px-2.5 py-1 text-[10px]");
-  const chipMuted = c ? "text-[8px] text-slate-400" : "text-slate-400";
-  const monoChip =
-    "inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200/45 bg-slate-50/80 font-mono font-medium tabular-nums text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.04)] " +
-    (c ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]");
-  const leadChip =
-    "inline-flex max-w-[min(100%,20rem)] items-center rounded-full border border-emerald-200/45 bg-emerald-50/55 font-medium leading-snug text-emerald-900/90 shadow-[0_1px_2px_rgba(16,185,129,0.06)] " +
-    (c ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]");
+  const chip = `${aiInsightsVizMetaChipBase} ${c ? aiInsightsVizMetaChipCompactSize : aiInsightsVizMetaChipSize}`;
+  const chipMuted = c ? aiInsightsVizMetaChipLabelCompact : aiInsightsVizMetaChipLabel;
+  const chipValue = aiInsightsVizMetaChipValue;
+  const monoChip = `${aiInsightsVizMetaChipMono} ${c ? aiInsightsVizMetaChipMonoCompactSize : aiInsightsVizMetaChipMonoSize}`;
+  const leadChip = `${aiInsightsVizMetaChipLead} ${c ? aiInsightsVizMetaChipLeadCompactSize : aiInsightsVizMetaChipLeadSize}`;
   return (
     <div
-      className={`flex flex-wrap items-center justify-center px-1 sm:gap-2.5 ${c ? "mt-2 gap-1.5" : "mt-3 gap-2"}`}
+      className={`flex flex-wrap items-center justify-center ${c ? "gap-x-2 gap-y-1.5 sm:gap-x-2.5 sm:gap-y-2" : "mt-3 gap-2 px-1 sm:gap-2.5"} ${c ? "" : ""}`}
     >
       <span className={`${chip} items-center`}>
         <span className={chipMuted}>View</span>
-        <span className="text-slate-800">{typeLbl}</span>
+        <span className={chipValue}>{typeLbl}</span>
       </span>
       <span className={`${chip} items-center`}>
         <span className={chipMuted}>Measure</span>
-        <span className="max-w-[14rem] truncate text-slate-800" title={props.metricLabel}>
+        <span
+          className={`max-w-[14rem] truncate ${chipValue}`}
+          title={props.metricLabel}
+        >
           {props.metricLabel}
         </span>
       </span>
@@ -514,13 +702,13 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
         <>
           <span className={`${chip} items-center`}>
             <span className={chipMuted}>X</span>
-            <span className="max-w-[10rem] truncate text-slate-800">
+            <span className={`max-w-[10rem] truncate ${chipValue}`}>
               {props.semanticHeader.xLabel}
             </span>
           </span>
           <span className={`${chip} items-center`}>
             <span className={chipMuted}>Y</span>
-            <span className="max-w-[10rem] truncate text-slate-800">
+            <span className={`max-w-[10rem] truncate ${chipValue}`}>
               {props.semanticHeader.yLabel}
             </span>
           </span>
@@ -528,7 +716,10 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
       ) : (
         <span className={`${chip} max-w-full items-center`}>
           <span className={`shrink-0 ${chipMuted}`}>{props.semanticHeader.roleLabel}</span>
-          <span className="min-w-0 truncate text-slate-800" title={props.semanticHeader.detailLabel}>
+          <span
+            className={`min-w-0 truncate ${chipValue}`}
+            title={props.semanticHeader.detailLabel}
+          >
             {props.semanticHeader.detailLabel}
           </span>
         </span>
@@ -712,6 +903,79 @@ function extractDashboardChartTitleFromPrefillQuestion(
   return m?.[1]?.trim() || null;
 }
 
+function normalizeQuestionForMatch(q: string): string {
+  return q.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function snapshotMetricCategoryTokens(snap: ChartSnapshot): {
+  metric: string;
+  category: string;
+} {
+  const prov = snap.visualization as { provenance?: InsightProvenance } | null;
+  const fp = snap.finalPresentation;
+  return {
+    metric: normalizeIntentToken(
+      prov?.provenance?.numericColumn ?? fp?.metric ?? ""
+    ),
+    category: normalizeIntentToken(
+      prov?.provenance?.categoryColumn ?? fp?.dimension ?? ""
+    ),
+  };
+}
+
+function analysisMetricCategoryTokens(
+  parsed: AlignedAnalysisContext | null
+): { metric: string; category: string } {
+  return {
+    metric: normalizeIntentToken(parsed?.metricColumn ?? ""),
+    category: normalizeIntentToken(parsed?.categoryColumn ?? ""),
+  };
+}
+
+function metricCategoryTokensAlign(
+  a: { metric: string; category: string },
+  b: { metric: string; category: string }
+): boolean {
+  if (a.metric && b.metric && a.metric !== b.metric) return false;
+  if (a.category && b.category && a.category !== b.category) return false;
+  return true;
+}
+
+function chartSnapshotMatchesAnalysis(
+  snap: ChartSnapshot,
+  parsed: AlignedAnalysisContext | null
+): boolean {
+  if (!parsed) return false;
+  return metricCategoryTokensAlign(
+    snapshotMetricCategoryTokens(snap),
+    analysisMetricCategoryTokens(parsed)
+  );
+}
+
+/** Keep a pinned insight chart only for same-question re-asks or aligned follow-ups. */
+function shouldPreservePinnedInsightChart(args: {
+  pinned: ChartSnapshot;
+  question: string;
+  parsed: AlignedAnalysisContext | null;
+  followUpDetected: boolean;
+}): boolean {
+  const pinnedQ = normalizeQuestionForMatch(args.pinned.question ?? "");
+  const newQ = normalizeQuestionForMatch(args.question);
+  if (pinnedQ && newQ && pinnedQ === newQ) return true;
+
+  if (extractDashboardChartTitleFromPrefillQuestion(args.question)) {
+    return true;
+  }
+
+  if (isTrendMode(args.pinned.contract)) {
+    return args.followUpDetected;
+  }
+
+  if (!args.followUpDetected) return false;
+
+  return chartSnapshotMatchesAnalysis(args.pinned, args.parsed);
+}
+
 function resolveOriginChartRefSnapshot(args: {
   question: string;
   insightChartId: string | null;
@@ -868,15 +1132,22 @@ function buildChartMetadataLine(
     metricRaw = "metric";
   }
 
-  const metric = buildMetricLabel({
-    aggregationKey: aggRaw || null,
-    aggregationLabel: aggRaw || null,
-    metricColumn:
-      (preferAlignedAnalysis && analysis?.metricColumn?.trim()) ||
-      prov?.numericColumn?.trim() ||
-      null,
-    metricColumnDisplay: metricRaw || null,
-  });
+  const metric =
+    kind === "histogram"
+      ? resolveHistogramMeasureChipLabel(
+          viz as ChartSemanticVizLike,
+          analysis,
+          preferAlignedAnalysis
+        )
+      : buildMetricLabel({
+          aggregationKey: aggRaw || null,
+          aggregationLabel: aggRaw || null,
+          metricColumn:
+            (preferAlignedAnalysis && analysis?.metricColumn?.trim()) ||
+            prov?.numericColumn?.trim() ||
+            null,
+          metricColumnDisplay: metricRaw || null,
+        });
 
   const rowsNum = resolveAnalyzedRowsForChartMetadata({
     preferAlignedAnalysis,
@@ -959,6 +1230,8 @@ function computeCartesianCategoryPlanForRender(args: {
   axes: ChartAxes;
   /** Narrow overview mini-cards (half main grid width). */
   layoutVariant?: "default" | "overview_half";
+  /** Overview dashboard: allow horizontal bar when X ticks cannot fit. */
+  allowHorizontalBarFallback?: boolean;
 }): VerticalCategoryAxisPlan | null {
   const {
     rows,
@@ -970,6 +1243,7 @@ function computeCartesianCategoryPlanForRender(args: {
     viewportWidthPx,
     axes,
     layoutVariant = "default",
+    allowHorizontalBarFallback = false,
   } = args;
   if (!rows.length) return null;
   if (kind !== "bar" && kind !== "line" && kind !== "area" && kind !== "histogram")
@@ -1034,7 +1308,10 @@ function computeCartesianCategoryPlanForRender(args: {
     categoryLabels: labels,
     estimatedPlotInnerWidthPx: innerW,
     chartLayoutMode,
-    disableHorizontalFallback: stackedBar || kind === "bar" || kind === "histogram",
+    disableHorizontalFallback:
+      stackedBar ||
+      kind === "histogram" ||
+      (kind === "bar" && !allowHorizontalBarFallback),
     preferAngledCategoryTicks: preferAngledInsight,
     categoryAngleDeg: categoryAngleDegInsight,
   });
@@ -1208,6 +1485,23 @@ function refineChartAxesWithAnalysis(
   analysis: AlignedAnalysisContext | null
 ): ChartAxes {
   const prov = viz?.provenance ?? null;
+
+  const isHistogramViz =
+    String(viz?.chartType ?? "").toLowerCase() === "histogram" ||
+    String(prov?.visualizationType ?? "").toLowerCase() === "histogram";
+
+  if (isHistogramViz) {
+    const valueAxis = resolveHistogramMeasureChipLabel(
+      viz as ChartSemanticVizLike,
+      analysis,
+      Boolean(analysis)
+    );
+    return {
+      categoryAxis: base.categoryAxis,
+      valueAxis,
+      valueAxisCompact: valueAxis,
+    };
+  }
 
   const metricDisplay = (
     analysis?.metricColumnDisplay?.trim() ||
@@ -3061,8 +3355,14 @@ function parseAutoDashboardPayload(raw: unknown): AutoDashboardPayload | null {
   };
 }
 
-function formatOverviewMiniInsight(rows: ChartRow[]): string | null {
-  if (rows.length < 2) return null;
+type OverviewMiniInsightChip = {
+  key: "top" | "lowest" | "gap";
+  text: string;
+};
+
+/** Structured insight pills for overview mini charts (avoids merged single-line text). */
+function formatOverviewMiniInsightChips(rows: ChartRow[]): OverviewMiniInsightChip[] {
+  if (rows.length < 2) return [];
   let hi = rows[0];
   let lo = rows[0];
   for (const r of rows) {
@@ -3070,7 +3370,7 @@ function formatOverviewMiniInsight(rows: ChartRow[]): string | null {
     if (r.value > hi.value) hi = r;
     if (r.value < lo.value) lo = r;
   }
-  if (String(hi.name) === String(lo.name)) return null;
+  if (String(hi.name) === String(lo.name)) return [];
   const hiDisp =
     hi.displayValue?.trim() ||
     String(hi.value ?? "").trim() ||
@@ -3091,7 +3391,11 @@ function formatOverviewMiniInsight(rows: ChartRow[]): string | null {
       ? gap.toLocaleString(undefined, { maximumFractionDigits: 2 })
       : Math.round(gap).toLocaleString()
     : "—";
-  return `Top: ${String(hi.name)} (${hiDisp}) · Lowest: ${String(lo.name)} (${loDisp}) · Gap: ${gapDisp}`;
+  return [
+    { key: "top", text: `Top: ${String(hi.name)} (${hiDisp})` },
+    { key: "lowest", text: `Lowest: ${String(lo.name)} (${loDisp})` },
+    { key: "gap", text: `Gap: ${gapDisp}` },
+  ];
 }
 
 function truncateOverviewPhrase(s: string, maxLen: number): string {
@@ -3665,12 +3969,206 @@ async function exportDashboardMiniChartAsPng(
   a.click();
 }
 
+/** Plot band heights — keep in sync with `--overview-chart-plot-min-h` in globals.css */
+const OVERVIEW_DASH_PLOT_HEIGHT_MOBILE = 300;
+const OVERVIEW_DASH_PLOT_HEIGHT_DESKTOP = 340;
+const OVERVIEW_DASH_PLOT_BREAKPOINT_PX = 768;
+
+function useOverviewDashPlotHeight(): number {
+  const [height, setHeight] = useState(OVERVIEW_DASH_PLOT_HEIGHT_MOBILE);
+  useEffect(() => {
+    const mq = window.matchMedia(
+      `(min-width: ${OVERVIEW_DASH_PLOT_BREAKPOINT_PX}px)`
+    );
+    const apply = () => {
+      setHeight(
+        mq.matches
+          ? OVERVIEW_DASH_PLOT_HEIGHT_DESKTOP
+          : OVERVIEW_DASH_PLOT_HEIGHT_MOBILE
+      );
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return height;
+}
+
+/** Overview mini-chart grid only — reads theme tokens from globals.css. */
+function useOverviewDashGridStyle(): { stroke: string; opacity: number } {
+  const read = (): { stroke: string; opacity: number } => {
+    if (typeof document === "undefined") {
+      return { stroke: "#e2e8f0", opacity: 0.28 };
+    }
+    const cs = getComputedStyle(document.documentElement);
+    const stroke =
+      cs.getPropertyValue("--overview-dash-grid-stroke").trim() || "#e2e8f0";
+    const opacityRaw = cs
+      .getPropertyValue("--overview-dash-grid-opacity")
+      .trim();
+    const opacity = opacityRaw ? parseFloat(opacityRaw) : 0.28;
+    return {
+      stroke,
+      opacity: Number.isFinite(opacity) ? opacity : 0.28,
+    };
+  };
+  const [grid, setGrid] = useState(() => read());
+  useEffect(() => {
+    const sync = () => setGrid(read());
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
+  return grid;
+}
+
+const OV_DASH_CHART_MARGIN = {
+  top: 16,
+  right: 24,
+  bottom: 36,
+  left: 24,
+} as const;
+
+const OV_DASH_GRID_DASHARRAY = "3 10";
+
+const OV_AXIS_TICK = "var(--chart-axis-tick)";
+const OV_AXIS_LINE = "var(--chart-axis-line)";
+const OV_DASH_AXIS_LABEL_STYLE = {
+  fill: "var(--chart-axis-label)",
+  fontSize: 9,
+  fontWeight: 600,
+} as const;
+
+function overviewDashLabelLooksTemporal(name: string): boolean {
+  const s = String(name ?? "").trim();
+  if (!s) return false;
+  if (/^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(s))
+    return true;
+  if (/\bq[1-4]\b(?:\s*[''\u2019]?|\/|\s|,)\s*\d{2,4}$/i.test(s)) return true;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return true;
+  return !Number.isNaN(Date.parse(s));
+}
+
+function overviewRowsLookReadableTimeSeries(rows: ChartRow[]): boolean {
+  if (rows.length < 2 || rows.length > 28) return false;
+  const hits = rows.filter((r) =>
+    overviewDashLabelLooksTemporal(String(r.name ?? ""))
+  ).length;
+  return hits >= Math.max(2, Math.ceil(rows.length * 0.75));
+}
+
+/**
+ * Overview-only chart kind: stricter bar orientation and readable line trends.
+ * Does not alter Charts tab / AI / PDF presentation (`computeFinalChartPresentation`).
+ */
+function computeOverviewDashboardChartPresentation(args: {
+  apiChartType: string;
+  title: string;
+  rows: ChartRow[];
+}): ChartKind {
+  const api = apiChartStringToKind(args.apiChartType);
+  const { rows, title } = args;
+
+  if (
+    api === "pie" ||
+    api === "donut" ||
+    api === "histogram" ||
+    api === "scatter"
+  ) {
+    return computeFinalChartPresentation(args);
+  }
+
+  if (api === "line" || api === "area") {
+    return overviewRowsLookReadableTimeSeries(rows) ? api : "bar_horizontal";
+  }
+
+  if (api === "bar_horizontal") return "bar_horizontal";
+
+  const fromRows = computeFinalChartPresentation(args);
+  if (fromRows === "line" || fromRows === "area") {
+    return overviewRowsLookReadableTimeSeries(rows)
+      ? fromRows
+      : "bar_horizontal";
+  }
+  if (fromRows !== "bar" && fromRows !== "bar_horizontal") return fromRows;
+
+  const labels = rows.map((r) => String(r.name ?? ""));
+  const n = labels.length;
+  const maxLen = Math.max(0, ...labels.map((s) => s.length));
+  const shortLabels = maxLen <= 14;
+
+  if (n <= 4 && shortLabels) return "bar";
+  return "bar_horizontal";
+}
+
+function overviewDashShortValueAxisLabel(title: string): string {
+  const stripped = title
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(
+      /\b(trend|over time|time series|weekly|daily|monthly|quarterly)\b/gi,
+      " "
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+  const compact = compactAxisLabelFromFullPhrase(stripped || title);
+  return truncateOverviewPhrase(compact, 32);
+}
+
+function overviewDashTrendCategoryLabel(
+  title: string,
+  drillLabel?: string | null
+): string {
+  const fromDrill = drillLabel?.trim();
+  if (fromDrill) return shortenLabel(fromDrill, 16);
+  const blob = title.toLowerCase();
+  if (/\bweekly\b|\bweek\b/.test(blob)) return "Week";
+  if (/\bdaily\b|\bday\b/.test(blob)) return "Day";
+  if (/\bmonthly\b|\bmonth\b/.test(blob)) return "Month";
+  if (/\bquarter/.test(blob)) return "Quarter";
+  return "Period";
+}
+
+function overviewDashCategoryAxisLabel(
+  displayKind: string,
+  drillLabel?: string | null,
+  chartTitle?: string
+): string {
+  const fromDrill = drillLabel?.trim();
+  if (fromDrill) return shortenLabel(fromDrill, 18);
+  if (displayKind === "line" || displayKind === "area") {
+    return overviewDashTrendCategoryLabel(chartTitle ?? "", drillLabel);
+  }
+  if (displayKind === "histogram") return "Value range";
+  return "Category";
+}
+
+function formatOverviewTrendTickLabel(raw: string): string {
+  const base = formatTrendXAxisTickLabel(String(raw ?? ""));
+  const m = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})$/i.exec(
+    base.trim()
+  );
+  if (m) {
+    const mon =
+      m[1]!.charAt(0).toUpperCase() + m[1]!.slice(1, 3).toLowerCase();
+    return `${mon} ${m[2]!.padStart(2, "0")}`;
+  }
+  return base.length > 14 ? `${base.slice(0, 13)}…` : base;
+}
+
+function overviewDashPlotMarginLeft(yAxisWidth: number): number {
+  return Math.max(OV_DASH_CHART_MARGIN.left, Math.ceil(yAxisWidth) + 10);
+}
+
 const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartCard({
   chart,
   canonicalTitle,
   snapshotId,
-  compactHeight,
   viewportWidthPx,
+  plotHeightPx,
   loadingPulse,
   onDashboardDrill,
   onViewInChartsTab,
@@ -3680,9 +4178,10 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   chart: AutoDashboardMiniChart;
   canonicalTitle: string;
   snapshotId: string | null;
-  compactHeight: number;
   /** Used to estimate category tick overlap for vertical bars / lines. */
   viewportWidthPx: number;
+  /** Matches CSS `--overview-chart-plot-min-h` for Recharts explicit height. */
+  plotHeightPx: number;
   /** Subtle busy state when dataset refresh is in flight. */
   loadingPulse?: boolean;
   /** Click a chart category (or slice) to tighten global dashboard filters. */
@@ -3700,6 +4199,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 }) {
   const chartCaptureRef = useRef<HTMLDivElement | null>(null);
   const [exportingPng, setExportingPng] = useState(false);
+  const dashGrid = useOverviewDashGridStyle();
   const drillPrimary = chart.interaction?.drillDimensions.find(
     (d) => d.role === "primary"
   )
@@ -3723,10 +4223,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 
   const displayKind = useMemo(
     () =>
-      computeFinalChartPresentation({
+      computeOverviewDashboardChartPresentation({
         apiChartType: chart.chartType,
         title: chart.title,
-        question: undefined,
         rows: baseChartRows,
       }),
     [chart.chartType, chart.title, baseChartRows]
@@ -3750,8 +4249,18 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   }, [baseChartRows, displayKind]);
 
   const valueAxisTitle = useMemo(
-    () => (chart.title || "Value").trim() || "Value",
+    () => overviewDashShortValueAxisLabel((chart.title || "Value").trim() || "Value"),
     [chart.title]
+  );
+
+  const categoryAxisLabel = useMemo(
+    () =>
+      overviewDashCategoryAxisLabel(
+        displayKind,
+        drillPrimary?.label,
+        chart.title
+      ),
+    [displayKind, drillPrimary?.label, chart.title]
   );
 
   const dashTickSamples = useMemo(
@@ -3761,11 +4270,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 
   const miniAxes = useMemo(
     (): ChartAxes => ({
-      categoryAxis: "",
+      categoryAxis: categoryAxisLabel,
       valueAxis: valueAxisTitle,
-      valueAxisCompact: valueAxisTitle,
+      valueAxisCompact: compactAxisLabelFromFullPhrase(valueAxisTitle),
     }),
-    [valueAxisTitle]
+    [categoryAxisLabel, valueAxisTitle]
   );
 
   const miniCategoryPlan = useMemo(() => {
@@ -3783,16 +4292,19 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       rows: chartRows,
       kind: rowKind,
       stackedBar: false,
-      chartHeight: compactHeight,
+      chartHeight: plotHeightPx,
       compact: true,
       insightMode: false,
-      viewportWidthPx: Math.min(Math.max(viewportWidthPx, 280), 820),
+      viewportWidthPx: Math.max(viewportWidthPx, 200),
       axes: miniAxes,
       layoutVariant: "overview_half",
+      allowHorizontalBarFallback: rowKind === "bar",
     });
-  }, [displayKind, chartRows, compactHeight, miniAxes, viewportWidthPx]);
+  }, [displayKind, chartRows, miniAxes, viewportWidthPx, plotHeightPx]);
 
-  const renderBarAsHorizontal = displayKind === "bar_horizontal";
+  const renderBarAsHorizontal =
+    displayKind === "bar_horizontal" ||
+    (displayKind === "bar" && Boolean(miniCategoryPlan?.renderAsHorizontalBar));
 
   const verticalDashLayout = useMemo(() => {
     if (
@@ -3806,11 +4318,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       valueAxisMeasureLabel: valueAxisTitle,
       tickSampleStrings: dashTickSamples,
       chartLayoutMode: "compact",
-      tickFontSizePx: 10,
-      titleFontSizePx: 10,
-      plotInnerHeightPx: Math.max(64, Math.floor(compactHeight * 0.58)),
+      tickFontSizePx: OV_DASH_AXIS_LABEL_STYLE.fontSize,
+      titleFontSizePx: OV_DASH_AXIS_LABEL_STYLE.fontSize,
+      plotInnerHeightPx: Math.max(180, Math.floor(plotHeightPx * 0.72)),
     });
-  }, [displayKind, valueAxisTitle, dashTickSamples, compactHeight]);
+  }, [displayKind, valueAxisTitle, dashTickSamples, plotHeightPx]);
 
   const horizontalDashLayout = useMemo(() => {
     if (!renderBarAsHorizontal) return null;
@@ -3818,19 +4330,21 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       categoryTickStrings: chartRows.map((r) => String(r.name ?? "")),
       valueAxisLabel: valueAxisTitle,
       valueAxisFull: valueAxisTitle,
-      categoryAxisLabel: "",
-      chartLayoutMode: "compact",
+      categoryAxisLabel,
+      chartLayoutMode: "full",
       tickFontSizePx: 9,
       titleFontSizePx: 10,
-      maxValueAxisTitleWidthPx: compactHeight > 200 ? 280 : 200,
+      maxValueAxisTitleWidthPx: Math.max(120, viewportWidthPx - 72),
     });
-    const catW = Math.min(300, Math.max(base.categoryAxisWidth, 88));
+    const catCap = Math.max(72, Math.floor(viewportWidthPx * 0.34));
+    const catW = Math.min(catCap, Math.max(base.categoryAxisWidth, 72));
+    const marginCap = Math.max(catW + 12, Math.floor(viewportWidthPx * 0.36));
     return {
       ...base,
       categoryAxisWidth: catW,
-      marginLeft: Math.min(340, Math.max(base.marginLeft, catW + 14)),
+      marginLeft: Math.min(marginCap, Math.max(base.marginLeft, catW + 10)),
     };
-  }, [renderBarAsHorizontal, chartRows, valueAxisTitle, compactHeight]);
+  }, [renderBarAsHorizontal, chartRows, valueAxisTitle, categoryAxisLabel, viewportWidthPx]);
 
   const dashboardBarCatBottom = useMemo(
     () =>
@@ -3839,44 +4353,25 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             categoryTickStrings: chartRows.map((r) => String(r.name ?? "")),
             angled: miniCategoryPlan.angled,
             tickFontSizePx: miniCategoryPlan.tickFontSizePx,
-            chartLayoutMode: "compact",
+            chartLayoutMode: miniCategoryPlan.angled ? "full" : "compact",
           })
         : computeCategoryAxisBottomMargin({
             categoryTickStrings: chartRows.map((r) => String(r.name ?? "")),
             angled: chartRows.length > 3,
             tickFontSizePx: 10,
-            chartLayoutMode: "compact",
+            chartLayoutMode: chartRows.length > 3 ? "full" : "compact",
           }),
     [displayKind, chartRows, miniCategoryPlan]
   );
-
-  const dashboardLineCatBottom = useMemo(() => {
-    if (displayKind !== "line" && displayKind !== "area") {
-      return 32;
-    }
-    return computeLineAreaChartBottomMargin({
-      temporalTickStrings: temporalTickStringsForChartRows(chartRows),
-      tickFontSizePx: lineAreaTickFontSizePx(true, viewportWidthPx),
-      chartLayoutMode: "compact",
-    });
-  }, [displayKind, chartRows, viewportWidthPx]);
 
   const valueTickFormatter = useCallback(
     (tick: number) => formatAxisTickFromRows(chartRows, tick),
     [chartRows]
   );
 
-  const overviewInsightLine = useMemo(
-    () => formatOverviewMiniInsight(chartRows),
-    [chartRows]
-  );
-
   const overviewInsightChips = useMemo(
-    () =>
-      overviewInsightLine
-        ? overviewInsightLine.split(" · ").map((s) => s.trim()).filter(Boolean)
-        : [],
-    [overviewInsightLine]
+    () => formatOverviewMiniInsightChips(chartRows),
+    [chartRows]
   );
 
   if (chartRows.length === 0) return null;
@@ -3893,8 +4388,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   if (displayKind === "pie" || displayKind === "donut") {
     const innerR = displayKind === "pie" ? 0 : chartRows.length >= 8 ? 40 : 32;
     chartBody = (
-      <ResponsiveContainer width="100%" height={compactHeight}>
-        <PieChart margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
+      <ResponsiveContainer
+        width="100%"
+        height={plotHeightPx}
+        minWidth={0}
+        minHeight={plotHeightPx}
+      >
+        <PieChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
           <Pie
             data={chartRows}
             dataKey="value"
@@ -3902,7 +4402,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             cx="50%"
             cy="50%"
             innerRadius={innerR}
-            outerRadius={compactHeight > 210 ? 78 : 64}
+            outerRadius={Math.floor(plotHeightPx * 0.34)}
             paddingAngle={1.5}
             stroke="#fff"
             strokeWidth={1}
@@ -3952,52 +4452,51 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   } else if (renderBarAsHorizontal) {
     const hb = horizontalDashLayout;
     if (!hb) return null;
-    const hmBalancedCompact = balanceHorizontalOuterMargins({
-      marginLeft: hb.marginLeft,
+    const hbBalanced = balanceVerticalOuterMargins({
+      marginLeft: Math.min(
+        Math.floor(viewportWidthPx * 0.36),
+        Math.max(OV_DASH_CHART_MARGIN.left, hb.marginLeft)
+      ),
       chartLayoutMode: "compact",
     });
     chartBody = (
-      <ResponsiveContainer width="100%" height={compactHeight}>
+      <ResponsiveContainer
+        width="100%"
+        height={plotHeightPx}
+        minWidth={0}
+        minHeight={plotHeightPx}
+      >
         <BarChart
           layout="vertical"
           data={chartRows}
           margin={{
-            left: hmBalancedCompact.marginLeft,
-            right: hmBalancedCompact.marginRight,
-            top: 6,
-            bottom: Math.max(hb.marginBottom, 8),
+            left: hbBalanced.marginLeft,
+            right: hbBalanced.marginRight,
+            top: OV_DASH_CHART_MARGIN.top,
+            bottom: 32,
           }}
         >
           <CartesianGrid
             horizontal={false}
             vertical
-            stroke={GRID_STROKE}
-            strokeDasharray="4 12"
-            strokeOpacity={0.38}
+            stroke={dashGrid.stroke}
+            strokeDasharray={OV_DASH_GRID_DASHARRAY}
+            strokeOpacity={dashGrid.opacity}
           />
           <XAxis
             type="number"
-            tick={{ fontSize: 10, fill: AXIS_TICK }}
+            tick={{ fontSize: OV_DASH_AXIS_LABEL_STYLE.fontSize, fill: OV_AXIS_TICK }}
             tickFormatter={valueTickFormatter}
-            axisLine={{ stroke: CHART_AXIS_LINE }}
-            tickLine={{ stroke: CHART_AXIS_LINE }}
-          >
-            {hb.showValueAxisTitle ? (
-              <Label
-                content={createHorizontalBottomAxisValueLabel(
-                  hb.valueAxisTitleFull,
-                  hb.valueAxisTitleDisplay
-                )}
-              />
-            ) : null}
-          </XAxis>
+            axisLine={{ stroke: OV_AXIS_LINE }}
+            tickLine={{ stroke: OV_AXIS_LINE }}
+          />
           <YAxis
             type="category"
             dataKey="name"
             width={hb.categoryAxisWidth}
             tick={<WrappedCategoryYAxisTick chartLayoutMode="compact" compact />}
-            axisLine={{ stroke: CHART_AXIS_LINE }}
-            tickLine={{ stroke: CHART_AXIS_LINE }}
+            axisLine={{ stroke: OV_AXIS_LINE }}
+            tickLine={{ stroke: OV_AXIS_LINE }}
           />
           <Tooltip
             {...CHART_TOOLTIP_FRAME}
@@ -4013,7 +4512,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             dataKey="value"
             fill="#6366f1"
             radius={[0, 6, 6, 0]}
-            maxBarSize={26}
+            maxBarSize={32}
             isAnimationActive={overviewChartAnimOn}
             cursor={drillable ? "pointer" : "default"}
             onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
@@ -4035,66 +4534,86 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   } else if (displayKind === "line" || displayKind === "area") {
     const vLay = verticalDashLayout;
     if (!vLay) return null;
-    const vmBalancedCompact = balanceVerticalOuterMargins({
-      marginLeft: vLay.marginLeft,
-      chartLayoutMode: "compact",
-    });
     const ChartWrap = displayKind === "area" ? AreaChart : LineChart;
-    const trendTickFsMini = lineAreaTickFontSizePx(true, viewportWidthPx);
-    const trendIntervalMini = computeLineAreaXAxisInterval(chartRows.length, {
-      compact: true,
+    const trendTickFs = OV_DASH_AXIS_LABEL_STYLE.fontSize;
+    const trendCompact = viewportWidthPx < 640;
+    const trendTickMini = (v: string | number) =>
+      formatOverviewTrendTickLabel(String(v ?? ""));
+    const temporalTickStrings = chartRows.map((r) =>
+      trendTickMini(String(r.name ?? ""))
+    );
+    const trendInterval = computeLineAreaXAxisInterval(chartRows.length, {
+      compact: trendCompact,
       viewportWidthPx,
     });
-    const trendTickMini = (v: string | number) =>
-      tickTruncateLocal(formatTrendXAxisTickLabel(String(v)));
+    const trendLabelLens = temporalTickStrings.map((s) => s.length);
+    const maxTrendLabelLen = Math.max(6, ...trendLabelLens, 0);
+    const needsTrendAngle =
+      chartRows.length > 6 || maxTrendLabelLen > 9;
+    const trendAngle = needsTrendAngle ? TREND_X_AXIS_ANGLE_DEG : 0;
+    const trendXHeight = lineAreaXAxisHeightPx(true);
+    const trendBottomRaw = computeLineAreaChartBottomMargin({
+      temporalTickStrings,
+      tickFontSizePx: trendTickFs,
+      chartLayoutMode: "compact",
+    });
+    const trendBottom = Math.min(
+      trendBottomRaw,
+      needsTrendAngle ? 54 : 44
+    );
+    const trendMargins = balanceVerticalOuterMargins({
+      marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
+      chartLayoutMode: "compact",
+    });
+    const plotMargin = {
+      top: OV_DASH_CHART_MARGIN.top,
+      right: trendMargins.marginRight,
+      bottom: trendBottom,
+      left: trendMargins.marginLeft,
+    };
     chartBody = (
-      <ResponsiveContainer width="100%" height={compactHeight}>
-        <ChartWrap
-          data={chartRows}
-          margin={{
-            left: vmBalancedCompact.marginLeft,
-            right: vmBalancedCompact.marginRight,
-            top: 8,
-            bottom: dashboardLineCatBottom,
-          }}
-        >
+      <ResponsiveContainer
+        width="100%"
+        height={plotHeightPx}
+        minWidth={0}
+        minHeight={plotHeightPx}
+      >
+        <ChartWrap data={chartRows} margin={plotMargin}>
           <CartesianGrid
-            stroke={GRID_STROKE}
-            strokeDasharray="4 12"
-            strokeOpacity={0.38}
+            stroke={dashGrid.stroke}
+            strokeDasharray={OV_DASH_GRID_DASHARRAY}
+            strokeOpacity={dashGrid.opacity}
             vertical={false}
           />
           <XAxis
             dataKey="name"
             tick={{
-              fontSize: trendTickFsMini,
-              fill: AXIS_TICK,
+              fontSize: trendTickFs,
+              fill: OV_AXIS_TICK,
             }}
             tickFormatter={trendTickMini}
-            angle={TREND_X_AXIS_ANGLE_DEG}
-            textAnchor="end"
-            height={lineAreaXAxisHeightPx(true)}
-            interval={trendIntervalMini}
-            tickMargin={8}
-            axisLine={{ stroke: CHART_AXIS_LINE }}
-            tickLine={{ stroke: CHART_AXIS_LINE }}
-          />
+            angle={trendAngle}
+            textAnchor={trendAngle ? "end" : "middle"}
+            height={trendXHeight}
+            interval={trendInterval}
+            tickMargin={6}
+            minTickGap={trendCompact ? 6 : 12}
+            axisLine={{ stroke: OV_AXIS_LINE }}
+            tickLine={{ stroke: OV_AXIS_LINE }}
+          >
+            <Label
+              value={categoryAxisLabel}
+              position="insideBottom"
+              offset={-6}
+              style={OV_DASH_AXIS_LABEL_STYLE}
+            />
+          </XAxis>
           <YAxis
-            tick={{ fontSize: 10, fill: AXIS_TICK, dx: 4 }}
+            tick={{ fontSize: trendTickFs, fill: OV_AXIS_TICK, dx: 2 }}
             tickFormatter={valueTickFormatter}
             width={vLay.yAxisWidth}
-            axisLine={{ stroke: CHART_AXIS_LINE }}
-            tickLine={{ stroke: CHART_AXIS_LINE }}
-            label={
-              vLay.showValueAxisTitle
-                ? {
-                    content: createVerticalValueAxisLabel(
-                      vLay.valueAxisTitleFull,
-                      vLay.valueAxisTitleDisplay
-                    ),
-                  }
-                : undefined
-            }
+            axisLine={{ stroke: OV_AXIS_LINE }}
+            tickLine={{ stroke: OV_AXIS_LINE }}
           />
           <Tooltip
             {...CHART_TOOLTIP_FRAME}
@@ -4102,7 +4621,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               const p = item?.payload as ChartRow;
               const d = p?.displayValue?.trim();
               const shown = d ?? (v == null ? "—" : String(v));
-              return [shown, shortenLabel(chart.title, 22)];
+              return [shown, shortenLabel(valueAxisTitle, 22)];
             }}
             labelFormatter={(l) => trendTickMini(String(l ?? ""))}
           />
@@ -4111,14 +4630,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               type="monotone"
               dataKey="value"
               stroke="#4f46e5"
-              strokeWidth={2}
+              strokeWidth={2.5}
               fill="#6366f1"
               fillOpacity={0.18}
               isAnimationActive={overviewChartAnimOn}
               dot={
-                chartRows.length > 32
+                chartRows.length > 28
                   ? false
-                  : { r: 3, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
+                  : { r: 4, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
               }
             />
           ) : (
@@ -4126,12 +4645,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               type="monotone"
               dataKey="value"
               stroke="#4f46e5"
-              strokeWidth={2}
+              strokeWidth={2.5}
               isAnimationActive={overviewChartAnimOn}
               dot={
-                chartRows.length > 32
+                chartRows.length > 28
                   ? false
-                  : { r: 3, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
+                  : { r: 4, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
               }
             />
           )}
@@ -4142,77 +4661,66 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     const vLay = verticalDashLayout;
     if (!vLay) return null;
     const isHist = displayKind === "histogram";
-    const vmBalancedCompact = balanceVerticalOuterMargins({
-      marginLeft: vLay.marginLeft,
+    const barMargins = balanceVerticalOuterMargins({
+      marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
       chartLayoutMode: "compact",
     });
+    const plotMargin = {
+      top: OV_DASH_CHART_MARGIN.top,
+      right: barMargins.marginRight,
+      bottom:
+        OV_DASH_CHART_MARGIN.bottom +
+        (miniCategoryPlan?.angled ? Math.min(12, dashboardBarCatBottom * 0.28) : 0),
+      left: barMargins.marginLeft,
+    };
     chartBody = (
-      <ResponsiveContainer width="100%" height={compactHeight}>
+      <ResponsiveContainer
+        width="100%"
+        height={plotHeightPx}
+        minWidth={0}
+        minHeight={plotHeightPx}
+      >
         <BarChart
           data={chartRows}
           barCategoryGap={isHist ? 2 : undefined}
-          margin={{
-            left: vmBalancedCompact.marginLeft,
-            right: vmBalancedCompact.marginRight,
-            top: 10,
-            bottom: dashboardBarCatBottom,
-          }}
+          margin={plotMargin}
         >
           <CartesianGrid
             vertical={false}
             horizontal
-            stroke={GRID_STROKE}
-            strokeDasharray="4 12"
-            strokeOpacity={0.38}
+            stroke={dashGrid.stroke}
+            strokeDasharray={OV_DASH_GRID_DASHARRAY}
+            strokeOpacity={dashGrid.opacity}
           />
           <XAxis
             dataKey="name"
             tick={{
-              fontSize: miniCategoryPlan?.tickFontSizePx ?? 10,
-              fill: AXIS_TICK,
+              fontSize: miniCategoryPlan?.tickFontSizePx ?? OV_DASH_AXIS_LABEL_STYLE.fontSize,
+              fill: OV_AXIS_TICK,
             }}
-            tickFormatter={(v) => String(v)}
+            tickFormatter={(v) => tickTruncateLocal(String(v))}
             angle={
-              miniCategoryPlan
-                ? miniCategoryPlan.angled
-                  ? miniCategoryPlan.angleDeg
-                  : 0
-                : chartRows.length > 3
-                  ? -26
-                  : 0
+              miniCategoryPlan?.angled ? miniCategoryPlan.angleDeg : 0
             }
-            textAnchor={
-              miniCategoryPlan?.angled || chartRows.length > 3
-                ? "end"
-                : "middle"
-            }
-            height={
-              miniCategoryPlan?.xAxisHeightPx ??
-              (chartRows.length > 3 ? 50 : 28)
-            }
-            interval={
-              miniCategoryPlan?.interval ??
-              (chartRows.length > 10 ? "preserveStartEnd" : 0)
-            }
-            axisLine={{ stroke: CHART_AXIS_LINE }}
-            tickLine={{ stroke: CHART_AXIS_LINE }}
-          />
+            textAnchor={miniCategoryPlan?.angled ? "end" : "middle"}
+            height={miniCategoryPlan?.xAxisHeightPx ?? 32}
+            interval={miniCategoryPlan?.interval ?? 0}
+            axisLine={{ stroke: OV_AXIS_LINE }}
+            tickLine={{ stroke: OV_AXIS_LINE }}
+          >
+            <Label
+              value={categoryAxisLabel}
+              position="insideBottom"
+              offset={-4}
+              style={OV_DASH_AXIS_LABEL_STYLE}
+            />
+          </XAxis>
           <YAxis
-            tick={{ fontSize: 10, fill: AXIS_TICK, dx: 4 }}
+            tick={{ fontSize: OV_DASH_AXIS_LABEL_STYLE.fontSize, fill: OV_AXIS_TICK, dx: 2 }}
             tickFormatter={valueTickFormatter}
             width={vLay.yAxisWidth}
-            axisLine={{ stroke: CHART_AXIS_LINE }}
-            tickLine={{ stroke: CHART_AXIS_LINE }}
-            label={
-              vLay.showValueAxisTitle
-                ? {
-                    content: createVerticalValueAxisLabel(
-                      vLay.valueAxisTitleFull,
-                      vLay.valueAxisTitleDisplay
-                    ),
-                  }
-                : undefined
-            }
+            axisLine={{ stroke: OV_AXIS_LINE }}
+            tickLine={{ stroke: OV_AXIS_LINE }}
           />
           <Tooltip
             {...CHART_TOOLTIP_FRAME}
@@ -4228,7 +4736,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             dataKey="value"
             fill="#6366f1"
             radius={isHist ? [3, 3, 0, 0] : [8, 8, 4, 4]}
-            maxBarSize={isHist ? 40 : 38}
+            maxBarSize={isHist ? 44 : 42}
             isAnimationActive={overviewChartAnimOn}
             cursor={drillable ? "pointer" : "default"}
             onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
@@ -4257,23 +4765,16 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     <div
       role="region"
       aria-label={canonicalTitle}
-      className={`group relative flex w-full min-w-0 max-w-full flex-col rounded-2xl border border-slate-200/60 bg-white p-3.5 shadow-[0_8px_28px_-12px_rgb(15_23_42/0.1)] ring-1 ring-inset ring-slate-900/[0.02] transition-[box-shadow,border-color] duration-200 hover:border-slate-300/70 hover:shadow-[0_14px_40px_-14px_rgb(15_23_42/0.14)] focus-within:border-slate-300/70 focus-within:shadow-[0_14px_40px_-14px_rgb(15_23_42/0.14)] ${
-        loadingPulse ? "animate-pulse opacity-[0.92]" : ""
-      }`}
+      className={`${ovDashChartCard} group ${loadingPulse ? "animate-pulse opacity-[0.92]" : ""}`}
     >
-      <div className="mb-1.5 flex min-w-0 items-start justify-between gap-2">
-        <h3 className="min-w-0 flex-1 text-xs font-semibold leading-snug tracking-tight text-slate-900">
-          {canonicalTitle}
-        </h3>
-        <div
-          className="flex shrink-0 flex-wrap items-center justify-end gap-0.5 rounded-lg border border-slate-200/80 bg-white/95 p-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.045)] backdrop-blur-sm transition-opacity duration-150 max-sm:opacity-100 sm:opacity-0 sm:shadow-md sm:ring-1 sm:ring-slate-200/60 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-          onClick={(e) => e.stopPropagation()}
-        >
+      <header className={ovDashChartHead}>
+        <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
+        <div className={ovDashChartActions} onClick={(e) => e.stopPropagation()}>
           {onViewInChartsTab && snapshotId ? (
             <button
               type="button"
               onClick={() => onViewInChartsTab(snapshotId)}
-              className="rounded-md px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1"
+              className={ovDashChartActionCharts}
               title="Open this chart in the Charts tab"
               aria-label="Open this chart in the Charts tab"
             >
@@ -4284,7 +4785,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             <button
               type="button"
               onClick={() => onAskAiAboutChart(snapshotId)}
-              className="rounded-md px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1"
+              className={ovDashChartActionAskAi}
               title="Switch to AI Insights with a starter question about this chart"
               aria-label="Ask AI about this chart in AI Insights"
             >
@@ -4309,14 +4810,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 setExportingPng(false);
               }
             }}
-            className="rounded-md px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`${ovDashChartActionPng} disabled:cursor-not-allowed disabled:opacity-50`}
             title="Download this chart as PNG"
             aria-label="Export this chart as a PNG image"
           >
             {exportingPng ? "…" : "PNG"}
           </button>
         </div>
-      </div>
+      </header>
       <div
         ref={chartCaptureRef}
         role={onViewInChartsTab && snapshotId ? "button" : undefined}
@@ -4331,31 +4832,32 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             onViewInChartsTab(snapshotId);
           }
         }}
-        className={`w-full shrink-0 ${
+        className={`${ovDashChartPlot} ${
           onViewInChartsTab && snapshotId
-            ? "cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50"
+            ? "cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/45"
             : ""
         }`}
-        style={{ height: compactHeight }}
         title={
           onViewInChartsTab && snapshotId
             ? "Open this chart in the Charts tab"
             : undefined
         }
       >
-        {chartBody}
+        <div className={ovDashChartPlotInner}>{chartBody}</div>
       </div>
       {overviewInsightChips.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5 px-0.5">
-          {overviewInsightChips.map((chip, i) => (
-            <span
-              key={`${i}-${chip.slice(0, 24)}`}
-              className="rounded-full border border-slate-200/85 bg-slate-50/95 px-2 py-0.5 text-[10px] font-medium text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.045)]"
-            >
-              {chip}
-            </span>
-          ))}
-        </div>
+        <footer className={ovDashChartFooter}>
+          <div className={ovDashInsightChips}>
+            {overviewInsightChips.map((chip) => (
+              <span
+                key={chip.key}
+                className={`${ovDashInsightChip} overview-dash-insight-chip--${chip.key}`}
+              >
+                {chip.text}
+              </span>
+            ))}
+          </div>
+        </footer>
       ) : null}
     </div>
   );
@@ -4366,8 +4868,6 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   chart,
   canonicalTitle,
   snapshotId,
-  compactHeight,
-  viewportWidthPx,
   loadingPulse,
   onDashboardDrill,
   onOpenDashboardChartInChartsTab,
@@ -4377,14 +4877,37 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   chart: AutoDashboardMiniChart;
   canonicalTitle: string;
   snapshotId: string | null;
-  compactHeight: number;
-  viewportWidthPx: number;
   loadingPulse?: boolean;
   onDashboardDrill?: (ev: { column: string; label: string; value: string }) => void;
   onOpenDashboardChartInChartsTab: (snapshotId: string) => void;
   onAskAiAboutDashboardChart: (snapshotId: string) => void;
   onChartExportError: (message: string) => void;
 }) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [plotWidth, setPlotWidth] = useState(380);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const apply = (w: number) => {
+      if (w > 0) setPlotWidth(Math.floor(w));
+    };
+    apply(el.getBoundingClientRect().width);
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w != null) apply(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const layoutWidthPx = useMemo(
+    () => Math.max(plotWidth, 200),
+    [plotWidth],
+  );
+
+  const plotHeightPx = useOverviewDashPlotHeight();
+
   const handleViewInChartsTab = useCallback(() => {
     if (snapshotId) onOpenDashboardChartInChartsTab(snapshotId);
   }, [snapshotId, onOpenDashboardChartInChartsTab]);
@@ -4393,22 +4916,24 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
     (id: string) => {
       onAskAiAboutDashboardChart(id);
     },
-    [onAskAiAboutDashboardChart]
+    [onAskAiAboutDashboardChart],
   );
 
   return (
-    <OverviewAutoDashboardChartCard
-      chart={chart}
-      canonicalTitle={canonicalTitle}
-      snapshotId={snapshotId}
-      compactHeight={compactHeight}
-      viewportWidthPx={viewportWidthPx}
-      loadingPulse={loadingPulse}
-      onDashboardDrill={onDashboardDrill}
-      onViewInChartsTab={snapshotId ? handleViewInChartsTab : undefined}
-      onAskAiAboutChart={snapshotId ? handleAskAiAboutChart : undefined}
-      onChartExportError={onChartExportError}
-    />
+    <div ref={wrapRef} className="w-full min-w-0 max-w-full">
+      <OverviewAutoDashboardChartCard
+        chart={chart}
+        canonicalTitle={canonicalTitle}
+        snapshotId={snapshotId}
+        viewportWidthPx={layoutWidthPx}
+        plotHeightPx={plotHeightPx}
+        loadingPulse={loadingPulse}
+        onDashboardDrill={onDashboardDrill}
+        onViewInChartsTab={snapshotId ? handleViewInChartsTab : undefined}
+        onAskAiAboutChart={snapshotId ? handleAskAiAboutChart : undefined}
+        onChartExportError={onChartExportError}
+      />
+    </div>
   );
 });
 
@@ -4911,8 +5436,7 @@ function pickDataPreviewHeaderSecondaryBadge(args: {
       key: "empty-heavy",
       label: "Missing",
       title: `About ${Math.round(nullRatio * 100)}% of rows are blank (${nullCount.toLocaleString()} of ${nRows.toLocaleString()}). Heavy blanks can skew joins and aggregates.`,
-      className:
-        "inline-flex max-w-[5rem] shrink-0 items-center truncate rounded-full border border-amber-200/25 bg-amber-50/40 px-1 py-px text-[7px] font-medium leading-none text-amber-900/82",
+      className: dpBadgeMissing,
     };
   }
   if (nullCount > 0) {
@@ -4920,8 +5444,7 @@ function pickDataPreviewHeaderSecondaryBadge(args: {
       key: "missing",
       label: "Missing",
       title: `${nullCount.toLocaleString()} blank cells (${Math.round(nullRatio * 100)}% of rows).`,
-      className:
-        "inline-flex max-w-[5rem] shrink-0 items-center truncate rounded-full border border-amber-200/25 bg-amber-50/40 px-1 py-px text-[7px] font-medium leading-none text-amber-900/82",
+      className: dpBadgeMissing,
     };
   }
   if (possibleKey) {
@@ -4930,8 +5453,7 @@ function pickDataPreviewHeaderSecondaryBadge(args: {
       label: "Identifier",
       title:
         "Looks like a primary or surrogate key—use for grain or joins, not as a default chart breakdown.",
-      className:
-        "inline-flex max-w-[5rem] shrink-0 items-center truncate rounded-full border border-violet-200/25 bg-violet-50/38 px-1 py-px text-[7px] font-medium leading-none text-violet-900/80",
+      className: dpBadgeId,
     };
   }
   if (highCard) {
@@ -4940,8 +5462,7 @@ function pickDataPreviewHeaderSecondaryBadge(args: {
       label: "Unique",
       title:
         "Values repeat rarely in the loaded preview—expect high cardinality when filtering or charting.",
-      className:
-        "inline-flex max-w-[5rem] shrink-0 items-center truncate rounded-full border border-sky-200/25 bg-sky-50/38 px-1 py-px text-[7px] font-medium leading-none text-sky-900/80",
+      className: dpBadgeUnique,
     };
   }
   if (nullCount === 0) {
@@ -4950,8 +5471,7 @@ function pickDataPreviewHeaderSecondaryBadge(args: {
       label: "Clean",
       title:
         "No nulls in this column in the profile snapshot. Watch for hidden placeholders in raw cells.",
-      className:
-        "inline-flex max-w-[5rem] shrink-0 items-center truncate rounded-full border border-emerald-200/25 bg-emerald-50/35 px-1 py-px text-[7px] font-medium leading-none text-emerald-900/78",
+      className: dpBadgeClean,
     };
   }
   return null;
@@ -6096,15 +6616,23 @@ function HomeInner() {
         applyInsightBundleToLiveState(stored);
         return;
       }
-      if (value.trim() !== lastAskedQuestion.trim()) {
+      const nextQ = value.trim();
+      const snapQ = (insightSnapshot?.question ?? lastAskedQuestion).trim();
+      if (nextQ !== lastAskedQuestion.trim() || (snapQ && nextQ !== snapQ)) {
         setHasValidAIAnswer(false);
+        setAlignedAnalysis(null);
+        setLastAskVisualizationHydrated(false);
+        pinnedInsightChartIdRef.current = null;
+        clearInsightThread();
       }
     },
     [
       lastAskedQuestion,
       insightChartId,
+      insightSnapshot?.question,
       aiAnswerByChartId,
       applyInsightBundleToLiveState,
+      clearInsightThread,
     ]
   );
 
@@ -6437,6 +6965,34 @@ function HomeInner() {
     clearAiInsightSession();
   }, [clearAiInsightSession]);
 
+  const hasActiveAiConversation = useMemo(() => {
+    if (
+      hasValidAIAnswer ||
+      answer.trim() ||
+      lastAskedQuestion.trim() ||
+      question.trim()
+    ) {
+      return true;
+    }
+    if (questionHistory.length > 0) return true;
+    if (conversationSnapshot?.lastQuestion?.trim()) return true;
+    if (aiConversationState.followUpChain.length > 0) return true;
+    if (aiConversationState.lastQuestion.trim()) return true;
+    return Object.values(aiAnswerByChartId).some(
+      (stored) => stored?.hasValidAIAnswer && stored.answer.trim()
+    );
+  }, [
+    hasValidAIAnswer,
+    answer,
+    lastAskedQuestion,
+    question,
+    questionHistory,
+    conversationSnapshot,
+    aiConversationState.followUpChain,
+    aiConversationState.lastQuestion,
+    aiAnswerByChartId,
+  ]);
+
   const askAI = async (overrideQuestion?: string) => {
     const qRaw = (overrideQuestion ?? question).trim();
     if (!qRaw) {
@@ -6456,7 +7012,18 @@ function HomeInner() {
     setAlignedAnalysis(null);
     setLoading(true);
 
-    const lineageParentChartId = insightChartId;
+    let lineageParentChartId = insightChartId;
+    if (insightSnapshot?.source === "ai") {
+      const snapQ = normalizeQuestionForMatch(
+        insightSnapshot.question ?? lastAskedQuestion
+      );
+      const newQ = normalizeQuestionForMatch(qRaw);
+      if (snapQ && newQ && snapQ !== newQ) {
+        pinnedInsightChartIdRef.current = null;
+        clearInsightThread();
+        lineageParentChartId = null;
+      }
+    }
 
     try {
       const chartHistorySnapshot = chartHistory;
@@ -6464,12 +7031,6 @@ function HomeInner() {
       const askPinnedSnapshot = lineageParentChartId
         ? chartHistorySnapshot.find((h) => h.id === lineageParentChartId)
         : null;
-      const preservePinnedChart = Boolean(
-        askPinnedSnapshot &&
-          askPinnedSnapshot.chartData.length > 0 &&
-          lineageParentChartId &&
-          askPinnedSnapshot.id === lineageParentChartId
-      );
 
       const dcAsk = dimensionOptions.date?.column ?? "";
       const dateAskPayload =
@@ -6526,7 +7087,24 @@ function HomeInner() {
       });
 
       if (!response.ok) {
-        throw new Error("AI request failed");
+        let detail = `AI request failed (${response.status})`;
+        try {
+          const errBody = (await response.json()) as { detail?: unknown };
+          if (typeof errBody.detail === "string" && errBody.detail.trim()) {
+            detail = errBody.detail.trim();
+          } else if (Array.isArray(errBody.detail)) {
+            detail = errBody.detail
+              .map((d) =>
+                typeof d === "object" && d && "msg" in d
+                  ? String((d as { msg: string }).msg)
+                  : String(d),
+              )
+              .join(" ");
+          }
+        } catch {
+          /* ignore parse errors */
+        }
+        throw new Error(detail);
       }
 
       const data = await response.json();
@@ -6553,6 +7131,19 @@ function HomeInner() {
 
       const hydrated = hydrateVisualizationFromApi(data.visualization);
       const parsedAnalysis = parseAlignedAnalysis(data.analysis);
+      const followUpDetected = Boolean(meta?.followUpDetected);
+      const preservePinnedChart = Boolean(
+        askPinnedSnapshot &&
+          askPinnedSnapshot.chartData.length > 0 &&
+          lineageParentChartId &&
+          askPinnedSnapshot.id === lineageParentChartId &&
+          shouldPreservePinnedInsightChart({
+            pinned: askPinnedSnapshot,
+            question: qRaw,
+            parsed: parsedAnalysis,
+            followUpDetected,
+          })
+      );
       const pinnedContract = askPinnedSnapshot?.contract ?? null;
       const narrativeForPinned =
         preservePinnedChart && pinnedContract
@@ -6653,10 +7244,19 @@ function HomeInner() {
           question: qRaw,
           rows: hydrated.chartData,
         });
+        const lockOrigin =
+          preservePinnedChart ||
+          (originChartRefSnapshot &&
+            chartSnapshotMatchesAnalysis(
+              originChartRefSnapshot,
+              parsedAnalysis
+            ))
+            ? originChartRefSnapshot
+            : null;
         chartKindForIntent = applyOriginChartPresentationLock({
           inferred,
           hydratedKind: hydrated.chartKind,
-          origin: originChartRefSnapshot,
+          origin: lockOrigin,
         });
       }
 
@@ -6667,6 +7267,8 @@ function HomeInner() {
           chartKind: chartKindForIntent,
           analysisContextKey: chartAnalysisContextKey,
         }) ?? undefined;
+
+      let pushedInsightChartId: string | null = null;
 
       if (hydrated && !preservePinnedChart) {
         const titleFromApi =
@@ -6710,7 +7312,7 @@ function HomeInner() {
               }
             : null
         );
-        pushAIChart({
+        pushedInsightChartId = pushAIChart({
           title: titleFromApi,
           subtitle: hydrated.persisted.subtitle,
           chartKind: chartKindForIntent,
@@ -6725,7 +7327,7 @@ function HomeInner() {
           semanticIntentKey,
         });
       } else if (!preservePinnedChart) {
-        pushAIChart({
+        pushedInsightChartId = pushAIChart({
           title: "No dedicated visualization for this answer",
           subtitle:
             "No chart specification was returned for this question. The narrative and KPI context still reflect the latest AI response.",
@@ -6744,10 +7346,13 @@ function HomeInner() {
       if (preservePinnedChart && askPinnedSnapshot) {
         selectChart(askPinnedSnapshot.id);
         pinnedInsightChartIdRef.current = askPinnedSnapshot.id;
+        pushedInsightChartId = askPinnedSnapshot.id;
       }
 
-      if (lineageParentChartId) {
-        saveInsightBundleForChart(lineageParentChartId, {
+      const bundleChartId =
+        pushedInsightChartId ?? lineageParentChartId ?? insightChartId;
+      if (bundleChartId) {
+        saveInsightBundleForChart(bundleChartId, {
           answer: answerForBundle,
           lastAskedQuestion: qRaw,
           hasValidAIAnswer: validForBundle,
@@ -7211,8 +7816,75 @@ function HomeInner() {
     [aiAnswerByChartId, insightChartId, answer, hasValidAIAnswer]
   );
 
+  const insightChartMatchesQuestionIntent = useMemo(() => {
+    if (!insightSnapshot || !lastAskedQuestion.trim()) return false;
+    const prov = insightVisualization?.provenance ?? null;
+    return chartSnapshotMatchesQuestionIntent({
+      question: lastAskedQuestion,
+      chartTitle: insightSnapshot.title,
+      aggregationKey: prov?.aggregationKey ?? prov?.aggregation ?? null,
+      aggregationLabel: prov?.aggregation ?? null,
+      categoryColumn: prov?.categoryColumn ?? null,
+      chartKind: insightSnapshot.chartKind,
+      rowCount: insightSnapshot.chartData.length,
+    });
+  }, [
+    insightSnapshot,
+    lastAskedQuestion,
+    insightVisualization?.provenance,
+    insightSnapshot?.chartKind,
+    insightSnapshot?.chartData.length,
+    insightSnapshot?.title,
+  ]);
+
+  const insightChartMatchesCurrentQuestion = useMemo(() => {
+    if (!insightSnapshot || !lastAskedQuestion.trim()) return false;
+    if (!insightChartMatchesQuestionIntent) return false;
+
+    if (insightSnapshot.source === "auto_dashboard") {
+      const dashTitle = extractDashboardChartTitleFromPrefillQuestion(
+        lastAskedQuestion
+      );
+      return dashTitle
+        ? insightSnapshot.title.trim() === dashTitle
+        : false;
+    }
+
+    const asked = normalizeQuestionForMatch(lastAskedQuestion);
+    const snapQ = normalizeQuestionForMatch(insightSnapshot.question ?? "");
+    if (snapQ && snapQ === asked) return true;
+
+    const turnId = lastConversationMeta?.turnId ?? aiConversationState.turnId;
+    if (
+      turnId &&
+      insightSnapshot.questionTurnId &&
+      insightSnapshot.questionTurnId === turnId
+    ) {
+      return true;
+    }
+
+    if (lastConversationMeta?.followUpDetected && alignedAnalysis) {
+      return chartSnapshotMatchesAnalysis(insightSnapshot, alignedAnalysis);
+    }
+
+    if (alignedAnalysis) {
+      return chartSnapshotMatchesAnalysis(insightSnapshot, alignedAnalysis);
+    }
+
+    return false;
+  }, [
+    insightSnapshot,
+    lastAskedQuestion,
+    insightChartMatchesQuestionIntent,
+    lastConversationMeta?.turnId,
+    lastConversationMeta?.followUpDetected,
+    aiConversationState.turnId,
+    alignedAnalysis,
+  ]);
+
   const insightHasRenderableVisualization = useMemo(() => {
     if (!insightSnapshot) return false;
+    if (!insightChartMatchesCurrentQuestion) return false;
     if (
       insightSnapshot.source !== "ai" &&
       insightSnapshot.source !== "auto_dashboard"
@@ -7227,7 +7899,7 @@ function HomeInner() {
     const title = insightSnapshot.title.trim();
     if (title.startsWith("No dedicated visualization")) return false;
     return true;
-  }, [insightSnapshot]);
+  }, [insightSnapshot, insightChartMatchesCurrentQuestion]);
 
   const insightExportNeedsAiNarrative =
     insightSnapshot?.source === "ai";
@@ -7237,6 +7909,15 @@ function HomeInner() {
     insightHasRenderableVisualization &&
     (!insightExportNeedsAiNarrative ||
       (insightHasExportableAnswer && questionAlignedForExport));
+
+  const showInsightExportButton = useMemo(
+    () =>
+      hasValidAIAnswer &&
+      Boolean(answer.trim()) &&
+      Boolean(lastAskedQuestion.trim()) &&
+      canExportInsight,
+    [hasValidAIAnswer, answer, lastAskedQuestion, canExportInsight]
+  );
 
   const exportEnabledReason = useMemo(() => {
     if (!insightSnapshot) return "no_insight_chart_ask_ai_first";
@@ -7434,12 +8115,9 @@ function HomeInner() {
 
   const chartHeightMain = useMemo(
     () =>
-      clampChartHeightToViewport(
-        resolveChartDisplayHeight(
-          chartData.length,
-          presentationChartKind,
-          false
-        ),
+      resolveChartsTabPreviewPlotHeight(
+        chartData.length,
+        presentationChartKind,
         viewportH
       ),
     [chartData.length, presentationChartKind, viewportH]
@@ -7866,13 +8544,13 @@ function HomeInner() {
     if (k === "line" || k === "area") {
       return Math.min(
         plotHeightMax,
-        Math.max(plotHeightMin, Math.round(viewportH * 0.38))
+        Math.max(plotHeightMin, 336)
       );
     }
     if (k === "bar" || k === "histogram") {
       const cat = n;
-      const extra = Math.min(40, Math.max(0, cat - 5) * 7);
-      return Math.min(plotHeightMax, Math.max(plotHeightMin, 362 + extra));
+      const extra = Math.min(36, Math.max(0, cat - 5) * 6);
+      return Math.min(plotHeightMax, Math.max(plotHeightMin, 300 + extra));
     }
     return Math.min(
       plotHeightMax,
@@ -8895,74 +9573,93 @@ function HomeInner() {
     />
   );
 
+  const sessionChartIntelAxisLabel = useMemo(() => {
+    const h = sessionChartSemanticHeader;
+    if (h.mode === "scatter") {
+      return `${h.xLabel} · ${h.yLabel}`;
+    }
+    return h.detailLabel?.trim() || h.roleLabel?.trim() || null;
+  }, [sessionChartSemanticHeader]);
+
+  const sessionChartIntelSourceLabel = useMemo(() => {
+    const src = activeSnapshot?.source;
+    if (src === "ai") return "AI";
+    if (src === "auto_dashboard") return "Auto Dashboard";
+    return null;
+  }, [activeSnapshot?.source]);
+
+  const sessionChartIntelNote = useMemo(() => {
+    const w = visualization?.partialVisualizationWarning?.trim();
+    if (!w) return null;
+    return w.length > 160 ? `${w.slice(0, 157)}…` : w;
+  }, [visualization?.partialVisualizationWarning]);
+
+  const sessionChartReason = useMemo(
+    () =>
+      generateChartReason(
+        {
+          chartType: sessionRenderedChartKind,
+          measure: chartAxisLabels.valueAxis,
+          category: chartAxisLabels.categoryAxis,
+          question: lastAskedQuestion,
+          metadata: {
+            groupCount: sortedChartData.length,
+            stackedOrMultiSeries:
+              visualization?.multiSeries?.layout === "stacked_bar",
+            histogramStyle: sessionSmartChartIntel?.histogramStyle ?? false,
+            routingExplanation:
+              chartRoutingRecommendation?.selectionExplanation ?? null,
+            detectedIntent: chartRoutingRecommendation?.detectedIntent ?? null,
+            recommendationHint:
+              sessionSmartChartIntel?.recommendationBlurb ?? null,
+          },
+        },
+        sortedChartData
+      ),
+    [
+      sessionRenderedChartKind,
+      chartAxisLabels.valueAxis,
+      chartAxisLabels.categoryAxis,
+      lastAskedQuestion,
+      sortedChartData,
+      visualization?.multiSeries?.layout,
+      sessionSmartChartIntel?.histogramStyle,
+      sessionSmartChartIntel?.recommendationBlurb,
+      chartRoutingRecommendation?.selectionExplanation,
+      chartRoutingRecommendation?.detectedIntent,
+    ]
+  );
+
   const chartHeadingBlock =
     sessionDisplayChartTitle || chartSubtitle ? (
-      <div
-        className={`text-center px-2 sm:px-4 ${chartSubtitle ? "mb-4 mt-1" : "mb-4 mt-0.5"}`}
-      >
+      <div className={chartsTabVizHeaderZone}>
         {sessionDisplayChartTitle ? (
-          <h3 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-slate-900 sm:text-2xl sm:leading-tight">
-            {sessionDisplayChartTitle}
-          </h3>
+          <h3 className={aiInsightsVizTitle}>{sessionDisplayChartTitle}</h3>
         ) : null}
         {chartSubtitle ? (
-          <p className="mx-auto mt-2 max-w-3xl text-sm leading-relaxed text-slate-500 sm:text-[15px]">
-            {chartSubtitle}
-          </p>
+          <p className={aiInsightsVizSubtitle}>{chartSubtitle}</p>
         ) : null}
       </div>
     ) : null;
 
   const insightChartHeadingBlock =
     insightDisplayChartTitle || insightChartSubtitle ? (
-      <div
-        className={`text-center px-2 sm:px-3 ${insightChartSubtitle ? "mb-2 mt-0.5" : "mb-2 mt-0"}`}
-      >
+      <div className={aiInsightsVizHeadingWrap}>
         {insightDisplayChartTitle ? (
-          <h3 className="text-[1.45rem] font-semibold leading-snug tracking-tight text-[var(--foreground)] sm:text-[1.75rem] sm:leading-tight">
-            {insightDisplayChartTitle}
-          </h3>
+          <h3 className={aiInsightsVizTitle}>{insightDisplayChartTitle}</h3>
         ) : null}
         {insightChartSubtitle ? (
-          <p className="mx-auto mt-1.5 max-w-3xl text-sm leading-relaxed text-[var(--text-muted)] sm:text-[15px]">
-            {insightChartSubtitle}
-          </p>
+          <p className={aiInsightsVizSubtitle}>{insightChartSubtitle}</p>
         ) : null}
       </div>
     ) : null;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(ellipse_100%_60%_at_50%_-10%,rgba(99,102,241,0.06),transparent_55%),linear-gradient(180deg,#eef2f9_0%,#f4f6fb_45%,#f0f4f8_100%)] px-4 py-8 sm:px-6 sm:py-10">
-      <div className="mx-auto w-full min-w-0 max-w-6xl">
-        <div className="w-full min-w-0 rounded-[1.75rem] border border-slate-200/50 bg-white/90 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_16px_48px_-20px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.03] backdrop-blur-sm sm:p-7">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              AI Data Analyst
-            </h1>
-
-            <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-slate-600">
-              Upload your CSV or Excel file and ask AI questions about your business
-              data.
-            </p>
-          </div>
-          <div className="text-xs font-medium text-slate-600 sm:text-sm">
-            {columns.length > 0 ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-50/80 px-3 py-1.5 text-emerald-900/90 shadow-[0_1px_2px_rgba(16,185,129,0.08)]">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]" />
-                Dataset loaded
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-slate-50/90 px-3 py-1.5 text-slate-600">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-slate-300" />
-                No dataset
-              </span>
-            )}
-          </div>
-        </div>
-
-        <MainNavTabs activeTab={activeTab} onTabClick={handleMainTabClick} />
-
+    <AppShell
+      activeTab={activeTab}
+      onNavigate={handleMainTabClick}
+      datasetLoaded={columns.length > 0}
+    >
         {error && (
           <div className="mb-4 mt-6 flex items-start justify-between gap-3 rounded-xl border border-red-200/70 bg-red-50/90 p-3.5 text-red-800 shadow-[0_1px_2px_rgba(185,28,28,0.06)]">
             <p className="min-w-0 flex-1 text-sm leading-relaxed">{error}</p>
@@ -8987,10 +9684,10 @@ function HomeInner() {
           </div>
         )}
 
-        <div className="mt-8">
+        <div>
           {(activeTab === "overview" || activeTab === "insights") &&
           columns.length > 0 ? (
-            <div className="mb-5">
+            <div className="mb-4">
               <FilterPanel
                 dashboardFilters={dashboardFilters}
                 dimensionOptions={dimensionOptions}
@@ -9003,6 +9700,7 @@ function HomeInner() {
                 onClearAll={clearExplorerFilters}
                 onDateStart={setDashDateStart}
                 onDateEnd={setDashDateEnd}
+                appearance="dashboard"
               />
             </div>
           ) : null}
@@ -9024,18 +9722,15 @@ function HomeInner() {
           {insightChartData.length > 0 && (
             <div
               ref={chartCaptureInsightRef}
-              className="fixed left-[-10000px] top-0 z-0 w-[860px] min-h-[400px] overflow-hidden bg-white rounded-xl border border-slate-200/70 p-5 pb-6 shadow-[0_12px_40px_-12px_rgb(15_23_42_/_0.12)]"
+              className="fixed left-[-10000px] top-0 z-0 w-[860px] min-h-0 overflow-hidden bg-white rounded-xl border border-slate-200/70 p-5 pb-6 shadow-[0_12px_40px_-12px_rgb(15_23_42_/_0.12)]"
               aria-hidden="true"
             >
               {insightChartHeadingBlock}
               <AiInsightChartShell
                 chartKind={insightPresentationChartKind}
-                minOuterHeight={insightLayoutMetrics.outerShellMinHeight}
+                plotHeight={insightShellPlotHeight}
               >
-                <div
-                  className="w-full min-w-0 overflow-visible rounded-xl bg-gradient-to-b from-slate-50/40 via-transparent to-transparent px-1 py-2"
-                  style={{ height: insightShellPlotHeight }}
-                >
+                <div className={aiInsightsVizPlotSurface}>
                   {renderDatasetChart(insightShellPlotHeight, false, true)}
                 </div>
               </AiInsightChartShell>
@@ -9043,9 +9738,15 @@ function HomeInner() {
           )}
 
           {activeTab === "overview" && (
+            <>
+            {columns.length === 0 ? (
+              <p className={`mb-5 max-w-2xl text-[15px] leading-relaxed ${ovMuted}`}>
+                Upload your CSV or Excel file and ask AI questions about your business data.
+              </p>
+            ) : null}
             <div className="grid w-full min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-6">
               {columns.length > 0 && !overviewUploadExpanded ? (
-                <section className="col-span-1 min-w-0 lg:col-span-2 rounded-2xl border border-slate-200/50 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.045)] order-1">
+                <section className={`col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-1 ${ovCard}`}>
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
                       <div className="flex items-center gap-2 shrink-0">
@@ -9053,33 +9754,33 @@ function HomeInner() {
                           className="h-2.5 w-2.5 rounded-full bg-emerald-500"
                           aria-hidden
                         />
-                        <span className="text-sm font-semibold text-emerald-800">
+                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                           Dataset ready
                         </span>
                       </div>
                       <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-4">
                         <div className="min-w-0">
-                          <dt className="text-slate-500">File</dt>
-                          <dd className="truncate font-medium text-slate-900" title={uploadMeta?.name || ""}>
+                          <dt className={ovMuted}>File</dt>
+                          <dd className="truncate font-medium text-foreground" title={uploadMeta?.name || ""}>
                             {uploadMeta?.name || "—"}
                             {uploadMeta?.size_bytes != null ? (
-                              <span className="ml-1 font-normal text-slate-500">
+                              <span className={`ml-1 font-normal ${ovMuted}`}>
                                 ({formatBytes(uploadMeta.size_bytes)})
                               </span>
                             ) : null}
                           </dd>
                         </div>
                         <div>
-                          <dt className="text-slate-500">Rows</dt>
-                          <dd className="font-medium text-slate-900">{rows}</dd>
+                          <dt className={ovDataLabel}>Rows</dt>
+                          <dd className={ovDataValue}>{rows}</dd>
                         </div>
                         <div>
-                          <dt className="text-slate-500">Columns</dt>
-                          <dd className="font-medium text-slate-900">{columns.length}</dd>
+                          <dt className={ovDataLabel}>Columns</dt>
+                          <dd className={ovDataValue}>{columns.length}</dd>
                         </div>
                         <div className="min-w-0">
-                          <dt className="text-slate-500">Sheet</dt>
-                          <dd className="truncate font-medium text-slate-900">
+                          <dt className={ovDataLabel}>Sheet</dt>
+                          <dd className={`truncate ${ovDataValue}`}>
                             {selectedSheet.trim() ||
                               (uploadMeta?.name ?? "").toLowerCase().endsWith(".csv")
                                 ? "CSV"
@@ -9093,7 +9794,7 @@ function HomeInner() {
                         type="button"
                         onClick={openOverviewReplaceUpload}
                         title="Upload a new CSV or Excel file (replaces the dataset in this session)"
-                        className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] hover:bg-slate-50"
+                        className={ovBtnSecondary}
                       >
                         Replace file
                       </button>
@@ -9102,14 +9803,14 @@ function HomeInner() {
                 </section>
               ) : (
                 <>
-                  <section className="min-w-0 bg-slate-50 border border-slate-200 rounded-2xl p-5 order-1">
+                  <section className={`min-w-0 p-5 order-1 ${ovCard}`}>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <h2 className="text-lg font-semibold text-slate-900">
+                        <h2 className={ovSectionTitle}>
                           {columns.length > 0 ? "Upload a new file" : "Upload"}
                         </h2>
                         {columns.length > 0 ? (
-                          <p className="mt-1 text-sm text-slate-600">
+                          <p className={`mt-1 ${ovSectionDesc}`}>
                             CSV or Excel — replaces the dataset in this session.
                           </p>
                         ) : null}
@@ -9171,8 +9872,8 @@ function HomeInner() {
                         }}
                         className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-8 ${
                           overviewDropActive
-                            ? "border-blue-500 bg-blue-50/60"
-                            : "border-slate-300 bg-white"
+                            ? "border-[color:var(--accent)] bg-[color:var(--accent-wash)]"
+                            : "border-[color:var(--border-default)] bg-[color:var(--surface-inset)]"
                         }`}
                       >
                         <p className="text-sm font-medium text-slate-800">
@@ -9219,10 +9920,10 @@ function HomeInner() {
                     </div>
                   </section>
 
-                  <section className="min-w-0 bg-white border border-slate-200 rounded-2xl p-5 order-1">
-                    <h2 className="text-lg font-semibold text-slate-900">Dataset</h2>
+                  <section className={`min-w-0 p-5 order-1 ${ovCardElevated}`}>
+                    <h2 className={ovSectionTitle}>Dataset</h2>
                     {columns.length === 0 ? (
-                      <p className="mt-2 text-slate-600 text-sm">
+                      <p className={`mt-2 text-sm ${ovMuted}`}>
                         Upload a dataset to see KPIs, preview, charts, and insights.
                       </p>
                     ) : (
@@ -9267,34 +9968,17 @@ function HomeInner() {
               )}
 
               {columns.length > 0 ? (
-                <section className="col-span-1 min-w-0 lg:col-span-2 order-2 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/90 via-white to-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.045)]">
-                  <h2 className="text-lg font-semibold text-slate-900">AI Summary</h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Based on your file, KPI cards, and auto-dashboard charts—updates when
-                    you upload, switch sheets, or change mapping.
-                  </p>
-                  <ul className="mt-4 space-y-2.5 text-sm text-slate-800 leading-relaxed">
-                    {overviewAiSummaryBullets.map((line, idx) => (
-                      <li key={idx} className="flex gap-2.5">
-                        <span
-                          className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500"
-                          aria-hidden
-                        />
-                        <span>{line}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <section className="col-span-1 min-w-0 lg:col-span-2 order-2">
+                  <OverviewAiSummaryPanel bullets={overviewAiSummaryBullets} />
                 </section>
               ) : null}
 
               {columns.length > 0 && (
-                <section className="col-span-1 min-w-0 lg:col-span-2 bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl p-5 order-5">
+                <section className={`col-span-1 min-w-0 lg:col-span-2 p-5 sm:p-6 order-5 ${ovCardElevated}`}>
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900">
-                        Data setup
-                      </h2>
-                      <p className="text-sm text-slate-600 mt-1">
+                      <h2 className={ovSectionTitle}>Data setup</h2>
+                      <p className={`mt-1 ${ovSectionDesc}`}>
                         Column mapping drives KPIs, charts, AI answers, and PDF
                         export.
                       </p>
@@ -9302,7 +9986,7 @@ function HomeInner() {
                     <button
                       type="button"
                       onClick={() => setMappingModalOpen(true)}
-                      className={`shrink-0 ${btnPrimarySm}`}
+                      className={`shrink-0 ${ovBtnPrimaryAccent}`}
                     >
                       Review mapping
                     </button>
@@ -9322,21 +10006,21 @@ function HomeInner() {
                       regionColumn.trim() || (engineRegion && engineRegion) || "";
                     const confidenceBadgeClass =
                       mappingConfidence === "High"
-                        ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+                        ? "bg-emerald-500/10 text-emerald-800 ring-emerald-500/25 dark:text-emerald-200"
                         : mappingConfidence === "Medium"
-                          ? "bg-amber-50 text-amber-900 ring-amber-200"
-                          : "bg-slate-100 text-slate-800 ring-slate-200";
+                          ? "bg-amber-500/10 text-amber-900 ring-amber-500/25 dark:text-amber-100"
+                          : "bg-[color:var(--surface-subtle)] text-foreground ring-[color:var(--border-default)]";
                     const colHint = (explicit: string, inferred: string | null) => {
                       if (explicit.trim()) {
                         return (
-                          <span className="ml-1 text-xs font-normal text-slate-500">
+                          <span className={`ml-1 ${ovDataHint}`}>
                             (manual)
                           </span>
                         );
                       }
                       if (inferred) {
                         return (
-                          <span className="ml-1 text-xs font-normal text-slate-500">
+                          <span className={`ml-1 ${ovDataHint}`}>
                             (auto-detect)
                           </span>
                         );
@@ -9346,61 +10030,59 @@ function HomeInner() {
                     const colValue = (explicit: string, inferred: string | null) => {
                       const v = explicit.trim() || inferred;
                       return v ? (
-                        <span className="font-mono text-slate-900">{v}</span>
+                        <span className={ovDataValueMono}>{v}</span>
                       ) : (
-                        <span className="text-slate-500">Not detected</span>
+                        <span className={ovMuted}>Not detected</span>
                       );
                     };
                     return (
                       <>
-                        <div className="mt-4 rounded-2xl border border-slate-200/50 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.045)]">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            AI detected
-                          </p>
-                          <ul className="mt-3 space-y-2 text-sm text-slate-800">
+                        <div className={`mt-4 p-4 ${ovInset}`}>
+                          <p className={ovLabel}>AI detected</p>
+                          <ul className="mt-3 space-y-2 text-sm text-foreground">
                             <li>
-                              <span className="text-slate-500">Dataset type:</span>{" "}
-                              <span className="font-medium text-slate-900">
+                              <span className={ovDataLabel}>Dataset type:</span>{" "}
+                              <span className={ovDataValue}>
                                 {datasetTypeLabel}
                               </span>
                             </li>
                             <li>
-                              <span className="text-slate-500">Primary metric:</span>{" "}
+                              <span className={ovDataLabel}>Primary metric:</span>{" "}
                               {colValue(salesColumn, effectiveSales)}
                               {colHint(salesColumn, effectiveSales)}
                             </li>
                             <li>
-                              <span className="text-slate-500">Date column:</span>{" "}
+                              <span className={ovDataLabel}>Date column:</span>{" "}
                               {colValue(dateColumn, effectiveDate)}
                               {colHint(dateColumn, effectiveDate)}
                             </li>
                             <li>
-                              <span className="text-slate-500">Main dimension:</span>{" "}
+                              <span className={ovDataLabel}>Main dimension:</span>{" "}
                               {colValue(productColumn, effectiveProduct)}
                               {colHint(productColumn, effectiveProduct)}
                             </li>
                             {regionDisplay ? (
                               <li>
-                                <span className="text-slate-500">
+                                <span className={ovDataLabel}>
                                   Region / location:
                                 </span>{" "}
-                                <span className="font-mono text-slate-900">
+                                <span className={ovDataValueMono}>
                                   {regionDisplay}
                                 </span>
                                 {regionColumn.trim() ? (
-                                  <span className="ml-1 text-xs font-normal text-slate-500">
+                                  <span className={`ml-1 ${ovDataHint}`}>
                                     (manual)
                                   </span>
                                 ) : engineRegion ? (
-                                  <span className="ml-1 text-xs font-normal text-slate-500">
+                                  <span className={`ml-1 ${ovDataHint}`}>
                                     (auto-detect)
                                   </span>
                                 ) : null}
                               </li>
                             ) : null}
                           </ul>
-                          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-                            <span className="text-xs font-medium text-slate-500">
+                          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[color:var(--border-default)] pt-4">
+                            <span className={`text-xs font-medium ${ovDataLabel}`}>
                               Confidence
                             </span>
                             <span
@@ -9409,16 +10091,16 @@ function HomeInner() {
                               {mappingConfidence}
                             </span>
                             {mappingConfirmedByUser ? (
-                              <span className="text-xs text-slate-500">(saved mapping)</span>
+                              <span className={`text-xs ${ovMuted}`}>(saved mapping)</span>
                             ) : null}
                           </div>
                         </div>
                         {mappingMetadata?.domain ? (
-                          <details className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80">
-                            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-800">
+                          <details className={`mt-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]`}>
+                            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-foreground">
                               Advanced technical mapping
                             </summary>
-                            <div className="border-t border-slate-200 px-4 py-4 text-xs text-slate-700 space-y-2.5">
+                            <div className="space-y-2.5 border-t border-[color:var(--border-default)] px-4 py-4 text-xs text-[color:var(--text-muted)]">
                               <p>
                                 <span className="font-semibold text-slate-800">
                                   Semantic column map
@@ -9481,53 +10163,32 @@ function HomeInner() {
 
               {autoDashboardKpiRows.length > 0 && (
                 <section className="col-span-1 min-w-0 lg:col-span-2 pt-1 order-3">
-                  <h2 className="text-lg font-semibold text-slate-900 mb-1">
-                    Auto Dashboard
-                  </h2>
-                  <p className="text-sm text-slate-600 mb-4">
+                  <h2 className={`${ovSectionTitle} mb-1`}>Auto Dashboard</h2>
+                  <p className={`${ovSectionDesc} mb-5`}>
                     Detected dataset type:{" "}
-                    <span className="font-medium text-slate-900">
+                    <span className="font-medium text-foreground">
                       {autoDashboard?.type_label ?? "Dashboard"}
                     </span>
                   </p>
                   <div className="grid auto-rows-fr gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                     {autoDashboardKpiRows.map(({ card, contextLine }, idx) => (
-                      <div
+                      <OverviewKpiCard
                         key={`auto-${card.title}-${idx}`}
-                        className="flex min-h-[132px] flex-col rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_8px_24px_-10px_rgb(15_23_42/0.1)] ring-1 ring-inset ring-slate-900/[0.02]"
-                      >
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
-                          {card.title}
-                        </p>
-                        <p className="mt-2.5 text-2xl font-bold leading-tight tracking-tight text-slate-900 tabular-nums break-words">
-                          {card.value}
-                        </p>
-                        {card.subtitle ? (
-                          <p className="mt-2 text-sm font-medium leading-snug text-slate-600">
-                            {card.subtitle}
-                          </p>
-                        ) : null}
-                        {contextLine ? (
-                          <p className="mt-auto border-t border-slate-100/90 pt-3 text-xs leading-snug text-slate-500">
-                            {contextLine}
-                          </p>
-                        ) : (
-                          <span className="mt-auto block min-h-[0.5rem]" aria-hidden />
-                        )}
-                      </div>
+                        card={card}
+                        contextLine={contextLine}
+                        index={idx}
+                      />
                     ))}
                   </div>
                 </section>
               )}
 
               {columns.length > 0 && (
-                <section className="col-span-1 min-w-0 lg:col-span-2 pt-2 order-4">
+                <section className="col-span-1 min-w-0 max-w-full lg:col-span-2 pt-1 order-4 overflow-hidden">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-2">
                     <div className="min-w-0">
-                      <h2 className="text-lg font-semibold text-slate-900 mb-1">
-                        Auto Dashboard Charts
-                      </h2>
-                      <p className="text-sm text-slate-600">
+                      <h2 className={`${ovSectionTitle} mb-1`}>Auto Dashboard Charts</h2>
+                      <p className={ovSectionDesc}>
                         Quick views built from your current sheet. They refresh when you
                         upload a file, switch sheets, or save column mapping.
                       </p>
@@ -9544,7 +10205,7 @@ function HomeInner() {
                   </div>
                   {(autoDashboard?.cards?.length ?? 0) > 0 &&
                   (autoDashboard?.charts?.length ?? 0) > 0 ? (
-                    <div className="flex flex-wrap gap-2 mb-3">
+                    <div className="flex flex-wrap gap-2 mb-2">
                       {autoDashboardKpiRows.map(({ card }, idx) => (
                         <OverviewInlineKpiChip
                           key={`dash-kpi-${idx}-${card.title}`}
@@ -9555,7 +10216,7 @@ function HomeInner() {
                     </div>
                   ) : null}
                   {dashboardEmpty ? (
-                    <p className="text-sm text-slate-600 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center leading-relaxed">
+                    <p className={`text-sm rounded-xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-4 py-6 text-center leading-relaxed ${ovMuted}`}>
                       No records match current filters.
                     </p>
                   ) : (autoDashboard?.charts?.length ?? 0) > 0 ? (
@@ -9566,8 +10227,9 @@ function HomeInner() {
                           : ""
                       }
                     >
-                      <div className="grid w-full min-w-0 grid-cols-1 gap-4 md:grid-cols-[repeat(2,minmax(0,1fr))]">
-                      {(autoDashboard?.charts ?? []).map((c, idx, arr) => {
+                      <div className={`${ovChartsWrap} min-w-0 max-w-full`}>
+                      <div className={`${ovChartGrid} min-w-0 max-w-full`}>
+                      {(autoDashboard?.charts ?? []).map((c, idx) => {
                         const dKey = dashboardChartKeyFromTitle(c.title);
                         const dashSnap = dashboardSnapshotByKey.get(dKey);
                         const canonicalTitle = getCanonicalChartTitle({
@@ -9578,28 +10240,16 @@ function HomeInner() {
                           contract: dashSnap?.contract ?? null,
                           aggregationKey: dashSnap?.contract?.aggregation ?? "sum",
                         });
-                        const oddLast =
-                          arr.length % 2 === 1 && idx === arr.length - 1;
                         return (
                           <div
                             key={`overview-dash-${idx}-${c.title.slice(0, 40)}`}
-                            className={
-                              oddLast
-                                ? "md:col-span-2 flex justify-center"
-                                : undefined
-                            }
+                            className={ovChartCell}
                           >
-                            <div
-                              className={
-                                oddLast ? "w-full max-w-xl md:max-w-2xl" : "w-full"
-                              }
-                            >
+                            <div className={ovChartInner}>
                               <OverviewDashboardChartSlot
                                 chart={c}
                                 canonicalTitle={canonicalTitle}
                                 snapshotId={dashSnap?.id ?? null}
-                                compactHeight={220}
-                                viewportWidthPx={viewportW}
                                 loadingPulse={loading}
                                 onDashboardDrill={onAutoDashboardDrill}
                                 onOpenDashboardChartInChartsTab={
@@ -9613,9 +10263,10 @@ function HomeInner() {
                         );
                       })}
                       </div>
+                      </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-600 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center leading-relaxed">
+                    <p className={`text-sm rounded-xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-4 py-6 text-center leading-relaxed ${ovMuted}`}>
                       No dashboard charts generated yet. Review column mapping or ask
                       an AI question.
                     </p>
@@ -9623,9 +10274,92 @@ function HomeInner() {
                 </section>
               )}
             </div>
+            </>
           )}
 
-          {activeTab !== "overview" && columns.length > 0 && (
+          {activeTab === "insights" && columns.length > 0 && (
+            <section className={`mb-6 p-4 sm:p-5 ${ovCard}`}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full bg-emerald-500"
+                      aria-hidden
+                    />
+                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                      Dataset ready
+                    </span>
+                  </div>
+                  <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="min-w-0">
+                      <dt className={ovMuted}>File</dt>
+                      <dd
+                        className="truncate font-medium text-foreground"
+                        title={uploadMeta?.name || ""}
+                      >
+                        {uploadMeta?.name || "—"}
+                        {uploadMeta?.size_bytes != null ? (
+                          <span className={`ml-1 font-normal ${ovMuted}`}>
+                            ({formatBytes(uploadMeta.size_bytes)})
+                          </span>
+                        ) : null}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className={ovDataLabel}>Rows</dt>
+                      <dd className={ovDataValue}>{rows}</dd>
+                    </div>
+                    <div>
+                      <dt className={ovDataLabel}>Columns</dt>
+                      <dd className={ovDataValue}>{columns.length}</dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className={ovDataLabel}>Sheet</dt>
+                      <dd className={`truncate ${ovDataValue}`}>
+                        {selectedSheet.trim() ||
+                          (uploadMeta?.name ?? "").toLowerCase().endsWith(".csv")
+                            ? "CSV"
+                            : "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-end gap-2">
+                  {sheets.length > 1 ? (
+                    <div className="flex min-w-[10rem] flex-col gap-1.5">
+                      <label className={ovDataLabel} htmlFor="insights-sheet-select">
+                        Sheet
+                      </label>
+                      <select
+                        id="insights-sheet-select"
+                        value={selectedSheet}
+                        onChange={(e) => selectSheet(e.target.value)}
+                        className={`${ovFilterControl} h-[52px] cursor-pointer`}
+                      >
+                        {sheets.map((sheet) => (
+                          <option key={sheet} value={sheet}>
+                            {sheet}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={openOverviewReplaceUpload}
+                    title="Upload a new CSV or Excel file (replaces the dataset in this session)"
+                    className={ovBtnSecondary}
+                  >
+                    Replace file
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {activeTab !== "overview" &&
+            activeTab !== "insights" &&
+            columns.length > 0 && (
             <div className="mb-6 bg-slate-50 border rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div className="flex flex-col gap-1 text-sm text-slate-700">
                 <div className="flex flex-wrap items-center gap-2">
@@ -9681,21 +10415,19 @@ function HomeInner() {
           )}
 
         {activeTab === "preview" && columns.length > 0 && (
-          <section className="mb-6">
-            <div className="mb-4 flex flex-col gap-4">
+          <section className="mb-6 min-w-0">
+            <div className="mb-5 flex flex-col gap-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="min-w-0 max-w-3xl">
-                  <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
-                    Data Preview
-                  </h2>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                  <h2 className={dpSectionTitle}>Data Preview</h2>
+                  <p className={dpSectionDesc}>
                     Showing first {preview.length} of {rows} rows in this window. Missing
                     values are highlighted. AI highlights important column quality signals
                     automatically.
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2.5">
-                  <label className="text-sm font-medium text-slate-600" htmlFor="preview-row-limit">
+                  <label className="text-sm font-medium text-[color:var(--text-muted)]" htmlFor="preview-row-limit">
                     Rows
                   </label>
                   <select
@@ -9706,7 +10438,7 @@ function HomeInner() {
                       setPreviewRowLimit(val);
                       await fetchPreviewRows(val);
                     }}
-                    className="rounded-xl border border-slate-200/55 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition duration-200 hover:border-slate-300/70 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100/90"
+                    className={dpControl}
                   >
                     <option value="10">10 rows</option>
                     <option value="25">25 rows</option>
@@ -9716,11 +10448,11 @@ function HomeInner() {
                   </select>
                 </div>
               </div>
-              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
-                <div className="flex w-full min-w-0 items-center gap-2 lg:max-w-[45%]">
+              <div className={dpToolbarRow}>
+                <div className={dpSearchWrap}>
                   <div className="relative min-w-0 flex-1">
                     <span
-                      className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-400"
+                      className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[color:var(--text-subtle)]"
                       aria-hidden
                     >
                       <svg
@@ -9742,7 +10474,7 @@ function HomeInner() {
                       value={dataPreviewSearchQuery}
                       onChange={(e) => setDataPreviewSearchQuery(e.target.value)}
                       placeholder="Search loaded rows (all columns)…"
-                      className="min-w-0 w-full rounded-xl border border-slate-200/55 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] placeholder:text-slate-400 transition duration-200 focus:border-indigo-400/90 focus:outline-none focus:ring-[3px] focus:ring-indigo-500/15"
+                      className={dpSearchInput}
                       aria-label="Search data preview across all columns"
                       autoComplete="off"
                       spellCheck={false}
@@ -9752,7 +10484,7 @@ function HomeInner() {
                     <button
                       type="button"
                       onClick={() => setDataPreviewSearchQuery("")}
-                      className="shrink-0 rounded-xl border border-slate-200/55 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition duration-200 hover:border-slate-300/70 hover:bg-slate-50/90 hover:text-slate-900 active:scale-[0.99]"
+                      className={dpBtnGhost}
                     >
                       Clear
                     </button>
@@ -9760,7 +10492,7 @@ function HomeInner() {
                 </div>
                 {deferredDataPreviewSearch ? (
                   <p
-                    className="text-xs font-medium tabular-nums text-slate-500 sm:ml-auto"
+                    className="shrink-0 text-xs font-medium tabular-nums text-[color:var(--text-muted)] sm:ml-auto"
                     aria-live="polite"
                   >
                     {dataPreviewFilteredRows.length} of {preview.length} loaded row
@@ -9771,11 +10503,11 @@ function HomeInner() {
             </div>
 
             {dataPreviewSuggestedQuestions.length > 0 ? (
-              <div className="mb-4 rounded-2xl border border-indigo-100/50 bg-gradient-to-br from-indigo-50/50 via-white to-slate-50/40 px-4 py-3.5 shadow-[0_1px_2px_rgba(67,56,202,0.05)] sm:px-5">
-                <h3 className="text-sm font-semibold tracking-tight text-slate-900">
+              <div className={dpSuggestionsPanel}>
+                <h3 className="text-sm font-semibold tracking-tight text-foreground">
                   AI suggested questions
                 </h3>
-                <p className="mb-3 mt-1 text-xs leading-relaxed text-slate-600">
+                <p className="mb-3 mt-1 text-xs leading-relaxed text-[color:var(--text-muted)]">
                   Tap to open AI Insights with the prompt ready to send.
                 </p>
                 <div className="flex flex-wrap items-stretch gap-2">
@@ -9790,7 +10522,7 @@ function HomeInner() {
                         setQuestionAndResetInsightState(q);
                         setActiveTab("insights");
                       }}
-                      className="max-w-[min(100%,14rem)] shrink rounded-xl border border-slate-200/45 bg-white/95 px-3 py-2 text-left text-xs font-medium leading-snug text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-all duration-200 hover:border-indigo-200/70 hover:bg-white hover:shadow-[0_4px_14px_-4px_rgba(67,56,202,0.18)] active:scale-[0.99]"
+                      className={dpSuggestionChip}
                     >
                       {q}
                     </button>
@@ -9801,7 +10533,7 @@ function HomeInner() {
                       onClick={() =>
                         setDataPreviewSuggestionsExpanded((v) => !v)
                       }
-                      className="shrink-0 self-center rounded-xl border border-transparent bg-slate-50/90 px-3 py-2 text-xs font-medium text-slate-500 transition-all duration-200 hover:border-slate-200/60 hover:bg-white hover:text-slate-700 active:scale-[0.99]"
+                      className={dpSuggestionMore}
                     >
                       {dataPreviewSuggestionsExpanded
                         ? "Fewer suggestions"
@@ -9813,27 +10545,42 @@ function HomeInner() {
             ) : null}
 
             {dataPreviewQualityNotes.length > 0 ? (
-              <div className="mb-3 rounded-xl border border-amber-100/40 bg-amber-50/22 px-2.5 py-2 shadow-[0_1px_2px_rgba(180,83,9,0.04)] sm:px-3">
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-amber-900/75">
-                  AI Dataset Insights
-                </h3>
-                <ul className="mt-1 list-disc space-y-0.5 pl-3.5 text-[11px] leading-snug text-amber-950/85">
-                  {dataPreviewQualityNotes.map((note) => (
-                    <li key={note}>{note}</li>
-                  ))}
-                </ul>
+              <div className={dpInsightsPanel} role="note">
+                <span className="data-preview-insights__icon" aria-hidden>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-900/90 dark:text-amber-100/90">
+                    AI Dataset Insights
+                  </h3>
+                  <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-[color:var(--text-muted)]">
+                    {dataPreviewQualityNotes.map((note) => (
+                      <li key={note} className="flex gap-2">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500/65 dark:bg-amber-400/50" aria-hidden />
+                        <span>{note}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             ) : null}
 
             <div
               ref={dataPreviewTableSurfaceRef}
-              className="relative isolate overflow-x-clip rounded-2xl border border-slate-200/55 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)]"
+              className={`${dpTableShell}${previewLoading ? " opacity-80" : ""}`}
             >
-              <div
-                ref={dataPreviewTableScrollRef}
-                className="max-h-[min(70vh,42rem)] overflow-auto [overscroll-behavior-x:contain] [overscroll-behavior-y:auto]"
-              >
-                <table className="data-preview-table min-w-max w-full border-separate border-spacing-0 text-sm">
+              <div ref={dataPreviewTableScrollRef} className={dpTableScroll}>
+                {previewLoading && preview.length === 0 ? (
+                  <div className="data-preview-loading" aria-busy="true" aria-label="Loading preview rows">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div key={i} className="data-preview-shimmer-row" />
+                    ))}
+                  </div>
+                ) : (
+                <table className={dpTable}>
                   <thead>
                     <tr>
                       {columns.map((col, colIdx) => {
@@ -9841,23 +10588,14 @@ function HomeInner() {
                           previewColumnHeaderSecondaryMap.get(col) ?? null;
                         const dt = profile?.column_types?.[col];
                         const elevated = dataPreviewTableHeaderElevated;
-                        const thShadow =
-                          colIdx === 0
-                            ? elevated
-                              ? "shadow-[inset_0_-1px_0_rgba(226,232,240,0.9),2px_0_12px_-8px_rgba(15,23,42,0.06),0_10px_24px_-12px_rgba(15,23,42,0.12)]"
-                              : "shadow-[inset_0_-1px_0_rgba(226,232,240,0.65),2px_0_12px_-8px_rgba(15,23,42,0.06)]"
-                            : elevated
-                              ? "shadow-[inset_0_-1px_0_rgba(226,232,240,0.9),0_10px_22px_-12px_rgba(15,23,42,0.11)]"
-                              : "shadow-[inset_0_-1px_0_rgba(226,232,240,0.65)]";
+                        const thExtra = [
+                          elevated ? "data-preview-th--elevated" : "",
+                          colIdx === 0 ? "data-preview-th--sticky-col" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ");
                         return (
-                        <th
-                          key={col}
-                          className={`min-h-[3.75rem] max-w-[12rem] border-b border-slate-200/50 px-2 py-2 text-left align-top text-slate-700 sm:max-w-[15rem] md:max-w-[16rem] sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm transition-shadow duration-300 ease-out ${thShadow} ${
-                            colIdx === 0
-                              ? "left-0 z-30 border-r border-slate-200/55"
-                              : ""
-                          }`}
-                        >
+                        <th key={col} className={thExtra || undefined}>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -9878,32 +10616,19 @@ function HomeInner() {
                                   }
                             );
                           }}
-                          className="flex h-full min-h-[2.75rem] w-full min-w-0 flex-col justify-start gap-1 rounded-lg px-0.5 py-px text-left transition-colors duration-200 hover:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50"
+                          className={dpThBtn}
                           aria-expanded={dataPreviewProfileOpen?.column === col}
                           title="Column profile"
                         >
-                          <span className="line-clamp-2 min-h-0 text-[12px] font-semibold leading-snug tracking-tight text-slate-900">
-                            {col}
-                          </span>
-                          <div className="flex min-h-0 shrink-0 flex-wrap items-center gap-1">
-                            <span className="inline-flex shrink-0 items-center rounded-full border border-slate-200/30 bg-slate-50/75 px-1 py-px text-[7px] font-medium uppercase tracking-wide text-slate-600/90">
+                          <span className={dpThName}>{col}</span>
+                          <div className={dpThMeta}>
+                            <span className={dpBadgeType}>
                               {dataPreviewHeaderTypeLabel(dt)}
                             </span>
                             {secondary ? (
-                              <>
-                                <span
-                                  className="shrink-0 text-[8px] font-medium leading-none text-slate-300/90"
-                                  aria-hidden
-                                >
-                                  ·
-                                </span>
-                                <span
-                                  title={secondary.title}
-                                  className={secondary.className}
-                                >
-                                  {secondary.label}
-                                </span>
-                              </>
+                              <span title={secondary.title} className={secondary.className}>
+                                {secondary.label}
+                              </span>
                             ) : null}
                           </div>
                         </button>
@@ -9927,35 +10652,19 @@ function HomeInner() {
                             qLower.length > 0 &&
                             dataPreviewCellMatchesQuery(raw, qLower);
                           const isFirstCol = colIdx === 0;
-                          const zebraDark = index % 2 === 1;
-                          let bgClass: string;
-                          if (emptyCell) {
-                            bgClass =
-                              "bg-rose-50/40 text-rose-800/90 group-hover:bg-rose-50/60";
-                          } else if (isFirstCol) {
-                            bgClass = zebraDark
-                              ? "bg-slate-50/65 text-slate-800 group-hover:bg-slate-50/85"
-                              : "bg-white text-slate-800 group-hover:bg-slate-50/55";
-                          } else {
-                            bgClass = zebraDark
-                              ? "bg-slate-50/38 text-slate-800 group-hover:bg-slate-50/58"
-                              : "bg-white text-slate-800 group-hover:bg-slate-50/55";
-                          }
-                          const stickyFirst = isFirstCol
-                            ? "sticky left-0 z-[11] border-r border-slate-200/50 shadow-[2px_0_12px_-8px_rgba(15,23,42,0.06)]"
-                            : "";
+                          const cellClass = emptyCell
+                            ? dpCellNull
+                            : isFirstCol
+                              ? dpCellSticky
+                              : dpCell;
                           return (
                             <td
                               key={col}
                               title={emptyCell ? undefined : displayText}
-                              className={`border-b border-slate-200/45 px-2.5 py-2 text-sm transition-[background-color,color] duration-200 ease-out ${bgClass} ${stickyFirst} ${
-                                isFirstCol
-                                  ? "max-w-[11rem] sm:max-w-[13rem] truncate whitespace-nowrap font-medium"
-                                  : "max-w-[10rem] sm:max-w-[14rem] truncate whitespace-nowrap"
-                              } ${emptyCell ? "font-medium" : ""}`}
+                              className={cellClass}
                             >
                               {emptyCell ? (
-                                <span className="inline-flex items-center rounded-md border border-rose-200/35 bg-rose-50/50 px-1.5 py-0.5 font-medium text-rose-800/85 tabular-nums">
+                                <span className={dpNullPill}>
                                   {showHighlight
                                     ? highlightSearchInText(
                                         displayText,
@@ -9979,22 +10688,23 @@ function HomeInner() {
                   })}
                 </tbody>
               </table>
+                )}
               </div>
             </div>
-            {previewLoading && (
-              <p className="text-sm text-slate-500 mt-2">Loading preview rows...</p>
-            )}
-            {!previewLoading && preview.length === 0 && (
-              <p className="text-sm text-slate-500 mt-2">No preview rows available.</p>
-            )}
+            {previewLoading && preview.length > 0 ? (
+              <p className={`mt-2 ${dpEmptyState}`}>Refreshing preview rows…</p>
+            ) : null}
+            {!previewLoading && preview.length === 0 ? (
+              <p className={`mt-2 ${dpEmptyState}`}>No preview rows available.</p>
+            ) : null}
             {!previewLoading &&
               preview.length > 0 &&
               dataPreviewFilteredRows.length === 0 &&
-              deferredDataPreviewSearch && (
-                <p className="text-sm text-amber-800 mt-2 rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2">
+              deferredDataPreviewSearch ? (
+                <p className={`mt-2 ${dpEmptySearch}`}>
                   {`No rows match "${deferredDataPreviewSearch}". Try a shorter term or clear the search.`}
                 </p>
-              )}
+              ) : null}
             {dataPreviewProfileOpen ? (
               <DataPreviewColumnProfilePopover
                 col={dataPreviewProfileOpen.column}
@@ -10009,86 +10719,120 @@ function HomeInner() {
         )}
 
         {activeTab === "charts" && (
-          <section className="mb-10 rounded-[1.35rem] border border-slate-200/40 bg-gradient-to-b from-slate-50/55 via-white/50 to-slate-100/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_1px_3px_rgba(15,23,42,0.04)] sm:p-5">
-            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <section className={chartsTabPage}>
+            <div className={chartsTabHeaderRow}>
               <div className="min-w-0 max-w-2xl">
-                <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                  Charts
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+                <h2 className={chartsTabTitle}>Charts</h2>
+                <p className={chartsTabDesc}>
                   Session visualizations from{" "}
-                  <span className="font-medium text-slate-800">Overview</span> and{" "}
-                  <span className="font-medium text-slate-800">AI Insights</span>. Select a
+                  <span className={chartsTabDescEmphasis}>Overview</span> and{" "}
+                  <span className={chartsTabDescEmphasis}>AI Insights</span>. Select a
                   run in the timeline to preview, export PNG, or attach to the Export tab
                   PDF. History resets when the dataset or mapping changes.
                 </p>
               </div>
-              <button
-                onClick={downloadChartPng}
-                disabled={chartData.length === 0}
-                className={`shrink-0 ${btnPrimary} disabled:shadow-none`}
-              >
-                Download Chart PNG
-              </button>
+              {chartData.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={downloadChartPng}
+                  className={chartsTabDownloadBtn}
+                >
+                  Download Chart PNG
+                </button>
+              ) : null}
             </div>
 
-            <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-5 lg:grid-cols-[minmax(10.5rem,23%)_minmax(0,1fr)] lg:gap-6">
-              <ChartsTimelineAside
-                ref={chartHistoryAsideRef}
-                sections={chartHistorySections}
-                activeChartId={activeChartId}
-                onSelectChart={selectChartPreserveScroll}
-                historyEmpty={chartHistory.length === 0}
-              />
+            <div className="grid w-full min-h-0 min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(10.5rem,23%)_minmax(0,1fr)] lg:items-start lg:gap-6">
+              <div className={chartsTabTimelineColumn}>
+                <ChartsTimelineAside
+                  ref={chartHistoryAsideRef}
+                  sections={chartHistorySections}
+                  activeChartId={activeChartId}
+                  onSelectChart={selectChartPreserveScroll}
+                  historyEmpty={chartHistory.length === 0}
+                />
+              </div>
 
-              <div ref={chartsPreviewRef} className="flex min-w-0 w-full flex-1 flex-col scroll-mt-24">
+              <div
+                ref={chartsPreviewRef}
+                className="flex min-h-0 min-w-0 w-full flex-1 flex-col scroll-mt-24"
+              >
                 {chartData.length > 0 ? (
-                  <div className="group relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-slate-200/45 bg-gradient-to-br from-white via-white to-slate-50/35 p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_22px_52px_-22px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.025] transition-all duration-500 ease-out hover:border-slate-200/70 hover:shadow-[0_1px_2px_rgba(15,23,42,0.045),0_26px_60px_-20px_rgba(79,70,229,0.11)] sm:p-4 md:p-5">
-                    <div
-                      ref={chartsSessionHeadingRef}
-                      className="mb-1 w-full min-w-0 scroll-mt-28 text-center lg:mb-2"
-                    >
-                      <div className="mx-auto min-w-0 max-w-4xl">
-                        {chartHeadingBlock ?? (
-                          <div className="px-2 sm:px-4">
-                            <h3 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-slate-900 sm:text-2xl sm:leading-tight">
-                              Visualization
-                            </h3>
-                            {chartSubtitle ? (
-                              <p className="mx-auto mt-2 max-w-3xl text-sm leading-relaxed text-slate-500 sm:text-[15px]">
-                                {chartSubtitle}
-                              </p>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div title={sessionChartMetadataLine}>
-                    <ChartContextSummary
-                      renderedKind={sessionRenderedChartKind}
-                      metricLabel={chartAxisLabels.valueAxis}
-                      semanticHeader={sessionChartSemanticHeader}
-                      badgeCompact={sessionChartMetadataBadgeCompact}
-                      leadInsight={chartInsightBadge ?? undefined}
-                    />
-                    </div>
-                    {visualization?.partialVisualizationWarning ? (
-                      <p className="mb-3 mt-1 rounded-xl border border-amber-200/55 bg-amber-50/50 px-3 py-2 text-xs leading-snug text-amber-950/90">
-                        <span className="font-semibold text-amber-900/95">Note · </span>
-                        {visualization.partialVisualizationWarning.length > 220
-                          ? `${visualization.partialVisualizationWarning.slice(0, 217)}…`
-                          : visualization.partialVisualizationWarning}
-                      </p>
-                    ) : null}
-
-                    <div className="flex w-full min-w-0 flex-col gap-2.5 sm:gap-3">
+                  <div className={chartsTabVizPreviewCard}>
+                    <div className={chartsTabPreviewHeaderSticky}>
                       <div
-                        key={activeChartId ?? "session-chart"}
-                        className="animate-chart-surface-in motion-reduce:animate-none w-full min-h-0 min-w-0 overflow-visible rounded-xl bg-gradient-to-b from-slate-50/35 via-transparent to-transparent px-1 pb-0.5 pt-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition-[box-shadow] duration-500 ease-out group-hover:from-slate-50/45"
-                        style={{ height: chartHeightMain }}
+                        ref={chartsSessionHeadingRef}
+                        className="w-full min-w-0 scroll-mt-28"
                       >
-                        {renderDatasetChart(chartHeightMain, false, false)}
+                        <div className="mx-auto min-w-0 max-w-4xl">
+                          {chartHeadingBlock ?? (
+                            <div className={chartsTabVizHeaderZone}>
+                              <p className={chartsTabVizKicker}>Chart preview</p>
+                              <h3 className={aiInsightsVizTitle}>Visualization</h3>
+                              {chartSubtitle ? (
+                                <p className={aiInsightsVizSubtitle}>
+                                  {chartSubtitle}
+                                </p>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      <div
+                        title={sessionChartMetadataLine}
+                        className={`${aiInsightsVizChipsWrap} mt-1`}
+                      >
+                        <ChartContextSummary
+                          renderedKind={sessionRenderedChartKind}
+                          metricLabel={chartAxisLabels.valueAxis}
+                          semanticHeader={sessionChartSemanticHeader}
+                          badgeCompact={sessionChartMetadataBadgeCompact}
+                          leadInsight={chartInsightBadge ?? undefined}
+                          compactChips
+                        />
+                      </div>
+                      <ChartsTabIntelligenceStrip
+                        sourceLabel={sessionChartIntelSourceLabel}
+                        chartTypeLabel={presentationKindUiLabel(
+                          sessionRenderedChartKind
+                        )}
+                        measureLabel={chartAxisLabels.valueAxis}
+                        axisLabel={sessionChartIntelAxisLabel}
+                        highlight={chartInsightBadge ?? null}
+                        note={sessionChartIntelNote}
+                      />
+                      <ChartsTabChartReason
+                        chartId={activeChartId}
+                        reason={sessionChartReason}
+                      />
+                    </div>
+                    <ChartsTabPlotTransition
+                      chartId={activeChartId}
+                      plotHeightPx={chartHeightMain}
+                    >
+                      <div
+                        className={chartsTabVizSessionFrame}
+                        style={
+                          {
+                            "--insights-viz-plot-h": `${chartHeightMain}px`,
+                          } as CSSProperties
+                        }
+                      >
+                        <ChartInsightViewportWrapper
+                          chartKind={sessionRenderedChartKind}
+                          sessionMode
+                        >
+                          <div className={chartsTabSessionPlotSurface}>
+                            {renderDatasetChart(
+                              chartHeightMain,
+                              false,
+                              false
+                            )}
+                          </div>
+                        </ChartInsightViewportWrapper>
+                      </div>
+                    </ChartsTabPlotTransition>
+                    <div className={chartsTabSmartReadWrap}>
                       <SmartChartInsightPanel
                         intel={sessionSmartChartIntel}
                         cards={executiveVizInsights.slice(0, 3)}
@@ -10096,24 +10840,22 @@ function HomeInner() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4 rounded-[1.35rem] border border-slate-200/50 bg-white/90 p-10 text-center text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ring-1 ring-slate-900/[0.02]">
+                  <div className={chartsTabEmptyState}>
                     {chartHistory.length > 0 ? (
                       <>
-                        <p className="text-base font-semibold tracking-tight text-slate-900">
-                          Select a chart
-                        </p>
-                        <p className="mx-auto max-w-lg text-sm leading-relaxed text-slate-600">
-                          Pick an <span className="font-medium text-slate-800">Auto</span> or{" "}
-                          <span className="font-medium text-slate-800">AI</span> card in the
+                        <p className={chartsTabEmptyTitle}>Select a chart</p>
+                        <p className="mx-auto max-w-lg text-sm leading-relaxed text-[color:var(--text-muted)]">
+                          Pick an <span className={chartsTabDescEmphasis}>Auto</span> or{" "}
+                          <span className={chartsTabDescEmphasis}>AI</span> card in the
                           timeline to load it here for PNG export or the session PDF.
                         </p>
                       </>
                     ) : (
                       <>
-                        <p className="text-base font-semibold tracking-tight text-slate-900">
+                        <p className={chartsTabEmptyTitle}>
                           Ask something analytical
                         </p>
-                        <ul className="mx-auto inline-block max-w-lg space-y-2 text-left text-sm text-slate-600">
+                        <ul className="mx-auto inline-block max-w-lg space-y-2 text-left text-sm text-[color:var(--text-muted)]">
                           <li className="flex gap-2">
                             <span className="select-none text-slate-400">—</span>
                             <span>sales by region</span>
@@ -10145,129 +10887,125 @@ function HomeInner() {
         )}
 
         {activeTab === "insights" && (
-          <section className="mb-8 w-full min-w-0 rounded-[1.25rem] border border-[color:var(--border-default)] bg-gradient-to-b from-[var(--surface-subtle)] via-[color:var(--surface-elevated)] to-[var(--surface-accent-wash)] p-4 shadow-[var(--shadow-card)] ring-1 ring-slate-900/[0.02] sm:p-5">
-            <div className="grid w-full min-w-0 grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)] lg:gap-4 xl:gap-5">
-              <div className="min-w-0 w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3.5 sm:p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)] lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:overscroll-contain">
-                <h2 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
-                  Suggested Questions
-                </h2>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Click to prefill, then ask.
-                </p>
-                <div className="mt-3 flex flex-col gap-2">
-                  {visibleSuggestedQuestions.map((q, i) => (
-                    <button
-                      key={`sq-${i}-${suggestionTokenMultisetKey(q)}`}
-                      onClick={() => setQuestionAndResetInsightState(q)}
-                      className="text-left rounded-xl border border-slate-200/80 bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-slate-800 shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-slate-300/80 hover:bg-slate-50/90 hover:shadow-[var(--shadow-md)]"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-                {questionHistory.length > 0 ? (
-                  <div className="mt-5 pt-5 border-t border-slate-200/90">
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Recent questions
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Tap to refill the input (last 3).
-                    </p>
-                    <div className="mt-2 flex flex-col gap-1.5">
-                      {questionHistory.map((hq) => (
-                        <button
-                          key={hq}
-                          type="button"
-                          onClick={() => setQuestion(hq)}
-                          className="text-left text-xs leading-snug rounded-xl border border-slate-200/80 bg-[color:var(--surface-elevated)] px-3 py-2 text-slate-800 shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-slate-300/80 hover:bg-slate-50/90 hover:shadow-[var(--shadow-md)]"
-                        >
-                          {hq.length > 72 ? `${hq.slice(0, 70)}…` : hq}
-                        </button>
-                      ))}
-                    </div>
+          <section className={`${aiInsightsPage} ${aiInsightsOuterShell}`}>
+            <div className={aiInsightsGrid}>
+              <div className={aiInsightsPanelShell}>
+                <h2 className={aiInsightsSuggestedHeading}>Suggested Questions</h2>
+                <p className={aiInsightsSuggestedDesc}>Click to prefill, then ask.</p>
+                <div className={aiInsightsSuggestedScrollBody}>
+                  <div className={aiInsightsSuggestedList}>
+                    {visibleSuggestedQuestions.map((q, i) => (
+                      <button
+                        key={`sq-${i}-${suggestionTokenMultisetKey(q)}`}
+                        type="button"
+                        onClick={() => setQuestionAndResetInsightState(q)}
+                        className={aiInsightsSuggestedQ}
+                      >
+                        {q}
+                      </button>
+                    ))}
                   </div>
-                ) : null}
+                  {questionHistory.length > 0 ? (
+                    <div className={aiInsightsSuggestedRecentSection}>
+                      <h3 className={aiInsightsSuggestedRecentTitle}>Recent questions</h3>
+                      <p className={aiInsightsSuggestedRecentDesc}>
+                        Tap to refill the input (last 3).
+                      </p>
+                      <div className={aiInsightsSuggestedRecentList}>
+                        {questionHistory.map((hq) => (
+                          <button
+                            key={hq}
+                            type="button"
+                            onClick={() => setQuestion(hq)}
+                            className={aiInsightsSuggestedRecentItem}
+                          >
+                            {hq.length > 72 ? `${hq.slice(0, 70)}…` : hq}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="min-w-0 w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3.5 sm:p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
-                <div className="flex flex-wrap items-start justify-between gap-3 mb-1.5">
-                  <h2 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
-                    Ask AI
-                  </h2>
+              <div className={aiInsightsAskPanel}>
+                <div className={aiInsightsAskHeaderRow}>
+                  <h2 className={aiInsightsAskHeading}>Ask AI</h2>
                   <button
                     type="button"
                     onClick={resetAiConversation}
-                    className={btnSecondary}
-                    title="Clears the question, answer, insight cards, AI chart, follow-up chips, and thread memory. Your file, filters, auto-dashboard, and non-AI chart history stay."
+                    disabled={!hasActiveAiConversation}
+                    className={`${btnSecondary} ${aiInsightsAskResetBtn}`}
+                    title={
+                      hasActiveAiConversation
+                        ? "Clears the question, answer, insight cards, AI chart, follow-up chips, and thread memory. Your file, filters, auto-dashboard, and non-AI chart history stay."
+                        : "Ask a question to start a conversation before resetting."
+                    }
                   >
                     Reset conversation
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 min-h-[28px] mb-2">
-                  {lastConversationMeta?.followUpDetected ? (
-                    <>
-                      <span className="rounded-full border border-emerald-200/60 bg-emerald-50/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]">
-                        Using previous insight context
-                      </span>
-                      <span className="rounded-full border border-violet-200/60 bg-violet-50/90 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-violet-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]">
-                        Follow-up detected
-                      </span>
-                    </>
-                  ) : null}
-                  {lastConversationMeta?.followUpDetected &&
-                  lastConversationMeta.usingContextSummary.trim() ? (
-                    <span className="text-xs text-slate-600">
-                      Thread focus:{" "}
-                      <span className="font-medium text-slate-800">
-                        {lastConversationMeta.usingContextSummary}
-                      </span>
+                {lastConversationMeta?.followUpDetected ? (
+                  <div className={aiInsightsAskMetaRow}>
+                    <span className="rounded-full border border-emerald-200/60 bg-emerald-50/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-emerald-500/25 dark:bg-emerald-950/40 dark:text-emerald-100">
+                      Using previous insight context
                     </span>
-                  ) : null}
+                    <span className="rounded-full border border-violet-200/60 bg-violet-50/90 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-violet-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-violet-400/25 dark:bg-violet-950/40 dark:text-violet-100">
+                      Follow-up detected
+                    </span>
+                    {lastConversationMeta.usingContextSummary.trim() ? (
+                      <span className="text-xs text-slate-600 dark:text-[color:var(--insights-text-muted)]">
+                        Thread focus:{" "}
+                        <span className="font-medium text-slate-800 dark:text-[color:var(--insights-text-secondary)]">
+                          {lastConversationMeta.usingContextSummary}
+                        </span>
+                      </span>
+                    ) : null}
                 </div>
+                ) : null}
                 {(lastConversationMeta?.inheritedAssumptionNote ?? "").trim() ? (
-                  <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                  <p className={aiInsightsAskAssumptionNote}>
                     {lastConversationMeta?.inheritedAssumptionNote ?? ""}
                   </p>
                 ) : null}
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Your question
-                  </label>
-                  <textarea
-                    value={question}
-                    onChange={(e) => setQuestionAndResetInsightState(e.target.value)}
-                    className="border p-4 w-full rounded-xl h-32"
-                    placeholder="Example: Show sales by product"
-                  />
-                </div>
-
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                  <button
-                    onClick={() => void askAI()}
-                    disabled={loading}
-                    className={`shrink-0 ${btnPrimary} px-6 py-3 text-sm font-semibold disabled:shadow-none`}
-                  >
-                    {loading ? "Thinking..." : "Ask AI"}
-                  </button>
-                  {loading && (
-                    <div className="text-sm text-slate-600 space-y-0.5">
-                      <span className="block">Generating answer…</span>
-                      <span className="block text-xs text-slate-500">
-                        Generating visualization…
-                      </span>
+                <div className={aiInsightsAskInputBlock}>
+                  <label className={aiInsightsAskQuestionLabel}>Your question</label>
+                  <div className={aiInsightsAskComposer}>
+                    <textarea
+                      value={question}
+                      onChange={(e) => setQuestionAndResetInsightState(e.target.value)}
+                      className={aiInsightsAskTextarea}
+                      placeholder="Example: Show sales by product"
+                    />
+                    <div className={aiInsightsAskActionsRow}>
+                      <button
+                        onClick={() => void askAI()}
+                        disabled={loading}
+                        className={`${btnPrimary} ${aiInsightsAskSubmitBtn}`}
+                      >
+                        {loading ? "Thinking..." : "Ask AI"}
+                      </button>
+                      {loading ? (
+                        <div className="text-sm text-slate-600 space-y-0.5 dark:text-[color:var(--insights-text-muted)]">
+                          <span className="block">Generating answer…</span>
+                          <span className="block text-xs text-slate-500 dark:text-[color:var(--insights-text-muted)]">
+                            Generating visualization…
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {alignedAnalysis?.alignmentRepaired ? (
-                  <div className="mt-4 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-950">
+                  <div className="mt-4 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-950 dark:border-amber-500/22 dark:bg-amber-950/35 dark:text-amber-100/90">
                     Chart was rebuilt so the series matches the metric detected from
                     your question (pandas alignment check).
                   </div>
                 ) : null}
 
                 {insightVisualization?.partialVisualizationWarning ? (
-                  <p className="mt-4 text-xs text-amber-950 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-2 leading-snug">
+                  <p className="mt-4 text-xs text-amber-950 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-2 leading-snug dark:border-amber-500/22 dark:bg-amber-950/30 dark:text-amber-100/90">
                     <span className="font-semibold">Visualization caution:</span> full
                     statistical note is under{" "}
                     <span className="font-medium">How this insight was generated</span>.
@@ -10278,9 +11016,9 @@ function HomeInner() {
                 !hasValidAIAnswer &&
                 !loading &&
                 !answer.trim() ? (
-                  <div className="mt-3 rounded-xl border border-indigo-100/70 bg-indigo-50/35 px-3.5 py-3 text-sm text-slate-700 leading-snug">
+                  <div className="mt-3 rounded-xl border border-indigo-100/70 bg-indigo-50/35 px-3.5 py-3 text-sm text-slate-700 leading-snug dark:border-indigo-400/18 dark:bg-[color:var(--insights-wash-followup)] dark:text-[color:var(--insights-text-secondary)]">
                     This chart is selected. Click{" "}
-                    <span className="font-semibold text-slate-900">Ask AI</span> to
+                    <span className="font-semibold text-slate-900 dark:text-[var(--foreground)]">Ask AI</span> to
                     generate an insight.
                   </div>
                 ) : null}
@@ -10296,34 +11034,34 @@ function HomeInner() {
 
                 {hasValidAIAnswer && alignedAnalysis ? (
                   <div
-                    className={`mt-4 rounded-xl border px-4 py-3 transition-shadow duration-300 hover:shadow-[var(--shadow-sm)] ${
+                    className={`${aiInsightsConfidenceShell} ${
                       alignedAnalysis.smallSampleCohort ||
                       isCautiousNarrativeTone(insightNarrativeTone)
-                        ? "border-amber-200/90 bg-amber-50/40"
-                        : "border-slate-200/90 bg-slate-50/60"
+                        ? aiInsightsConfidenceCaution
+                        : aiInsightsConfidenceNormal
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <p className={aiInsightsMutedLabel}>
                           Insight confidence (sample-aware)
                         </p>
-                        <p className="text-sm text-slate-800 mt-1 leading-snug">
+                        <p className={`${aiInsightsBodyText} mt-1.5`}>
                           {insightUnifiedConfidence?.rationale ||
                             alignedAnalysis.evidenceSummaryLine ||
                             `Chart uses ${alignedAnalysis.chartSeriesPointCount.toLocaleString()} series point(s).`}
                         </p>
                         {insightNarrativeDisclaimer ? (
-                          <p className="text-xs text-amber-950/90 mt-2 leading-relaxed">
+                          <p className={aiInsightsConfidenceDisclaimer}>
                             {insightNarrativeDisclaimer}
                           </p>
                         ) : null}
                         {(alignedAnalysis.insightConfidenceRationale ||
                           alignedAnalysis.smallSampleCohort ||
                           isCautiousNarrativeTone(insightNarrativeTone)) && (
-                          <p className="text-[11px] text-slate-500 mt-1.5">
+                          <p className={`${aiInsightsSubtleText} mt-1.5`}>
                             Details on scoring and sample cautions are under{" "}
-                            <span className="font-medium text-slate-700">
+                            <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
                               How this insight was generated
                             </span>
                             .
@@ -10342,7 +11080,7 @@ function HomeInner() {
                               (alignedAnalysis.insightConfidenceLevel as InsightConfidenceLevel)
                           )}
                         </span>
-                        <span className="text-[11px] tabular-nums text-slate-600">
+                        <span className="text-[11px] tabular-nums text-slate-600 dark:text-[color:var(--insights-text-muted)]">
                           Score{" "}
                           {insightUnifiedConfidence?.score ??
                             alignedAnalysis.insightConfidenceScore}
@@ -10354,82 +11092,130 @@ function HomeInner() {
                 ) : null}
 
                 {(hasValidAIAnswer || loading || answer.trim()) ? (
-                <div
-                  className="rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-3.5 sm:p-4 transition-shadow duration-300 hover:shadow-[var(--shadow-md)] mt-3"
-                >
-                  <h3 className="text-base font-semibold mb-2">AI Answer</h3>
+                <div className={aiInsightsAnswerCard}>
+                  <div className={aiInsightsAnswerHeader}>
+                    <p className={aiInsightsAnswerKicker}>Executive analysis</p>
+                    <h3 className={aiInsightsAnswerTitle}>AI Answer</h3>
+                  </div>
                   {answer.trim() || loading ? (
-                    <div className="space-y-2 text-slate-800">
+                    <div className={aiInsightsAnswerStack}>
                       {(() => {
                         const lead = aiAnswerLeadIn(
                           datasetKind || "",
                           insightPresentationChartKind
                         );
                         return lead ? (
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-900/80">
-                            {lead}
-                          </p>
+                          <p className={aiInsightsAnswerLead}>{lead}</p>
                         ) : null;
                       })()}
-                      <div className="text-sm whitespace-pre-line leading-relaxed">
-                        {parsedInsightAnswer.summary ||
-                          "Summary unavailable — see detail sections."}
+                      <div className={aiInsightsAnswerSummaryPanel}>
+                        <p className={aiInsightsAnswerSummary}>
+                          {formatInsightSummary(
+                            parsedInsightAnswer.summary ||
+                              "Summary unavailable — see detail sections."
+                          )}
+                        </p>
                       </div>
+                      <div className={aiInsightsAnswerDetailsGroup}>
+                        <p className={aiInsightsAnswerDetailsLabel}>
+                          Supporting detail
+                        </p>
                       {parsedInsightAnswer.statistical ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            {AI_INSIGHT_SECTION_LABELS.statistical}
+                        <details className={aiInsightsAnswerDetailFindings} open>
+                          <summary className={aiInsightsAnswerDetailSummaryFindings}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                Core
+                              </span>
+                              <span>{AI_INSIGHT_SECTION_LABELS.statistical}</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.statistical}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody
+                              text={parsedInsightAnswer.statistical}
+                              variant="findings"
+                            />
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.hypotheses ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            {AI_INSIGHT_SECTION_LABELS.hypotheses}
+                        <details className={aiInsightsAnswerDetail}>
+                          <summary className={aiInsightsAnswerDetailSummaryHypotheses}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                Context
+                              </span>
+                              <span>{AI_INSIGHT_SECTION_LABELS.hypotheses}</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.hypotheses}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody text={parsedInsightAnswer.hypotheses} />
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.recommendations ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            {AI_INSIGHT_SECTION_LABELS.recommendations}
+                        <details className={aiInsightsAnswerDetail}>
+                          <summary className={aiInsightsAnswerDetailSummaryRecommendations}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                Action
+                              </span>
+                              <span>{AI_INSIGHT_SECTION_LABELS.recommendations}</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.recommendations}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody
+                              text={parsedInsightAnswer.recommendations}
+                            />
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.methodology ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            {AI_INSIGHT_SECTION_LABELS.methodology}
+                        <details className={aiInsightsAnswerDetail}>
+                          <summary className={aiInsightsAnswerDetailSummaryMethodology}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                Method
+                              </span>
+                              <span>{AI_INSIGHT_SECTION_LABELS.methodology}</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.methodology}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody text={parsedInsightAnswer.methodology} />
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.moreDetail ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            Additional detail
+                        <details className={aiInsightsAnswerDetail}>
+                          <summary className={aiInsightsAnswerDetailSummaryMore}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                More
+                              </span>
+                              <span>Additional detail</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.moreDetail}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody text={parsedInsightAnswer.moreDetail} />
                           </div>
                         </details>
                       ) : null}
+                      </div>
                     </div>
                   ) : loading ? (
-                    <p className="text-slate-600 text-sm">Generating insight…</p>
+                    <p className={`${aiInsightsBodyText} mt-4`}>Generating insight…</p>
                   ) : (
-                    <p className="text-slate-600 text-sm">
+                    <p className={`${aiInsightsBodyText} mt-4`}>
                       AI answer will appear here.
                     </p>
                   )}
@@ -10437,11 +11223,9 @@ function HomeInner() {
                 ) : null}
 
                 {hasValidAIAnswer && insightFollowUpChips.length > 0 ? (
-                  <div className="mt-3 rounded-2xl border border-indigo-100/70 bg-indigo-50/35 p-3 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
-                    <p className="text-xs font-semibold text-slate-700 mb-1.5">
-                      Suggested follow-ups
-                    </p>
-                    <div className="flex flex-wrap gap-2">
+                  <div className={aiInsightsFollowupSection}>
+                    <p className={aiInsightsFollowupTitle}>Suggested follow-ups</p>
+                    <div className={aiInsightsFollowupList}>
                       {insightFollowUpChips.map((chip) => (
                         <button
                           key={chip}
@@ -10450,7 +11234,7 @@ function HomeInner() {
                           onClick={() => {
                             void askAI(chip);
                           }}
-                          className="max-w-full rounded-xl border border-indigo-200/70 bg-[color:var(--surface-elevated)] px-3 py-2 text-left text-xs leading-snug text-indigo-950 shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-indigo-300/80 hover:bg-indigo-50/60 hover:shadow-[var(--shadow-md)] disabled:opacity-45 sm:max-w-[min(100%,22rem)] sm:text-sm"
+                          className={aiInsightsFollowupChip}
                         >
                           {chip}
                         </button>
@@ -10465,13 +11249,13 @@ function HomeInner() {
                 insightVisualization?.contextUsed ||
                 insightVisualization?.partialVisualizationWarning ||
                 alignedAnalysis?.conversationFollowUp) ? (
-                  <div className="mt-3 rounded-xl border border-slate-200/90 bg-slate-50/80 overflow-hidden">
+                  <div className={`${aiInsightsProvenanceShell} ai-insights-provenance`}>
                     <button
                       type="button"
                       onClick={() => setHowCalculatedOpen((o) => !o)}
-                      className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-slate-100/80 transition-colors"
+                      className={aiInsightsProvenanceToggle}
                     >
-                      <span className="text-sm font-semibold text-slate-800">
+                      <span className={aiInsightsProvenanceToggleTitle}>
                         How this insight was generated
                       </span>
                       <span className="flex items-center gap-2 shrink-0">
@@ -10492,19 +11276,19 @@ function HomeInner() {
                             Context
                           </span>
                         )}
-                        <span className="text-slate-400 text-xs" aria-hidden>
+                        <span className="text-slate-400 text-xs dark:text-slate-500" aria-hidden>
                           {howCalculatedOpen ? "▾" : "▸"}
                         </span>
                       </span>
                     </button>
                     {howCalculatedOpen ? (
-                      <div className="border-t border-slate-200/80 px-3.5 py-2.5 bg-white/60">
+                      <div className={aiInsightsProvenanceBody}>
                         {insightVisualization?.partialVisualizationWarning ? (
-                          <div className="mb-3 pb-3 border-b border-slate-200/80">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                          <div className={aiInsightsProvenanceDivider}>
+                            <p className={`${aiInsightsProvenanceSectionLabel} mb-2`}>
                               Visualization caution (full)
                             </p>
-                            <p className="text-sm text-amber-950/95 whitespace-pre-line leading-relaxed">
+                            <p className={`${aiInsightsProvenanceSectionBodyEmphasis} text-amber-950/95 dark:text-amber-200/90`}>
                               {insightVisualization.partialVisualizationWarning}
                             </p>
                           </div>
@@ -10512,11 +11296,11 @@ function HomeInner() {
                         {alignedAnalysis?.insightConfidenceRationale ||
                         alignedAnalysis?.smallSampleCohort ||
                         isCautiousNarrativeTone(insightNarrativeTone) ? (
-                          <div className="mb-3 pb-3 border-b border-slate-200/80">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                          <div className={aiInsightsProvenanceDivider}>
+                            <p className={`${aiInsightsProvenanceSectionLabel} mb-1.5`}>
                               Confidence &amp; sample methodology
                             </p>
-                            <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                            <p className={aiInsightsProvenanceSectionBodyEmphasis}>
                               {insightUnifiedConfidence?.rationale ||
                                 alignedAnalysis?.insightConfidenceRationale}
                             </p>
@@ -10540,14 +11324,14 @@ function HomeInner() {
                             className={
                               insightChartRoutingRecommendation ||
                               insightVisualization?.provenance
-                                ? "mb-4 pb-4 border-b border-slate-200/80"
+                                ? aiInsightsProvenanceDivider
                                 : ""
                             }
                           >
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                            <p className={`${aiInsightsProvenanceSectionLabel} mb-1.5`}>
                               Context used
                             </p>
-                            <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                            <p className={aiInsightsProvenanceSectionBodyEmphasis}>
                               {insightVisualization?.contextUsed ||
                                 alignedAnalysis?.conversationFollowUp
                                   ?.contextUsedLine}
@@ -10558,51 +11342,51 @@ function HomeInner() {
                           <div
                             className={
                               insightVisualization?.provenance
-                                ? "mb-4 pb-4 border-b border-slate-200/80"
+                                ? aiInsightsProvenanceDivider
                                 : ""
                             }
                           >
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                            <p className={`${aiInsightsProvenanceSectionLabel} mb-2`}>
                               Chart selection (engine)
                             </p>
-                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 text-sm">
+                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
                               <div className="flex flex-col gap-0.5 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Detected chart type
                                 </dt>
-                                <dd className="font-semibold text-slate-900">
+                                <dd className={aiInsightsProvenanceMetaValue}>
                                   {humanizeRecommendedChartApi(
                                     insightChartRoutingRecommendation.recommendedChart
                                   )}
                                 </dd>
                               </div>
                               <div className="flex flex-col gap-0.5 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Question bucket
                                 </dt>
-                                <dd className="font-semibold text-slate-900 capitalize">
+                                <dd className={`${aiInsightsProvenanceMetaValue} capitalize`}>
                                   {insightChartRoutingRecommendation.detectedIntent ||
                                     "—"}
                                 </dd>
                               </div>
                               <div className="flex flex-col gap-0.5 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Category count
                                 </dt>
-                                <dd className="font-semibold text-slate-900 tabular-nums">
+                                <dd className={`${aiInsightsProvenanceMetaValue} tabular-nums`}>
                                   {insightChartRoutingRecommendation.categoryCount.toLocaleString()}
                                 </dd>
                               </div>
                               <div className="flex flex-col gap-0.5 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Metric type
                                 </dt>
-                                <dd className="font-semibold text-slate-900 capitalize">
+                                <dd className={`${aiInsightsProvenanceMetaValue} capitalize`}>
                                   {insightChartRoutingRecommendation.metricType}
                                 </dd>
                               </div>
                               <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Why this chart
                                 </dt>
                                 <dd className="text-slate-800 text-sm leading-relaxed">
@@ -10617,10 +11401,10 @@ function HomeInner() {
                         <>
                         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 text-sm">
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Category column
                             </dt>
-                            <dd className="font-semibold text-slate-900 truncate">
+                            <dd className={`${aiInsightsProvenanceMetaValue} truncate`}>
                               {formatProvenanceColumn(
                                 insightVisualization.provenance.categoryColumnDisplay ||
                                   insightVisualization.provenance.categoryColumn
@@ -10641,10 +11425,10 @@ function HomeInner() {
                             ) : null}
                           </div>
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Metric
                             </dt>
-                            <dd className="font-semibold text-slate-900 truncate">
+                            <dd className={`${aiInsightsProvenanceMetaValue} truncate`}>
                               {formatProvenanceColumn(
                                 insightVisualization.provenance.numericColumnDisplay ||
                                   insightVisualization.provenance.numericColumn
@@ -10665,18 +11449,18 @@ function HomeInner() {
                             ) : null}
                           </div>
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Aggregation
                             </dt>
-                            <dd className="font-semibold text-slate-900 capitalize">
+                            <dd className={`${aiInsightsProvenanceMetaValue} capitalize`}>
                               {insightVisualization.provenance.aggregation}
                             </dd>
                           </div>
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Rows analyzed
                             </dt>
-                            <dd className="font-semibold text-slate-900 tabular-nums">
+                            <dd className={`${aiInsightsProvenanceMetaValue} tabular-nums`}>
                               {(
                                 insightRowsAnalyzedDisplay ??
                                 insightVisualization.provenance.rowsAnalyzed
@@ -10686,7 +11470,7 @@ function HomeInner() {
                           {insightVisualization.provenance.dashboardFiltersApplied
                             ?.length ? (
                             <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <dt className={aiInsightsProvenanceMetaLabel}>
                                 Filters applied
                               </dt>
                               <dd>
@@ -10701,16 +11485,16 @@ function HomeInner() {
                             </div>
                           ) : null}
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Visualization
                             </dt>
-                            <dd className="font-semibold text-slate-900">
+                                <dd className={aiInsightsProvenanceMetaValue}>
                               {insightVisualization.provenance.visualizationType}
                             </dd>
                           </div>
                           {insightVisualization.provenance.chartSelectionReason ? (
                             <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <dt className={aiInsightsProvenanceMetaLabel}>
                                 Reason
                               </dt>
                               <dd className="text-slate-800 text-sm leading-relaxed">
@@ -10720,7 +11504,7 @@ function HomeInner() {
                           ) : null}
                           {insightVisualization.provenance.timeSeriesAnalysis ? (
                             <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <dt className={aiInsightsProvenanceMetaLabel}>
                                 Time coverage
                               </dt>
                               <dd className="text-slate-800 text-sm leading-relaxed space-y-1">
@@ -10769,7 +11553,7 @@ function HomeInner() {
                           ) : null}
                           {alignedAnalysis?.detectedIntent?.length ? (
                             <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <dt className={aiInsightsProvenanceMetaLabel}>
                                 Detected intent
                               </dt>
                               <dd className="text-slate-800 text-sm">
@@ -10778,15 +11562,15 @@ function HomeInner() {
                             </div>
                           ) : null}
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Series points
                             </dt>
-                            <dd className="font-semibold text-slate-900 tabular-nums">
+                            <dd className={`${aiInsightsProvenanceMetaValue} tabular-nums`}>
                               {insightVisualization.provenance.chartPoints.toLocaleString()}
                             </dd>
                           </div>
                           <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Confidence
                             </dt>
                             <dd className="flex flex-wrap items-center gap-2 text-slate-800">
@@ -10849,35 +11633,35 @@ function HomeInner() {
                   </div>
                 ) : null}
 
-                {insightChartData.length > 0 ? (
-                  <div className="group/chart mt-3 w-full min-w-0 overflow-hidden rounded-[1.25rem] border border-[color:var(--border-default)] bg-gradient-to-br from-[color:var(--surface-elevated)] via-[color:var(--surface-elevated)] to-[var(--surface-accent-wash)] p-3.5 shadow-[var(--shadow-card)] ring-1 ring-slate-900/[0.025] transition-all duration-500 ease-out hover:shadow-[0_22px_56px_-22px_rgba(15,23,42,0.14)] sm:p-4">
-                    <div className="mb-1.5 w-full min-w-0 text-center">
-                      <div className="mx-auto min-w-0 max-w-5xl">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
-                          Visualization
-                        </h3>
-                      </div>
+                {insightHasRenderableVisualization ? (
+                  <div className={aiInsightsVizCard}>
+                    <div className="mb-1 w-full min-w-0 text-center">
+                      <p className={aiInsightsVizKicker}>Visualization</p>
                     </div>
-                    {insightChartHeadingBlock}
-                    <div title={insightChartMetadataLine} className="mt-1">
-                      <ChartContextSummary
-                        renderedKind={insightRenderedChartKind}
-                        metricLabel={insightChartAxisLabels.valueAxis}
-                        semanticHeader={insightChartSemanticHeader}
-                        badgeCompact={insightChartMetadataBadgeCompact}
-                        leadInsight={insightChartInsightBadge ?? undefined}
-                        compactChips
-                      />
+                    <div className={aiInsightsVizHeaderZone}>
+                      {insightChartHeadingBlock}
+                      <div
+                        title={insightChartMetadataLine}
+                        className={aiInsightsVizChipsWrap}
+                      >
+                        <ChartContextSummary
+                          renderedKind={insightRenderedChartKind}
+                          metricLabel={insightChartAxisLabels.valueAxis}
+                          semanticHeader={insightChartSemanticHeader}
+                          badgeCompact={insightChartMetadataBadgeCompact}
+                          leadInsight={insightChartInsightBadge ?? undefined}
+                          compactChips
+                        />
                     </div>
-                    <div className="mt-2 flex w-full min-w-0 flex-col items-center gap-0">
+                    </div>
+                    <div className={aiInsightsVizChartStage}>
                       <AiInsightChartShell
                         chartKind={insightPresentationChartKind}
-                        minOuterHeight={insightLayoutMetrics.outerShellMinHeight}
+                        plotHeight={insightShellPlotHeight}
                       >
                         <div
                           key={`${insightChartId ?? "ic"}-${insightSnapshot?.createdAt ?? 0}-${insightChartData.length}`}
-                          className="animate-chart-surface-in motion-reduce:animate-none w-full min-w-0 overflow-visible rounded-xl bg-gradient-to-b from-slate-50/40 via-transparent to-transparent px-1 py-2 transition-[box-shadow] duration-500 ease-out group-hover/chart:from-slate-50/55"
-                          style={{ height: insightShellPlotHeight }}
+                          className={aiInsightsVizPlotSurface}
                         >
                           {renderDatasetChart(
                             insightShellPlotHeight,
@@ -10886,8 +11670,9 @@ function HomeInner() {
                           )}
                         </div>
                       </AiInsightChartShell>
-                      {insightSmartChartIntel?.active ? (
-                        <div className="mt-8 border-t border-slate-200/55 pt-5">
+                      {insightChartMatchesCurrentQuestion &&
+                      insightSmartChartIntel?.active ? (
+                        <div className={aiInsightsSmartPanelDivider}>
                           <SmartChartInsightPanel
                             intel={insightSmartChartIntel}
                             cards={insightExecutiveVizInsights.slice(0, 3)}
@@ -10896,61 +11681,52 @@ function HomeInner() {
                       ) : null}
                     </div>
                   </div>
-                ) : hasValidAIAnswer && insightSnapshot?.source === "ai" ? (
-                  <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800">
-                    <p className="font-semibold text-slate-900">
+                ) : hasValidAIAnswer && !insightHasRenderableVisualization ? (
+                  <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
+                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
                       No dedicated visualization for this answer
                     </p>
-                    <p className="mt-1.5 text-slate-600 leading-relaxed">
-                      The assistant did not return chart data for this question. The
-                      narrative and KPI context above still reflect the latest response.
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      {!insightChartMatchesCurrentQuestion &&
+                      insightSnapshot &&
+                      insightSnapshot.chartData.length > 0
+                        ? "The chart from your previous question does not match this one. The narrative above reflects your latest ask."
+                        : "The assistant did not return chart data for this question. The narrative and KPI context above still reflect the latest response."}
                     </p>
                   </div>
                 ) : null}
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      downloadReport({
-                        includeKPIs: true,
-                        includeAIInsight: true,
-                        includeChart: true,
-                        includeDataPreview: true,
-                        includeDataQuality: true,
-                        includeConversationContext: true,
-                        chartScope: "insight",
-                      })
-                    }
-                    disabled={!canExportInsight}
-                    className={btnExportSm}
-                  >
-                    Export this insight (PDF)
-                  </button>
-                </div>
-                <details className="mt-1.5 text-xs text-slate-600">
-                  <summary className="cursor-pointer font-medium text-slate-700 select-none">
+                {showInsightExportButton ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadReport({
+                          includeKPIs: true,
+                          includeAIInsight: true,
+                          includeChart: true,
+                          includeDataPreview: true,
+                          includeDataQuality: true,
+                          includeConversationContext: true,
+                          chartScope: "insight",
+                        })
+                      }
+                      className={aiInsightsBtnExport}
+                    >
+                      Export this insight (PDF)
+                    </button>
+                  </div>
+                ) : null}
+                {process.env.NEXT_PUBLIC_AI_INSIGHTS_DEBUG === "true" ? (
+                <details className="mt-1.5 text-xs text-slate-600 dark:text-[color:var(--insights-text-muted)]">
+                  <summary className="cursor-pointer font-medium text-slate-500 select-none dark:text-[color:var(--insights-text-muted)]">
                     Export / chart debug
                   </summary>
-                  <pre className="mt-2 p-3 bg-slate-100 rounded-lg overflow-x-auto text-[11px] leading-relaxed">
+                  <pre className="mt-2 p-3 bg-slate-100 rounded-lg overflow-x-auto text-[11px] leading-relaxed dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
                     {JSON.stringify(exportInsightDebug, null, 2)}
                   </pre>
                 </details>
-                {!canExportInsight && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    {exportEnabledReason === "no_insight_chart_ask_ai_first"
-                      ? "Ask a question in AI Insights first; export uses the insight chart from your last ask."
-                      : exportEnabledReason === "insight_not_ai_scoped"
-                        ? "Select a chart from Overview or Charts first."
-                        : exportEnabledReason === "missing_ai_visualization"
-                          ? "Export needs a real chart from your last AI ask (not the no-visualization placeholder)."
-                          : exportEnabledReason === "missing_ai_narrative"
-                            ? "Generate an AI answer before exporting this insight."
-                            : exportEnabledReason === "question_changed_since_last_ask"
-                              ? "Ask again with the current question text so the export matches your last AI ask."
-                              : "Unable to export right now."}
-                  </p>
-                )}
+                ) : null}
               </div>
             </div>
           </section>
@@ -11222,25 +11998,25 @@ function HomeInner() {
 
         {mappingModalOpen && columns.length > 0 && (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
+            className={ovModalOverlay}
             role="dialog"
             aria-modal="true"
             aria-labelledby="mapping-modal-title"
             onClick={() => setMappingModalOpen(false)}
           >
             <div
-              className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200"
+              className={ovModalPanel}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-4 border-b border-[color:var(--border-default)] p-6">
                 <div>
                   <h2
                     id="mapping-modal-title"
-                    className="text-lg font-semibold text-slate-900"
+                    className={ovSectionTitle}
                   >
                     Review column mapping
                   </h2>
-                  <p className="text-sm text-slate-600 mt-1">
+                  <p className={`mt-1 ${ovSectionDesc}`}>
                     Select columns for each role, or leave{" "}
                     <span className="font-medium">Auto Detect</span> for automatic
                     matching.
@@ -11259,13 +12035,13 @@ function HomeInner() {
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-700">
+                    <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
                       Grouping dimension
                     </label>
                     <select
                       value={productColumn}
                       onChange={(e) => setProductColumn(e.target.value)}
-                      className="border border-slate-200/50 bg-white p-2 rounded-xl w-full"
+                      className={ovModalInput}
                     >
                       <option value="">Auto Detect</option>
                       {columns.map((col) => (
@@ -11276,13 +12052,13 @@ function HomeInner() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-700">
+                    <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
                       Primary metric
                     </label>
                     <select
                       value={salesColumn}
                       onChange={(e) => setSalesColumn(e.target.value)}
-                      className="border border-slate-200/50 bg-white p-2 rounded-xl w-full"
+                      className={ovModalInput}
                     >
                       <option value="">Auto Detect</option>
                       {columns.map((col) => (
@@ -11293,13 +12069,13 @@ function HomeInner() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-700">
+                    <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
                       Region / geography
                     </label>
                     <select
                       value={regionColumn}
                       onChange={(e) => setRegionColumn(e.target.value)}
-                      className="border border-slate-200/50 bg-white p-2 rounded-xl w-full"
+                      className={ovModalInput}
                     >
                       <option value="">Auto Detect</option>
                       {columns.map((col) => (
@@ -11310,13 +12086,13 @@ function HomeInner() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-700">
+                    <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
                       Customer / entity
                     </label>
                     <select
                       value={customerColumn}
                       onChange={(e) => setCustomerColumn(e.target.value)}
-                      className="border border-slate-200/50 bg-white p-2 rounded-xl w-full"
+                      className={ovModalInput}
                     >
                       <option value="">Auto Detect</option>
                       {columns.map((col) => (
@@ -11327,13 +12103,13 @@ function HomeInner() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-slate-700">
+                    <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
                       Secondary metric (e.g. profit)
                     </label>
                     <select
                       value={profitColumn}
                       onChange={(e) => setProfitColumn(e.target.value)}
-                      className="border border-slate-200/50 bg-white p-2 rounded-xl w-full"
+                      className={ovModalInput}
                     >
                       <option value="">Auto Detect</option>
                       {columns.map((col) => (
@@ -11344,13 +12120,13 @@ function HomeInner() {
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1 text-slate-700">
+                    <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
                       Time / date column
                     </label>
                     <select
                       value={dateColumn}
                       onChange={(e) => setDateColumn(e.target.value)}
-                      className="border border-slate-200/50 bg-white p-2 rounded-xl w-full"
+                      className={ovModalInput}
                     >
                       <option value="">Auto Detect</option>
                       {columns.map((col) => (
@@ -11374,7 +12150,7 @@ function HomeInner() {
                   <button
                     type="button"
                     onClick={() => setMappingModalOpen(false)}
-                    className="rounded-xl border border-slate-200/60 bg-white px-5 py-2.5 text-sm font-medium text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition duration-200 hover:border-slate-300/80 hover:bg-slate-50/90 active:scale-[0.99]"
+                    className={ovBtnSecondary}
                   >
                     Cancel
                   </button>
@@ -11385,9 +12161,7 @@ function HomeInner() {
         )}
 
         </div>
-        </div>
-      </div>
-    </main>
+    </AppShell>
   );
 }
 

@@ -204,7 +204,7 @@ export type ChartSessionValue = {
     derivedFromChartId?: string;
     analysisContextKey?: string;
     semanticIntentKey?: string;
-  }) => void;
+  }) => string;
   replaceAutoDashboardCharts: (charts: AutoDashboardLike[]) => void;
   invalidateForDatasetChange: () => void;
   clearInsightThread: () => void;
@@ -281,7 +281,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
       derivedFromChartId?: string;
       analysisContextKey?: string;
       semanticIntentKey?: string;
-    }) => {
+    }): string => {
       const ctxKey = args.analysisContextKey?.trim() ?? "";
       const semKey = args.semanticIntentKey?.trim() ?? "";
       const snapBase: Omit<ChartSnapshot, "id" | "createdAt"> = {
@@ -309,9 +309,13 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           chartKind: snapBase.chartKind,
           analysisContextKey: ctxKey,
         });
-        const dupIdx = prev.findIndex(
-          (h) => h.source === "ai" && aiDedupeKeyFromSnapshot(h) === candKey
-        );
+        const dupIdx = prev.findIndex((h) => {
+          if (h.source !== "ai") return false;
+          if (aiDedupeKeyFromSnapshot(h) !== candKey) return false;
+          const prevQ = normalizeDedupePart(h.question ?? "");
+          const nextQ = normalizeDedupePart(snapBase.question ?? "");
+          return !prevQ || !nextQ || prevQ === nextQ;
+        });
         const id = dupIdx >= 0 ? prev[dupIdx].id : newId();
         const contract = freezeVisualizationContract({
           id,
@@ -343,6 +347,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
       });
       setActiveId(pushedId);
       setInsightChartId(pushedId);
+      return pushedId;
     },
     []
   );

@@ -27,7 +27,9 @@ import {
 } from "@/app/components/chart-value-axis-title";
 import {
   getInsightLayoutMetrics,
-  insightCartesianOuterMargins,
+  radialChartOuterMargins,
+  resolveVerticalBarPlotBottomPad,
+  verticalCartesianOuterMargins,
 } from "@/lib/chart-layout-config";
 import {
   formatAxisTickFromRows,
@@ -65,6 +67,7 @@ const GRID_STROKE = "#eef2f7";
 const CHART_AXIS_LINE = "#e2e8f0";
 const AXIS_TICK = "#64748b";
 const CHART_TOOLTIP_FRAME = {
+  cursor: false,
   contentStyle: {
     borderRadius: 14,
     border: "1px solid rgba(226, 232, 240, 0.95)",
@@ -194,17 +197,10 @@ function ChartRendererInner({
     chartLayoutMode,
   });
 
-  const pickCartesianMargin = (bottomForCartesian: number) => {
-    if (!insightUi) {
-      return {
-        left: vmBalanced.marginLeft,
-        right: vmBalanced.marginRight,
-        top: 22,
-        bottom: bottomForCartesian,
-      };
-    }
-    return insightCartesianOuterMargins(rKind, vmBalanced, bottomForCartesian);
-  };
+  const pickCartesianMargin = (bottomForCartesian: number) =>
+    verticalCartesianOuterMargins(rKind, vmBalanced, bottomForCartesian, {
+      insightUi,
+    });
 
   const horizontalBarLayout =
     rKind === "bar_horizontal"
@@ -243,13 +239,28 @@ function ChartRendererInner({
     insightUi &&
     (rKind === "bar" || rKind === "histogram") &&
     rData.length >= 6;
+  const insightHasCategoryLabel = Boolean(rAxes.categoryAxis?.trim());
+  const insightVBarAngled =
+    insightVBarCatDense ||
+    Boolean(categoryPlan?.angled) ||
+    (manyCategoryLegacy && (rKind === "bar" || rKind === "histogram"));
+  const insightVBarXHeight =
+    (categoryPlan?.xAxisHeightPx ??
+      (manyCategoryLegacy ? (insightUi ? 42 : 58) : insightUi ? 24 : 36)) +
+    (insightVBarCatDense ? 2 : 0);
+  const insightVBarLabelOffset = insightVBarAngled ? -14 : -4;
   const insightVBarBottomPad =
-    categoryAxisBottomMargin +
-    (insightVBarCatDense
-      ? 22
-      : insightUi && (rKind === "bar" || rKind === "histogram")
-        ? 10
-        : 0);
+    rKind === "bar" || rKind === "histogram"
+      ? resolveVerticalBarPlotBottomPad({
+          kind: rKind,
+          categoryAxisBottomMargin,
+          xAxisHeightPx: insightVBarXHeight,
+          angled: insightVBarAngled,
+          hasCategoryLabel: insightHasCategoryLabel,
+          insightUi,
+          denseCategories: insightVBarCatDense,
+        })
+      : categoryAxisBottomMargin;
 
   const insightVBarXInterval =
     categoryPlan?.interval ??
@@ -271,12 +282,7 @@ function ChartRendererInner({
         ? -30
         : 0;
   const insightVBarXAnchor =
-    insightVBarCatDense || categoryPlan?.angled || manyCategoryLegacy
-      ? "end"
-      : "middle";
-  const insightVBarXHeight =
-    (categoryPlan?.xAxisHeightPx ?? (manyCategoryLegacy ? 58 : 36)) +
-    (insightVBarCatDense ? 16 : 0);
+    insightVBarAngled ? "end" : "middle";
 
   const vizDrill = rViz?.interaction?.drillDimensions;
   const canInsightDrill = Boolean(vizDrill?.length);
@@ -321,11 +327,7 @@ function ChartRendererInner({
             <Label
               value={rAxes.categoryAxis}
               position="insideBottom"
-              offset={
-                insightVBarCatDense || categoryPlan?.angled || manyCategoryLegacy
-                  ? -34
-                  : -8
-              }
+              offset={insightVBarLabelOffset}
               style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
             />
           </XAxis>
@@ -478,12 +480,7 @@ function ChartRendererInner({
     return (
       <ResponsiveContainer width="100%" height={chartHeight}>
         <PieChart
-          margin={{
-            top: 10,
-            right: 10 + piePad.marginHorizontal,
-            left: 8 + piePad.marginHorizontal,
-            bottom: 10 + piePad.marginBottom,
-          }}
+          margin={radialChartOuterMargins(rKind, compact, piePad)}
         >
           <Pie
             data={rData}
@@ -647,7 +644,7 @@ function ChartRendererInner({
         temporalTickStrings,
         tickFontSizePx: trendTickFs,
         chartLayoutMode,
-      }) * (insightUi ? 1.2 : 1)
+      }) * (insightUi ? 0.86 : 0.94)
     );
     const trendInterval = computeLineAreaXAxisInterval(rData.length, {
       compact,
@@ -692,7 +689,7 @@ function ChartRendererInner({
             <Label
               value={rAxes.categoryAxis}
               position="insideBottom"
-              offset={compact ? -22 : -26}
+              offset={insightUi ? -14 : compact ? -20 : -24}
               style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
             />
           </XAxis>
@@ -812,11 +809,7 @@ function ChartRendererInner({
           <Label
             value={rAxes.categoryAxis}
             position="insideBottom"
-            offset={
-              insightVBarCatDense || categoryPlan?.angled || manyCategoryLegacy
-                ? -36
-                : -10
-            }
+            offset={insightVBarLabelOffset}
             style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
           />
         </XAxis>

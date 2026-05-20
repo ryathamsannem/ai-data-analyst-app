@@ -84,6 +84,11 @@ export function orientationForChartKind(kind: ChartKind): FinalChartOrientation 
 
 function rankIntentFromText(title: string, question?: string): boolean {
   const blob = `${title} ${question ?? ""}`.toLowerCase();
+  if (
+    /\b(outliers?|anomal(?:y|ies)|ranked\s+by|value\s+distribution)\b/i.test(blob)
+  ) {
+    return true;
+  }
   return /\b(rank|ranking|top\s*\d+|bottom\s*\d+|highest|lowest|leading|trailing|sorted)\b/i.test(
     blob
   );
