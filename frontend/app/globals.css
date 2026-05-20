@@ -401,7 +401,7 @@ body {
   }
 }
 
-/* Charts tab timeline — thin scrollbar */
+/* Charts tab timeline — thin scrollbar + reliable wheel / trackpad / touch scroll */
 .timeline-scroll-fine {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
@@ -420,6 +420,151 @@ body {
 }
 .timeline-scroll-fine::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-thumb-hover);
+}
+
+.charts-tab-page .charts-tab-timeline-scroll {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+/* Charts tab — timeline card hover (idle only; selected stays dominant) */
+.charts-tab-page .charts-tab-timeline-card--idle:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--border-default));
+  background: var(--surface-elevated);
+  box-shadow:
+    0 10px 26px -14px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.dark .charts-tab-page .charts-tab-timeline-card--idle:hover {
+  border-color: var(--insights-border-medium);
+  background: var(--insights-layer-nested);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 10px 28px -14px rgba(0, 0, 0, 0.38),
+    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.charts-tab-page .charts-tab-timeline-card--selected:hover {
+  transform: none;
+}
+
+/* Charts tab — preview transition on timeline selection */
+@keyframes charts-tab-preview-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.charts-tab-preview-enter {
+  animation: charts-tab-preview-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.charts-tab-preview-plot-content {
+  transition: opacity 0.16s ease-out;
+}
+
+.charts-tab-preview-plot-content--pending {
+  opacity: 0.35;
+}
+
+.charts-tab-preview-shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 0.9rem;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--surface-subtle) 88%, transparent) 0%,
+    color-mix(in srgb, var(--surface-elevated) 95%, transparent) 42%,
+    color-mix(in srgb, var(--surface-subtle) 88%, transparent) 78%
+  );
+  background-size: 220% 100%;
+  animation: charts-tab-preview-shimmer 0.9s ease-in-out infinite;
+}
+
+.dark .chart-viz-theme.charts-tab-viz-preview .charts-tab-preview-shimmer {
+  background: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--insights-layer-inset) 92%, transparent) 0%,
+    color-mix(in srgb, var(--insights-layer-nested) 96%, transparent) 45%,
+    color-mix(in srgb, var(--insights-layer-inset) 92%, transparent) 78%
+  );
+  background-size: 220% 100%;
+}
+
+@keyframes charts-tab-preview-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* Sticky preview header within page scroll */
+.charts-tab-preview-header-sticky {
+  position: sticky;
+  top: 0.5rem;
+  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.dark .chart-viz-theme.charts-tab-viz-preview .charts-tab-preview-header-sticky {
+  background: color-mix(in srgb, var(--insights-layer-card) 94%, transparent);
+}
+
+/* Charts tab — compact “Why this chart?” strip */
+@keyframes charts-tab-chart-reason-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.charts-tab-chart-reason-enter {
+  animation: charts-tab-chart-reason-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .charts-tab-chart-reason-enter {
+    animation: none;
+  }
+
+  .charts-tab-preview-enter {
+    animation: none;
+  }
+
+  .charts-tab-preview-plot-content,
+  .charts-tab-preview-plot-content--pending {
+    transition: none;
+  }
+
+  .charts-tab-preview-shimmer {
+    animation: none;
+    opacity: 0.55;
+  }
+
+  .charts-tab-page .charts-tab-timeline-card--idle:hover {
+    transform: none;
+  }
 }
 
 /* —— Data Preview grid —— */
@@ -1134,4 +1279,488 @@ body {
 
 .overview-kpi-value--neutral {
   color: var(--foreground);
+}
+
+/* —— Chart viz theme: dark hierarchy (AI Insights tab + Charts workspace) —— */
+.dark .ai-insights-page,
+.dark .charts-tab-page,
+.dark .chart-viz-theme {
+  --insights-layer-shell: #0a1224;
+  --insights-layer-panel: #0f172a;
+  --insights-layer-card: #172238;
+  --insights-layer-nested: #1e2f4f;
+  --insights-layer-inset: #1a2744;
+  --insights-border-soft: rgba(255, 255, 255, 0.08);
+  --insights-border-medium: rgba(255, 255, 255, 0.14);
+  --insights-text-secondary: #e8eef7;
+  --insights-text-muted: #a8b8d0;
+  --insights-answer-body: #e4ecf6;
+  --insights-answer-detail-body: #eaf1f9;
+  --insights-answer-emphasis: #f3f6fb;
+  --insights-answer-metric: #ffffff;
+  --insights-answer-label: #c5d3e8;
+  --insights-border-accordion: rgba(255, 255, 255, 0.17);
+  --insights-border-accordion-open: rgba(255, 255, 255, 0.22);
+  --insights-wash-accent: rgba(99, 102, 241, 0.14);
+  --insights-wash-caution: rgba(251, 191, 36, 0.14);
+  --insights-wash-followup: rgba(129, 140, 248, 0.12);
+  --chart-axis-tick: #cbd5e1;
+  --chart-axis-line: rgba(148, 163, 184, 0.42);
+  --overview-dash-grid-opacity: 0.36;
+}
+
+/* AI Insights — sample-aware confidence (dark caution surface) */
+.dark .ai-insights-page .ai-insights-confidence--caution {
+  background: linear-gradient(
+    145deg,
+    rgba(120, 53, 15, 0.52) 0%,
+    rgba(69, 45, 10, 0.38) 42%,
+    color-mix(in srgb, var(--insights-layer-nested) 88%, #1e293b) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(251, 191, 36, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.dark .ai-insights-page .ai-insights-confidence--caution .ai-insights-muted-label,
+.dark .ai-insights-page .ai-insights-confidence--caution .ai-insights-confidence__disclaimer,
+.dark .ai-insights-page .ai-insights-confidence--caution .ai-insights-body-text {
+  color: #fef3c7;
+}
+
+.dark .ai-insights-page .ai-insights-confidence--caution .text-slate-600,
+.dark .ai-insights-page .ai-insights-confidence--caution .text-slate-700 {
+  color: #fde68a;
+}
+
+.dark .ai-insights-page .ai-insights-confidence--normal {
+  background: color-mix(in srgb, var(--insights-layer-nested) 92%, #0f172a);
+}
+
+.dark .ai-insights-page .ai-insights-provenance .text-slate-900 {
+  color: var(--foreground);
+}
+
+.dark .ai-insights-page .ai-insights-provenance .text-slate-800 {
+  color: var(--insights-text-secondary);
+}
+
+.dark .ai-insights-page .ai-insights-provenance .text-slate-700,
+.dark .ai-insights-page .ai-insights-provenance .text-slate-600 {
+  color: var(--insights-text-muted);
+}
+
+.dark .ai-insights-page .ai-insights-provenance .text-slate-500 {
+  color: var(--insights-text-muted);
+}
+
+.dark .ai-insights-page .ai-insights-provenance [class*="text-amber-"] {
+  color: rgb(253 230 138);
+}
+
+.dark .ai-insights-page .ai-insights-provenance [class*="border-slate-200"] {
+  border-color: var(--insights-border-soft);
+}
+
+.dark .ai-insights-page .ai-insights-provenance .bg-sky-50 {
+  background-color: rgba(14, 165, 233, 0.12);
+  color: rgb(186 230 253);
+  border-color: rgba(56, 189, 248, 0.22);
+}
+
+.dark .ai-insights-page .ai-insights-provenance .bg-violet-50 {
+  background-color: rgba(139, 92, 246, 0.12);
+  color: rgb(221 214 254);
+  border-color: rgba(167, 139, 250, 0.22);
+}
+
+/* AI Insights — suggested prompts + follow-up chips */
+.ai-insights-page .ai-insights-suggested-q:focus-visible,
+.ai-insights-page .ai-insights-followup-chip:focus-visible {
+  outline: none;
+}
+
+.ai-insights-page .ai-insights-followup-chip:not(:disabled) {
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ai-insights-page .ai-insights-followup-chip:not(:disabled):active {
+  transform: translateY(0);
+  transition-duration: 0.12s;
+}
+
+.ai-insights-page .ai-insights-followup-chip:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.dark .ai-insights-page .ai-insights-followup-chip:not(:disabled):hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 14px -10px rgba(0, 0, 0, 0.3);
+}
+
+.dark .ai-insights-page .ai-insights-followup-chip:focus-visible {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 0 0 1px var(--insights-border-medium),
+    0 0 0 3px color-mix(in srgb, #818cf8 12%, transparent);
+}
+
+.ai-insights-page .ai-insights-ask-reset:disabled {
+  border-color: color-mix(in srgb, var(--border-default) 85%, transparent);
+  background: color-mix(in srgb, var(--surface-subtle) 55%, var(--surface-elevated));
+  color: color-mix(in srgb, var(--text-muted) 92%, var(--foreground));
+  box-shadow: none;
+  transform: none;
+}
+
+.dark .ai-insights-page .ai-insights-ask-reset:disabled {
+  border-color: var(--insights-border-soft);
+  background: color-mix(in srgb, var(--insights-layer-inset) 65%, var(--insights-layer-panel));
+  color: var(--insights-text-muted);
+}
+
+/* AI Insights — Suggested Questions scroll (thin; visible on hover) */
+.ai-insights-page .ai-insights-suggested-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  min-height: 0;
+}
+
+.ai-insights-page .ai-insights-suggested-scroll:hover {
+  scrollbar-color: color-mix(in srgb, var(--scrollbar-thumb) 55%, transparent) transparent;
+}
+
+.ai-insights-page .ai-insights-suggested-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.ai-insights-page .ai-insights-suggested-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ai-insights-page .ai-insights-suggested-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 999px;
+}
+
+.ai-insights-page .ai-insights-suggested-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--scrollbar-thumb) 70%, transparent);
+}
+
+.ai-insights-page .ai-insights-suggested-scroll:hover::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* AI Insights — Ask AI composer + focus */
+.ai-insights-page .ai-insights-ask-composer .ai-insights-ask-textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--border-default));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.dark .ai-insights-page .ai-insights-ask-panel .ai-insights-ask-textarea {
+  color-scheme: dark;
+}
+
+.dark .ai-insights-page .ai-insights-ask-composer .ai-insights-ask-textarea:focus {
+  border-color: color-mix(in srgb, #818cf8 38%, var(--insights-border-medium));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #818cf8 16%, transparent);
+}
+
+/* Ask AI submit — premium hover lift (size unchanged) */
+.ai-insights-page .ai-insights-ask-submit:not(:disabled) {
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ai-insights-page .ai-insights-ask-submit:not(:disabled):hover {
+  transform: translateY(-2px);
+  filter: brightness(1.03);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.08),
+    0 8px 18px -6px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.ai-insights-page .ai-insights-ask-submit:not(:disabled):active {
+  transform: translateY(0);
+  filter: brightness(0.98);
+  transition-duration: 0.14s;
+}
+
+.dark .ai-insights-page .ai-insights-ask-submit:not(:disabled) {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 4px 14px -4px rgba(99, 102, 241, 0.45);
+}
+
+.dark .ai-insights-page .ai-insights-ask-submit:not(:disabled):hover {
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.24),
+    0 10px 22px -8px rgba(99, 102, 241, 0.52);
+}
+
+.dark .ai-insights-page .ai-insights-executive {
+  border-color: var(--insights-border-medium);
+}
+
+.dark .ai-insights-page .ai-insights-followup-chip:disabled {
+  opacity: 0.4;
+}
+
+/* AI Insights — AI Answer executive panel (dark readability; Ask AI inset baseline) */
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-summary,
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-body-para,
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-body-list-item,
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-finding-item {
+  color: var(--insights-answer-body);
+}
+
+.dark .ai-insights-page .ai-insights-answer .text-slate-600,
+.dark .ai-insights-page .ai-insights-answer .text-slate-700,
+.dark .ai-insights-page .ai-insights-answer .text-slate-800,
+.dark .ai-insights-page .ai-insights-answer .text-slate-900 {
+  color: var(--insights-answer-body);
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-body-emphasis {
+  color: var(--insights-answer-emphasis);
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-body-metric {
+  color: var(--insights-answer-metric);
+  font-weight: 700;
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail-summary {
+  color: var(--insights-answer-emphasis);
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-lead,
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-details-label {
+  color: var(--insights-answer-label);
+}
+
+.dark .ai-insights-page .ai-insights-answer-summary-panel {
+  background: var(--insights-layer-inset);
+  border-color: var(--insights-border-medium);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .ai-insights-page .ai-insights-answer-details {
+  background: var(--insights-layer-card);
+  border-color: var(--insights-border-soft);
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail {
+  background: transparent;
+  border-color: var(--insights-border-soft);
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail[open] {
+  background: transparent;
+  border-color: var(--insights-border-soft);
+  box-shadow: none;
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail-body {
+  background: transparent;
+  border-top-color: var(--insights-border-soft);
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail-body .ai-insights-answer-body-para,
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail-body .ai-insights-answer-body-list-item,
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail-body .ai-insights-answer-finding-item {
+  color: var(--insights-answer-detail-body);
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail-body .ai-insights-answer-body-metric {
+  color: var(--insights-answer-metric);
+  font-weight: 700;
+}
+
+.ai-insights-page .ai-insights-answer details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ai-insights-page .ai-insights-answer .ai-insights-answer-detail-summary::after {
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+  font-size: 0.62rem;
+  line-height: 1;
+  color: var(--text-subtle);
+  content: "▸";
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail-summary::after {
+  color: var(--insights-answer-label);
+}
+
+.ai-insights-page .ai-insights-answer details[open] > .ai-insights-answer-detail-summary::after {
+  color: var(--foreground);
+  content: "▾";
+}
+
+.dark .ai-insights-page .ai-insights-answer details[open] > .ai-insights-answer-detail-summary::after {
+  color: var(--insights-answer-emphasis);
+}
+
+.ai-insights-page .ai-insights-answer-detail--findings[open] {
+  border-color: color-mix(in srgb, #6366f1 18%, var(--border-default));
+}
+
+.dark .ai-insights-page .ai-insights-answer-detail--findings[open] {
+  border-bottom-color: color-mix(in srgb, #818cf8 22%, var(--insights-border-soft));
+  background: transparent;
+}
+
+.ai-insights-page .ai-insights-answer .ai-insights-answer-detail-summary:hover {
+  background: color-mix(in srgb, var(--surface-subtle) 50%, transparent);
+}
+
+.dark .ai-insights-page .ai-insights-answer .ai-insights-answer-detail-summary:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ai-insights-page .ai-insights-answer-summary-panel {
+  background: var(--surface-elevated);
+}
+
+/* Light mode only — dark uses solid layer tokens above */
+
+/* Shared chart viz — visualization stage (light + dark) */
+.ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame {
+  background: color-mix(in srgb, var(--surface-inset) 28%, var(--surface-elevated));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 1px 2px rgba(15, 23, 42, 0.04);
+  height: auto;
+}
+
+.chart-viz-theme.ai-insights-viz .charts-session-viz-frame {
+  max-width: none;
+}
+
+.ai-insights-page .ai-insights-viz .ai-insights-viz-plot-host,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-plot-host {
+  width: 100%;
+  min-width: 0;
+}
+
+.ai-insights-page .ai-insights-viz .ai-insights-viz-plot,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-plot {
+  --insights-viz-plot-ring: color-mix(in srgb, var(--accent) 12%, transparent);
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: var(--insights-viz-plot-h, auto);
+  box-sizing: border-box;
+}
+
+.ai-insights-page .ai-insights-viz .ai-insights-viz-plot .recharts-responsive-container,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-plot .recharts-responsive-container {
+  width: 100% !important;
+  height: 100% !important;
+  margin-inline: auto;
+}
+
+.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame,
+.dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame {
+  background: color-mix(in srgb, var(--insights-layer-card) 72%, var(--insights-layer-inset));
+  border-color: var(--insights-border-soft);
+  box-shadow: none;
+}
+
+.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-text,
+.dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame .recharts-text {
+  fill: var(--chart-axis-tick);
+}
+
+.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-cartesian-grid line,
+.dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame .recharts-cartesian-grid line {
+  stroke: var(--chart-axis-line);
+}
+
+/* Recharts tooltip cursor — no gray plot overlay on hover */
+.ai-insights-page .ai-insights-viz .recharts-tooltip-cursor,
+.ai-insights-page .ai-insights-viz .recharts-rectangle.recharts-tooltip-cursor,
+.chart-viz-theme.ai-insights-viz .recharts-tooltip-cursor,
+.chart-viz-theme.ai-insights-viz .recharts-rectangle.recharts-tooltip-cursor {
+  fill: transparent !important;
+  stroke: transparent !important;
+}
+
+.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-plot,
+.dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-plot {
+  --insights-viz-plot-ring: color-mix(in srgb, var(--accent) 16%, transparent);
+  background: transparent;
+  border-color: var(--insights-border-soft);
+}
+
+/* Viz metadata chips — readable in dark mode, no faux selection highlight */
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip,
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono {
+  border-color: var(--insights-border-soft);
+  background: var(--insights-layer-inset);
+  box-shadow: none;
+}
+
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-label,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-label {
+  color: var(--insights-answer-label);
+}
+
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-value,
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-value,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono {
+  color: var(--insights-answer-body);
+}
+
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-lead,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-lead {
+  color: #ecfdf5;
+  border-color: color-mix(in srgb, #34d399 35%, transparent);
+  background: color-mix(in srgb, #064e3b 48%, var(--insights-layer-inset));
+}
+
+/* Charts tab — responsive preview plot slot (less dead space at 80–125% zoom) */
+.charts-tab-viz-plot-slot {
+  height: clamp(
+    196px,
+    var(--charts-tab-plot-h, 280px),
+    min(42vh, 440px)
+  );
+}
+
+.chart-viz-theme.charts-tab-viz-preview .charts-tab-viz-plot-stage {
+  margin-top: 0.125rem;
+}
+
+.chart-viz-theme.charts-tab-viz-preview .charts-session-viz-frame {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100%;
+}
+
+.chart-viz-theme.charts-tab-viz-preview .charts-session-viz-frame .ai-insights-viz-plot-host {
+  max-width: 100%;
+  width: 100%;
 }

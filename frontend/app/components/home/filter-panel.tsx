@@ -50,8 +50,8 @@ function FilterPanelInner({
   const controlBase = isDashboard
     ? `${ovFilterControl} ${controlH} cursor-pointer`
     :
-    "w-full min-w-0 rounded-xl border border-slate-200/80 bg-white px-3 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition " +
-      "focus:border-indigo-300/90 focus:ring-2 focus:ring-indigo-200/55 [color-scheme:light]";
+        "w-full min-w-0 rounded-xl border border-slate-200/80 bg-white px-3 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition " +
+          "focus:border-indigo-300/90 focus:ring-2 focus:ring-indigo-200/55 [color-scheme:light]";
   const selectChevron =
     "appearance-none bg-[length:0.75rem] bg-[position:right_0.75rem_center] bg-no-repeat pr-10 " +
     "bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%3E%3Cpath%20d%3D%22M1%202l5%204%205-4%22%20stroke%3D%22%2394a3b8%22%20fill%3D%22none%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')]";
@@ -59,9 +59,9 @@ function FilterPanelInner({
   const dateInputInner = isDashboard
     ? "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-foreground outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80"
     :
-    "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-slate-900 outline-none " +
-      "[color-scheme:light] cursor-pointer " +
-      "[&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100";
+        "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-slate-900 outline-none " +
+          "[color-scheme:light] cursor-pointer " +
+          "[&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100";
 
   const labelCls = isDashboard
     ? `block min-h-[18px] ${ovFilterLabel}`
@@ -146,10 +146,12 @@ function FilterPanelInner({
   const dateBarCls = isDashboard
     ? `${controlH} flex w-full min-w-0 items-center overflow-hidden rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] px-1 shadow-[var(--shadow-sm)] transition focus-within:border-[color:var(--accent-muted)] focus-within:ring-2 focus-within:ring-[color:var(--accent)]/25`
     :
-      `${controlH} flex w-full min-w-0 items-center overflow-hidden rounded-xl border border-slate-200/80 bg-white px-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ` +
-      "focus-within:border-indigo-300/90 focus-within:ring-2 focus-within:ring-indigo-200/55";
+        `${controlH} flex w-full min-w-0 items-center overflow-hidden rounded-xl border border-slate-200/80 bg-white px-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ` +
+        "focus-within:border-indigo-300/90 focus-within:ring-2 focus-within:ring-indigo-200/55";
 
-  const clearBtnCls = isDashboard ? ovFilterClearBtn : `${controlH} ${ovFilterClearBtn}`;
+  const clearBtnCls = isDashboard
+    ? ovFilterClearBtn
+    : `${controlH} ${ovFilterClearBtn}`;
 
   const filterChipCls = isDashboard
     ? "inline-flex items-center gap-1.5 rounded-full border border-[color:var(--accent-muted)] bg-[color:var(--accent-wash)] px-3 py-1 text-xs font-medium text-foreground transition duration-150 hover:border-[color:var(--accent)] hover:bg-[color:var(--accent-wash)]"
@@ -196,12 +198,18 @@ function FilterPanelInner({
           <div className="min-w-0 sm:col-span-2 lg:col-span-2">
             <span className={labelCls}>Date range</span>
             <div className={dateBarCls}>
-              <label className="flex min-h-0 min-w-0 flex-1 cursor-pointer items-center border-r border-[color:var(--border-default)] px-2 py-2">
+              <label
+                className={`flex min-h-0 min-w-0 flex-1 cursor-pointer items-center border-r px-2 py-2 ${
+                  isDashboard
+                    ? "border-[color:var(--border-default)]"
+                    : "border-slate-200/80"
+                }`}
+              >
                 <input
                   type="date"
                   value={dateStart}
                   onChange={(e) => onDateStart(e.target.value)}
-                  className={`${dateInputInner} h-[30px] leading-none`}
+                  className={`${dateInputInner}${isDashboard ? " h-[30px] leading-none" : ""}`}
                   aria-label="From date"
                 />
               </label>
@@ -210,7 +218,7 @@ function FilterPanelInner({
                   type="date"
                   value={dateEnd}
                   onChange={(e) => onDateEnd(e.target.value)}
-                  className={`${dateInputInner} h-[30px] leading-none`}
+                  className={`${dateInputInner}${isDashboard ? " h-[30px] leading-none" : ""}`}
                   aria-label="To date"
                 />
               </label>
@@ -230,7 +238,11 @@ function FilterPanelInner({
 
       {(dashboardFilters.length > 0 || dateActive) && (
         <div className="space-y-1.5">
-          <p className={`text-[11px] font-semibold uppercase tracking-wide ${isDashboard ? ovFilterLabel : "text-slate-500"}`}>
+          <p
+            className={`text-[11px] font-semibold uppercase tracking-wide ${
+              isDashboard ? ovFilterLabel : "text-slate-500"
+            }`}
+          >
             Filters active
           </p>
           <div className="flex flex-wrap gap-2">
@@ -266,19 +278,22 @@ function FilterPanelInner({
       )}
 
       {filterBreadcrumb.trim() ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200/50 pt-3">
-          <span className="shrink-0 rounded-full border border-slate-200/70 bg-slate-50/90 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200/50 pt-3 dark:border-[color:var(--border-default)]">
+          <span className="shrink-0 rounded-full border border-slate-200/70 bg-slate-50/90 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-[color:var(--border-default)] dark:bg-[color:var(--surface-elevated)] dark:text-[color:var(--text-muted)]">
             Drill path
           </span>
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {breadcrumbSegments.map((seg, i) => (
                 <span key={`${i}-${seg.slice(0, 24)}`} className="flex items-center gap-1.5">
                   {i > 0 ? (
-                    <span className="text-slate-300" aria-hidden>
+                    <span
+                      className="text-slate-300 dark:text-[color:var(--text-subtle)]"
+                      aria-hidden
+                    >
                       /
                     </span>
                   ) : null}
-                  <span className="max-w-[min(100%,18rem)] truncate rounded-full border border-slate-200/60 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-700 shadow-[0_1px_1px_rgba(15,23,42,0.04)]">
+                  <span className="max-w-[min(100%,18rem)] truncate rounded-full border border-slate-200/60 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-700 shadow-[0_1px_1px_rgba(15,23,42,0.04)] dark:border-[color:var(--border-default)] dark:bg-[color:var(--surface-elevated)] dark:text-foreground dark:shadow-none">
                     {seg}
                   </span>
                 </span>
@@ -288,7 +303,7 @@ function FilterPanelInner({
       ) : null}
 
       {dashboardEmpty ? (
-        <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200/80 rounded-xl px-3 py-2">
+        <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/28 dark:bg-amber-950/35 dark:text-amber-100/95">
           No records match current filters.
         </p>
       ) : null}

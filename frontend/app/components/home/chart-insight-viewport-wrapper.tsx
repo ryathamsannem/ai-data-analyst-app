@@ -10,19 +10,22 @@ import { insightViewportMaxClassForChartKind } from "@/lib/chart-layout-config";
 export function ChartInsightViewportWrapper({
   chartKind,
   children,
+  /** Charts tab session preview — full width centering without insight max-width cap. */
+  sessionMode,
 }: {
   chartKind: ChartKind;
   children: React.ReactNode;
+  sessionMode?: boolean;
 }) {
-  const innerMax = insightViewportMaxClassForChartKind(chartKind);
+  const innerMax = sessionMode
+    ? "max-w-full"
+    : insightViewportMaxClassForChartKind(chartKind);
   return (
-    <div className="flex min-h-[420px] w-full flex-col items-center justify-center py-4 sm:py-5">
-      <div
-        className={`mx-auto flex w-full min-w-0 justify-center ${innerMax} px-1 sm:px-2`}
-      >
-        <div className="flex w-full min-w-0 max-w-full flex-col items-center justify-center [&_.recharts-responsive-container]:mx-auto [&_.recharts-responsive-container]:max-w-full">
-          {children}
-        </div>
+    <div
+      className={`ai-insights-viz-plot-host grid w-full min-w-0 place-items-center ${innerMax}`}
+    >
+      <div className="grid w-full min-w-0 place-items-center [&_.recharts-cartesian-grid_line]:stroke-[color:var(--chart-axis-line)] [&_.recharts-cartesian-grid_line]:opacity-[var(--overview-dash-grid-opacity,0.28)] [&_.recharts-text]:fill-[color:var(--chart-axis-tick)]">
+        {children}
       </div>
     </div>
   );

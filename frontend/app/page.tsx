@@ -66,8 +66,30 @@ import {
 } from "@/lib/final-chart-presentation";
 import {
   getInsightLayoutMetrics,
+  resolveChartsTabPreviewPlotHeight,
   timelineTypeToChartKind,
 } from "@/lib/chart-layout-config";
+import {
+  chartsTabDesc,
+  chartsTabDescEmphasis,
+  chartsTabDownloadBtn,
+  chartsTabEmptyState,
+  chartsTabEmptyTitle,
+  chartsTabHeaderRow,
+  chartsTabPage,
+  chartsTabSmartReadWrap,
+  chartsTabTitle,
+  chartsTabTimelineColumn,
+  chartsTabPreviewHeaderSticky,
+  chartsTabSessionPlotSurface,
+  chartsTabVizHeaderZone,
+  chartsTabVizKicker,
+} from "@/lib/charts-tab-ui";
+import { ChartsTabChartReason } from "@/app/components/home/charts-tab-chart-reason";
+import { ChartsTabIntelligenceStrip } from "@/app/components/home/charts-tab-intelligence-strip";
+import { ChartsTabPlotTransition } from "@/app/components/home/charts-tab-plot-transition";
+import { generateChartReason } from "@/lib/generate-chart-reason";
+import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
 import {
   formatAxisTickFromRows,
   formatAxisTickFromScatterX,
@@ -82,6 +104,7 @@ import {
   buildChartSemanticHeader,
   pdfXAxisLineTitle,
   pdfYAxisLineTitle,
+  resolveHistogramMeasureChipLabel,
   resolveSemanticCategoryAxisForCharts,
 } from "@/lib/chart-semantic-metadata";
 import {
@@ -129,10 +152,108 @@ import type {
   DashboardFilterEntry,
 } from "./dashboard-filter-types";
 import { AiExecutiveInsightsPanel } from "./components/ai-executive-insights-panel";
+import {
+  AiInsightAnswerBody,
+  formatInsightSummary,
+} from "./components/ai-insight-answer-body";
 import { WrappedCategoryYAxisTick } from "./components/chart-category-axis-tick";
 import {
+  aiInsightsAnswerCard,
+  aiInsightsAnswerDetail,
+  aiInsightsAnswerDetailBody,
+  aiInsightsAnswerDetailFindings,
+  aiInsightsAnswerDetailSummaryBadge,
+  aiInsightsAnswerDetailSummaryFindings,
+  aiInsightsAnswerDetailSummaryHypotheses,
+  aiInsightsAnswerDetailSummaryLabel,
+  aiInsightsAnswerDetailSummaryMethodology,
+  aiInsightsAnswerDetailSummaryMore,
+  aiInsightsAnswerDetailSummaryRecommendations,
+  aiInsightsAnswerDetailsGroup,
+  aiInsightsAnswerDetailsLabel,
+  aiInsightsAnswerHeader,
+  aiInsightsAnswerKicker,
+  aiInsightsAnswerLead,
+  aiInsightsAnswerStack,
+  aiInsightsAnswerSummary,
+  aiInsightsAnswerSummaryPanel,
+  aiInsightsAnswerTitle,
+  aiInsightsBodyText,
+  aiInsightsConfidenceCaution,
+  aiInsightsConfidenceDisclaimer,
+  aiInsightsConfidenceNormal,
+  aiInsightsConfidenceShell,
+  aiInsightsFollowupChip,
+  aiInsightsFollowupList,
+  aiInsightsFollowupSection,
+  aiInsightsFollowupTitle,
+  aiInsightsAskActionsRow,
+  aiInsightsAskAssumptionNote,
+  aiInsightsAskComposer,
+  aiInsightsAskHeading,
+  aiInsightsAskHeaderRow,
+  aiInsightsAskInputBlock,
+  aiInsightsAskMetaRow,
+  aiInsightsAskQuestionLabel,
+  aiInsightsAskResetBtn,
+  aiInsightsAskSubmitBtn,
+  aiInsightsAskTextarea,
+  aiInsightsBtnExport,
+  aiInsightsSuggestedDesc,
+  aiInsightsSuggestedHeading,
+  aiInsightsSuggestedList,
+  aiInsightsSuggestedQ,
+  aiInsightsSuggestedRecentDesc,
+  aiInsightsSuggestedRecentItem,
+  aiInsightsSuggestedRecentList,
+  aiInsightsSuggestedRecentSection,
+  aiInsightsSuggestedRecentTitle,
+  aiInsightsMutedLabel,
+  aiInsightsAskPanel,
+  aiInsightsGrid,
+  aiInsightsOuterShell,
+  aiInsightsPage,
+  aiInsightsPanelShell,
+  aiInsightsSuggestedScrollBody,
+  aiInsightsProvenanceBody,
+  aiInsightsProvenanceDivider,
+  aiInsightsProvenanceMetaLabel,
+  aiInsightsProvenanceMetaValue,
+  aiInsightsProvenanceSectionBody,
+  aiInsightsProvenanceSectionBodyEmphasis,
+  aiInsightsProvenanceSectionLabel,
+  aiInsightsProvenanceShell,
+  aiInsightsProvenanceToggle,
+  aiInsightsProvenanceToggleTitle,
+  aiInsightsSmartPanelDivider,
+  aiInsightsStrongText,
+  aiInsightsSubtleText,
+  aiInsightsVizCard,
+  aiInsightsVizChartStage,
+  aiInsightsVizChipsWrap,
+  chartsTabVizPreviewCard,
+  chartsTabVizSessionFrame,
+  aiInsightsVizMetaChipBase,
+  aiInsightsVizMetaChipCompactSize,
+  aiInsightsVizMetaChipLabel,
+  aiInsightsVizMetaChipLabelCompact,
+  aiInsightsVizMetaChipLead,
+  aiInsightsVizMetaChipLeadCompactSize,
+  aiInsightsVizMetaChipLeadSize,
+  aiInsightsVizMetaChipMono,
+  aiInsightsVizMetaChipMonoCompactSize,
+  aiInsightsVizMetaChipMonoSize,
+  aiInsightsVizMetaChipSize,
+  aiInsightsVizMetaChipValue,
+  aiInsightsVizHeaderZone,
+  aiInsightsVizHeadingWrap,
+  aiInsightsVizKicker,
+  aiInsightsVizPlotSurface,
+  aiInsightsVizSubtitle,
+  aiInsightsVizTitle,
+} from "@/lib/ai-insights-ui";
+import {
   btnExport,
-  btnExportSm,
   btnPrimary,
   btnPrimarySm,
   btnSecondary,
@@ -168,6 +289,7 @@ import {
   ovDataLabel,
   ovDataValue,
   ovDataValueMono,
+  ovFilterControl,
   ovCard,
   ovCardElevated,
   ovCardInteractive,
@@ -216,6 +338,7 @@ import {
   apiChartStringToKind,
   computeSmartChartIntel,
 } from "@/lib/smart-chart-intelligence";
+import { chartSnapshotMatchesQuestionIntent } from "@/lib/chart-question-intent";
 import { getCanonicalChartTitle } from "@/lib/canonical-chart-title";
 import {
   apiChartTypeFromContract,
@@ -282,6 +405,7 @@ const CHART_AXIS_LINE = "#e2e8f0";
 const AXIS_TICK = "#64748b";
 /** Shared Recharts tooltip frame (session + overview mini charts). */
 const CHART_TOOLTIP_FRAME = {
+  cursor: false,
   contentStyle: {
     borderRadius: 14,
     border: "1px solid rgba(226, 232, 240, 0.95)",
@@ -552,27 +676,25 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
 }) {
   const typeLbl = presentationKindUiLabel(props.renderedKind);
   const c = props.compactChips;
-  const chip =
-    "inline-flex items-center rounded-full border border-slate-200/50 bg-white/90 font-medium text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.04)] " +
-    (c ? "gap-1 px-2 py-0.5 text-[9px]" : "gap-1.5 px-2.5 py-1 text-[10px]");
-  const chipMuted = c ? "text-[8px] text-slate-400" : "text-slate-400";
-  const monoChip =
-    "inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200/45 bg-slate-50/80 font-mono font-medium tabular-nums text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.04)] " +
-    (c ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]");
-  const leadChip =
-    "inline-flex max-w-[min(100%,20rem)] items-center rounded-full border border-emerald-200/45 bg-emerald-50/55 font-medium leading-snug text-emerald-900/90 shadow-[0_1px_2px_rgba(16,185,129,0.06)] " +
-    (c ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]");
+  const chip = `${aiInsightsVizMetaChipBase} ${c ? aiInsightsVizMetaChipCompactSize : aiInsightsVizMetaChipSize}`;
+  const chipMuted = c ? aiInsightsVizMetaChipLabelCompact : aiInsightsVizMetaChipLabel;
+  const chipValue = aiInsightsVizMetaChipValue;
+  const monoChip = `${aiInsightsVizMetaChipMono} ${c ? aiInsightsVizMetaChipMonoCompactSize : aiInsightsVizMetaChipMonoSize}`;
+  const leadChip = `${aiInsightsVizMetaChipLead} ${c ? aiInsightsVizMetaChipLeadCompactSize : aiInsightsVizMetaChipLeadSize}`;
   return (
     <div
-      className={`flex flex-wrap items-center justify-center px-1 sm:gap-2.5 ${c ? "mt-2 gap-1.5" : "mt-3 gap-2"}`}
+      className={`flex flex-wrap items-center justify-center ${c ? "gap-x-2 gap-y-1.5 sm:gap-x-2.5 sm:gap-y-2" : "mt-3 gap-2 px-1 sm:gap-2.5"} ${c ? "" : ""}`}
     >
       <span className={`${chip} items-center`}>
         <span className={chipMuted}>View</span>
-        <span className="text-slate-800">{typeLbl}</span>
+        <span className={chipValue}>{typeLbl}</span>
       </span>
       <span className={`${chip} items-center`}>
         <span className={chipMuted}>Measure</span>
-        <span className="max-w-[14rem] truncate text-slate-800" title={props.metricLabel}>
+        <span
+          className={`max-w-[14rem] truncate ${chipValue}`}
+          title={props.metricLabel}
+        >
           {props.metricLabel}
         </span>
       </span>
@@ -580,13 +702,13 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
         <>
           <span className={`${chip} items-center`}>
             <span className={chipMuted}>X</span>
-            <span className="max-w-[10rem] truncate text-slate-800">
+            <span className={`max-w-[10rem] truncate ${chipValue}`}>
               {props.semanticHeader.xLabel}
             </span>
           </span>
           <span className={`${chip} items-center`}>
             <span className={chipMuted}>Y</span>
-            <span className="max-w-[10rem] truncate text-slate-800">
+            <span className={`max-w-[10rem] truncate ${chipValue}`}>
               {props.semanticHeader.yLabel}
             </span>
           </span>
@@ -594,7 +716,10 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
       ) : (
         <span className={`${chip} max-w-full items-center`}>
           <span className={`shrink-0 ${chipMuted}`}>{props.semanticHeader.roleLabel}</span>
-          <span className="min-w-0 truncate text-slate-800" title={props.semanticHeader.detailLabel}>
+          <span
+            className={`min-w-0 truncate ${chipValue}`}
+            title={props.semanticHeader.detailLabel}
+          >
             {props.semanticHeader.detailLabel}
           </span>
         </span>
@@ -778,6 +903,79 @@ function extractDashboardChartTitleFromPrefillQuestion(
   return m?.[1]?.trim() || null;
 }
 
+function normalizeQuestionForMatch(q: string): string {
+  return q.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function snapshotMetricCategoryTokens(snap: ChartSnapshot): {
+  metric: string;
+  category: string;
+} {
+  const prov = snap.visualization as { provenance?: InsightProvenance } | null;
+  const fp = snap.finalPresentation;
+  return {
+    metric: normalizeIntentToken(
+      prov?.provenance?.numericColumn ?? fp?.metric ?? ""
+    ),
+    category: normalizeIntentToken(
+      prov?.provenance?.categoryColumn ?? fp?.dimension ?? ""
+    ),
+  };
+}
+
+function analysisMetricCategoryTokens(
+  parsed: AlignedAnalysisContext | null
+): { metric: string; category: string } {
+  return {
+    metric: normalizeIntentToken(parsed?.metricColumn ?? ""),
+    category: normalizeIntentToken(parsed?.categoryColumn ?? ""),
+  };
+}
+
+function metricCategoryTokensAlign(
+  a: { metric: string; category: string },
+  b: { metric: string; category: string }
+): boolean {
+  if (a.metric && b.metric && a.metric !== b.metric) return false;
+  if (a.category && b.category && a.category !== b.category) return false;
+  return true;
+}
+
+function chartSnapshotMatchesAnalysis(
+  snap: ChartSnapshot,
+  parsed: AlignedAnalysisContext | null
+): boolean {
+  if (!parsed) return false;
+  return metricCategoryTokensAlign(
+    snapshotMetricCategoryTokens(snap),
+    analysisMetricCategoryTokens(parsed)
+  );
+}
+
+/** Keep a pinned insight chart only for same-question re-asks or aligned follow-ups. */
+function shouldPreservePinnedInsightChart(args: {
+  pinned: ChartSnapshot;
+  question: string;
+  parsed: AlignedAnalysisContext | null;
+  followUpDetected: boolean;
+}): boolean {
+  const pinnedQ = normalizeQuestionForMatch(args.pinned.question ?? "");
+  const newQ = normalizeQuestionForMatch(args.question);
+  if (pinnedQ && newQ && pinnedQ === newQ) return true;
+
+  if (extractDashboardChartTitleFromPrefillQuestion(args.question)) {
+    return true;
+  }
+
+  if (isTrendMode(args.pinned.contract)) {
+    return args.followUpDetected;
+  }
+
+  if (!args.followUpDetected) return false;
+
+  return chartSnapshotMatchesAnalysis(args.pinned, args.parsed);
+}
+
 function resolveOriginChartRefSnapshot(args: {
   question: string;
   insightChartId: string | null;
@@ -934,15 +1132,22 @@ function buildChartMetadataLine(
     metricRaw = "metric";
   }
 
-  const metric = buildMetricLabel({
-    aggregationKey: aggRaw || null,
-    aggregationLabel: aggRaw || null,
-    metricColumn:
-      (preferAlignedAnalysis && analysis?.metricColumn?.trim()) ||
-      prov?.numericColumn?.trim() ||
-      null,
-    metricColumnDisplay: metricRaw || null,
-  });
+  const metric =
+    kind === "histogram"
+      ? resolveHistogramMeasureChipLabel(
+          viz as ChartSemanticVizLike,
+          analysis,
+          preferAlignedAnalysis
+        )
+      : buildMetricLabel({
+          aggregationKey: aggRaw || null,
+          aggregationLabel: aggRaw || null,
+          metricColumn:
+            (preferAlignedAnalysis && analysis?.metricColumn?.trim()) ||
+            prov?.numericColumn?.trim() ||
+            null,
+          metricColumnDisplay: metricRaw || null,
+        });
 
   const rowsNum = resolveAnalyzedRowsForChartMetadata({
     preferAlignedAnalysis,
@@ -1280,6 +1485,23 @@ function refineChartAxesWithAnalysis(
   analysis: AlignedAnalysisContext | null
 ): ChartAxes {
   const prov = viz?.provenance ?? null;
+
+  const isHistogramViz =
+    String(viz?.chartType ?? "").toLowerCase() === "histogram" ||
+    String(prov?.visualizationType ?? "").toLowerCase() === "histogram";
+
+  if (isHistogramViz) {
+    const valueAxis = resolveHistogramMeasureChipLabel(
+      viz as ChartSemanticVizLike,
+      analysis,
+      Boolean(analysis)
+    );
+    return {
+      categoryAxis: base.categoryAxis,
+      valueAxis,
+      valueAxisCompact: valueAxis,
+    };
+  }
 
   const metricDisplay = (
     analysis?.metricColumnDisplay?.trim() ||
@@ -6394,15 +6616,23 @@ function HomeInner() {
         applyInsightBundleToLiveState(stored);
         return;
       }
-      if (value.trim() !== lastAskedQuestion.trim()) {
+      const nextQ = value.trim();
+      const snapQ = (insightSnapshot?.question ?? lastAskedQuestion).trim();
+      if (nextQ !== lastAskedQuestion.trim() || (snapQ && nextQ !== snapQ)) {
         setHasValidAIAnswer(false);
+        setAlignedAnalysis(null);
+        setLastAskVisualizationHydrated(false);
+        pinnedInsightChartIdRef.current = null;
+        clearInsightThread();
       }
     },
     [
       lastAskedQuestion,
       insightChartId,
+      insightSnapshot?.question,
       aiAnswerByChartId,
       applyInsightBundleToLiveState,
+      clearInsightThread,
     ]
   );
 
@@ -6735,6 +6965,34 @@ function HomeInner() {
     clearAiInsightSession();
   }, [clearAiInsightSession]);
 
+  const hasActiveAiConversation = useMemo(() => {
+    if (
+      hasValidAIAnswer ||
+      answer.trim() ||
+      lastAskedQuestion.trim() ||
+      question.trim()
+    ) {
+      return true;
+    }
+    if (questionHistory.length > 0) return true;
+    if (conversationSnapshot?.lastQuestion?.trim()) return true;
+    if (aiConversationState.followUpChain.length > 0) return true;
+    if (aiConversationState.lastQuestion.trim()) return true;
+    return Object.values(aiAnswerByChartId).some(
+      (stored) => stored?.hasValidAIAnswer && stored.answer.trim()
+    );
+  }, [
+    hasValidAIAnswer,
+    answer,
+    lastAskedQuestion,
+    question,
+    questionHistory,
+    conversationSnapshot,
+    aiConversationState.followUpChain,
+    aiConversationState.lastQuestion,
+    aiAnswerByChartId,
+  ]);
+
   const askAI = async (overrideQuestion?: string) => {
     const qRaw = (overrideQuestion ?? question).trim();
     if (!qRaw) {
@@ -6754,7 +7012,18 @@ function HomeInner() {
     setAlignedAnalysis(null);
     setLoading(true);
 
-    const lineageParentChartId = insightChartId;
+    let lineageParentChartId = insightChartId;
+    if (insightSnapshot?.source === "ai") {
+      const snapQ = normalizeQuestionForMatch(
+        insightSnapshot.question ?? lastAskedQuestion
+      );
+      const newQ = normalizeQuestionForMatch(qRaw);
+      if (snapQ && newQ && snapQ !== newQ) {
+        pinnedInsightChartIdRef.current = null;
+        clearInsightThread();
+        lineageParentChartId = null;
+      }
+    }
 
     try {
       const chartHistorySnapshot = chartHistory;
@@ -6762,12 +7031,6 @@ function HomeInner() {
       const askPinnedSnapshot = lineageParentChartId
         ? chartHistorySnapshot.find((h) => h.id === lineageParentChartId)
         : null;
-      const preservePinnedChart = Boolean(
-        askPinnedSnapshot &&
-          askPinnedSnapshot.chartData.length > 0 &&
-          lineageParentChartId &&
-          askPinnedSnapshot.id === lineageParentChartId
-      );
 
       const dcAsk = dimensionOptions.date?.column ?? "";
       const dateAskPayload =
@@ -6868,6 +7131,19 @@ function HomeInner() {
 
       const hydrated = hydrateVisualizationFromApi(data.visualization);
       const parsedAnalysis = parseAlignedAnalysis(data.analysis);
+      const followUpDetected = Boolean(meta?.followUpDetected);
+      const preservePinnedChart = Boolean(
+        askPinnedSnapshot &&
+          askPinnedSnapshot.chartData.length > 0 &&
+          lineageParentChartId &&
+          askPinnedSnapshot.id === lineageParentChartId &&
+          shouldPreservePinnedInsightChart({
+            pinned: askPinnedSnapshot,
+            question: qRaw,
+            parsed: parsedAnalysis,
+            followUpDetected,
+          })
+      );
       const pinnedContract = askPinnedSnapshot?.contract ?? null;
       const narrativeForPinned =
         preservePinnedChart && pinnedContract
@@ -6968,10 +7244,19 @@ function HomeInner() {
           question: qRaw,
           rows: hydrated.chartData,
         });
+        const lockOrigin =
+          preservePinnedChart ||
+          (originChartRefSnapshot &&
+            chartSnapshotMatchesAnalysis(
+              originChartRefSnapshot,
+              parsedAnalysis
+            ))
+            ? originChartRefSnapshot
+            : null;
         chartKindForIntent = applyOriginChartPresentationLock({
           inferred,
           hydratedKind: hydrated.chartKind,
-          origin: originChartRefSnapshot,
+          origin: lockOrigin,
         });
       }
 
@@ -6982,6 +7267,8 @@ function HomeInner() {
           chartKind: chartKindForIntent,
           analysisContextKey: chartAnalysisContextKey,
         }) ?? undefined;
+
+      let pushedInsightChartId: string | null = null;
 
       if (hydrated && !preservePinnedChart) {
         const titleFromApi =
@@ -7025,7 +7312,7 @@ function HomeInner() {
               }
             : null
         );
-        pushAIChart({
+        pushedInsightChartId = pushAIChart({
           title: titleFromApi,
           subtitle: hydrated.persisted.subtitle,
           chartKind: chartKindForIntent,
@@ -7040,7 +7327,7 @@ function HomeInner() {
           semanticIntentKey,
         });
       } else if (!preservePinnedChart) {
-        pushAIChart({
+        pushedInsightChartId = pushAIChart({
           title: "No dedicated visualization for this answer",
           subtitle:
             "No chart specification was returned for this question. The narrative and KPI context still reflect the latest AI response.",
@@ -7059,10 +7346,13 @@ function HomeInner() {
       if (preservePinnedChart && askPinnedSnapshot) {
         selectChart(askPinnedSnapshot.id);
         pinnedInsightChartIdRef.current = askPinnedSnapshot.id;
+        pushedInsightChartId = askPinnedSnapshot.id;
       }
 
-      if (lineageParentChartId) {
-        saveInsightBundleForChart(lineageParentChartId, {
+      const bundleChartId =
+        pushedInsightChartId ?? lineageParentChartId ?? insightChartId;
+      if (bundleChartId) {
+        saveInsightBundleForChart(bundleChartId, {
           answer: answerForBundle,
           lastAskedQuestion: qRaw,
           hasValidAIAnswer: validForBundle,
@@ -7526,8 +7816,75 @@ function HomeInner() {
     [aiAnswerByChartId, insightChartId, answer, hasValidAIAnswer]
   );
 
+  const insightChartMatchesQuestionIntent = useMemo(() => {
+    if (!insightSnapshot || !lastAskedQuestion.trim()) return false;
+    const prov = insightVisualization?.provenance ?? null;
+    return chartSnapshotMatchesQuestionIntent({
+      question: lastAskedQuestion,
+      chartTitle: insightSnapshot.title,
+      aggregationKey: prov?.aggregationKey ?? prov?.aggregation ?? null,
+      aggregationLabel: prov?.aggregation ?? null,
+      categoryColumn: prov?.categoryColumn ?? null,
+      chartKind: insightSnapshot.chartKind,
+      rowCount: insightSnapshot.chartData.length,
+    });
+  }, [
+    insightSnapshot,
+    lastAskedQuestion,
+    insightVisualization?.provenance,
+    insightSnapshot?.chartKind,
+    insightSnapshot?.chartData.length,
+    insightSnapshot?.title,
+  ]);
+
+  const insightChartMatchesCurrentQuestion = useMemo(() => {
+    if (!insightSnapshot || !lastAskedQuestion.trim()) return false;
+    if (!insightChartMatchesQuestionIntent) return false;
+
+    if (insightSnapshot.source === "auto_dashboard") {
+      const dashTitle = extractDashboardChartTitleFromPrefillQuestion(
+        lastAskedQuestion
+      );
+      return dashTitle
+        ? insightSnapshot.title.trim() === dashTitle
+        : false;
+    }
+
+    const asked = normalizeQuestionForMatch(lastAskedQuestion);
+    const snapQ = normalizeQuestionForMatch(insightSnapshot.question ?? "");
+    if (snapQ && snapQ === asked) return true;
+
+    const turnId = lastConversationMeta?.turnId ?? aiConversationState.turnId;
+    if (
+      turnId &&
+      insightSnapshot.questionTurnId &&
+      insightSnapshot.questionTurnId === turnId
+    ) {
+      return true;
+    }
+
+    if (lastConversationMeta?.followUpDetected && alignedAnalysis) {
+      return chartSnapshotMatchesAnalysis(insightSnapshot, alignedAnalysis);
+    }
+
+    if (alignedAnalysis) {
+      return chartSnapshotMatchesAnalysis(insightSnapshot, alignedAnalysis);
+    }
+
+    return false;
+  }, [
+    insightSnapshot,
+    lastAskedQuestion,
+    insightChartMatchesQuestionIntent,
+    lastConversationMeta?.turnId,
+    lastConversationMeta?.followUpDetected,
+    aiConversationState.turnId,
+    alignedAnalysis,
+  ]);
+
   const insightHasRenderableVisualization = useMemo(() => {
     if (!insightSnapshot) return false;
+    if (!insightChartMatchesCurrentQuestion) return false;
     if (
       insightSnapshot.source !== "ai" &&
       insightSnapshot.source !== "auto_dashboard"
@@ -7542,7 +7899,7 @@ function HomeInner() {
     const title = insightSnapshot.title.trim();
     if (title.startsWith("No dedicated visualization")) return false;
     return true;
-  }, [insightSnapshot]);
+  }, [insightSnapshot, insightChartMatchesCurrentQuestion]);
 
   const insightExportNeedsAiNarrative =
     insightSnapshot?.source === "ai";
@@ -7552,6 +7909,15 @@ function HomeInner() {
     insightHasRenderableVisualization &&
     (!insightExportNeedsAiNarrative ||
       (insightHasExportableAnswer && questionAlignedForExport));
+
+  const showInsightExportButton = useMemo(
+    () =>
+      hasValidAIAnswer &&
+      Boolean(answer.trim()) &&
+      Boolean(lastAskedQuestion.trim()) &&
+      canExportInsight,
+    [hasValidAIAnswer, answer, lastAskedQuestion, canExportInsight]
+  );
 
   const exportEnabledReason = useMemo(() => {
     if (!insightSnapshot) return "no_insight_chart_ask_ai_first";
@@ -7749,12 +8115,9 @@ function HomeInner() {
 
   const chartHeightMain = useMemo(
     () =>
-      clampChartHeightToViewport(
-        resolveChartDisplayHeight(
-          chartData.length,
-          presentationChartKind,
-          false
-        ),
+      resolveChartsTabPreviewPlotHeight(
+        chartData.length,
+        presentationChartKind,
         viewportH
       ),
     [chartData.length, presentationChartKind, viewportH]
@@ -8181,13 +8544,13 @@ function HomeInner() {
     if (k === "line" || k === "area") {
       return Math.min(
         plotHeightMax,
-        Math.max(plotHeightMin, Math.round(viewportH * 0.38))
+        Math.max(plotHeightMin, 336)
       );
     }
     if (k === "bar" || k === "histogram") {
       const cat = n;
-      const extra = Math.min(40, Math.max(0, cat - 5) * 7);
-      return Math.min(plotHeightMax, Math.max(plotHeightMin, 362 + extra));
+      const extra = Math.min(36, Math.max(0, cat - 5) * 6);
+      return Math.min(plotHeightMax, Math.max(plotHeightMin, 300 + extra));
     }
     return Math.min(
       plotHeightMax,
@@ -9210,38 +9573,83 @@ function HomeInner() {
     />
   );
 
+  const sessionChartIntelAxisLabel = useMemo(() => {
+    const h = sessionChartSemanticHeader;
+    if (h.mode === "scatter") {
+      return `${h.xLabel} · ${h.yLabel}`;
+    }
+    return h.detailLabel?.trim() || h.roleLabel?.trim() || null;
+  }, [sessionChartSemanticHeader]);
+
+  const sessionChartIntelSourceLabel = useMemo(() => {
+    const src = activeSnapshot?.source;
+    if (src === "ai") return "AI";
+    if (src === "auto_dashboard") return "Auto Dashboard";
+    return null;
+  }, [activeSnapshot?.source]);
+
+  const sessionChartIntelNote = useMemo(() => {
+    const w = visualization?.partialVisualizationWarning?.trim();
+    if (!w) return null;
+    return w.length > 160 ? `${w.slice(0, 157)}…` : w;
+  }, [visualization?.partialVisualizationWarning]);
+
+  const sessionChartReason = useMemo(
+    () =>
+      generateChartReason(
+        {
+          chartType: sessionRenderedChartKind,
+          measure: chartAxisLabels.valueAxis,
+          category: chartAxisLabels.categoryAxis,
+          question: lastAskedQuestion,
+          metadata: {
+            groupCount: sortedChartData.length,
+            stackedOrMultiSeries:
+              visualization?.multiSeries?.layout === "stacked_bar",
+            histogramStyle: sessionSmartChartIntel?.histogramStyle ?? false,
+            routingExplanation:
+              chartRoutingRecommendation?.selectionExplanation ?? null,
+            detectedIntent: chartRoutingRecommendation?.detectedIntent ?? null,
+            recommendationHint:
+              sessionSmartChartIntel?.recommendationBlurb ?? null,
+          },
+        },
+        sortedChartData
+      ),
+    [
+      sessionRenderedChartKind,
+      chartAxisLabels.valueAxis,
+      chartAxisLabels.categoryAxis,
+      lastAskedQuestion,
+      sortedChartData,
+      visualization?.multiSeries?.layout,
+      sessionSmartChartIntel?.histogramStyle,
+      sessionSmartChartIntel?.recommendationBlurb,
+      chartRoutingRecommendation?.selectionExplanation,
+      chartRoutingRecommendation?.detectedIntent,
+    ]
+  );
+
   const chartHeadingBlock =
     sessionDisplayChartTitle || chartSubtitle ? (
-      <div
-        className={`text-center px-2 sm:px-4 ${chartSubtitle ? "mb-4 mt-1" : "mb-4 mt-0.5"}`}
-      >
+      <div className={chartsTabVizHeaderZone}>
         {sessionDisplayChartTitle ? (
-          <h3 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-slate-900 sm:text-2xl sm:leading-tight">
-            {sessionDisplayChartTitle}
-          </h3>
+          <h3 className={aiInsightsVizTitle}>{sessionDisplayChartTitle}</h3>
         ) : null}
         {chartSubtitle ? (
-          <p className="mx-auto mt-2 max-w-3xl text-sm leading-relaxed text-slate-500 sm:text-[15px]">
-            {chartSubtitle}
-          </p>
+          <p className={aiInsightsVizSubtitle}>{chartSubtitle}</p>
         ) : null}
       </div>
     ) : null;
 
   const insightChartHeadingBlock =
     insightDisplayChartTitle || insightChartSubtitle ? (
-      <div
-        className={`text-center px-2 sm:px-3 ${insightChartSubtitle ? "mb-2 mt-0.5" : "mb-2 mt-0"}`}
-      >
+      <div className={aiInsightsVizHeadingWrap}>
         {insightDisplayChartTitle ? (
-          <h3 className="text-[1.45rem] font-semibold leading-snug tracking-tight text-[var(--foreground)] sm:text-[1.75rem] sm:leading-tight">
-            {insightDisplayChartTitle}
-          </h3>
+          <h3 className={aiInsightsVizTitle}>{insightDisplayChartTitle}</h3>
         ) : null}
         {insightChartSubtitle ? (
-          <p className="mx-auto mt-1.5 max-w-3xl text-sm leading-relaxed text-[var(--text-muted)] sm:text-[15px]">
-            {insightChartSubtitle}
-          </p>
+          <p className={aiInsightsVizSubtitle}>{insightChartSubtitle}</p>
         ) : null}
       </div>
     ) : null;
@@ -9292,7 +9700,7 @@ function HomeInner() {
                 onClearAll={clearExplorerFilters}
                 onDateStart={setDashDateStart}
                 onDateEnd={setDashDateEnd}
-                appearance={activeTab === "overview" ? "dashboard" : "legacy"}
+                appearance="dashboard"
               />
             </div>
           ) : null}
@@ -9314,18 +9722,15 @@ function HomeInner() {
           {insightChartData.length > 0 && (
             <div
               ref={chartCaptureInsightRef}
-              className="fixed left-[-10000px] top-0 z-0 w-[860px] min-h-[400px] overflow-hidden bg-white rounded-xl border border-slate-200/70 p-5 pb-6 shadow-[0_12px_40px_-12px_rgb(15_23_42_/_0.12)]"
+              className="fixed left-[-10000px] top-0 z-0 w-[860px] min-h-0 overflow-hidden bg-white rounded-xl border border-slate-200/70 p-5 pb-6 shadow-[0_12px_40px_-12px_rgb(15_23_42_/_0.12)]"
               aria-hidden="true"
             >
               {insightChartHeadingBlock}
               <AiInsightChartShell
                 chartKind={insightPresentationChartKind}
-                minOuterHeight={insightLayoutMetrics.outerShellMinHeight}
+                plotHeight={insightShellPlotHeight}
               >
-                <div
-                  className="w-full min-w-0 overflow-visible rounded-xl bg-gradient-to-b from-slate-50/40 via-transparent to-transparent px-1 py-2"
-                  style={{ height: insightShellPlotHeight }}
-                >
+                <div className={aiInsightsVizPlotSurface}>
                   {renderDatasetChart(insightShellPlotHeight, false, true)}
                 </div>
               </AiInsightChartShell>
@@ -9872,7 +10277,89 @@ function HomeInner() {
             </>
           )}
 
-          {activeTab !== "overview" && columns.length > 0 && (
+          {activeTab === "insights" && columns.length > 0 && (
+            <section className={`mb-6 p-4 sm:p-5 ${ovCard}`}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full bg-emerald-500"
+                      aria-hidden
+                    />
+                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                      Dataset ready
+                    </span>
+                  </div>
+                  <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="min-w-0">
+                      <dt className={ovMuted}>File</dt>
+                      <dd
+                        className="truncate font-medium text-foreground"
+                        title={uploadMeta?.name || ""}
+                      >
+                        {uploadMeta?.name || "—"}
+                        {uploadMeta?.size_bytes != null ? (
+                          <span className={`ml-1 font-normal ${ovMuted}`}>
+                            ({formatBytes(uploadMeta.size_bytes)})
+                          </span>
+                        ) : null}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className={ovDataLabel}>Rows</dt>
+                      <dd className={ovDataValue}>{rows}</dd>
+                    </div>
+                    <div>
+                      <dt className={ovDataLabel}>Columns</dt>
+                      <dd className={ovDataValue}>{columns.length}</dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className={ovDataLabel}>Sheet</dt>
+                      <dd className={`truncate ${ovDataValue}`}>
+                        {selectedSheet.trim() ||
+                          (uploadMeta?.name ?? "").toLowerCase().endsWith(".csv")
+                            ? "CSV"
+                            : "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-end gap-2">
+                  {sheets.length > 1 ? (
+                    <div className="flex min-w-[10rem] flex-col gap-1.5">
+                      <label className={ovDataLabel} htmlFor="insights-sheet-select">
+                        Sheet
+                      </label>
+                      <select
+                        id="insights-sheet-select"
+                        value={selectedSheet}
+                        onChange={(e) => selectSheet(e.target.value)}
+                        className={`${ovFilterControl} h-[52px] cursor-pointer`}
+                      >
+                        {sheets.map((sheet) => (
+                          <option key={sheet} value={sheet}>
+                            {sheet}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={openOverviewReplaceUpload}
+                    title="Upload a new CSV or Excel file (replaces the dataset in this session)"
+                    className={ovBtnSecondary}
+                  >
+                    Replace file
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {activeTab !== "overview" &&
+            activeTab !== "insights" &&
+            columns.length > 0 && (
             <div className="mb-6 bg-slate-50 border rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div className="flex flex-col gap-1 text-sm text-slate-700">
                 <div className="flex flex-wrap items-center gap-2">
@@ -10232,86 +10719,120 @@ function HomeInner() {
         )}
 
         {activeTab === "charts" && (
-          <section className="mb-10 rounded-[1.35rem] border border-slate-200/40 bg-gradient-to-b from-slate-50/55 via-white/50 to-slate-100/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_1px_3px_rgba(15,23,42,0.04)] sm:p-5">
-            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <section className={chartsTabPage}>
+            <div className={chartsTabHeaderRow}>
               <div className="min-w-0 max-w-2xl">
-                <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                  Charts
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+                <h2 className={chartsTabTitle}>Charts</h2>
+                <p className={chartsTabDesc}>
                   Session visualizations from{" "}
-                  <span className="font-medium text-slate-800">Overview</span> and{" "}
-                  <span className="font-medium text-slate-800">AI Insights</span>. Select a
+                  <span className={chartsTabDescEmphasis}>Overview</span> and{" "}
+                  <span className={chartsTabDescEmphasis}>AI Insights</span>. Select a
                   run in the timeline to preview, export PNG, or attach to the Export tab
                   PDF. History resets when the dataset or mapping changes.
                 </p>
               </div>
-              <button
-                onClick={downloadChartPng}
-                disabled={chartData.length === 0}
-                className={`shrink-0 ${btnPrimary} disabled:shadow-none`}
-              >
-                Download Chart PNG
-              </button>
+              {chartData.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={downloadChartPng}
+                  className={chartsTabDownloadBtn}
+                >
+                  Download Chart PNG
+                </button>
+              ) : null}
             </div>
 
-            <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-5 lg:grid-cols-[minmax(10.5rem,23%)_minmax(0,1fr)] lg:gap-6">
-              <ChartsTimelineAside
-                ref={chartHistoryAsideRef}
-                sections={chartHistorySections}
-                activeChartId={activeChartId}
-                onSelectChart={selectChartPreserveScroll}
-                historyEmpty={chartHistory.length === 0}
-              />
+            <div className="grid w-full min-h-0 min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(10.5rem,23%)_minmax(0,1fr)] lg:items-start lg:gap-6">
+              <div className={chartsTabTimelineColumn}>
+                <ChartsTimelineAside
+                  ref={chartHistoryAsideRef}
+                  sections={chartHistorySections}
+                  activeChartId={activeChartId}
+                  onSelectChart={selectChartPreserveScroll}
+                  historyEmpty={chartHistory.length === 0}
+                />
+              </div>
 
-              <div ref={chartsPreviewRef} className="flex min-w-0 w-full flex-1 flex-col scroll-mt-24">
+              <div
+                ref={chartsPreviewRef}
+                className="flex min-h-0 min-w-0 w-full flex-1 flex-col scroll-mt-24"
+              >
                 {chartData.length > 0 ? (
-                  <div className="group relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-slate-200/45 bg-gradient-to-br from-white via-white to-slate-50/35 p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_22px_52px_-22px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.025] transition-all duration-500 ease-out hover:border-slate-200/70 hover:shadow-[0_1px_2px_rgba(15,23,42,0.045),0_26px_60px_-20px_rgba(79,70,229,0.11)] sm:p-4 md:p-5">
-                    <div
-                      ref={chartsSessionHeadingRef}
-                      className="mb-1 w-full min-w-0 scroll-mt-28 text-center lg:mb-2"
-                    >
-                      <div className="mx-auto min-w-0 max-w-4xl">
-                        {chartHeadingBlock ?? (
-                          <div className="px-2 sm:px-4">
-                            <h3 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-slate-900 sm:text-2xl sm:leading-tight">
-                              Visualization
-                            </h3>
-                            {chartSubtitle ? (
-                              <p className="mx-auto mt-2 max-w-3xl text-sm leading-relaxed text-slate-500 sm:text-[15px]">
-                                {chartSubtitle}
-                              </p>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div title={sessionChartMetadataLine}>
-                    <ChartContextSummary
-                      renderedKind={sessionRenderedChartKind}
-                      metricLabel={chartAxisLabels.valueAxis}
-                      semanticHeader={sessionChartSemanticHeader}
-                      badgeCompact={sessionChartMetadataBadgeCompact}
-                      leadInsight={chartInsightBadge ?? undefined}
-                    />
-                    </div>
-                    {visualization?.partialVisualizationWarning ? (
-                      <p className="mb-3 mt-1 rounded-xl border border-amber-200/55 bg-amber-50/50 px-3 py-2 text-xs leading-snug text-amber-950/90">
-                        <span className="font-semibold text-amber-900/95">Note · </span>
-                        {visualization.partialVisualizationWarning.length > 220
-                          ? `${visualization.partialVisualizationWarning.slice(0, 217)}…`
-                          : visualization.partialVisualizationWarning}
-                      </p>
-                    ) : null}
-
-                    <div className="flex w-full min-w-0 flex-col gap-2.5 sm:gap-3">
+                  <div className={chartsTabVizPreviewCard}>
+                    <div className={chartsTabPreviewHeaderSticky}>
                       <div
-                        key={activeChartId ?? "session-chart"}
-                        className="animate-chart-surface-in motion-reduce:animate-none w-full min-h-0 min-w-0 overflow-visible rounded-xl bg-gradient-to-b from-slate-50/35 via-transparent to-transparent px-1 pb-0.5 pt-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition-[box-shadow] duration-500 ease-out group-hover:from-slate-50/45"
-                        style={{ height: chartHeightMain }}
+                        ref={chartsSessionHeadingRef}
+                        className="w-full min-w-0 scroll-mt-28"
                       >
-                        {renderDatasetChart(chartHeightMain, false, false)}
+                        <div className="mx-auto min-w-0 max-w-4xl">
+                          {chartHeadingBlock ?? (
+                            <div className={chartsTabVizHeaderZone}>
+                              <p className={chartsTabVizKicker}>Chart preview</p>
+                              <h3 className={aiInsightsVizTitle}>Visualization</h3>
+                              {chartSubtitle ? (
+                                <p className={aiInsightsVizSubtitle}>
+                                  {chartSubtitle}
+                                </p>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      <div
+                        title={sessionChartMetadataLine}
+                        className={`${aiInsightsVizChipsWrap} mt-1`}
+                      >
+                        <ChartContextSummary
+                          renderedKind={sessionRenderedChartKind}
+                          metricLabel={chartAxisLabels.valueAxis}
+                          semanticHeader={sessionChartSemanticHeader}
+                          badgeCompact={sessionChartMetadataBadgeCompact}
+                          leadInsight={chartInsightBadge ?? undefined}
+                          compactChips
+                        />
+                      </div>
+                      <ChartsTabIntelligenceStrip
+                        sourceLabel={sessionChartIntelSourceLabel}
+                        chartTypeLabel={presentationKindUiLabel(
+                          sessionRenderedChartKind
+                        )}
+                        measureLabel={chartAxisLabels.valueAxis}
+                        axisLabel={sessionChartIntelAxisLabel}
+                        highlight={chartInsightBadge ?? null}
+                        note={sessionChartIntelNote}
+                      />
+                      <ChartsTabChartReason
+                        chartId={activeChartId}
+                        reason={sessionChartReason}
+                      />
+                    </div>
+                    <ChartsTabPlotTransition
+                      chartId={activeChartId}
+                      plotHeightPx={chartHeightMain}
+                    >
+                      <div
+                        className={chartsTabVizSessionFrame}
+                        style={
+                          {
+                            "--insights-viz-plot-h": `${chartHeightMain}px`,
+                          } as CSSProperties
+                        }
+                      >
+                        <ChartInsightViewportWrapper
+                          chartKind={sessionRenderedChartKind}
+                          sessionMode
+                        >
+                          <div className={chartsTabSessionPlotSurface}>
+                            {renderDatasetChart(
+                              chartHeightMain,
+                              false,
+                              false
+                            )}
+                          </div>
+                        </ChartInsightViewportWrapper>
+                      </div>
+                    </ChartsTabPlotTransition>
+                    <div className={chartsTabSmartReadWrap}>
                       <SmartChartInsightPanel
                         intel={sessionSmartChartIntel}
                         cards={executiveVizInsights.slice(0, 3)}
@@ -10319,24 +10840,22 @@ function HomeInner() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4 rounded-[1.35rem] border border-slate-200/50 bg-white/90 p-10 text-center text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.05)] ring-1 ring-slate-900/[0.02]">
+                  <div className={chartsTabEmptyState}>
                     {chartHistory.length > 0 ? (
                       <>
-                        <p className="text-base font-semibold tracking-tight text-slate-900">
-                          Select a chart
-                        </p>
-                        <p className="mx-auto max-w-lg text-sm leading-relaxed text-slate-600">
-                          Pick an <span className="font-medium text-slate-800">Auto</span> or{" "}
-                          <span className="font-medium text-slate-800">AI</span> card in the
+                        <p className={chartsTabEmptyTitle}>Select a chart</p>
+                        <p className="mx-auto max-w-lg text-sm leading-relaxed text-[color:var(--text-muted)]">
+                          Pick an <span className={chartsTabDescEmphasis}>Auto</span> or{" "}
+                          <span className={chartsTabDescEmphasis}>AI</span> card in the
                           timeline to load it here for PNG export or the session PDF.
                         </p>
                       </>
                     ) : (
                       <>
-                        <p className="text-base font-semibold tracking-tight text-slate-900">
+                        <p className={chartsTabEmptyTitle}>
                           Ask something analytical
                         </p>
-                        <ul className="mx-auto inline-block max-w-lg space-y-2 text-left text-sm text-slate-600">
+                        <ul className="mx-auto inline-block max-w-lg space-y-2 text-left text-sm text-[color:var(--text-muted)]">
                           <li className="flex gap-2">
                             <span className="select-none text-slate-400">—</span>
                             <span>sales by region</span>
@@ -10368,129 +10887,125 @@ function HomeInner() {
         )}
 
         {activeTab === "insights" && (
-          <section className="mb-8 w-full min-w-0 rounded-[1.25rem] border border-[color:var(--border-default)] bg-gradient-to-b from-[var(--surface-subtle)] via-[color:var(--surface-elevated)] to-[var(--surface-accent-wash)] p-4 shadow-[var(--shadow-card)] ring-1 ring-slate-900/[0.02] sm:p-5">
-            <div className="grid w-full min-w-0 grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)] lg:gap-4 xl:gap-5">
-              <div className="min-w-0 w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3.5 sm:p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)] lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:overscroll-contain">
-                <h2 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
-                  Suggested Questions
-                </h2>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Click to prefill, then ask.
-                </p>
-                <div className="mt-3 flex flex-col gap-2">
-                  {visibleSuggestedQuestions.map((q, i) => (
-                    <button
-                      key={`sq-${i}-${suggestionTokenMultisetKey(q)}`}
-                      onClick={() => setQuestionAndResetInsightState(q)}
-                      className="text-left rounded-xl border border-slate-200/80 bg-[color:var(--surface-elevated)] px-4 py-3 text-sm text-slate-800 shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-slate-300/80 hover:bg-slate-50/90 hover:shadow-[var(--shadow-md)]"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-                {questionHistory.length > 0 ? (
-                  <div className="mt-5 pt-5 border-t border-slate-200/90">
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Recent questions
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Tap to refill the input (last 3).
-                    </p>
-                    <div className="mt-2 flex flex-col gap-1.5">
-                      {questionHistory.map((hq) => (
-                        <button
-                          key={hq}
-                          type="button"
-                          onClick={() => setQuestion(hq)}
-                          className="text-left text-xs leading-snug rounded-xl border border-slate-200/80 bg-[color:var(--surface-elevated)] px-3 py-2 text-slate-800 shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-slate-300/80 hover:bg-slate-50/90 hover:shadow-[var(--shadow-md)]"
-                        >
-                          {hq.length > 72 ? `${hq.slice(0, 70)}…` : hq}
-                        </button>
-                      ))}
-                    </div>
+          <section className={`${aiInsightsPage} ${aiInsightsOuterShell}`}>
+            <div className={aiInsightsGrid}>
+              <div className={aiInsightsPanelShell}>
+                <h2 className={aiInsightsSuggestedHeading}>Suggested Questions</h2>
+                <p className={aiInsightsSuggestedDesc}>Click to prefill, then ask.</p>
+                <div className={aiInsightsSuggestedScrollBody}>
+                  <div className={aiInsightsSuggestedList}>
+                    {visibleSuggestedQuestions.map((q, i) => (
+                      <button
+                        key={`sq-${i}-${suggestionTokenMultisetKey(q)}`}
+                        type="button"
+                        onClick={() => setQuestionAndResetInsightState(q)}
+                        className={aiInsightsSuggestedQ}
+                      >
+                        {q}
+                      </button>
+                    ))}
                   </div>
-                ) : null}
+                  {questionHistory.length > 0 ? (
+                    <div className={aiInsightsSuggestedRecentSection}>
+                      <h3 className={aiInsightsSuggestedRecentTitle}>Recent questions</h3>
+                      <p className={aiInsightsSuggestedRecentDesc}>
+                        Tap to refill the input (last 3).
+                      </p>
+                      <div className={aiInsightsSuggestedRecentList}>
+                        {questionHistory.map((hq) => (
+                          <button
+                            key={hq}
+                            type="button"
+                            onClick={() => setQuestion(hq)}
+                            className={aiInsightsSuggestedRecentItem}
+                          >
+                            {hq.length > 72 ? `${hq.slice(0, 70)}…` : hq}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="min-w-0 w-full rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] p-3.5 sm:p-4 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
-                <div className="flex flex-wrap items-start justify-between gap-3 mb-1.5">
-                  <h2 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
-                    Ask AI
-                  </h2>
+              <div className={aiInsightsAskPanel}>
+                <div className={aiInsightsAskHeaderRow}>
+                  <h2 className={aiInsightsAskHeading}>Ask AI</h2>
                   <button
                     type="button"
                     onClick={resetAiConversation}
-                    className={btnSecondary}
-                    title="Clears the question, answer, insight cards, AI chart, follow-up chips, and thread memory. Your file, filters, auto-dashboard, and non-AI chart history stay."
+                    disabled={!hasActiveAiConversation}
+                    className={`${btnSecondary} ${aiInsightsAskResetBtn}`}
+                    title={
+                      hasActiveAiConversation
+                        ? "Clears the question, answer, insight cards, AI chart, follow-up chips, and thread memory. Your file, filters, auto-dashboard, and non-AI chart history stay."
+                        : "Ask a question to start a conversation before resetting."
+                    }
                   >
                     Reset conversation
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 min-h-[28px] mb-2">
-                  {lastConversationMeta?.followUpDetected ? (
-                    <>
-                      <span className="rounded-full border border-emerald-200/60 bg-emerald-50/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]">
-                        Using previous insight context
-                      </span>
-                      <span className="rounded-full border border-violet-200/60 bg-violet-50/90 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-violet-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]">
-                        Follow-up detected
-                      </span>
-                    </>
-                  ) : null}
-                  {lastConversationMeta?.followUpDetected &&
-                  lastConversationMeta.usingContextSummary.trim() ? (
-                    <span className="text-xs text-slate-600">
-                      Thread focus:{" "}
-                      <span className="font-medium text-slate-800">
-                        {lastConversationMeta.usingContextSummary}
-                      </span>
+                {lastConversationMeta?.followUpDetected ? (
+                  <div className={aiInsightsAskMetaRow}>
+                    <span className="rounded-full border border-emerald-200/60 bg-emerald-50/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-emerald-500/25 dark:bg-emerald-950/40 dark:text-emerald-100">
+                      Using previous insight context
                     </span>
-                  ) : null}
+                    <span className="rounded-full border border-violet-200/60 bg-violet-50/90 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-violet-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-violet-400/25 dark:bg-violet-950/40 dark:text-violet-100">
+                      Follow-up detected
+                    </span>
+                    {lastConversationMeta.usingContextSummary.trim() ? (
+                      <span className="text-xs text-slate-600 dark:text-[color:var(--insights-text-muted)]">
+                        Thread focus:{" "}
+                        <span className="font-medium text-slate-800 dark:text-[color:var(--insights-text-secondary)]">
+                          {lastConversationMeta.usingContextSummary}
+                        </span>
+                      </span>
+                    ) : null}
                 </div>
+                ) : null}
                 {(lastConversationMeta?.inheritedAssumptionNote ?? "").trim() ? (
-                  <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                  <p className={aiInsightsAskAssumptionNote}>
                     {lastConversationMeta?.inheritedAssumptionNote ?? ""}
                   </p>
                 ) : null}
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Your question
-                  </label>
-                  <textarea
-                    value={question}
-                    onChange={(e) => setQuestionAndResetInsightState(e.target.value)}
-                    className="border p-4 w-full rounded-xl h-32"
-                    placeholder="Example: Show sales by product"
-                  />
-                </div>
-
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                  <button
-                    onClick={() => void askAI()}
-                    disabled={loading}
-                    className={`shrink-0 ${btnPrimary} px-6 py-3 text-sm font-semibold disabled:shadow-none`}
-                  >
-                    {loading ? "Thinking..." : "Ask AI"}
-                  </button>
-                  {loading && (
-                    <div className="text-sm text-slate-600 space-y-0.5">
-                      <span className="block">Generating answer…</span>
-                      <span className="block text-xs text-slate-500">
-                        Generating visualization…
-                      </span>
+                <div className={aiInsightsAskInputBlock}>
+                  <label className={aiInsightsAskQuestionLabel}>Your question</label>
+                  <div className={aiInsightsAskComposer}>
+                    <textarea
+                      value={question}
+                      onChange={(e) => setQuestionAndResetInsightState(e.target.value)}
+                      className={aiInsightsAskTextarea}
+                      placeholder="Example: Show sales by product"
+                    />
+                    <div className={aiInsightsAskActionsRow}>
+                      <button
+                        onClick={() => void askAI()}
+                        disabled={loading}
+                        className={`${btnPrimary} ${aiInsightsAskSubmitBtn}`}
+                      >
+                        {loading ? "Thinking..." : "Ask AI"}
+                      </button>
+                      {loading ? (
+                        <div className="text-sm text-slate-600 space-y-0.5 dark:text-[color:var(--insights-text-muted)]">
+                          <span className="block">Generating answer…</span>
+                          <span className="block text-xs text-slate-500 dark:text-[color:var(--insights-text-muted)]">
+                            Generating visualization…
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {alignedAnalysis?.alignmentRepaired ? (
-                  <div className="mt-4 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-950">
+                  <div className="mt-4 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-950 dark:border-amber-500/22 dark:bg-amber-950/35 dark:text-amber-100/90">
                     Chart was rebuilt so the series matches the metric detected from
                     your question (pandas alignment check).
                   </div>
                 ) : null}
 
                 {insightVisualization?.partialVisualizationWarning ? (
-                  <p className="mt-4 text-xs text-amber-950 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-2 leading-snug">
+                  <p className="mt-4 text-xs text-amber-950 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-2 leading-snug dark:border-amber-500/22 dark:bg-amber-950/30 dark:text-amber-100/90">
                     <span className="font-semibold">Visualization caution:</span> full
                     statistical note is under{" "}
                     <span className="font-medium">How this insight was generated</span>.
@@ -10501,9 +11016,9 @@ function HomeInner() {
                 !hasValidAIAnswer &&
                 !loading &&
                 !answer.trim() ? (
-                  <div className="mt-3 rounded-xl border border-indigo-100/70 bg-indigo-50/35 px-3.5 py-3 text-sm text-slate-700 leading-snug">
+                  <div className="mt-3 rounded-xl border border-indigo-100/70 bg-indigo-50/35 px-3.5 py-3 text-sm text-slate-700 leading-snug dark:border-indigo-400/18 dark:bg-[color:var(--insights-wash-followup)] dark:text-[color:var(--insights-text-secondary)]">
                     This chart is selected. Click{" "}
-                    <span className="font-semibold text-slate-900">Ask AI</span> to
+                    <span className="font-semibold text-slate-900 dark:text-[var(--foreground)]">Ask AI</span> to
                     generate an insight.
                   </div>
                 ) : null}
@@ -10519,34 +11034,34 @@ function HomeInner() {
 
                 {hasValidAIAnswer && alignedAnalysis ? (
                   <div
-                    className={`mt-4 rounded-xl border px-4 py-3 transition-shadow duration-300 hover:shadow-[var(--shadow-sm)] ${
+                    className={`${aiInsightsConfidenceShell} ${
                       alignedAnalysis.smallSampleCohort ||
                       isCautiousNarrativeTone(insightNarrativeTone)
-                        ? "border-amber-200/90 bg-amber-50/40"
-                        : "border-slate-200/90 bg-slate-50/60"
+                        ? aiInsightsConfidenceCaution
+                        : aiInsightsConfidenceNormal
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <p className={aiInsightsMutedLabel}>
                           Insight confidence (sample-aware)
                         </p>
-                        <p className="text-sm text-slate-800 mt-1 leading-snug">
+                        <p className={`${aiInsightsBodyText} mt-1.5`}>
                           {insightUnifiedConfidence?.rationale ||
                             alignedAnalysis.evidenceSummaryLine ||
                             `Chart uses ${alignedAnalysis.chartSeriesPointCount.toLocaleString()} series point(s).`}
                         </p>
                         {insightNarrativeDisclaimer ? (
-                          <p className="text-xs text-amber-950/90 mt-2 leading-relaxed">
+                          <p className={aiInsightsConfidenceDisclaimer}>
                             {insightNarrativeDisclaimer}
                           </p>
                         ) : null}
                         {(alignedAnalysis.insightConfidenceRationale ||
                           alignedAnalysis.smallSampleCohort ||
                           isCautiousNarrativeTone(insightNarrativeTone)) && (
-                          <p className="text-[11px] text-slate-500 mt-1.5">
+                          <p className={`${aiInsightsSubtleText} mt-1.5`}>
                             Details on scoring and sample cautions are under{" "}
-                            <span className="font-medium text-slate-700">
+                            <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
                               How this insight was generated
                             </span>
                             .
@@ -10565,7 +11080,7 @@ function HomeInner() {
                               (alignedAnalysis.insightConfidenceLevel as InsightConfidenceLevel)
                           )}
                         </span>
-                        <span className="text-[11px] tabular-nums text-slate-600">
+                        <span className="text-[11px] tabular-nums text-slate-600 dark:text-[color:var(--insights-text-muted)]">
                           Score{" "}
                           {insightUnifiedConfidence?.score ??
                             alignedAnalysis.insightConfidenceScore}
@@ -10577,82 +11092,130 @@ function HomeInner() {
                 ) : null}
 
                 {(hasValidAIAnswer || loading || answer.trim()) ? (
-                <div
-                  className="rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-3.5 sm:p-4 transition-shadow duration-300 hover:shadow-[var(--shadow-md)] mt-3"
-                >
-                  <h3 className="text-base font-semibold mb-2">AI Answer</h3>
+                <div className={aiInsightsAnswerCard}>
+                  <div className={aiInsightsAnswerHeader}>
+                    <p className={aiInsightsAnswerKicker}>Executive analysis</p>
+                    <h3 className={aiInsightsAnswerTitle}>AI Answer</h3>
+                  </div>
                   {answer.trim() || loading ? (
-                    <div className="space-y-2 text-slate-800">
+                    <div className={aiInsightsAnswerStack}>
                       {(() => {
                         const lead = aiAnswerLeadIn(
                           datasetKind || "",
                           insightPresentationChartKind
                         );
                         return lead ? (
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-900/80">
-                            {lead}
-                          </p>
+                          <p className={aiInsightsAnswerLead}>{lead}</p>
                         ) : null;
                       })()}
-                      <div className="text-sm whitespace-pre-line leading-relaxed">
-                        {parsedInsightAnswer.summary ||
-                          "Summary unavailable — see detail sections."}
+                      <div className={aiInsightsAnswerSummaryPanel}>
+                        <p className={aiInsightsAnswerSummary}>
+                          {formatInsightSummary(
+                            parsedInsightAnswer.summary ||
+                              "Summary unavailable — see detail sections."
+                          )}
+                        </p>
                       </div>
+                      <div className={aiInsightsAnswerDetailsGroup}>
+                        <p className={aiInsightsAnswerDetailsLabel}>
+                          Supporting detail
+                        </p>
                       {parsedInsightAnswer.statistical ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            {AI_INSIGHT_SECTION_LABELS.statistical}
+                        <details className={aiInsightsAnswerDetailFindings} open>
+                          <summary className={aiInsightsAnswerDetailSummaryFindings}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                Core
+                              </span>
+                              <span>{AI_INSIGHT_SECTION_LABELS.statistical}</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.statistical}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody
+                              text={parsedInsightAnswer.statistical}
+                              variant="findings"
+                            />
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.hypotheses ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            {AI_INSIGHT_SECTION_LABELS.hypotheses}
+                        <details className={aiInsightsAnswerDetail}>
+                          <summary className={aiInsightsAnswerDetailSummaryHypotheses}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                Context
+                              </span>
+                              <span>{AI_INSIGHT_SECTION_LABELS.hypotheses}</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.hypotheses}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody text={parsedInsightAnswer.hypotheses} />
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.recommendations ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            {AI_INSIGHT_SECTION_LABELS.recommendations}
+                        <details className={aiInsightsAnswerDetail}>
+                          <summary className={aiInsightsAnswerDetailSummaryRecommendations}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                Action
+                              </span>
+                              <span>{AI_INSIGHT_SECTION_LABELS.recommendations}</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.recommendations}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody
+                              text={parsedInsightAnswer.recommendations}
+                            />
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.methodology ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            {AI_INSIGHT_SECTION_LABELS.methodology}
+                        <details className={aiInsightsAnswerDetail}>
+                          <summary className={aiInsightsAnswerDetailSummaryMethodology}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                Method
+                              </span>
+                              <span>{AI_INSIGHT_SECTION_LABELS.methodology}</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.methodology}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody text={parsedInsightAnswer.methodology} />
                           </div>
                         </details>
                       ) : null}
                       {parsedInsightAnswer.moreDetail ? (
-                        <details className="group rounded-lg border border-slate-200/90 bg-white px-3 py-1.5">
-                          <summary className="cursor-pointer py-0.5 text-sm font-semibold text-slate-900 select-none list-none [&::-webkit-details-marker]:hidden">
-                            Additional detail
+                        <details className={aiInsightsAnswerDetail}>
+                          <summary className={aiInsightsAnswerDetailSummaryMore}>
+                            <span className={aiInsightsAnswerDetailSummaryLabel}>
+                              <span
+                                className={`${aiInsightsAnswerDetailSummaryBadge} ai-insights-answer-detail-badge`}
+                              >
+                                More
+                              </span>
+                              <span>Additional detail</span>
+                            </span>
                           </summary>
-                          <div className="mt-1.5 pb-1 text-sm whitespace-pre-line leading-snug text-slate-700">
-                            {parsedInsightAnswer.moreDetail}
+                          <div className={aiInsightsAnswerDetailBody}>
+                            <AiInsightAnswerBody text={parsedInsightAnswer.moreDetail} />
                           </div>
                         </details>
                       ) : null}
+                      </div>
                     </div>
                   ) : loading ? (
-                    <p className="text-slate-600 text-sm">Generating insight…</p>
+                    <p className={`${aiInsightsBodyText} mt-4`}>Generating insight…</p>
                   ) : (
-                    <p className="text-slate-600 text-sm">
+                    <p className={`${aiInsightsBodyText} mt-4`}>
                       AI answer will appear here.
                     </p>
                   )}
@@ -10660,11 +11223,9 @@ function HomeInner() {
                 ) : null}
 
                 {hasValidAIAnswer && insightFollowUpChips.length > 0 ? (
-                  <div className="mt-3 rounded-2xl border border-indigo-100/70 bg-indigo-50/35 p-3 shadow-[var(--shadow-sm)] transition-shadow duration-300 hover:shadow-[var(--shadow-md)]">
-                    <p className="text-xs font-semibold text-slate-700 mb-1.5">
-                      Suggested follow-ups
-                    </p>
-                    <div className="flex flex-wrap gap-2">
+                  <div className={aiInsightsFollowupSection}>
+                    <p className={aiInsightsFollowupTitle}>Suggested follow-ups</p>
+                    <div className={aiInsightsFollowupList}>
                       {insightFollowUpChips.map((chip) => (
                         <button
                           key={chip}
@@ -10673,7 +11234,7 @@ function HomeInner() {
                           onClick={() => {
                             void askAI(chip);
                           }}
-                          className="max-w-full rounded-xl border border-indigo-200/70 bg-[color:var(--surface-elevated)] px-3 py-2 text-left text-xs leading-snug text-indigo-950 shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-indigo-300/80 hover:bg-indigo-50/60 hover:shadow-[var(--shadow-md)] disabled:opacity-45 sm:max-w-[min(100%,22rem)] sm:text-sm"
+                          className={aiInsightsFollowupChip}
                         >
                           {chip}
                         </button>
@@ -10688,13 +11249,13 @@ function HomeInner() {
                 insightVisualization?.contextUsed ||
                 insightVisualization?.partialVisualizationWarning ||
                 alignedAnalysis?.conversationFollowUp) ? (
-                  <div className="mt-3 rounded-xl border border-slate-200/90 bg-slate-50/80 overflow-hidden">
+                  <div className={`${aiInsightsProvenanceShell} ai-insights-provenance`}>
                     <button
                       type="button"
                       onClick={() => setHowCalculatedOpen((o) => !o)}
-                      className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-slate-100/80 transition-colors"
+                      className={aiInsightsProvenanceToggle}
                     >
-                      <span className="text-sm font-semibold text-slate-800">
+                      <span className={aiInsightsProvenanceToggleTitle}>
                         How this insight was generated
                       </span>
                       <span className="flex items-center gap-2 shrink-0">
@@ -10715,19 +11276,19 @@ function HomeInner() {
                             Context
                           </span>
                         )}
-                        <span className="text-slate-400 text-xs" aria-hidden>
+                        <span className="text-slate-400 text-xs dark:text-slate-500" aria-hidden>
                           {howCalculatedOpen ? "▾" : "▸"}
                         </span>
                       </span>
                     </button>
                     {howCalculatedOpen ? (
-                      <div className="border-t border-slate-200/80 px-3.5 py-2.5 bg-white/60">
+                      <div className={aiInsightsProvenanceBody}>
                         {insightVisualization?.partialVisualizationWarning ? (
-                          <div className="mb-3 pb-3 border-b border-slate-200/80">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                          <div className={aiInsightsProvenanceDivider}>
+                            <p className={`${aiInsightsProvenanceSectionLabel} mb-2`}>
                               Visualization caution (full)
                             </p>
-                            <p className="text-sm text-amber-950/95 whitespace-pre-line leading-relaxed">
+                            <p className={`${aiInsightsProvenanceSectionBodyEmphasis} text-amber-950/95 dark:text-amber-200/90`}>
                               {insightVisualization.partialVisualizationWarning}
                             </p>
                           </div>
@@ -10735,11 +11296,11 @@ function HomeInner() {
                         {alignedAnalysis?.insightConfidenceRationale ||
                         alignedAnalysis?.smallSampleCohort ||
                         isCautiousNarrativeTone(insightNarrativeTone) ? (
-                          <div className="mb-3 pb-3 border-b border-slate-200/80">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                          <div className={aiInsightsProvenanceDivider}>
+                            <p className={`${aiInsightsProvenanceSectionLabel} mb-1.5`}>
                               Confidence &amp; sample methodology
                             </p>
-                            <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                            <p className={aiInsightsProvenanceSectionBodyEmphasis}>
                               {insightUnifiedConfidence?.rationale ||
                                 alignedAnalysis?.insightConfidenceRationale}
                             </p>
@@ -10763,14 +11324,14 @@ function HomeInner() {
                             className={
                               insightChartRoutingRecommendation ||
                               insightVisualization?.provenance
-                                ? "mb-4 pb-4 border-b border-slate-200/80"
+                                ? aiInsightsProvenanceDivider
                                 : ""
                             }
                           >
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                            <p className={`${aiInsightsProvenanceSectionLabel} mb-1.5`}>
                               Context used
                             </p>
-                            <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                            <p className={aiInsightsProvenanceSectionBodyEmphasis}>
                               {insightVisualization?.contextUsed ||
                                 alignedAnalysis?.conversationFollowUp
                                   ?.contextUsedLine}
@@ -10781,51 +11342,51 @@ function HomeInner() {
                           <div
                             className={
                               insightVisualization?.provenance
-                                ? "mb-4 pb-4 border-b border-slate-200/80"
+                                ? aiInsightsProvenanceDivider
                                 : ""
                             }
                           >
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                            <p className={`${aiInsightsProvenanceSectionLabel} mb-2`}>
                               Chart selection (engine)
                             </p>
-                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 text-sm">
+                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
                               <div className="flex flex-col gap-0.5 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Detected chart type
                                 </dt>
-                                <dd className="font-semibold text-slate-900">
+                                <dd className={aiInsightsProvenanceMetaValue}>
                                   {humanizeRecommendedChartApi(
                                     insightChartRoutingRecommendation.recommendedChart
                                   )}
                                 </dd>
                               </div>
                               <div className="flex flex-col gap-0.5 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Question bucket
                                 </dt>
-                                <dd className="font-semibold text-slate-900 capitalize">
+                                <dd className={`${aiInsightsProvenanceMetaValue} capitalize`}>
                                   {insightChartRoutingRecommendation.detectedIntent ||
                                     "—"}
                                 </dd>
                               </div>
                               <div className="flex flex-col gap-0.5 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Category count
                                 </dt>
-                                <dd className="font-semibold text-slate-900 tabular-nums">
+                                <dd className={`${aiInsightsProvenanceMetaValue} tabular-nums`}>
                                   {insightChartRoutingRecommendation.categoryCount.toLocaleString()}
                                 </dd>
                               </div>
                               <div className="flex flex-col gap-0.5 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Metric type
                                 </dt>
-                                <dd className="font-semibold text-slate-900 capitalize">
+                                <dd className={`${aiInsightsProvenanceMetaValue} capitalize`}>
                                   {insightChartRoutingRecommendation.metricType}
                                 </dd>
                               </div>
                               <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <dt className={aiInsightsProvenanceMetaLabel}>
                                   Why this chart
                                 </dt>
                                 <dd className="text-slate-800 text-sm leading-relaxed">
@@ -10840,10 +11401,10 @@ function HomeInner() {
                         <>
                         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 text-sm">
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Category column
                             </dt>
-                            <dd className="font-semibold text-slate-900 truncate">
+                            <dd className={`${aiInsightsProvenanceMetaValue} truncate`}>
                               {formatProvenanceColumn(
                                 insightVisualization.provenance.categoryColumnDisplay ||
                                   insightVisualization.provenance.categoryColumn
@@ -10864,10 +11425,10 @@ function HomeInner() {
                             ) : null}
                           </div>
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Metric
                             </dt>
-                            <dd className="font-semibold text-slate-900 truncate">
+                            <dd className={`${aiInsightsProvenanceMetaValue} truncate`}>
                               {formatProvenanceColumn(
                                 insightVisualization.provenance.numericColumnDisplay ||
                                   insightVisualization.provenance.numericColumn
@@ -10888,18 +11449,18 @@ function HomeInner() {
                             ) : null}
                           </div>
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Aggregation
                             </dt>
-                            <dd className="font-semibold text-slate-900 capitalize">
+                            <dd className={`${aiInsightsProvenanceMetaValue} capitalize`}>
                               {insightVisualization.provenance.aggregation}
                             </dd>
                           </div>
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Rows analyzed
                             </dt>
-                            <dd className="font-semibold text-slate-900 tabular-nums">
+                            <dd className={`${aiInsightsProvenanceMetaValue} tabular-nums`}>
                               {(
                                 insightRowsAnalyzedDisplay ??
                                 insightVisualization.provenance.rowsAnalyzed
@@ -10909,7 +11470,7 @@ function HomeInner() {
                           {insightVisualization.provenance.dashboardFiltersApplied
                             ?.length ? (
                             <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <dt className={aiInsightsProvenanceMetaLabel}>
                                 Filters applied
                               </dt>
                               <dd>
@@ -10924,16 +11485,16 @@ function HomeInner() {
                             </div>
                           ) : null}
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Visualization
                             </dt>
-                            <dd className="font-semibold text-slate-900">
+                                <dd className={aiInsightsProvenanceMetaValue}>
                               {insightVisualization.provenance.visualizationType}
                             </dd>
                           </div>
                           {insightVisualization.provenance.chartSelectionReason ? (
                             <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <dt className={aiInsightsProvenanceMetaLabel}>
                                 Reason
                               </dt>
                               <dd className="text-slate-800 text-sm leading-relaxed">
@@ -10943,7 +11504,7 @@ function HomeInner() {
                           ) : null}
                           {insightVisualization.provenance.timeSeriesAnalysis ? (
                             <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <dt className={aiInsightsProvenanceMetaLabel}>
                                 Time coverage
                               </dt>
                               <dd className="text-slate-800 text-sm leading-relaxed space-y-1">
@@ -10992,7 +11553,7 @@ function HomeInner() {
                           ) : null}
                           {alignedAnalysis?.detectedIntent?.length ? (
                             <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              <dt className={aiInsightsProvenanceMetaLabel}>
                                 Detected intent
                               </dt>
                               <dd className="text-slate-800 text-sm">
@@ -11001,15 +11562,15 @@ function HomeInner() {
                             </div>
                           ) : null}
                           <div className="flex flex-col gap-0.5 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Series points
                             </dt>
-                            <dd className="font-semibold text-slate-900 tabular-nums">
+                            <dd className={`${aiInsightsProvenanceMetaValue} tabular-nums`}>
                               {insightVisualization.provenance.chartPoints.toLocaleString()}
                             </dd>
                           </div>
                           <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
-                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <dt className={aiInsightsProvenanceMetaLabel}>
                               Confidence
                             </dt>
                             <dd className="flex flex-wrap items-center gap-2 text-slate-800">
@@ -11072,35 +11633,35 @@ function HomeInner() {
                   </div>
                 ) : null}
 
-                {insightChartData.length > 0 ? (
-                  <div className="group/chart mt-3 w-full min-w-0 overflow-hidden rounded-[1.25rem] border border-[color:var(--border-default)] bg-gradient-to-br from-[color:var(--surface-elevated)] via-[color:var(--surface-elevated)] to-[var(--surface-accent-wash)] p-3.5 shadow-[var(--shadow-card)] ring-1 ring-slate-900/[0.025] transition-all duration-500 ease-out hover:shadow-[0_22px_56px_-22px_rgba(15,23,42,0.14)] sm:p-4">
-                    <div className="mb-1.5 w-full min-w-0 text-center">
-                      <div className="mx-auto min-w-0 max-w-5xl">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
-                          Visualization
-                        </h3>
-                      </div>
+                {insightHasRenderableVisualization ? (
+                  <div className={aiInsightsVizCard}>
+                    <div className="mb-1 w-full min-w-0 text-center">
+                      <p className={aiInsightsVizKicker}>Visualization</p>
                     </div>
-                    {insightChartHeadingBlock}
-                    <div title={insightChartMetadataLine} className="mt-1">
-                      <ChartContextSummary
-                        renderedKind={insightRenderedChartKind}
-                        metricLabel={insightChartAxisLabels.valueAxis}
-                        semanticHeader={insightChartSemanticHeader}
-                        badgeCompact={insightChartMetadataBadgeCompact}
-                        leadInsight={insightChartInsightBadge ?? undefined}
-                        compactChips
-                      />
+                    <div className={aiInsightsVizHeaderZone}>
+                      {insightChartHeadingBlock}
+                      <div
+                        title={insightChartMetadataLine}
+                        className={aiInsightsVizChipsWrap}
+                      >
+                        <ChartContextSummary
+                          renderedKind={insightRenderedChartKind}
+                          metricLabel={insightChartAxisLabels.valueAxis}
+                          semanticHeader={insightChartSemanticHeader}
+                          badgeCompact={insightChartMetadataBadgeCompact}
+                          leadInsight={insightChartInsightBadge ?? undefined}
+                          compactChips
+                        />
                     </div>
-                    <div className="mt-2 flex w-full min-w-0 flex-col items-center gap-0">
+                    </div>
+                    <div className={aiInsightsVizChartStage}>
                       <AiInsightChartShell
                         chartKind={insightPresentationChartKind}
-                        minOuterHeight={insightLayoutMetrics.outerShellMinHeight}
+                        plotHeight={insightShellPlotHeight}
                       >
                         <div
                           key={`${insightChartId ?? "ic"}-${insightSnapshot?.createdAt ?? 0}-${insightChartData.length}`}
-                          className="animate-chart-surface-in motion-reduce:animate-none w-full min-w-0 overflow-visible rounded-xl bg-gradient-to-b from-slate-50/40 via-transparent to-transparent px-1 py-2 transition-[box-shadow] duration-500 ease-out group-hover/chart:from-slate-50/55"
-                          style={{ height: insightShellPlotHeight }}
+                          className={aiInsightsVizPlotSurface}
                         >
                           {renderDatasetChart(
                             insightShellPlotHeight,
@@ -11109,8 +11670,9 @@ function HomeInner() {
                           )}
                         </div>
                       </AiInsightChartShell>
-                      {insightSmartChartIntel?.active ? (
-                        <div className="mt-8 border-t border-slate-200/55 pt-5">
+                      {insightChartMatchesCurrentQuestion &&
+                      insightSmartChartIntel?.active ? (
+                        <div className={aiInsightsSmartPanelDivider}>
                           <SmartChartInsightPanel
                             intel={insightSmartChartIntel}
                             cards={insightExecutiveVizInsights.slice(0, 3)}
@@ -11119,61 +11681,52 @@ function HomeInner() {
                       ) : null}
                     </div>
                   </div>
-                ) : hasValidAIAnswer && insightSnapshot?.source === "ai" ? (
-                  <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800">
-                    <p className="font-semibold text-slate-900">
+                ) : hasValidAIAnswer && !insightHasRenderableVisualization ? (
+                  <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
+                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
                       No dedicated visualization for this answer
                     </p>
-                    <p className="mt-1.5 text-slate-600 leading-relaxed">
-                      The assistant did not return chart data for this question. The
-                      narrative and KPI context above still reflect the latest response.
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      {!insightChartMatchesCurrentQuestion &&
+                      insightSnapshot &&
+                      insightSnapshot.chartData.length > 0
+                        ? "The chart from your previous question does not match this one. The narrative above reflects your latest ask."
+                        : "The assistant did not return chart data for this question. The narrative and KPI context above still reflect the latest response."}
                     </p>
                   </div>
                 ) : null}
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      downloadReport({
-                        includeKPIs: true,
-                        includeAIInsight: true,
-                        includeChart: true,
-                        includeDataPreview: true,
-                        includeDataQuality: true,
-                        includeConversationContext: true,
-                        chartScope: "insight",
-                      })
-                    }
-                    disabled={!canExportInsight}
-                    className={btnExportSm}
-                  >
-                    Export this insight (PDF)
-                  </button>
-                </div>
-                <details className="mt-1.5 text-xs text-slate-600">
-                  <summary className="cursor-pointer font-medium text-slate-700 select-none">
+                {showInsightExportButton ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadReport({
+                          includeKPIs: true,
+                          includeAIInsight: true,
+                          includeChart: true,
+                          includeDataPreview: true,
+                          includeDataQuality: true,
+                          includeConversationContext: true,
+                          chartScope: "insight",
+                        })
+                      }
+                      className={aiInsightsBtnExport}
+                    >
+                      Export this insight (PDF)
+                    </button>
+                  </div>
+                ) : null}
+                {process.env.NEXT_PUBLIC_AI_INSIGHTS_DEBUG === "true" ? (
+                <details className="mt-1.5 text-xs text-slate-600 dark:text-[color:var(--insights-text-muted)]">
+                  <summary className="cursor-pointer font-medium text-slate-500 select-none dark:text-[color:var(--insights-text-muted)]">
                     Export / chart debug
                   </summary>
-                  <pre className="mt-2 p-3 bg-slate-100 rounded-lg overflow-x-auto text-[11px] leading-relaxed">
+                  <pre className="mt-2 p-3 bg-slate-100 rounded-lg overflow-x-auto text-[11px] leading-relaxed dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
                     {JSON.stringify(exportInsightDebug, null, 2)}
                   </pre>
                 </details>
-                {!canExportInsight && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    {exportEnabledReason === "no_insight_chart_ask_ai_first"
-                      ? "Ask a question in AI Insights first; export uses the insight chart from your last ask."
-                      : exportEnabledReason === "insight_not_ai_scoped"
-                        ? "Select a chart from Overview or Charts first."
-                        : exportEnabledReason === "missing_ai_visualization"
-                          ? "Export needs a real chart from your last AI ask (not the no-visualization placeholder)."
-                          : exportEnabledReason === "missing_ai_narrative"
-                            ? "Generate an AI answer before exporting this insight."
-                            : exportEnabledReason === "question_changed_since_last_ask"
-                              ? "Ask again with the current question text so the export matches your last AI ask."
-                              : "Unable to export right now."}
-                  </p>
-                )}
+                ) : null}
               </div>
             </div>
           </section>
