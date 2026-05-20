@@ -38,6 +38,10 @@ export const chartsTabVizPlotSlot =
 export const chartsTabSmartReadWrap =
   "mt-3 w-full min-w-0 border-t border-[color:var(--border-default)]/60 pt-4 sm:mt-3.5 dark:border-[color:var(--insights-border-soft)]";
 
+/** Charts session plot — transition handled by `charts-tab-preview-enter`; no duplicate surface-in. */
+export const chartsTabSessionPlotSurface =
+  "ai-insights-viz-plot w-full min-w-0 overflow-visible rounded-[0.9rem] border border-[color:var(--border-default)]/40 bg-[color:var(--surface-elevated)] px-2 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition-[border-color] duration-300 ease-out dark:border-[color:var(--insights-border-soft)] dark:bg-transparent dark:shadow-none";
+
 export const chartsTabEmptyState =
   "space-y-4 rounded-[1.35rem] border border-[color:var(--border-default)]/55 bg-[color:var(--surface-elevated)] p-10 text-center text-[color:var(--text-muted)] shadow-[var(--shadow-sm)] ring-1 ring-slate-900/[0.02] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:ring-white/[0.03]";
 
@@ -93,13 +97,17 @@ export const chartsTabTimelineSectionLabel =
   "mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--text-subtle)] dark:text-[color:var(--insights-text-muted)]";
 
 export const chartsTabTimelineCardBase =
-  "charts-tab-timeline-card flex h-full min-h-[108px] w-full flex-col rounded-xl border p-3 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 ease-out";
+  "charts-tab-timeline-card flex h-full min-h-[108px] w-full flex-col rounded-xl border p-3 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
 
 export const chartsTabTimelineCardSelected =
-  "border-[color:color-mix(in_srgb,var(--accent)_32%,var(--border-default))] bg-[color:color-mix(in_srgb,var(--accent-wash)_55%,var(--surface-elevated))] shadow-[0_4px_18px_-8px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_0_1px_color-mix(in_srgb,var(--accent)_18%,transparent)] ring-1 ring-[color:color-mix(in_srgb,var(--accent)_22%,transparent)] dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-nested)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_-12px_rgba(0,0,0,0.35)] dark:ring-[color:color-mix(in_srgb,var(--accent)_28%,transparent)]";
+  "charts-tab-timeline-card--selected border-[color:color-mix(in_srgb,var(--accent)_32%,var(--border-default))] bg-[color:color-mix(in_srgb,var(--accent-wash)_55%,var(--surface-elevated))] shadow-[0_4px_18px_-8px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_0_1px_color-mix(in_srgb,var(--accent)_18%,transparent)] ring-1 ring-[color:color-mix(in_srgb,var(--accent)_22%,transparent)] dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-nested)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_-12px_rgba(0,0,0,0.35)] dark:ring-[color:color-mix(in_srgb,var(--accent)_28%,transparent)]";
 
 export const chartsTabTimelineCardIdle =
-  "border-[color:var(--border-default)]/55 bg-[color:color-mix(in_srgb,var(--surface-subtle)_35%,var(--surface-elevated))] shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:-translate-y-px hover:border-[color:color-mix(in_srgb,var(--accent)_14%,var(--border-default))] hover:bg-[color:var(--surface-elevated)] hover:shadow-[0_8px_22px_-14px_rgba(15,23,42,0.12)] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:hover:border-[color:var(--insights-border-medium)] dark:hover:bg-[color:var(--insights-layer-nested)]";
+  "charts-tab-timeline-card--idle border-[color:var(--border-default)]/55 bg-[color:color-mix(in_srgb,var(--surface-subtle)_35%,var(--surface-elevated))] shadow-[0_1px_2px_rgba(15,23,42,0.03)] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)]";
+
+/** Sticky preview header band when page scrolls (title, chips, intel strip). */
+export const chartsTabPreviewHeaderSticky =
+  "charts-tab-preview-header-sticky relative z-[2] -mx-0.5 rounded-t-[1.2rem] px-0.5 pb-1 sm:-mx-1 sm:px-1";
 
 export const chartsTabTimelineCardTitle =
   "min-w-0 flex-1 truncate text-sm font-medium leading-snug text-[var(--foreground)]";

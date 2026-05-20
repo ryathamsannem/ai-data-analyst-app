@@ -80,12 +80,13 @@ import {
   chartsTabSmartReadWrap,
   chartsTabTitle,
   chartsTabTimelineColumn,
+  chartsTabPreviewHeaderSticky,
+  chartsTabSessionPlotSurface,
   chartsTabVizHeaderZone,
   chartsTabVizKicker,
-  chartsTabVizPlotSlot,
-  chartsTabVizPlotStage,
 } from "@/lib/charts-tab-ui";
 import { ChartsTabIntelligenceStrip } from "@/app/components/home/charts-tab-intelligence-strip";
+import { ChartsTabPlotTransition } from "@/app/components/home/charts-tab-plot-transition";
 import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
 import {
   formatAxisTickFromRows,
@@ -10720,79 +10721,75 @@ function HomeInner() {
               >
                 {chartData.length > 0 ? (
                   <div className={chartsTabVizPreviewCard}>
-                    <div
-                      ref={chartsSessionHeadingRef}
-                      className="w-full min-w-0 scroll-mt-28"
-                    >
-                      <div className="mx-auto min-w-0 max-w-4xl">
-                        {chartHeadingBlock ?? (
-                          <div className={chartsTabVizHeaderZone}>
-                            <p className={chartsTabVizKicker}>Chart preview</p>
-                            <h3 className={aiInsightsVizTitle}>Visualization</h3>
-                            {chartSubtitle ? (
-                              <p className={aiInsightsVizSubtitle}>{chartSubtitle}</p>
-                            ) : null}
-                          </div>
-                        )}
+                    <div className={chartsTabPreviewHeaderSticky}>
+                      <div
+                        ref={chartsSessionHeadingRef}
+                        className="w-full min-w-0 scroll-mt-28"
+                      >
+                        <div className="mx-auto min-w-0 max-w-4xl">
+                          {chartHeadingBlock ?? (
+                            <div className={chartsTabVizHeaderZone}>
+                              <p className={chartsTabVizKicker}>Chart preview</p>
+                              <h3 className={aiInsightsVizTitle}>Visualization</h3>
+                              {chartSubtitle ? (
+                                <p className={aiInsightsVizSubtitle}>
+                                  {chartSubtitle}
+                                </p>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div
-                      title={sessionChartMetadataLine}
-                      className={`${aiInsightsVizChipsWrap} mt-1`}
-                    >
-                      <ChartContextSummary
-                        renderedKind={sessionRenderedChartKind}
-                        metricLabel={chartAxisLabels.valueAxis}
-                        semanticHeader={sessionChartSemanticHeader}
-                        badgeCompact={sessionChartMetadataBadgeCompact}
-                        leadInsight={chartInsightBadge ?? undefined}
-                        compactChips
+                      <div
+                        title={sessionChartMetadataLine}
+                        className={`${aiInsightsVizChipsWrap} mt-1`}
+                      >
+                        <ChartContextSummary
+                          renderedKind={sessionRenderedChartKind}
+                          metricLabel={chartAxisLabels.valueAxis}
+                          semanticHeader={sessionChartSemanticHeader}
+                          badgeCompact={sessionChartMetadataBadgeCompact}
+                          leadInsight={chartInsightBadge ?? undefined}
+                          compactChips
+                        />
+                      </div>
+                      <ChartsTabIntelligenceStrip
+                        sourceLabel={sessionChartIntelSourceLabel}
+                        chartTypeLabel={presentationKindUiLabel(
+                          sessionRenderedChartKind
+                        )}
+                        measureLabel={chartAxisLabels.valueAxis}
+                        axisLabel={sessionChartIntelAxisLabel}
+                        highlight={chartInsightBadge ?? null}
+                        note={sessionChartIntelNote}
                       />
                     </div>
-                    <ChartsTabIntelligenceStrip
-                      sourceLabel={sessionChartIntelSourceLabel}
-                      chartTypeLabel={presentationKindUiLabel(
-                        sessionRenderedChartKind
-                      )}
-                      measureLabel={chartAxisLabels.valueAxis}
-                      axisLabel={sessionChartIntelAxisLabel}
-                      highlight={chartInsightBadge ?? null}
-                      note={sessionChartIntelNote}
-                    />
-                    <div className={chartsTabVizPlotStage}>
+                    <ChartsTabPlotTransition
+                      chartId={activeChartId}
+                      plotHeightPx={chartHeightMain}
+                    >
                       <div
-                        key={activeChartId ?? "session-chart"}
-                        className={chartsTabVizPlotSlot}
+                        className={chartsTabVizSessionFrame}
                         style={
                           {
-                            "--charts-tab-plot-h": `${chartHeightMain}px`,
                             "--insights-viz-plot-h": `${chartHeightMain}px`,
                           } as CSSProperties
                         }
                       >
-                        <div
-                          className={chartsTabVizSessionFrame}
-                          style={
-                            {
-                              "--insights-viz-plot-h": `${chartHeightMain}px`,
-                            } as CSSProperties
-                          }
+                        <ChartInsightViewportWrapper
+                          chartKind={sessionRenderedChartKind}
+                          sessionMode
                         >
-                          <ChartInsightViewportWrapper
-                            chartKind={sessionRenderedChartKind}
-                            sessionMode
-                          >
-                            <div className={aiInsightsVizPlotSurface}>
-                              {renderDatasetChart(
-                                chartHeightMain,
-                                false,
-                                false
-                              )}
-                            </div>
-                          </ChartInsightViewportWrapper>
-                        </div>
+                          <div className={chartsTabSessionPlotSurface}>
+                            {renderDatasetChart(
+                              chartHeightMain,
+                              false,
+                              false
+                            )}
+                          </div>
+                        </ChartInsightViewportWrapper>
                       </div>
-                    </div>
+                    </ChartsTabPlotTransition>
                     <div className={chartsTabSmartReadWrap}>
                       <SmartChartInsightPanel
                         intel={sessionSmartChartIntel}

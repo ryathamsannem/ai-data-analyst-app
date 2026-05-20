@@ -432,6 +432,121 @@ body {
   touch-action: pan-y;
 }
 
+/* Charts tab — timeline card hover (idle only; selected stays dominant) */
+.charts-tab-page .charts-tab-timeline-card--idle:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--border-default));
+  background: var(--surface-elevated);
+  box-shadow:
+    0 10px 26px -14px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.dark .charts-tab-page .charts-tab-timeline-card--idle:hover {
+  border-color: var(--insights-border-medium);
+  background: var(--insights-layer-nested);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 10px 28px -14px rgba(0, 0, 0, 0.38),
+    0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.charts-tab-page .charts-tab-timeline-card--selected:hover {
+  transform: none;
+}
+
+/* Charts tab — preview transition on timeline selection */
+@keyframes charts-tab-preview-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.charts-tab-preview-enter {
+  animation: charts-tab-preview-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.charts-tab-preview-plot-content {
+  transition: opacity 0.16s ease-out;
+}
+
+.charts-tab-preview-plot-content--pending {
+  opacity: 0.35;
+}
+
+.charts-tab-preview-shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 0.9rem;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--surface-subtle) 88%, transparent) 0%,
+    color-mix(in srgb, var(--surface-elevated) 95%, transparent) 42%,
+    color-mix(in srgb, var(--surface-subtle) 88%, transparent) 78%
+  );
+  background-size: 220% 100%;
+  animation: charts-tab-preview-shimmer 0.9s ease-in-out infinite;
+}
+
+.dark .chart-viz-theme.charts-tab-viz-preview .charts-tab-preview-shimmer {
+  background: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--insights-layer-inset) 92%, transparent) 0%,
+    color-mix(in srgb, var(--insights-layer-nested) 96%, transparent) 45%,
+    color-mix(in srgb, var(--insights-layer-inset) 92%, transparent) 78%
+  );
+  background-size: 220% 100%;
+}
+
+@keyframes charts-tab-preview-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* Sticky preview header within page scroll */
+.charts-tab-preview-header-sticky {
+  position: sticky;
+  top: 0.5rem;
+  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.dark .chart-viz-theme.charts-tab-viz-preview .charts-tab-preview-header-sticky {
+  background: color-mix(in srgb, var(--insights-layer-card) 94%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .charts-tab-preview-enter {
+    animation: none;
+  }
+
+  .charts-tab-preview-plot-content,
+  .charts-tab-preview-plot-content--pending {
+    transition: none;
+  }
+
+  .charts-tab-preview-shimmer {
+    animation: none;
+    opacity: 0.55;
+  }
+
+  .charts-tab-page .charts-tab-timeline-card--idle:hover {
+    transform: none;
+  }
+}
+
 /* —— Data Preview grid —— */
 :root {
   --dp-surface: var(--card);

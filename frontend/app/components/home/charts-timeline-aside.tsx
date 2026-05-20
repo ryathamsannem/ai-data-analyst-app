@@ -85,7 +85,9 @@ const ChartTimelineCard = memo(function ChartTimelineCard({
         onClick={handleClick}
         aria-current={isSelected ? "true" : undefined}
         className={`${chartsTabTimelineCardBase} ${
-          isSelected ? chartsTabTimelineCardSelected : chartsTabTimelineCardIdle
+          isSelected
+            ? chartsTabTimelineCardSelected
+            : chartsTabTimelineCardIdle
         }`}
       >
         <div className="flex min-w-0 items-start justify-between gap-2">
