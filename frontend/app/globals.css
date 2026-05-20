@@ -1136,8 +1136,9 @@ body {
   color: var(--foreground);
 }
 
-/* —— AI Insights tab: dark hierarchy (scoped to tab root) —— */
-.dark .ai-insights-page {
+/* —— Chart viz theme: dark hierarchy (AI Insights tab + Charts preview) —— */
+.dark .ai-insights-page,
+.dark .chart-viz-theme {
   --insights-layer-shell: #0a1224;
   --insights-layer-panel: #0f172a;
   --insights-layer-card: #172238;
@@ -1492,8 +1493,9 @@ body {
 
 /* Light mode only — dark uses solid layer tokens above */
 
-/* AI Insights — visualization chart stage (light + dark) */
-.ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame {
+/* Shared chart viz — visualization stage (light + dark) */
+.ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame {
   background: color-mix(in srgb, var(--surface-inset) 28%, var(--surface-elevated));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
@@ -1501,12 +1503,18 @@ body {
   height: auto;
 }
 
-.ai-insights-page .ai-insights-viz .ai-insights-viz-plot-host {
+.chart-viz-theme.ai-insights-viz .charts-session-viz-frame {
+  max-width: none;
+}
+
+.ai-insights-page .ai-insights-viz .ai-insights-viz-plot-host,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-plot-host {
   width: 100%;
   min-width: 0;
 }
 
-.ai-insights-page .ai-insights-viz .ai-insights-viz-plot {
+.ai-insights-page .ai-insights-viz .ai-insights-viz-plot,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-plot {
   --insights-viz-plot-ring: color-mix(in srgb, var(--accent) 12%, transparent);
   display: grid;
   place-items: center;
@@ -1517,34 +1525,41 @@ body {
   box-sizing: border-box;
 }
 
-.ai-insights-page .ai-insights-viz .ai-insights-viz-plot .recharts-responsive-container {
+.ai-insights-page .ai-insights-viz .ai-insights-viz-plot .recharts-responsive-container,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-plot .recharts-responsive-container {
   width: 100% !important;
   height: 100% !important;
   margin-inline: auto;
 }
 
-.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame {
+.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame,
+.dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame {
   background: color-mix(in srgb, var(--insights-layer-card) 72%, var(--insights-layer-inset));
   border-color: var(--insights-border-soft);
   box-shadow: none;
 }
 
-.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-text {
+.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-text,
+.dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame .recharts-text {
   fill: var(--chart-axis-tick);
 }
 
-.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-cartesian-grid line {
+.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-cartesian-grid line,
+.dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame .recharts-cartesian-grid line {
   stroke: var(--chart-axis-line);
 }
 
 /* Recharts tooltip cursor — no gray plot overlay on hover */
 .ai-insights-page .ai-insights-viz .recharts-tooltip-cursor,
-.ai-insights-page .ai-insights-viz .recharts-rectangle.recharts-tooltip-cursor {
+.ai-insights-page .ai-insights-viz .recharts-rectangle.recharts-tooltip-cursor,
+.chart-viz-theme.ai-insights-viz .recharts-tooltip-cursor,
+.chart-viz-theme.ai-insights-viz .recharts-rectangle.recharts-tooltip-cursor {
   fill: transparent !important;
   stroke: transparent !important;
 }
 
-.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-plot {
+.dark .ai-insights-page .ai-insights-viz .ai-insights-viz-plot,
+.dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-plot {
   --insights-viz-plot-ring: color-mix(in srgb, var(--accent) 16%, transparent);
   background: transparent;
   border-color: var(--insights-border-soft);
@@ -1552,22 +1567,28 @@ body {
 
 /* Viz metadata chips — readable in dark mode, no faux selection highlight */
 .dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip,
-.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono {
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono {
   border-color: var(--insights-border-soft);
   background: var(--insights-layer-inset);
   box-shadow: none;
 }
 
-.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-label {
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-label,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-label {
   color: var(--insights-answer-label);
 }
 
 .dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-value,
-.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono {
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-value,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-mono {
   color: var(--insights-answer-body);
 }
 
-.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-lead {
+.dark .ai-insights-page .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-lead,
+.dark .chart-viz-theme .ai-insights-viz-chips-wrap .ai-insights-viz-meta-chip-lead {
   color: #ecfdf5;
   border-color: color-mix(in srgb, #34d399 35%, transparent);
   background: color-mix(in srgb, #064e3b 48%, var(--insights-layer-inset));

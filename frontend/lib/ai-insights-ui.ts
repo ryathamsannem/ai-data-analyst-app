@@ -252,9 +252,23 @@ export const aiInsightsProvenanceMetaLabel =
 export const aiInsightsProvenanceMetaValue =
   "font-semibold text-[var(--foreground)] dark:text-[color:var(--insights-text-secondary)]";
 
+/**
+ * Shared chart visualization theme scope (AI Insights + Charts tab preview).
+ * Pairs with `.ai-insights-viz` and rules in `globals.css` under `.chart-viz-theme`.
+ */
+export const chartVizThemeScope = "chart-viz-theme";
+
+/** Charts tab session preview card — same viz surface tokens as AI Insights; layout padding unchanged. */
+export const chartsTabVizPreviewCard =
+  `${chartVizThemeScope} ai-insights-viz group/chart relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-[color:var(--border-default)]/75 bg-[color:var(--surface-elevated)] p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_22px_52px_-22px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.025] transition-[border-color,box-shadow] duration-500 ease-out hover:border-[color:color-mix(in_srgb,var(--accent)_14%,var(--border-default))] sm:p-4 md:p-5 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-none dark:ring-white/[0.03] dark:hover:border-[color:var(--insights-border-medium)]`;
+
+/** Session chart frame (full width; no 960px insight cap). */
+export const chartsTabVizSessionFrame =
+  "ai-insights-viz-chart-frame charts-session-viz-frame h-full w-full min-w-0 rounded-[1.1rem] border border-[color:var(--border-default)]/50 p-1 sm:p-1.5";
+
 /** Visualization card — AI Insights tab only. */
 export const aiInsightsVizCard =
-  "ai-insights-viz group/chart mt-3 w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-[color:var(--border-default)]/75 bg-gradient-to-b from-[color:var(--surface-elevated)] via-[color:var(--surface-elevated)] to-[color:color-mix(in_srgb,var(--accent-wash)_55%,var(--surface-elevated))] p-4 shadow-[var(--shadow-sm)] ring-1 ring-slate-900/[0.025] transition-[border-color] duration-300 ease-out hover:border-[color:color-mix(in_srgb,var(--accent)_18%,var(--border-default))] sm:p-5 lg:px-6 lg:pb-5 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-none dark:ring-white/[0.03] dark:hover:border-[color:var(--insights-border-medium)]";
+  `${chartVizThemeScope} ai-insights-viz group/chart mt-3 w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-[color:var(--border-default)]/75 bg-gradient-to-b from-[color:var(--surface-elevated)] via-[color:var(--surface-elevated)] to-[color:color-mix(in_srgb,var(--accent-wash)_55%,var(--surface-elevated))] p-4 shadow-[var(--shadow-sm)] ring-1 ring-slate-900/[0.025] transition-[border-color] duration-300 ease-out hover:border-[color:color-mix(in_srgb,var(--accent)_18%,var(--border-default))] sm:p-5 lg:px-6 lg:pb-5 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-none dark:ring-white/[0.03] dark:hover:border-[color:var(--insights-border-medium)]`;
 
 export const aiInsightsVizKicker =
   "text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)] dark:text-[color:var(--insights-text-muted)]";

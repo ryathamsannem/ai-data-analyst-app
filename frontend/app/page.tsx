@@ -209,6 +209,8 @@ import {
   aiInsightsVizCard,
   aiInsightsVizChartStage,
   aiInsightsVizChipsWrap,
+  chartsTabVizPreviewCard,
+  chartsTabVizSessionFrame,
   aiInsightsVizMetaChipBase,
   aiInsightsVizMetaChipCompactSize,
   aiInsightsVizMetaChipLabel,
@@ -10681,38 +10683,37 @@ function HomeInner() {
 
               <div ref={chartsPreviewRef} className="flex min-w-0 w-full flex-1 flex-col scroll-mt-24">
                 {chartData.length > 0 ? (
-                  <div className="group relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-slate-200/45 bg-gradient-to-br from-white via-white to-slate-50/35 p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_22px_52px_-22px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.025] transition-all duration-500 ease-out hover:border-slate-200/70 hover:shadow-[0_1px_2px_rgba(15,23,42,0.045),0_26px_60px_-20px_rgba(79,70,229,0.11)] sm:p-4 md:p-5">
+                  <div className={chartsTabVizPreviewCard}>
                     <div
                       ref={chartsSessionHeadingRef}
                       className="mb-1 w-full min-w-0 scroll-mt-28 text-center lg:mb-2"
                     >
                       <div className="mx-auto min-w-0 max-w-4xl">
                         {chartHeadingBlock ?? (
-                          <div className="px-2 sm:px-4">
-                            <h3 className="text-[1.35rem] font-semibold leading-snug tracking-tight text-slate-900 sm:text-2xl sm:leading-tight">
-                              Visualization
-                            </h3>
+                          <div className={`${aiInsightsVizHeadingWrap} px-0`}>
+                            <h3 className={aiInsightsVizTitle}>Visualization</h3>
                             {chartSubtitle ? (
-                              <p className="mx-auto mt-2 max-w-3xl text-sm leading-relaxed text-slate-500 sm:text-[15px]">
-                                {chartSubtitle}
-                              </p>
+                              <p className={aiInsightsVizSubtitle}>{chartSubtitle}</p>
                             ) : null}
                           </div>
                         )}
                       </div>
                     </div>
-                    <div title={sessionChartMetadataLine}>
-                    <ChartContextSummary
-                      renderedKind={sessionRenderedChartKind}
-                      metricLabel={chartAxisLabels.valueAxis}
-                      semanticHeader={sessionChartSemanticHeader}
-                      badgeCompact={sessionChartMetadataBadgeCompact}
-                      leadInsight={chartInsightBadge ?? undefined}
-                    />
+                    <div
+                      title={sessionChartMetadataLine}
+                      className={aiInsightsVizChipsWrap}
+                    >
+                      <ChartContextSummary
+                        renderedKind={sessionRenderedChartKind}
+                        metricLabel={chartAxisLabels.valueAxis}
+                        semanticHeader={sessionChartSemanticHeader}
+                        badgeCompact={sessionChartMetadataBadgeCompact}
+                        leadInsight={chartInsightBadge ?? undefined}
+                      />
                     </div>
                     {visualization?.partialVisualizationWarning ? (
-                      <p className="mb-3 mt-1 rounded-xl border border-amber-200/55 bg-amber-50/50 px-3 py-2 text-xs leading-snug text-amber-950/90">
-                        <span className="font-semibold text-amber-900/95">Note · </span>
+                      <p className="mb-3 mt-1 rounded-xl border border-amber-200/55 bg-amber-50/50 px-3 py-2 text-xs leading-snug text-amber-950/90 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-wash-caution)] dark:text-[color:var(--insights-text-secondary)]">
+                        <span className="font-semibold text-amber-900/95 dark:text-[color:var(--insights-answer-emphasis)]">Note · </span>
                         {visualization.partialVisualizationWarning.length > 220
                           ? `${visualization.partialVisualizationWarning.slice(0, 217)}…`
                           : visualization.partialVisualizationWarning}
@@ -10722,10 +10723,21 @@ function HomeInner() {
                     <div className="flex w-full min-w-0 flex-col gap-2.5 sm:gap-3">
                       <div
                         key={activeChartId ?? "session-chart"}
-                        className="animate-chart-surface-in motion-reduce:animate-none w-full min-h-0 min-w-0 overflow-visible rounded-xl bg-gradient-to-b from-slate-50/35 via-transparent to-transparent px-1 pb-0.5 pt-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition-[box-shadow] duration-500 ease-out group-hover:from-slate-50/45"
+                        className="w-full min-h-0 min-w-0"
                         style={{ height: chartHeightMain }}
                       >
-                        {renderDatasetChart(chartHeightMain, false, false)}
+                        <div
+                          className={chartsTabVizSessionFrame}
+                          style={
+                            {
+                              "--insights-viz-plot-h": `${chartHeightMain}px`,
+                            } as CSSProperties
+                          }
+                        >
+                          <div className={aiInsightsVizPlotSurface}>
+                            {renderDatasetChart(chartHeightMain, false, false)}
+                          </div>
+                        </div>
                       </div>
                       <SmartChartInsightPanel
                         intel={sessionSmartChartIntel}
