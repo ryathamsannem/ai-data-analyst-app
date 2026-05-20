@@ -3,7 +3,7 @@
 **Canonical continuation snapshot** for the AI Data Analyst SaaS application.  
 **As of:** May 2026 · reflects **current working UI only** (not historical experiments).
 
-**Also read:** [`AGENTS.md`](AGENTS.md) (agent rules) · [`AI_INSIGHTS_LATEST_STATE.md`](AI_INSIGHTS_LATEST_STATE.md) (AI Insights UI deep-dive)
+**Also read:** [`AGENTS.md`](AGENTS.md) (agent rules) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`CHARTS_TAB_BASELINE.md`](CHARTS_TAB_BASELINE.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`AI_INSIGHTS_LATEST_STATE.md`](AI_INSIGHTS_LATEST_STATE.md) (AI Insights UI tokens deep-dive)
 
 ---
 
