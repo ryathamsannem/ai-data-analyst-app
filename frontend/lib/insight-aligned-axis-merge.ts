@@ -12,6 +12,7 @@ import {
   polishMetricDisplay,
 } from "@/lib/analytics-metadata";
 import {
+  resolveHistogramMeasureChipLabel,
   resolveSemanticCategoryAxisForCharts,
   type ChartSemanticAnalysisLike,
   type ChartSemanticVizLike,
@@ -73,15 +74,12 @@ export function mergeInsightAxesWithAlignedAnalysis(args: {
 
   if (args.presentationKind === "histogram") {
     if (args.mode === "full" && hasMetric) {
-      valueAxis = mDisp
-        ? polishMetricDisplay(mDisp)
-        : buildAxisLabelFromAggColumn(aggTokenForAxis(a, args.viz), mCol!);
-      valueAxisCompact = buildCompactAxisValueLabel({
-        metricColumnDisplay: mDisp ?? null,
-        metricColumn: mCol ?? null,
-        aggregationKey: a.aggregationKey ?? null,
-        aggregationLabel: a.aggregation ?? null,
-      });
+      valueAxis = resolveHistogramMeasureChipLabel(
+        args.viz,
+        a,
+        args.preferAligned
+      );
+      valueAxisCompact = valueAxis;
       return {
         categoryAxis: "Bucket range",
         valueAxis,

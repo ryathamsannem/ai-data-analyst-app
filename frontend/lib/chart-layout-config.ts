@@ -32,24 +32,24 @@ export function getInsightLayoutMetrics(kind: ChartKind): InsightChartLayoutMetr
   if (t === "horizontalBar") {
     return {
       planViewportPx: 900,
-      outerShellMinHeight: 430,
-      plotHeightMin: 320,
-      plotHeightMax: 560,
+      outerShellMinHeight: 352,
+      plotHeightMin: 288,
+      plotHeightMax: 500,
     };
   }
   if (t === "line") {
     return {
       planViewportPx: 850,
-      outerShellMinHeight: 430,
-      plotHeightMin: 360,
-      plotHeightMax: 410,
+      outerShellMinHeight: 352,
+      plotHeightMin: 312,
+      plotHeightMax: 376,
     };
   }
   return {
     planViewportPx: 760,
-    outerShellMinHeight: 430,
-    plotHeightMin: 360,
-    plotHeightMax: 420,
+    outerShellMinHeight: 352,
+    plotHeightMin: 312,
+    plotHeightMax: 384,
   };
 }
 
@@ -73,27 +73,28 @@ export function insightCartesianOuterMargins(
   computedBottom: number
 ): { top: number; left: number; right: number; bottom: number } {
   if (kind === "bar" || kind === "histogram") {
-    const left = Math.max(26, Math.min(40, vmBalanced.marginLeft - 8));
-    const right = Math.max(28, Math.min(44, vmBalanced.marginRight + 10));
-    return {
-      top: 20,
-      left,
-      right,
-      bottom: Math.max(computedBottom, 70),
-    };
+    const side = Math.max(26, Math.min(36, vmBalanced.marginLeft));
+    const bottom = Math.max(computedBottom, 28);
+    const top = Math.max(8, Math.min(14, Math.round(bottom * 0.24)));
+    return { top, left: side, right: side, bottom };
   }
   if (kind === "line" || kind === "area") {
-    return {
-      top: 20,
-      left: Math.max(24, Math.min(38, vmBalanced.marginLeft - 6)),
-      right: Math.max(26, Math.min(42, vmBalanced.marginRight + 8)),
-      bottom: computedBottom,
-    };
+    const side = Math.max(
+      26,
+      Math.min(36, Math.round((vmBalanced.marginLeft + vmBalanced.marginRight) / 2))
+    );
+    const bottom = computedBottom;
+    const top = Math.max(10, Math.min(14, Math.round(bottom * 0.22)));
+    return { top, left: side, right: side, bottom };
   }
+  const side = Math.max(
+    vmBalanced.marginLeft,
+    Math.round((vmBalanced.marginLeft + vmBalanced.marginRight) / 2)
+  );
   return {
-    top: 22,
-    left: vmBalanced.marginLeft,
-    right: vmBalanced.marginRight,
+    top: 16,
+    left: side,
+    right: side,
     bottom: computedBottom,
   };
 }

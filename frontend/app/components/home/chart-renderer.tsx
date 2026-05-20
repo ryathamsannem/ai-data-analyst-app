@@ -65,6 +65,7 @@ const GRID_STROKE = "#eef2f7";
 const CHART_AXIS_LINE = "#e2e8f0";
 const AXIS_TICK = "#64748b";
 const CHART_TOOLTIP_FRAME = {
+  cursor: false,
   contentStyle: {
     borderRadius: 14,
     border: "1px solid rgba(226, 232, 240, 0.95)",
@@ -243,13 +244,26 @@ function ChartRendererInner({
     insightUi &&
     (rKind === "bar" || rKind === "histogram") &&
     rData.length >= 6;
+  const insightHasCategoryLabel = Boolean(rAxes.categoryAxis?.trim());
+  const insightVBarAngled =
+    insightVBarCatDense ||
+    Boolean(categoryPlan?.angled) ||
+    (manyCategoryLegacy && (rKind === "bar" || rKind === "histogram"));
+  const insightVBarXHeight =
+    (categoryPlan?.xAxisHeightPx ??
+      (manyCategoryLegacy ? (insightUi ? 42 : 58) : insightUi ? 24 : 36)) +
+    (insightVBarCatDense ? 4 : 0);
+  const insightVBarLabelOffset = insightVBarAngled ? -16 : -2;
   const insightVBarBottomPad =
-    categoryAxisBottomMargin +
-    (insightVBarCatDense
-      ? 22
-      : insightUi && (rKind === "bar" || rKind === "histogram")
-        ? 10
-        : 0);
+    insightUi && (rKind === "bar" || rKind === "histogram")
+      ? (() => {
+          const labelPad = insightHasCategoryLabel ? 8 : 2;
+          const tight = insightVBarXHeight + labelPad + (insightVBarAngled ? 6 : 0);
+          return insightVBarAngled
+            ? Math.max(tight, categoryAxisBottomMargin - 10)
+            : tight;
+        })()
+      : categoryAxisBottomMargin + (insightVBarCatDense ? 8 : 0);
 
   const insightVBarXInterval =
     categoryPlan?.interval ??
@@ -271,12 +285,7 @@ function ChartRendererInner({
         ? -30
         : 0;
   const insightVBarXAnchor =
-    insightVBarCatDense || categoryPlan?.angled || manyCategoryLegacy
-      ? "end"
-      : "middle";
-  const insightVBarXHeight =
-    (categoryPlan?.xAxisHeightPx ?? (manyCategoryLegacy ? 58 : 36)) +
-    (insightVBarCatDense ? 16 : 0);
+    insightVBarAngled ? "end" : "middle";
 
   const vizDrill = rViz?.interaction?.drillDimensions;
   const canInsightDrill = Boolean(vizDrill?.length);
@@ -321,11 +330,7 @@ function ChartRendererInner({
             <Label
               value={rAxes.categoryAxis}
               position="insideBottom"
-              offset={
-                insightVBarCatDense || categoryPlan?.angled || manyCategoryLegacy
-                  ? -34
-                  : -8
-              }
+              offset={insightVBarLabelOffset}
               style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
             />
           </XAxis>
@@ -647,7 +652,7 @@ function ChartRendererInner({
         temporalTickStrings,
         tickFontSizePx: trendTickFs,
         chartLayoutMode,
-      }) * (insightUi ? 1.2 : 1)
+      }) * (insightUi ? 0.92 : 1)
     );
     const trendInterval = computeLineAreaXAxisInterval(rData.length, {
       compact,
@@ -692,7 +697,7 @@ function ChartRendererInner({
             <Label
               value={rAxes.categoryAxis}
               position="insideBottom"
-              offset={compact ? -22 : -26}
+              offset={insightUi ? -18 : compact ? -22 : -26}
               style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
             />
           </XAxis>
@@ -812,11 +817,7 @@ function ChartRendererInner({
           <Label
             value={rAxes.categoryAxis}
             position="insideBottom"
-            offset={
-              insightVBarCatDense || categoryPlan?.angled || manyCategoryLegacy
-                ? -36
-                : -10
-            }
+            offset={insightVBarLabelOffset}
             style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
           />
         </XAxis>

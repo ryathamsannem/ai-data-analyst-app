@@ -56,18 +56,47 @@ export function formatInsightInline(text: string) {
 const INSIGHT_LABEL_RE =
   /^(Key findings|What this may indicate|Suggested next steps|Statistical observations|How this was calculated)\b/i;
 
+const INSIGHT_LABEL_ONLY_RE =
+  /^(Key findings|What this may indicate|Suggested next steps|Statistical observations|How this was calculated)\s*:?\s*$/i;
+
+function isEmptyInsightLabelLine(line: string): boolean {
+  return INSIGHT_LABEL_ONLY_RE.test(line.trim());
+}
+
+/** Drop leading blank / label-only lines so hidden headings leave no vertical gap. */
+function stripSummaryLead(lines: string[]): string[] {
+  let start = 0;
+  while (start < lines.length) {
+    const trimmed = lines[start].trim();
+    if (!trimmed || isEmptyInsightLabelLine(trimmed)) {
+      start += 1;
+      continue;
+    }
+    break;
+  }
+  return lines.slice(start);
+}
+
 /** Multi-line summary with label lines emphasized (presentation only). */
 export function formatInsightSummary(text: string) {
-  const lines = text.split(/\r?\n/);
+  const lines = stripSummaryLead(text.split(/\r?\n/));
+  let hasPriorContent = false;
+
   return lines.map((line, i) => {
     const trimmed = line.trim();
-    if (!trimmed) {
-      return i < lines.length - 1 ? <br key={`br-${i}`} /> : null;
+    if (isEmptyInsightLabelLine(trimmed)) {
+      return null;
     }
+    if (!trimmed) {
+      if (!hasPriorContent) return null;
+      hasPriorContent = true;
+      return <br key={`br-${i}`} />;
+    }
+
     const isLabel = INSIGHT_LABEL_RE.test(trimmed);
-    return (
+    const node = (
       <Fragment key={`ln-${i}`}>
-        {i > 0 ? <br /> : null}
+        {hasPriorContent ? <br /> : null}
         {isLabel ? (
           <span className={aiInsightsAnswerBodyEmphasis}>{formatInsightInline(trimmed)}</span>
         ) : (
@@ -75,6 +104,8 @@ export function formatInsightSummary(text: string) {
         )}
       </Fragment>
     );
+    hasPriorContent = true;
+    return node;
   });
 }
 
