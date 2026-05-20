@@ -1,8 +1,17 @@
 # Charts Tab — Stable Baseline
 
+> **Canonical doc (May 2026):** [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) — standard baseline after polish revert.  
+> Also see [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md).
+
+This file is retained for older links. Prefer **CHARTS_TAB_STABLE_SUMMARY** for recovery before Export/PDF work.
+
+---
+
+# Charts Tab — Stable Baseline (legacy index)
+
 **Production snapshot** of the Charts tab (`activeTab === "charts"`) as implemented in the repo (May 2026). Documents **current behavior only**.
 
-**Related:** [`AGENTS.md`](AGENTS.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md)
+**Related:** [`AGENTS.md`](AGENTS.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md)
 
 ---
 

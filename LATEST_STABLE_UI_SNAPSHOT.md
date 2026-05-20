@@ -3,7 +3,7 @@
 **Canonical continuation snapshot** for the AI Data Analyst SaaS application.  
 **As of:** May 2026 · reflects **current working UI only** (not historical experiments).
 
-**Also read:** [`AGENTS.md`](AGENTS.md) (agent rules) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`CHARTS_TAB_BASELINE.md`](CHARTS_TAB_BASELINE.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`AI_INSIGHTS_LATEST_STATE.md`](AI_INSIGHTS_LATEST_STATE.md) (AI Insights UI tokens deep-dive)
+**Also read:** [`AGENTS.md`](AGENTS.md) (agent rules) · [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`AI_INSIGHTS_LATEST_STATE.md`](AI_INSIGHTS_LATEST_STATE.md) (AI Insights UI tokens deep-dive)
 
 ---
 
@@ -49,7 +49,7 @@ Visually approved / stabilized (fix bugs in place only):
 | **Overview** | KPI cards, auto-dashboard chart grid, AI summary panel, dataset-ready card (`ovCard` tokens) |
 | **Interactive filters** | Shared `FilterPanel` with `appearance="dashboard"` on Overview **and** AI Insights; `ovCard` shell, `ovFilterControl`, drill path |
 | **Dataset summary** | Overview + Insights use same `ovCard` “Dataset ready” strip (file, rows, columns, sheet, Replace file) |
-| **Charts layout** | `overview-chart-grid`, centered plots, horizontal bars stay horizontal |
+| **Charts tab** | Timeline + preview grid, `chart-viz-theme`, compact metadata, Why-this-chart strip, tight plot spacing — see [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) |
 | **AI Insights shell** | Outer gradient card + two-column grid (Suggested Questions \| Ask AI column) |
 | **Suggested Questions** | Unified question cards, hover-only lift, thin hover scrollbar on left panel |
 | **Ask AI** | Compact composer, premium submit hover, Reset aligned with header |
@@ -260,6 +260,9 @@ Established product rules (see `AGENTS.md`):
 ```
 AI-Data-Analyst-App/
 ├── AGENTS.md
+├── CHARTS_TAB_STABLE_SUMMARY.md          ← Charts tab standard baseline
+├── UI_ARCHITECTURE_SNAPSHOT.md           ← App UI structure + Charts regions
+├── AI_VISUALIZATION_BEHAVIOR.md          ← Chart selection, reasoning, render rules
 ├── LATEST_STABLE_UI_SNAPSHOT.md          ← this file
 ├── AI_INSIGHTS_LATEST_STATE.md
 ├── backend/
