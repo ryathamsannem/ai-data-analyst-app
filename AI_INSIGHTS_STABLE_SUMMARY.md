@@ -2,7 +2,9 @@
 
 **Production snapshot** of the AI Insights tab as implemented in the repo (May 2026). Documents **current behavior only** — not a redesign spec.
 
-**Related:** [`AGENTS.md`](AGENTS.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md) · [`LATEST_STABLE_UI_SNAPSHOT.md`](LATEST_STABLE_UI_SNAPSHOT.md) · [`AI_INSIGHTS_LATEST_STATE.md`](AI_INSIGHTS_LATEST_STATE.md)
+**Related:** [`AGENTS.md`](AGENTS.md) · [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md) · [`LATEST_STABLE_UI_SNAPSHOT.md`](LATEST_STABLE_UI_SNAPSHOT.md) · [`AI_INSIGHTS_LATEST_STATE.md`](AI_INSIGHTS_LATEST_STATE.md)
+
+**Recovery use:** Pre–Export/PDF enhancement baseline. Export tab polish is **pending**.
 
 ---
 
@@ -28,12 +30,13 @@ aiInsightsOuterShell
 
 **Not** the older `3fr / 7fr` split documented in earlier drafts.
 
-### Filters and dataset strip
+### Filters (no inline dataset card)
 
-When `columns.length > 0`, **above** the Insights shell (same as Overview):
+When `columns.length > 0`, **above** the Insights shell (shared with Overview):
 
-- `FilterPanel` with **`appearance="dashboard"`** (shared `ovCard` / `ovFilterControl` tokens)
-- Dataset-ready card (`ovCard`): file, rows, columns, sheet, Replace file
+- `FilterPanel` with **`appearance="dashboard"`** (`ovCard` / `ovFilterControl` tokens)
+
+**Dataset metadata:** **No** duplicate dataset-ready card on this tab. Loaded status appears in the **app header** (“Dataset loaded” badge). Full file metadata + **Replace file** live on **Overview** only; compact strip on **Data Preview** (`DataPreviewDatasetContext`). See [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) §7.
 
 ---
 
@@ -350,4 +353,4 @@ Stable UX decision: insight charts prioritize **readable fixed layout** over flu
 
 ---
 
-*Last updated: May 2026 — production baseline before Charts tab enhancements.*
+*Last updated: May 2026 — stable baseline before Export/PDF enhancements.*

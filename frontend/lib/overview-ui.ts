@@ -31,6 +31,19 @@ export const ovInset =
 export const ovChip =
   "inline-flex items-center rounded-full border border-[color:var(--border-default)] bg-gradient-to-b from-[color:var(--surface-elevated)] to-[color:var(--surface-subtle)] px-2.5 py-0.5 text-[10px] font-medium text-[color:var(--text-muted)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-[color:var(--border-strong)] hover:shadow-[var(--shadow-md)]";
 
+/** Compact dataset context row (non-Overview tabs). */
+export const ovDatasetContextRow =
+  "mb-4 flex min-w-0 flex-wrap items-center gap-2";
+
+export const ovDatasetContextChip =
+  "inline-flex max-w-[min(100%,18rem)] min-w-0 items-center truncate rounded-full border border-[color:var(--border-default)] bg-[color:color-mix(in_srgb,var(--surface-subtle)_55%,var(--surface-elevated))] px-2.5 py-0.5 text-[11px] font-medium text-foreground shadow-[var(--shadow-sm)] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]";
+
+export const ovDatasetContextMeta =
+  "text-xs tabular-nums text-[color:var(--text-muted)] dark:text-[color:var(--insights-text-muted)]";
+
+export const ovDatasetContextSheetSelect =
+  "h-8 min-w-[8.5rem] max-w-[14rem] cursor-pointer rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] px-2.5 text-xs font-medium text-foreground shadow-[var(--shadow-sm)] outline-none transition focus:border-[color:var(--accent-muted)] focus:ring-2 focus:ring-[color:var(--accent)]/25 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)]";
+
 export const ovChipAccent =
   "inline-flex items-center rounded-full border border-[color:var(--accent-muted)] bg-[color:var(--accent-wash)] px-2.5 py-0.5 text-[10px] font-semibold text-[color:var(--accent)]";
 

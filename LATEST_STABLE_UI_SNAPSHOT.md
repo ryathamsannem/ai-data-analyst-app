@@ -3,7 +3,9 @@
 **Canonical continuation snapshot** for the AI Data Analyst SaaS application.  
 **As of:** May 2026 · reflects **current working UI only** (not historical experiments).
 
-**Also read:** [`AGENTS.md`](AGENTS.md) (agent rules) · [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`AI_INSIGHTS_LATEST_STATE.md`](AI_INSIGHTS_LATEST_STATE.md) (AI Insights UI tokens deep-dive)
+**Also read:** [`AGENTS.md`](AGENTS.md) · [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) · [`DATA_PREVIEW_STABLE_SUMMARY.md`](DATA_PREVIEW_STABLE_SUMMARY.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md)
+
+**Recovery point:** May 2026 — all UI refinements through Data Preview metadata polish; **Export/PDF not finalized**.
 
 ---
 
@@ -47,9 +49,10 @@ Visually approved / stabilized (fix bugs in place only):
 | Area | Status |
 |------|--------|
 | **Overview** | KPI cards, auto-dashboard chart grid, AI summary panel, dataset-ready card (`ovCard` tokens) |
-| **Interactive filters** | Shared `FilterPanel` with `appearance="dashboard"` on Overview **and** AI Insights; `ovCard` shell, `ovFilterControl`, drill path |
-| **Dataset summary** | Overview + Insights use same `ovCard` “Dataset ready” strip (file, rows, columns, sheet, Replace file) |
-| **Charts tab** | Timeline + preview grid, `chart-viz-theme`, compact metadata, Why-this-chart strip, tight plot spacing — see [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) |
+| **Interactive filters** | Shared `FilterPanel` with `appearance="dashboard"` on Overview **and** AI Insights; 52px control height |
+| **Dataset summary** | **Overview:** full card + Replace file · **Data Preview:** `DataPreviewDatasetContext` · **Insights/Charts:** no duplicate card (header badge) |
+| **Data Preview** | Table, deferred search, quality chips, extension-preserving filename — [`DATA_PREVIEW_STABLE_SUMMARY.md`](DATA_PREVIEW_STABLE_SUMMARY.md) |
+| **Charts tab** | Timeline + preview, Why-this-chart, tight plot spacing — [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) |
 | **AI Insights shell** | Outer gradient card + two-column grid (Suggested Questions \| Ask AI column) |
 | **Suggested Questions** | Unified question cards, hover-only lift, thin hover scrollbar on left panel |
 | **Ask AI** | Compact composer, premium submit hover, Reset aligned with header |
@@ -58,7 +61,7 @@ Visually approved / stabilized (fix bugs in place only):
 | **Dark / light mode** | `class="dark"` on `<html>` via `frontend/lib/theme.ts` + `ThemeScript` |
 | **Responsive** | Single column on mobile; `lg:` grid splits; filters wrap; chart grids 1→2 cols |
 | **Sidebar / nav** | Collapsible `AppSidebar`, icon rail, `MainNavTabs` pill bar |
-| **Export / PDF** | Insight PDF from captured chart DOM + narrative blocks (`frontend/app/pdf-report.ts`) |
+| **Export / PDF** | Functional (`pdf-report.ts`) — **not finalized**; next product phase |
 
 ---
 
@@ -200,10 +203,11 @@ Visually approved / stabilized (fix bugs in place only):
 | `OverviewKpiCard` | `components/home/overview/overview-kpi-card.tsx` | Overview KPI tile |
 | `OverviewAiSummaryPanel` | `components/home/overview/overview-ai-summary.tsx` | Overview AI blurb |
 | `ChartsTimelineAside` | `components/home/charts-timeline-aside.tsx` | Charts tab timeline |
+| `DataPreviewDatasetContext` | `components/home/data-preview-dataset-context.tsx` | Data Preview dataset strip |
 | `SmartChartInsightPanel` | `components/SmartChartInsightPanel.tsx` | Optional smart chart copy |
 | `ThemeToggle` | `components/theme-toggle.tsx` | Light/dark control |
 
-**Token modules:** `overview-ui.ts`, `ai-insights-ui.ts`, `ui-buttons.ts`, `data-preview-ui.ts`
+**Token modules:** `overview-ui.ts`, `ai-insights-ui.ts`, `charts-tab-ui.ts`, `ui-buttons.ts`, `data-preview-ui.ts`
 
 ---
 
@@ -260,10 +264,14 @@ Established product rules (see `AGENTS.md`):
 ```
 AI-Data-Analyst-App/
 ├── AGENTS.md
-├── CHARTS_TAB_STABLE_SUMMARY.md          ← Charts tab standard baseline
-├── UI_ARCHITECTURE_SNAPSHOT.md           ← App UI structure + Charts regions
-├── AI_VISUALIZATION_BEHAVIOR.md          ← Chart selection, reasoning, render rules
+├── PROJECT_ARCHITECTURE_SUMMARY.md       ← Onboarding + file index
+├── UI_BASELINE_RULES.md                  ← Product UI rules (canonical)
 ├── LATEST_STABLE_UI_SNAPSHOT.md          ← this file
+├── CHARTS_STABLE_SUMMARY.md              ← Charts tab baseline
+├── DATA_PREVIEW_STABLE_SUMMARY.md        ← Data Preview baseline
+├── AI_INSIGHTS_STABLE_SUMMARY.md
+├── UI_ARCHITECTURE_SNAPSHOT.md
+├── AI_VISUALIZATION_BEHAVIOR.md
 ├── AI_INSIGHTS_LATEST_STATE.md
 ├── backend/
 │   └── main.py                           # FastAPI + /ask + upload
@@ -297,7 +305,9 @@ AI-Data-Analyst-App/
 
 ## 10. Next Recommended Enhancements
 
-Practical next phase (optional, not blocking):
+**Primary next phase:** **Export / PDF** finalization (UI polish, dark capture, WYSIWYG parity, code-split).
+
+Other optional items:
 
 1. **Code-split** `pdf-report.ts` / html2canvas for faster initial load  
 2. **Section parser UX** — detect plain-text “Key findings:” headers even without `##` markdown  

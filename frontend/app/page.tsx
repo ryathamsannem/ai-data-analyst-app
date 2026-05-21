@@ -260,6 +260,7 @@ import {
 } from "@/lib/ui-buttons";
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
+import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
 import { FilterPanel } from "./components/home/filter-panel";
 import { type MainNavTabId } from "./components/home/main-nav-tabs";
 import { AppShell } from "@/components/app-shell/app-shell";
@@ -317,6 +318,7 @@ import {
   dpCellNull,
   dpCellSticky,
   dpControl,
+  dpPreviewHeaderMain,
   dpEmptySearch,
   dpEmptyState,
   dpInsightsPanel,
@@ -6998,13 +7000,14 @@ function HomeInner() {
 
   const openOverviewReplaceUpload = useCallback(() => {
     dismissMappingMessage();
+    startTabTransition(() => setActiveTab("overview"));
     setOverviewUploadExpanded(true);
     setFile(null);
     setOverviewDropActive(false);
     if (overviewFileInputRef.current) {
       overviewFileInputRef.current.value = "";
     }
-  }, [dismissMappingMessage]);
+  }, [dismissMappingMessage, startTabTransition]);
 
   const cancelOverviewReplaceUpload = useCallback(() => {
     setOverviewUploadExpanded(false);
@@ -10341,154 +10344,24 @@ function HomeInner() {
             </>
           )}
 
-          {activeTab === "insights" && columns.length > 0 && (
-            <section className={`mb-6 p-4 sm:p-5 ${ovCard}`}>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full bg-emerald-500"
-                      aria-hidden
-                    />
-                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                      Dataset ready
-                    </span>
-                  </div>
-                  <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="min-w-0">
-                      <dt className={ovMuted}>File</dt>
-                      <dd
-                        className="truncate font-medium text-foreground"
-                        title={uploadMeta?.name || ""}
-                      >
-                        {uploadMeta?.name || "—"}
-                        {uploadMeta?.size_bytes != null ? (
-                          <span className={`ml-1 font-normal ${ovMuted}`}>
-                            ({formatBytes(uploadMeta.size_bytes)})
-                          </span>
-                        ) : null}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className={ovDataLabel}>Rows</dt>
-                      <dd className={ovDataValue}>{rows}</dd>
-                    </div>
-                    <div>
-                      <dt className={ovDataLabel}>Columns</dt>
-                      <dd className={ovDataValue}>{columns.length}</dd>
-                    </div>
-                    <div className="min-w-0">
-                      <dt className={ovDataLabel}>Sheet</dt>
-                      <dd className={`truncate ${ovDataValue}`}>
-                        {selectedSheet.trim() ||
-                          (uploadMeta?.name ?? "").toLowerCase().endsWith(".csv")
-                            ? "CSV"
-                            : "—"}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-                <div className="flex shrink-0 flex-wrap items-end gap-2">
-                  {sheets.length > 1 ? (
-                    <div className="flex min-w-[10rem] flex-col gap-1.5">
-                      <label className={ovDataLabel} htmlFor="insights-sheet-select">
-                        Sheet
-                      </label>
-                      <select
-                        id="insights-sheet-select"
-                        value={selectedSheet}
-                        onChange={(e) => selectSheet(e.target.value)}
-                        className={`${ovFilterControl} h-[52px] cursor-pointer`}
-                      >
-                        {sheets.map((sheet) => (
-                          <option key={sheet} value={sheet}>
-                            {sheet}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={openOverviewReplaceUpload}
-                    title="Upload a new CSV or Excel file (replaces the dataset in this session)"
-                    className={ovBtnSecondary}
-                  >
-                    Replace file
-                  </button>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {activeTab !== "overview" &&
-            activeTab !== "insights" &&
-            columns.length > 0 && (
-            <div className="mb-6 bg-slate-50 border rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <div className="flex flex-col gap-1 text-sm text-slate-700">
-                <div className="flex flex-wrap items-center gap-2">
-                  {uploadMeta?.name && (
-                    <span className="font-medium text-slate-900">
-                      {uploadMeta.name}
-                    </span>
-                  )}
-                  {uploadMeta?.size_bytes ? (
-                    <span className="text-slate-500">
-                      {formatBytes(uploadMeta.size_bytes)}
-                    </span>
-                  ) : null}
-                  <span className="text-slate-300">•</span>
-                  <span>
-                    <span className="text-slate-500">Rows</span>{" "}
-                    <span className="font-medium text-slate-900">{rows}</span>
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span>
-                    <span className="text-slate-500">Columns</span>{" "}
-                    <span className="font-medium text-slate-900">
-                      {columns.length}
-                    </span>
-                  </span>
-                </div>
-                {selectedSheet && (
-                  <div className="text-slate-600">
-                    Sheet: <span className="font-medium">{selectedSheet}</span>
-                  </div>
-                )}
-              </div>
-
-              {sheets.length > 1 && (
-                <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium text-slate-600">
-                    Sheet
-                  </label>
-                  <select
-                    value={selectedSheet}
-                    onChange={(e) => selectSheet(e.target.value)}
-                    className="border bg-white p-2 rounded-xl"
-                  >
-                    {sheets.map((sheet) => (
-                      <option key={sheet} value={sheet}>
-                        {sheet}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          )}
-
         {activeTab === "preview" && columns.length > 0 && (
           <section className="mb-6 min-w-0">
             <div className="mb-5 flex flex-col gap-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="min-w-0 max-w-3xl">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className={dpPreviewHeaderMain}>
                   <h2 className={dpSectionTitle}>Data Preview</h2>
                   <p className={dpSectionDesc}>
                     Showing first {preview.length} of {rows} rows in this window. Missing
                     values are highlighted. AI highlights important column quality signals
                     automatically.
                   </p>
+                  <DataPreviewDatasetContext
+                    fileName={uploadMeta?.name}
+                    fileSizeBytes={uploadMeta?.size_bytes}
+                    rows={rows}
+                    columnCount={columns.length}
+                    sheetLabel={selectedSheet.trim() || null}
+                  />
                 </div>
                 <div className="flex shrink-0 items-center gap-2.5">
                   <label className="text-sm font-medium text-[color:var(--text-muted)]" htmlFor="preview-row-limit">
@@ -11806,11 +11679,14 @@ function HomeInner() {
                 </p>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-slate-900">Report Preview Summary</h3>
-                <div className="mt-2 text-sm text-slate-700 space-y-1">
-                  <p>File: {uploadMeta?.name || "No file uploaded"}</p>
-                  <p>Dataset: {rows.toLocaleString()} rows • {columns.length} columns</p>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)]">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-[color:var(--insights-text-secondary)]">
+                  Report Preview Summary
+                </h3>
+                <div className="mt-2 text-sm text-slate-700 space-y-1 dark:text-[color:var(--insights-text-muted)]">
+                  <p>
+                    {rows.toLocaleString()} rows · {columns.length} columns
+                  </p>
                   <p>AI answer: {answer.trim() ? "Available" : "Not available yet"}</p>
                   <p>
                     Visualization:{" "}

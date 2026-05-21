@@ -7,6 +7,16 @@ export const dpSectionTitle =
 
 export const dpSectionDesc = "mt-1.5 text-sm leading-relaxed text-[color:var(--text-muted)]";
 
+/** Header main column — slightly wider than `max-w-3xl` for dataset card balance vs Rows control. */
+export const dpPreviewHeaderMain =
+  "min-w-0 w-full flex-1 lg:max-w-[min(54rem,calc(100%-11.5rem))]";
+
+/** Spacing hook for Data Preview dataset strip (shell uses `ovCard`). */
+export const dpDatasetContextStrip = "mt-3 w-full min-w-0 p-4 sm:p-5";
+
+/** File cell in dataset grid — room for stem truncation + preserved extension. */
+export const dpDatasetContextFileCell = "min-w-0 max-w-full sm:max-w-[14rem] md:max-w-[18rem] lg:max-w-[22rem]";
+
 export const dpControl =
   "rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-elevated)] px-3 py-2 text-sm font-medium text-foreground shadow-[var(--shadow-sm)] transition duration-200 hover:border-[color:var(--border-strong)] focus:border-[color:var(--accent-muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]/25";
 
