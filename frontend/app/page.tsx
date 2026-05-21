@@ -6225,7 +6225,66 @@ function HomeInner() {
     };
   }, [uploadMessage]);
   const [mappingMessage, setMappingMessage] = useState("");
+  const mappingSuccessHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const dismissMappingMessage = useCallback(() => {
+    if (mappingSuccessHideRef.current) {
+      clearTimeout(mappingSuccessHideRef.current);
+      mappingSuccessHideRef.current = null;
+    }
+    setMappingMessage("");
+  }, []);
+
+  /** Mapping save toast: auto-hide after 4s (same cadence as upload success). */
+  useEffect(() => {
+    if (!mappingMessage.trim()) {
+      if (mappingSuccessHideRef.current) {
+        clearTimeout(mappingSuccessHideRef.current);
+        mappingSuccessHideRef.current = null;
+      }
+      return;
+    }
+    if (mappingSuccessHideRef.current) {
+      clearTimeout(mappingSuccessHideRef.current);
+    }
+    mappingSuccessHideRef.current = setTimeout(() => {
+      setMappingMessage("");
+      mappingSuccessHideRef.current = null;
+    }, 4000);
+    return () => {
+      if (mappingSuccessHideRef.current) {
+        clearTimeout(mappingSuccessHideRef.current);
+        mappingSuccessHideRef.current = null;
+      }
+    };
+  }, [mappingMessage]);
+
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
+
+  const mappingModalOpenRef = useRef(mappingModalOpen);
+  const mappingMessageRef = useRef(mappingMessage);
+  mappingModalOpenRef.current = mappingModalOpen;
+  mappingMessageRef.current = mappingMessage;
+
+  /** Clear mapping toast when user changes tab. */
+  useEffect(() => {
+    dismissMappingMessage();
+  }, [activeTab, dismissMappingMessage]);
+
+  /** Clear mapping toast when user edits mapping fields in the open modal. */
+  useEffect(() => {
+    if (!mappingModalOpenRef.current || !mappingMessageRef.current.trim()) return;
+    dismissMappingMessage();
+  }, [
+    productColumn,
+    salesColumn,
+    regionColumn,
+    customerColumn,
+    profitColumn,
+    dateColumn,
+    dismissMappingMessage,
+  ]);
+
   const [mappingConfirmedByUser, setMappingConfirmedByUser] = useState(false);
   const [mappingMetadata, setMappingMetadata] = useState<MappingMetadata | null>(
     null
@@ -6716,6 +6775,7 @@ function HomeInner() {
     }
 
     setError("");
+    dismissMappingMessage();
     setUploadMessage("");
     setAnswer("");
     setHasValidAIAnswer(false);
@@ -6826,7 +6886,7 @@ function HomeInner() {
 
   const selectSheet = async (sheetName: string) => {
     setError("");
-    setMappingMessage("");
+    dismissMappingMessage();
     setAnswer("");
     setHasValidAIAnswer(false);
     setLastAskedQuestion("");
@@ -6932,17 +6992,19 @@ function HomeInner() {
       return;
     }
     setError("");
+    dismissMappingMessage();
     setFile(next);
-  }, []);
+  }, [dismissMappingMessage]);
 
   const openOverviewReplaceUpload = useCallback(() => {
+    dismissMappingMessage();
     setOverviewUploadExpanded(true);
     setFile(null);
     setOverviewDropActive(false);
     if (overviewFileInputRef.current) {
       overviewFileInputRef.current.value = "";
     }
-  }, []);
+  }, [dismissMappingMessage]);
 
   const cancelOverviewReplaceUpload = useCallback(() => {
     setOverviewUploadExpanded(false);
@@ -7380,7 +7442,7 @@ function HomeInner() {
     }
 
     setError("");
-    setMappingMessage("");
+    dismissMappingMessage();
 
     try {
       const response = await fetch(
