@@ -36,7 +36,19 @@ export const ovChipAccent =
 
 export const ovBtnSecondary = "saas-btn-premium";
 
+export const ovBtnSecondarySm = "saas-btn-premium saas-btn-premium--sm";
+
 export const ovBtnPrimaryAccent = "saas-btn-accent";
+
+export const ovBtnPrimaryAccentSm = "saas-btn-accent saas-btn-premium--sm";
+
+/** Upload zone — selected file metadata (theme-aware). */
+export const ovUploadSelectedWrap =
+  "text-sm text-[color:var(--text-muted)] sm:text-right";
+
+export const ovUploadSelectedName = "font-medium text-foreground";
+
+export const ovUploadSelectedSize = "text-[color:var(--text-muted)]";
 
 export const ovBtnGhostSm =
   "inline-flex items-center justify-center rounded-[0.85rem] border border-transparent bg-[color:var(--surface-subtle)] px-3 py-1.5 text-sm font-medium text-[color:var(--text-muted)] transition-all duration-200 hover:border-[color:var(--border-default)] hover:bg-[color:var(--surface-elevated)] hover:text-foreground active:scale-[0.99]";

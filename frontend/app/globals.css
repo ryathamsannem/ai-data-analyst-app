@@ -900,10 +900,17 @@ body {
   }
 
   /*
-   * Lone card in the last row (1, 3, 5, … charts): widen slightly, stay left-aligned.
-   * Does not affect pairs or mobile single-column layout.
+   * Lone card in the last row (3, 5, 7, …): stay in column 1 so it aligns with the first chart.
    */
-  .overview-chart-grid__cell:last-child:nth-child(odd) {
+  .overview-chart-grid__cell:last-child:nth-child(odd):not(:only-child) {
+    grid-column: 1;
+    width: 100%;
+    max-width: 100%;
+    justify-self: stretch;
+  }
+
+  /* Single chart: modest width, left-aligned with grid */
+  .overview-chart-grid__cell:only-child {
     grid-column: 1 / -1;
     width: var(--overview-chart-solo-row-width);
     max-width: 1240px;
@@ -916,6 +923,7 @@ body {
   min-width: 0;
   width: 100%;
   max-width: 100%;
+  align-self: stretch;
 }
 
 .overview-chart-grid__inner {

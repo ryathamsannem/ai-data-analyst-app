@@ -269,6 +269,10 @@ import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
 import {
   ovBtnPrimaryAccent,
   ovBtnSecondary,
+  ovBtnSecondarySm,
+  ovUploadSelectedName,
+  ovUploadSelectedSize,
+  ovUploadSelectedWrap,
   ovChartCell,
   ovChartGrid,
   ovChartInner,
@@ -9816,10 +9820,12 @@ function HomeInner() {
                         ) : null}
                       </div>
                       {file ? (
-                        <div className="text-sm text-slate-600 sm:text-right">
-                          Selected:{" "}
-                          <span className="font-medium text-slate-900">{file.name}</span>{" "}
-                          <span className="text-slate-500">({formatBytes(file.size)})</span>
+                        <div className={ovUploadSelectedWrap}>
+                          <span className={ovDataLabel}>Selected:</span>{" "}
+                          <span className={ovUploadSelectedName}>{file.name}</span>{" "}
+                          <span className={ovUploadSelectedSize}>
+                            ({formatBytes(file.size)})
+                          </span>
                         </div>
                       ) : null}
                     </div>
@@ -9876,16 +9882,16 @@ function HomeInner() {
                             : "border-[color:var(--border-default)] bg-[color:var(--surface-inset)]"
                         }`}
                       >
-                        <p className="text-sm font-medium text-slate-800">
+                        <p className="text-sm font-medium text-foreground">
                           Drag and drop a file here
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className={`mt-1 text-xs ${ovMuted}`}>
                           .csv, .xlsx, or .xls
                         </p>
                         <button
                           type="button"
                           onClick={() => overviewFileInputRef.current?.click()}
-                          className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+                          className={`mt-4 ${ovBtnSecondarySm}`}
                         >
                           Choose file
                         </button>
@@ -9896,7 +9902,7 @@ function HomeInner() {
                           type="button"
                           onClick={uploadFile}
                           disabled={loading}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl disabled:bg-gray-400"
+                          className={ovBtnPrimaryAccent}
                         >
                           {loading ? "Uploading..." : "Upload File"}
                         </button>
@@ -9905,14 +9911,14 @@ function HomeInner() {
                             type="button"
                             onClick={cancelOverviewReplaceUpload}
                             disabled={loading}
-                            className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200/60 disabled:opacity-50"
+                            className={`${ovBtnSecondarySm} disabled:opacity-50`}
                           >
                             Cancel
                           </button>
                         ) : null}
                         {loading && (
-                          <div className="flex items-center gap-3 text-gray-600">
-                            <div className="h-5 w-5 rounded-full border-2 border-gray-300 border-t-gray-700 animate-spin" />
+                          <div className={`flex items-center gap-3 ${ovMuted}`}>
+                            <div className="h-5 w-5 rounded-full border-2 border-[color:var(--border-default)] border-t-[color:var(--foreground)] animate-spin" />
                             <span>Processing file…</span>
                           </div>
                         )}
@@ -9927,27 +9933,23 @@ function HomeInner() {
                         Upload a dataset to see KPIs, preview, charts, and insights.
                       </p>
                     ) : (
-                      <div className="mt-3 space-y-2 text-sm text-slate-700">
+                      <div className="mt-3 space-y-2 text-sm text-foreground">
                         {uploadMeta?.name && (
                           <p>
-                            <span className="text-slate-500">File</span>{" "}
-                            <span className="font-medium text-slate-900">
-                              {uploadMeta.name}
-                            </span>{" "}
-                            <span className="text-slate-500">
+                            <span className={ovDataLabel}>File</span>{" "}
+                            <span className={ovDataValue}>{uploadMeta.name}</span>{" "}
+                            <span className={ovMuted}>
                               ({formatBytes(uploadMeta.size_bytes)})
                             </span>
                           </p>
                         )}
                         <p>
-                          <span className="text-slate-500">Rows</span>{" "}
-                          <span className="font-medium text-slate-900">{rows}</span>
+                          <span className={ovDataLabel}>Rows</span>{" "}
+                          <span className={ovDataValue}>{rows}</span>
                         </p>
                         <p>
-                          <span className="text-slate-500">Columns</span>{" "}
-                          <span className="font-medium text-slate-900">
-                            {columns.length}
-                          </span>
+                          <span className={ovDataLabel}>Columns</span>{" "}
+                          <span className={ovDataValue}>{columns.length}</span>
                         </p>
                         {(selectedSheet.trim() ||
                           (uploadMeta?.name ?? "").toLowerCase().endsWith(".csv")) && (
@@ -9986,7 +9988,7 @@ function HomeInner() {
                     <button
                       type="button"
                       onClick={() => setMappingModalOpen(true)}
-                      className={`shrink-0 ${ovBtnPrimaryAccent}`}
+                      className={`shrink-0 ${ovBtnSecondarySm}`}
                     >
                       Review mapping
                     </button>
@@ -12143,14 +12145,14 @@ function HomeInner() {
                     type="button"
                     onClick={saveColumnMapping}
                     disabled={loading}
-                    className={`${btnPrimarySm} disabled:shadow-none`}
+                    className={`${ovBtnSecondarySm} disabled:opacity-50`}
                   >
                     {loading ? "Saving…" : "Save mapping"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setMappingModalOpen(false)}
-                    className={ovBtnSecondary}
+                    className={ovBtnSecondarySm}
                   >
                     Cancel
                   </button>
