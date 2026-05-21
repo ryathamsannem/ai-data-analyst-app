@@ -253,11 +253,52 @@ import {
   aiInsightsVizTitle,
 } from "@/lib/ai-insights-ui";
 import {
-  btnExport,
   btnPrimary,
   btnPrimarySm,
   btnSecondary,
 } from "@/lib/ui-buttons";
+import {
+  exportTabAdvancedDivider,
+  exportTabAdvancedStack,
+  exportTabCheckboxInput,
+  exportTabCheckboxLabel,
+  exportTabCheckboxRow,
+  exportTabCheckboxRowWide,
+  exportTabColorField,
+  exportTabColorHex,
+  exportTabColorInput,
+  exportTabColorSwatchWrap,
+  exportTabDesc,
+  exportTabDownloadBtn,
+  exportTabExecutivePreview,
+  exportTabExecutivePreviewBody,
+  exportTabExecutivePreviewList,
+  exportTabExecutivePreviewScope,
+  exportTabExecutivePreviewTitle,
+  exportTabFieldLabel,
+  exportTabFooter,
+  exportTabFooterHint,
+  exportTabFormGrid,
+  exportTabFormRow,
+  exportTabHeaderRow,
+  exportTabOptionsGrid,
+  exportTabPage,
+  exportTabSectionCard,
+  exportTabSectionDesc,
+  exportTabSectionKicker,
+  exportTabSectionTitle,
+  exportTabStack,
+  exportTabSummaryChip,
+  exportTabSummaryChipLabel,
+  exportTabSummaryChipSpan,
+  exportTabSummaryChipValue,
+  exportTabSummaryChipValueMuted,
+  exportTabSummaryGrid,
+  exportTabSummarySectionPill,
+  exportTabSummarySectionsWrap,
+  exportTabTextInput,
+  exportTabTitle,
+} from "@/lib/export-tab-ui";
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
 import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
@@ -8957,6 +8998,29 @@ function HomeInner() {
     insightExecutiveBrief,
   ]);
 
+  const exportSelectedSectionLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (exportOptions.includeKPIs) labels.push("KPIs");
+    if (exportOptions.includeAIInsight) labels.push("AI Insight");
+    if (exportOptions.includeChart) labels.push("Chart");
+    if (exportOptions.includeDataPreview) labels.push("Data Preview");
+    if (exportOptions.includeDataQuality) labels.push("Data Quality");
+    if (exportOptions.includeConversationContext) labels.push("Conversation");
+    if (exportOptions.includeTechnicalAppendix) labels.push("Technical appendix");
+    return labels;
+  }, [exportOptions]);
+
+  const exportVizSummaryLabel = useMemo(() => {
+    if (!visualization || visualization.labels.length === 0) {
+      return "Not in session yet";
+    }
+    const kind = visualization.chartType?.trim() || "chart";
+    const title = visualization.title?.trim();
+    return title
+      ? `${visualization.labels.length} points · ${kind} — ${title}`
+      : `${visualization.labels.length} points · ${kind}`;
+  }, [visualization]);
+
   const chartHistoryAsideRef = useRef<HTMLDivElement | null>(null);
   const chartHistoryScrollRestore = useRef<number | null>(null);
 
@@ -11670,71 +11734,111 @@ function HomeInner() {
         )}
 
         {activeTab === "export" && (
-          <section className="mb-6">
-            <div className="bg-white border rounded-2xl p-4 sm:p-5 space-y-4">
-              <div>
-                <h2 className="text-xl font-semibold">Export</h2>
-                <p className="text-sm text-slate-600 mt-1">
-                  Choose what to include in the report, then download a business-ready PDF.
-                </p>
-              </div>
+          <section className={exportTabPage}>
+            <div className={exportTabHeaderRow}>
+              <h2 className={exportTabTitle}>Export</h2>
+              <p className={exportTabDesc}>
+                Choose what to include in the report, then download a business-ready PDF.
+              </p>
+            </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)]">
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-[color:var(--insights-text-secondary)]">
+            <div className={exportTabStack}>
+              <div className={exportTabSectionCard}>
+                <p className={exportTabSectionKicker}>Preview</p>
+                <h3 className={`${exportTabSectionTitle} mt-1`}>
                   Report Preview Summary
                 </h3>
-                <div className="mt-2 text-sm text-slate-700 space-y-1 dark:text-[color:var(--insights-text-muted)]">
-                  <p>
-                    {rows.toLocaleString()} rows · {columns.length} columns
-                  </p>
-                  <p>AI answer: {answer.trim() ? "Available" : "Not available yet"}</p>
-                  <p>
-                    Visualization:{" "}
-                    {visualization &&
-                    visualization.labels.length > 0
-                      ? `${visualization.labels.length} points (${visualization.chartType}) — ${visualization.title}`
-                      : "No visualization in this session yet"}
-                  </p>
-                  {exportExecutiveInsightsPreview ? (
-                    <div className="mt-3 rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Executive insights (PDF)
-                      </p>
-                      <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-                        {exportExecutiveInsightsPreview.scopeLabel}
-                      </p>
-                      {exportExecutiveInsightsPreview.brief ? (
-                        <p className="mt-2 text-sm leading-snug text-slate-800">
-                          <span className="font-semibold text-slate-900">AI context · </span>
-                          {exportExecutiveInsightsPreview.brief}
-                        </p>
-                      ) : null}
-                      {exportExecutiveInsightsPreview.facts.length > 0 ? (
-                        <ul className="mt-2 list-none space-y-1.5 text-xs leading-snug text-slate-700">
-                          {exportExecutiveInsightsPreview.facts.map((c) => (
-                            <li key={c.key}>
-                              <span className="font-semibold text-slate-800">{c.title}:</span>{" "}
-                              <span className="text-slate-700">{c.value}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
+                <div className={exportTabSummaryGrid}>
+                  <div className={exportTabSummaryChip}>
+                    <span className={exportTabSummaryChipLabel}>Dataset</span>
+                    <span className={exportTabSummaryChipValue}>
+                      {rows.toLocaleString()} rows · {columns.length} columns
+                    </span>
+                  </div>
+                  <div className={exportTabSummaryChip}>
+                    <span className={exportTabSummaryChipLabel}>AI answer</span>
+                    <span
+                      className={
+                        answer.trim()
+                          ? exportTabSummaryChipValue
+                          : exportTabSummaryChipValueMuted
+                      }
+                    >
+                      {answer.trim() ? "Available" : "Not available yet"}
+                    </span>
+                  </div>
+                  <div className={`${exportTabSummaryChip} ${exportTabSummaryChipSpan}`}>
+                    <span className={exportTabSummaryChipLabel}>Visualization</span>
+                    <span
+                      className={
+                        visualization && visualization.labels.length > 0
+                          ? exportTabSummaryChipValue
+                          : exportTabSummaryChipValueMuted
+                      }
+                      title={exportVizSummaryLabel}
+                    >
+                      {exportVizSummaryLabel}
+                    </span>
+                  </div>
+                  <div className={`${exportTabSummaryChip} ${exportTabSummaryChipSpan}`}>
+                    <span className={exportTabSummaryChipLabel}>Report sections</span>
+                    <div className={exportTabSummarySectionsWrap}>
+                      {exportSelectedSectionLabels.length > 0 ? (
+                        exportSelectedSectionLabels.map((label) => (
+                          <span key={label} className={exportTabSummarySectionPill}>
+                            {label}
+                          </span>
+                        ))
+                      ) : (
+                        <span className={exportTabSummaryChipValueMuted}>
+                          None selected
+                        </span>
+                      )}
                     </div>
-                  ) : null}
+                  </div>
                 </div>
+                {exportExecutiveInsightsPreview ? (
+                  <div className={exportTabExecutivePreview}>
+                    <p className={exportTabExecutivePreviewTitle}>
+                      Executive insights (PDF)
+                    </p>
+                    <p className={exportTabExecutivePreviewScope}>
+                      {exportExecutiveInsightsPreview.scopeLabel}
+                    </p>
+                    {exportExecutiveInsightsPreview.brief ? (
+                      <p className={exportTabExecutivePreviewBody}>
+                        <span className="font-semibold text-[var(--foreground)]">
+                          AI context ·{" "}
+                        </span>
+                        {exportExecutiveInsightsPreview.brief}
+                      </p>
+                    ) : null}
+                    {exportExecutiveInsightsPreview.facts.length > 0 ? (
+                      <ul className={exportTabExecutivePreviewList}>
+                        {exportExecutiveInsightsPreview.facts.map((c) => (
+                          <li key={c.key}>
+                            <span className="font-semibold text-[var(--foreground)]">
+                              {c.title}:
+                            </span>{" "}
+                            {c.value}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
-              <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Report branding</h3>
-                  <p className="text-xs text-slate-500">
-                    Shown on the cover page, running headers, and footers. Saved in this browser only.
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
-                    <label className="flex min-w-0 flex-1 flex-col text-sm">
-                      <span className="mb-1 text-slate-600">Company or team name</span>
+              <div className={exportTabSectionCard}>
+                <h3 className={exportTabSectionTitle}>Report branding</h3>
+                <p className={exportTabSectionDesc}>
+                  Shown on the cover page, running headers, and footers. Saved in this
+                  browser only.
+                </p>
+                <div className={exportTabFormGrid}>
+                  <div className={exportTabFormRow}>
+                    <label className="flex min-w-0 flex-1 flex-col">
+                      <span className={exportTabFieldLabel}>Company or team name</span>
                       <input
                         type="text"
                         value={reportBranding.companyName}
@@ -11752,12 +11856,12 @@ function HomeInner() {
                           });
                         }}
                         placeholder="e.g. Northwind Analytics"
-                        className="h-10 w-full rounded-lg border border-slate-200/50 bg-white px-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.045)] outline-none ring-slate-200 transition focus:border-slate-300 focus:ring-2"
+                        className={exportTabTextInput}
                       />
                     </label>
-                    <div className="flex w-full flex-col text-sm lg:w-[7.75rem] lg:flex-none">
-                      <span className="mb-1 text-slate-600">Accent color</span>
-                      <div className="flex h-10 items-center">
+                    <div className={exportTabColorField}>
+                      <span className={exportTabFieldLabel}>Accent color</span>
+                      <div className={exportTabColorSwatchWrap}>
                         <input
                           type="color"
                           value={reportBranding.accentHex}
@@ -11769,14 +11873,17 @@ function HomeInner() {
                               return next;
                             });
                           }}
-                          className="h-10 w-14 min-w-14 cursor-pointer rounded-lg border border-slate-200/50 bg-white p-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.045)] outline-none ring-slate-200 transition focus-visible:ring-2 focus-visible:ring-slate-200"
+                          className={exportTabColorInput}
                           title="Accent color"
                         />
+                        <span className={exportTabColorHex} aria-hidden>
+                          {reportBranding.accentHex}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <label className="block text-sm">
-                    <span className="text-slate-600">Tagline (optional)</span>
+                  <label className="block min-w-0">
+                    <span className={exportTabFieldLabel}>Tagline (optional)</span>
                     <input
                       type="text"
                       value={reportBranding.tagline}
@@ -11794,141 +11901,142 @@ function HomeInner() {
                         });
                       }}
                       placeholder="e.g. Q2 revenue & operations review"
-                      className="mt-1 h-10 w-full rounded-lg border border-slate-200/50 bg-white px-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.045)] outline-none ring-slate-200 transition focus:border-slate-300 focus:ring-2"
+                      className={`${exportTabTextInput} mt-1`}
                     />
                   </label>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200/90 bg-slate-50/40 p-4 sm:p-5">
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      Include in report
-                    </h3>
-                    <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2.5">
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeKPIs}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeKPIs: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include KPIs</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeAIInsight}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeAIInsight: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include AI Insight</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeChart}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeChart: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include Chart</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeDataPreview}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeDataPreview: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include Data Preview</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90 sm:col-span-2">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeDataQuality}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeDataQuality: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include Data Quality</span>
-                      </label>
-                    </div>
-                  </div>
+              <div className={exportTabSectionCard}>
+                <p className={exportTabSectionKicker}>Contents</p>
+                <h3 className={`${exportTabSectionTitle} mt-1`}>Include in report</h3>
+                <div className={exportTabOptionsGrid}>
+                  <label className={exportTabCheckboxRow}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeKPIs}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeKPIs: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>KPIs</span>
+                  </label>
+                  <label className={exportTabCheckboxRow}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeAIInsight}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeAIInsight: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>AI Insight</span>
+                  </label>
+                  <label className={exportTabCheckboxRow}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeChart}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeChart: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>Chart</span>
+                  </label>
+                  <label className={exportTabCheckboxRow}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeDataPreview}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeDataPreview: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>Data Preview</span>
+                  </label>
+                  <label className={`${exportTabCheckboxRow} sm:col-span-2`}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeDataQuality}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeDataQuality: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>Data Quality</span>
+                  </label>
+                </div>
 
-                  <div className="border-t border-slate-200/70 pt-4">
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      Advanced options
-                    </h3>
-                    <p className="mt-1 text-[11px] leading-snug text-slate-500">
-                      Optional add-ons for audit trails and technical readers.
-                    </p>
-                    <div className="mt-2.5 space-y-2">
-                      <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeConversationContext ?? false}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeConversationContext: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span className="leading-snug">
-                          Include AI conversation thread (prior questions, follow-up
-                          chain, inherited filters)
-                        </span>
-                      </label>
-                      <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeTechnicalAppendix === true}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeTechnicalAppendix: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span className="leading-snug">
-                          Include technical appendix (chart spec, raw series sample,
-                          sparklines, engine metadata)
-                        </span>
-                      </label>
-                    </div>
+                <div className={exportTabAdvancedDivider}>
+                  <p className={exportTabSectionKicker}>Advanced</p>
+                  <h3 className={`${exportTabSectionTitle} mt-1`}>Advanced options</h3>
+                  <p className={exportTabSectionDesc}>
+                    Optional add-ons for audit trails and technical readers.
+                  </p>
+                  <div className={exportTabAdvancedStack}>
+                    <label className={exportTabCheckboxRowWide}>
+                      <input
+                        type="checkbox"
+                        className={exportTabCheckboxInput}
+                        checked={exportOptions.includeConversationContext ?? false}
+                        onChange={(e) =>
+                          setExportOptions((prev) => ({
+                            ...prev,
+                            includeConversationContext: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className={exportTabCheckboxLabel}>
+                        AI conversation thread (prior questions, follow-up chain,
+                        inherited filters)
+                      </span>
+                    </label>
+                    <label className={exportTabCheckboxRowWide}>
+                      <input
+                        type="checkbox"
+                        className={exportTabCheckboxInput}
+                        checked={exportOptions.includeTechnicalAppendix === true}
+                        onChange={(e) =>
+                          setExportOptions((prev) => ({
+                            ...prev,
+                            includeTechnicalAppendix: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className={exportTabCheckboxLabel}>
+                        Technical appendix (chart spec, raw series sample, sparklines,
+                        engine metadata)
+                      </span>
+                    </label>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-end">
-                <button type="button" onClick={() => downloadReport()} className={btnExport}>
+              <div className={exportTabFooter}>
+                <p className={exportTabFooterHint}>
+                  Generates a business-ready PDF with your selected sections and branding.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => downloadReport()}
+                  className={exportTabDownloadBtn}
+                >
                   Download Report PDF
                 </button>
               </div>

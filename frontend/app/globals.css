@@ -379,6 +379,38 @@ body {
   color: #f8fafc;
 }
 
+/* Export tab — primary download CTA (premium system, restrained accent; no neon glow) */
+.export-tab-page .export-tab-download-btn {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border-default));
+  color: color-mix(in srgb, var(--accent) 82%, var(--foreground));
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.export-tab-page .export-tab-download-btn:hover {
+  box-shadow:
+    0 3px 10px -5px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.dark .export-tab-page .export-tab-download-btn {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--insights-border-soft, var(--border-default)));
+  color: color-mix(in srgb, var(--accent) 58%, var(--foreground));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 12%, var(--insights-layer-inset, var(--surface-elevated))) 0%,
+    var(--insights-layer-inset, var(--surface-elevated)) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .export-tab-page .export-tab-download-btn:hover {
+  box-shadow:
+    0 2px 8px -4px color-mix(in srgb, var(--accent) 30%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 /* Session chart surface: smooth reveal on Charts tab (respect reduced motion). */
 @keyframes chart-surface-in {
   from {
