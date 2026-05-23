@@ -1436,7 +1436,9 @@ function computePdfRankedSignalsFromChartRows(
   max = 3,
   /** Original series order (e.g. unsorted snapshot) for stable ties — matches key-figure `iMax` walk. */
   orderForTieBreak?: ChartRow[],
-  trendMode = false
+  trendMode = false,
+  /** Ascending = lowest/min first; false = highest first; null = highest (default). */
+  ascending: boolean | null = null
 ): PdfRankedSignal[] | null {
   if (trendMode) {
     const trendSignals = buildTrendPdfRankedSignals(rows, kind, max);
@@ -1446,7 +1448,7 @@ function computePdfRankedSignalsFromChartRows(
 
   const dispKind: ChartKind =
     kind === "pie" || kind === "donut"
-      ? kind
+      ? "bar_horizontal"
       : kind === "bar_horizontal"
         ? "bar_horizontal"
         : "bar";
@@ -1473,18 +1475,24 @@ function computePdfRankedSignalsFromChartRows(
   const deduped = [...merged.values()];
   if (!deduped.length) return null;
 
+  const preferLow = ascending === true;
   deduped.sort((a, b) => {
-    const vb = Number(b.value) - Number(a.value);
-    if (vb !== 0) return vb;
+    const va = Number(a.value);
+    const vb = Number(b.value);
+    const delta = preferLow ? va - vb : vb - va;
+    if (delta !== 0) return delta;
     const ia = firstIndex.get(String(a.name)) ?? 0;
     const ib = firstIndex.get(String(b.name)) ?? 0;
     return ia - ib;
   });
 
-  const rankWords =
-    kind === "pie" || kind === "donut"
-      ? (["Largest", "Second", "Third"] as const)
-      : (["Highest", "Second", "Third"] as const);
+  const rankWords = preferLow
+    ? (["Lowest", "Second lowest", "Third lowest"] as const)
+    : ascending === false
+      ? (["Highest", "Second highest", "Third highest"] as const)
+      : kind === "pie" || kind === "donut"
+        ? (["Largest", "Second", "Third"] as const)
+        : (["Highest", "Second", "Third"] as const);
 
   return deduped.slice(0, max).map((row, i) => {
     const v = Number(row.value);
@@ -8101,17 +8109,22 @@ function HomeInner() {
     if (!chartData.length) return "";
     const fromContract = resolvePresentationKindFromContract(activeSnapshot);
     if (fromContract) return fromContract;
-    const pinnedKind = activeSnapshot?.chartKind;
-    if (pinnedKind) return pinnedKind;
-    if (chartType) return chartType;
-    const t = activeSnapshot?.timelineChartType;
-    if (t) return timelineTypeToChartKind(t);
-    return computeFinalChartPresentation({
+    const computed = computeFinalChartPresentation({
       apiChartType: visualization?.chartType ?? "bar",
       title: chartTitle,
       question: lastAskedQuestion,
       rows: chartData,
     });
+    const pinnedKind = activeSnapshot?.chartKind;
+    if (pinnedKind === "pie" || pinnedKind === "donut") {
+      if (computed !== "pie" && computed !== "donut") return computed;
+      return pinnedKind;
+    }
+    if (pinnedKind) return pinnedKind;
+    if (chartType) return chartType;
+    const t = activeSnapshot?.timelineChartType;
+    if (t) return timelineTypeToChartKind(t);
+    return computed;
   }, [
     chartData,
     chartData.length,
@@ -8395,17 +8408,22 @@ function HomeInner() {
     if (!insightChartData.length) return "";
     const fromContract = resolvePresentationKindFromContract(insightSnapshot);
     if (fromContract) return fromContract;
-    const pinnedKind = insightSnapshot?.chartKind;
-    if (pinnedKind) return pinnedKind;
-    if (insightChartType) return insightChartType;
-    const t = insightSnapshot?.timelineChartType;
-    if (t) return timelineTypeToChartKind(t);
-    return computeFinalChartPresentation({
+    const computed = computeFinalChartPresentation({
       apiChartType: insightVisualization?.chartType ?? "bar",
       title: insightChartTitle,
       question: lastAskedQuestion,
       rows: insightChartData,
     });
+    const pinnedKind = insightSnapshot?.chartKind;
+    if (pinnedKind === "pie" || pinnedKind === "donut") {
+      if (computed !== "pie" && computed !== "donut") return computed;
+      return pinnedKind;
+    }
+    if (pinnedKind) return pinnedKind;
+    if (insightChartType) return insightChartType;
+    const t = insightSnapshot?.timelineChartType;
+    if (t) return timelineTypeToChartKind(t);
+    return computed;
   }, [
     insightChartData,
     insightChartData.length,
@@ -8976,7 +8994,11 @@ function HomeInner() {
 
   const exportExecutiveInsightsPreview = useMemo(() => {
     if (!exportOptions.includeChart || !exportOptions.includeAIInsight) return null;
-    const scope = exportOptions.chartScope ?? "session";
+    const scope =
+      exportOptions.chartScope ??
+      (insightChartMatchesCurrentQuestion && insightChartData.length > 0
+        ? "insight"
+        : "session");
     const facts =
       scope === "insight" ? insightExecutiveVizInsights : executiveVizInsights;
     const brief = insightExecutiveBrief.trim();
@@ -9070,7 +9092,10 @@ function HomeInner() {
         ...options,
       };
       const chartScope: "insight" | "session" =
-        resolved.chartScope ?? "session";
+        resolved.chartScope ??
+        (insightChartMatchesCurrentQuestion && insightChartData.length > 0
+          ? "insight"
+          : "session");
       const pdfAlignedAnalysis =
         chartScope === "insight" ? insightAnalysisForExport : alignedAnalysis;
       const pdfInsightAnswer =
@@ -9080,10 +9105,37 @@ function HomeInner() {
       const pdfChartDataRaw = pdfSnap?.chartData ?? [];
       const pdfChartTitle = pdfSnap?.title ?? "";
       const pdfChartSubtitle = pdfSnap?.subtitle ?? "";
-      const pdfPresentationKind =
+      const pdfVizEarly =
+        (pdfSnap?.visualization ?? null) as StoredVisualization | null;
+      const pdfPresentationKindBase =
         chartScope === "insight"
           ? insightRenderedChartKind
           : sessionRenderedChartKind;
+      const pdfPresentationKind = (() => {
+        if (!pdfChartDataRaw.length || !pdfPresentationKindBase) {
+          return pdfPresentationKindBase;
+        }
+        const q =
+          chartScope === "insight"
+            ? lastAskedQuestion.trim() || question.trim()
+            : question.trim() || lastAskedQuestion.trim();
+        const recomputed = computeFinalChartPresentation({
+          apiChartType:
+            pdfVizEarly?.chartType ?? pdfPresentationKindBase ?? "bar",
+          title: pdfChartTitle,
+          question: q,
+          rows: pdfChartDataRaw,
+        });
+        if (
+          (pdfPresentationKindBase === "pie" ||
+            pdfPresentationKindBase === "donut") &&
+          recomputed !== "pie" &&
+          recomputed !== "donut"
+        ) {
+          return recomputed;
+        }
+        return pdfPresentationKindBase;
+      })();
       const pdfContract = pdfSnap?.contract;
       const exportContractCheck = validateExportMatchesContract({
         exportChartId: pdfSnap?.id ?? null,
@@ -9117,12 +9169,13 @@ function HomeInner() {
                 insightSnapshot?.source !== "auto_dashboard"
               ? pdfAlignedAnalysis
               : null;
+      const pdfSortAscending = pdfTrendMode
+        ? null
+        : isAscendingValueIntent(pdfAnalysisForSort, pdfViz);
       const pdfChartData = sortRowsForPresentation(
         pdfChartDataRaw,
         pdfPresentationKind,
-        pdfTrendMode
-          ? null
-          : isAscendingValueIntent(pdfAnalysisForSort, pdfViz),
+        pdfSortAscending,
         pdfTrendMode
       );
       const pdfRankedSignals =
@@ -9134,7 +9187,8 @@ function HomeInner() {
               pdfPresentationKind,
               3,
               pdfChartDataRaw,
-              pdfTrendMode
+              pdfTrendMode,
+              pdfSortAscending
             )
           : null;
       const pdfProv = pdfViz?.provenance;
@@ -9221,9 +9275,11 @@ function HomeInner() {
       });
       const pdfExportDisplayTitle =
         contractDisplayTitle(pdfContract, "") ||
-        (pdfSnap?.source === "auto_dashboard"
-          ? pdfChartTitle.trim() || pdfNormMeta.chartTitle
-          : pdfNormMeta.chartTitle);
+        (chartScope === "insight" && pdfSnap?.source !== "auto_dashboard"
+          ? insightDisplayChartTitle.trim() || pdfNormMeta.chartTitle
+          : pdfSnap?.source === "auto_dashboard"
+            ? pdfChartTitle.trim() || pdfNormMeta.chartTitle
+            : pdfNormMeta.chartTitle);
 
       const pdfChartInsightBadge =
         chartScope === "insight"
@@ -9244,7 +9300,10 @@ function HomeInner() {
           `The dataset contains ${Number(rowCount).toLocaleString()} rows and ${colCount} columns (${domainLabel} profile).`
         );
 
-        const q = question.trim();
+        const q =
+          chartScope === "insight"
+            ? lastAskedQuestion.trim() || question.trim()
+            : question.trim() || lastAskedQuestion.trim();
         if (q) {
           const qShort = q.length > 200 ? `${q.slice(0, 197)}…` : q;
           lines.push(`Question: ${qShort}`);
@@ -9264,11 +9323,17 @@ function HomeInner() {
             }
             return "";
           }
-          const fromAligned = alignedAnalysis?.insightSummary?.trim();
+          const fromAligned = pdfAlignedAnalysis?.insightSummary?.trim();
           if (fromAligned) {
             return wrap(fromAligned);
           }
-          const fromParsed = parsedInsightAnswer.summary?.trim();
+          const fromParsed =
+            chartScope === "insight"
+              ? parseAnswerIntoSections(
+                  pdfInsightAnswer,
+                  pdfAlignedAnalysis?.insightSummary ?? undefined
+                ).summary?.trim()
+              : parsedInsightAnswer.summary?.trim();
           if (fromParsed) {
             return wrap(fromParsed);
           }
@@ -9583,7 +9648,10 @@ function HomeInner() {
           ? "KPI dashboard (aligned with your question)"
           : "KPI dashboard",
         kpiCards: cardsPdf,
-        question,
+        question:
+          chartScope === "insight"
+            ? lastAskedQuestion.trim() || question.trim()
+            : question.trim() || lastAskedQuestion.trim(),
         answer:
           pdfTrendMode && pdfContract
             ? sanitizeNarrativeForTrendContract(pdfInsightAnswer, pdfContract)
@@ -9638,8 +9706,13 @@ function HomeInner() {
           hint: c.hint,
         })),
         executiveInsightsBrief:
-          resolved.includeAIInsight && insightExecutiveBrief.trim()
+          resolved.includeAIInsight &&
+          (chartScope === "insight"
             ? insightExecutiveBrief.trim()
+            : parsedInsightAnswer.summary?.trim() ?? "")
+            ? chartScope === "insight"
+              ? insightExecutiveBrief.trim()
+              : parsedInsightAnswer.summary?.trim()
             : undefined,
         provenance: provenanceSlice,
         chart: resolved.includeChart
@@ -9840,7 +9913,7 @@ function HomeInner() {
           {chartData.length > 0 && (
             <div
               ref={chartCaptureSessionRef}
-              className="fixed left-[-10000px] top-0 z-0 w-[860px] min-h-[400px] overflow-hidden bg-white rounded-lg border border-slate-100 p-5 pb-6 shadow-[0_1px_2px_rgba(15,23,42,0.045)]"
+              className="pdf-chart-capture chart-viz-theme fixed left-[-10000px] top-0 z-0 w-[860px] min-h-[400px] overflow-hidden rounded-lg border border-slate-100/90 bg-white p-4 pb-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
               aria-hidden="true"
             >
               {chartHeadingBlock}
@@ -9855,7 +9928,7 @@ function HomeInner() {
           {insightChartData.length > 0 && (
             <div
               ref={chartCaptureInsightRef}
-              className="fixed left-[-10000px] top-0 z-0 w-[860px] min-h-0 overflow-hidden bg-white rounded-xl border border-slate-200/70 p-5 pb-6 shadow-[0_12px_40px_-12px_rgb(15_23_42_/_0.12)]"
+              className="pdf-chart-capture chart-viz-theme fixed left-[-10000px] top-0 z-0 w-[860px] min-h-0 overflow-hidden rounded-xl border border-slate-200/70 bg-white p-4 pb-5 shadow-[0_8px_28px_-10px_rgb(15_23_42_/_0.1)]"
               aria-hidden="true"
             >
               {insightChartHeadingBlock}

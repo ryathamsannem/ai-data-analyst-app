@@ -11,11 +11,14 @@ import { pdfXAxisLineTitle, pdfYAxisLineTitle } from "@/lib/chart-semantic-metad
 type JsPdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
 
 /** PDF-only insight section labels (executive report tone). */
+const PDF_APP_NAME = "AI Data Analyst App";
+const PDF_REPORT_TITLE = "Executive insight report";
+
 const PDF_INSIGHT_SECTION_LABELS = {
   overview: "Executive overview",
   findings: "Key findings",
   interpretation: "Business interpretation",
-  actions: "Recommended actions",
+  actions: "Recommendations",
   methodology: "How this was calculated",
 } as const;
 
@@ -25,35 +28,228 @@ const PDF_BUSINESS_COPY_REPLACEMENTS: readonly [RegExp, string][] = [
   [/\bChart series points\b/gi, "Visualized categories"],
   [/\bRows in current filtered view\b/gi, "Records in filtered view"],
   [/\bTotal Rows\b/g, "Records in dataset"],
-  [/\blimited evidence in this cohort\b/gi, "directional findings in this cohort"],
-  [/\bdirectional read — limited evidence\b/gi, "Directional findings"],
-  [/\bEvidence is limited\b/gi, "Evidence strength: Limited"],
-  [/\btreat takeaways as directional, not definitive\b/gi, "treat findings as directional, not definitive"],
-  [/\bUse cautious language\b/gi, "Use measured language"],
+  [/\blimited evidence in this cohort\b/gi, "based on a limited sample in this view"],
+  [/\bdirectional findings in this cohort\b/gi, "based on a limited sample in this view"],
+  [/\bdirectional read — limited evidence\b/gi, "Preliminary read"],
+  [/\bDirectional findings\b/gi, "Preliminary read"],
+  [/\bEvidence is limited\b/gi, "Confidence: Limited"],
+  [/\bEvidence strength: Limited\b/gi, "Confidence: Limited"],
+  [/\btreat takeaways as directional, not definitive\b/gi, "treat as preliminary guidance"],
+  [/\btreat findings as directional, not definitive\b/gi, "treat as preliminary guidance"],
+  [/\bUse cautious language\b/gi, "Use careful wording"],
+  [/\bUse measured language\b/gi, "Use careful wording"],
+  [/\bcolumn mapping is still inferred\b/gi, "field mapping is auto-detected"],
+  [/\bconfirm metric and breakdown fields\b/gi, "verify metric and dimension fields"],
+  [/\bexploratory pattern\b/gi, "early pattern"],
+  [/\bexploratory analysis\b/gi, "initial analysis"],
+  [/\bPartial alignment or visualization caveats\b/gi, "Chart alignment notes"],
+  [/\bThin evidence in view\b/gi, "Limited sample in view"],
   [/\bchart points\b/gi, "visualized categories"],
   [/\brows analyzed\b/gi, "records analyzed"],
+  [/\bThis view is based on ([\d,]+) filtered row\(s\)/gi, "This view reflects $1 filtered records"],
+  [/\bDataset mapping confidence\b/gi, "Field mapping confidence"],
+  [/\bin this cohort\b/gi, "in this view"],
+  [/\bcohort\b/gi, "view"],
+  [/\binferred from the data\b/gi, "auto-detected from the data"],
+  [/\bengine metadata\b/gi, "system metadata"],
+  [
+    /\bdirectional read\s*[—–-]\s*based on a limited sample in this view\b/gi,
+    "Preliminary read based on a limited sample",
+  ],
+  [/\bPreliminary read\s*[—–-]\s*based on a limited sample in this view\b/gi, "Preliminary read based on a limited sample"],
+  [/\bbased on a limited sample in this view\b/gi, "based on a limited sample"],
+  [
+    /\bGap\s*\(\s*peak\s*["'”]?\s*[^)]*lowest[^)]*\)/gi,
+    "Gap between peak and lowest",
+  ],
+  [/\bGap\s*\([^)]*↔[^)]*\)/gi, "Gap between peak and lowest"],
 ];
+
+/** ~12–18px in mm — spacing below insight paragraphs in PDF. */
+const PDF_INSIGHT_PARAGRAPH_GAP_MM = 4.5;
+/** Extra space before KPI rows in executive snapshot (~14px). */
+const PDF_SNAPSHOT_KPI_TOP_GAP_MM = 4;
+
+/** Strip control chars and fix common PDF encoding glitches. */
+function sanitizePdfSpecialCharacters(raw: string): string {
+  return raw
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+    .replace(/↔/g, " to ")
+    .replace(/[“”]/g, '"')
+    .replace(/['']/g, "'")
+    .replace(/\s*!\s*["'`]?\s*$/g, "")
+    .replace(/["'`]{1,3}\s*(?=lowest)/gi, "")
+    .replace(/\(\s*peak\s*["'`]?\s*/gi, "(peak ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Collapse any consecutive duplicate words globally. */
+function collapsePdfDuplicateWords(raw: string): string {
+  let t = raw;
+  for (let pass = 0; pass < 8; pass++) {
+    const next = t.replace(/\b([\w][\w'-]*)\s+\1\b/gi, "$1");
+    if (next === t) break;
+    t = next;
+  }
+  return t;
+}
+
+/** Fix locale-broken dates (2,026-2-4) and normalize to YYYY-MM-DD. */
+function normalizePdfDatesInText(raw: string): string {
+  let t = raw;
+  t = t.replace(
+    /(\d{1,4}(?:,\d{3})*)-(\d{1,2})-(\d{1,2})\b/g,
+    (_, y, m, d) => {
+      const year = String(y).replace(/,/g, "");
+      const mm = String(m).padStart(2, "0");
+      const dd = String(d).padStart(2, "0");
+      return `${year}-${mm}-${dd}`;
+    }
+  );
+  t = t.replace(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g, (_, y, m, d) => {
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  });
+  return t;
+}
+
+function pdfParseIsoDateLabel(label: string): string | null {
+  const t = label.trim();
+  if (!t) return null;
+  const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const broken = t.match(/^(\d{1,4}(?:,\d{3})*)-(\d{1,2})-(\d{1,2})/);
+  if (broken) {
+    const year = broken[1].replace(/,/g, "");
+    return `${year}-${String(broken[2]).padStart(2, "0")}-${String(broken[3]).padStart(2, "0")}`;
+  }
+  const parsed = Date.parse(t);
+  if (!Number.isNaN(parsed) && /[/-]/.test(t)) {
+    const d = new Date(parsed);
+    if (d.getFullYear() >= 1990 && d.getFullYear() <= 2100) {
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${d.getFullYear()}-${mm}-${dd}`;
+    }
+  }
+  return null;
+}
+
+/** Category axis label for PDF (dates stay YYYY-MM-DD, no thousands separators). */
+function formatPdfCategoryLabel(raw: string): string {
+  const iso = pdfParseIsoDateLabel(raw);
+  if (iso) return iso;
+  return polishPdfBusinessCopy(humanizePdfDumpLabel(raw));
+}
+
+function normalizePdfMetricPhrase(metricHint: string | null | undefined): string {
+  let m = polishPdfBusinessCopy(String(metricHint ?? "").trim());
+  m = m.replace(/^(highest|lowest|maximum|minimum)\s+/i, "");
+  m = m.replace(/^total\s+/i, "total ");
+  return m.trim() || "value";
+}
+
+function pdfIsTrendChart(kind: ChartKind, data: ChartRow[]): boolean {
+  if (kind !== "line" && kind !== "area") return false;
+  if (data.length < 2) return false;
+  const sample = data.slice(0, Math.min(8, data.length));
+  const dateHits = sample.filter((r) =>
+    pdfParseIsoDateLabel(String(r.name ?? ""))
+  ).length;
+  return dateHits >= Math.max(2, Math.ceil(sample.length * 0.4));
+}
+
+function isStaleStandaloneMetricTitle(
+  text: string,
+  metricHint: string | null,
+  chartTitle: string | null
+): boolean {
+  const t = text.trim();
+  if (!t || t.length > 120) return false;
+  if (/\b(has|at|followed|between|with|during|from|to)\b/i.test(t)) return false;
+  const norm = (s: string) =>
+    s
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+  const tn = norm(t);
+  for (const hint of [metricHint, chartTitle]) {
+    if (!hint?.trim()) continue;
+    const hn = norm(hint);
+    if (tn === hn || tn === `total ${hn}` || hn === tn) return true;
+  }
+  if (
+    /^(total\s+)?[a-z][a-z\s]{2,60}(units|percent|cost|loss|count|amount)?$/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
 
 /** Polish user-facing PDF copy — terminology only; no layout changes. */
 export function polishPdfBusinessCopy(raw: string | null | undefined): string {
   if (raw == null) return "";
   let t = String(raw).replace(/\s+/g, " ").trim();
+  t = sanitizePdfSpecialCharacters(t);
   for (const [re, repl] of PDF_BUSINESS_COPY_REPLACEMENTS) {
     t = t.replace(re, repl);
   }
-  return t;
+  t = collapsePdfDuplicateWords(t);
+  t = normalizePdfDatesInText(t);
+  return t.trim();
 }
 
-function polishPdfKpiLabel(title: string): string {
+/** Executive-friendly labels for KPI cards, insight tiles, and metadata. */
+function polishPdfExecutiveLabel(title: string): string {
   const key = title.trim().toLowerCase();
   const exact: Record<string, string> = {
     "rows in analysis": "Records analyzed",
     "chart series points": "Visualized categories",
     "rows in current filtered view": "Records in filtered view",
     "total rows": "Records in dataset",
+    axes: "Chart dimensions",
+    metric: "Primary metric",
+    "auto dashboard": "Automated dashboard",
+    "auto_dashboard": "Automated dashboard",
   };
   if (exact[key]) return exact[key];
-  return polishPdfBusinessCopy(title);
+
+  let t = title.trim();
+  const phraseRules: readonly [RegExp, string][] = [
+    [/production\s+loss\s+units\s+gap/gi, "Production Loss Gap"],
+    [/highest\s+production\s+loss(?:\s+units)?/gi, "Highest Production Loss"],
+    [/lowest\s+production\s+loss(?:\s+units)?/gi, "Lowest Production Loss"],
+    [/average\s+production\s+loss(?:\s+units)?/gi, "Average Production Loss"],
+    [/maximum\s+production\s+loss(?:\s+units)?/gi, "Maximum Production Loss"],
+    [/minimum\s+production\s+loss(?:\s+units)?/gi, "Minimum Production Loss"],
+    [/production\s+loss\s+units/gi, "Production Loss"],
+    [/^\s*highest\s+plant\s*$/i, "Top Plant"],
+    [/^\s*lowest\s+plant\s*$/i, "Bottom Plant"],
+    [/^\s*highest\s+(\w+)/i, "Highest $1"],
+    [/^\s*lowest\s+(\w+)/i, "Lowest $1"],
+    [/gap\s+between\s+peak\s+and\s+lowest/gi, "Gap between peak and lowest"],
+  ];
+  for (const [re, repl] of phraseRules) {
+    t = t.replace(re, repl);
+  }
+  t = polishPdfBusinessCopy(t);
+  if (/^[a-z0-9][a-z0-9\s/_-]*$/.test(t) && t.length > 2) {
+    t = t
+      .split(/\s+/)
+      .map((w) => {
+        if (!w) return w;
+        if (/^(by|of|and|or|in|to|vs)$/i.test(w)) return w.toLowerCase();
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      })
+      .join(" ");
+  }
+  return t;
+}
+
+function polishPdfKpiLabel(title: string): string {
+  return polishPdfExecutiveLabel(title);
 }
 
 function polishPdfConfidenceLevel(level: Confidence): string {
@@ -66,12 +262,27 @@ function polishPdfConfidenceLevel(level: Confidence): string {
  * Height (mm) of a non-split table: must match `drawDataTable` row measurement
  * when `suppressRowPageBreaks` is true (used for page-break planning).
  */
+function mixRgb(
+  a: [number, number, number],
+  b: [number, number, number],
+  ratio: number
+): [number, number, number] {
+  const t = Math.min(1, Math.max(0, ratio));
+  return [
+    Math.round(a[0] * (1 - t) + b[0] * t),
+    Math.round(a[1] * (1 - t) + b[1] * t),
+    Math.round(a[2] * (1 - t) + b[2] * t),
+  ];
+}
+
 function measureMonolithicTableStackMm(
   doc: JsPdfDocument,
   contentWidth: number,
   headsIn: string[],
   bodyIn: string[][],
-  fontSize: number
+  fontSize: number,
+  cellPad = 1.6,
+  outerFrameMm = 4
 ): number {
   const n = headsIn.length;
   if (n === 0) return 0;
@@ -84,7 +295,7 @@ function measureMonolithicTableStackMm(
       return s.length > 140 ? `${s.slice(0, 137)}…` : s;
     })
   );
-  const pad = 1.6;
+  const pad = cellPad;
   const weights = heads.map((head, col) => {
     let w = Math.min(Math.max(head.length, 6), 26);
     for (const row of body) {
@@ -109,7 +320,7 @@ function measureMonolithicTableStackMm(
   };
   measureRow(heads, true);
   for (const row of body) measureRow(row, false);
-  return totalH + 4;
+  return totalH + outerFrameMm;
 }
 
 export const REPORT_BRANDING_STORAGE_KEY = "ai-data-analyst-report-branding-v1";
@@ -379,47 +590,38 @@ function sanitizeExecutivePdfExportInput(
   raw: ExecutivePdfExportInput
 ): ExecutivePdfExportInput {
   const sLine = (line: string) => sanitizeUserFacingReportText(line);
-  const execSummaryLines = raw.execSummaryLines
-    .map((l) => polishPdfBusinessCopy(sLine(l)))
-    .filter((l) => l.length > 0);
-
-  const kpiCards = raw.kpiCards.map((c) => ({
-    title: polishPdfKpiLabel(sanitizeUserFacingReportText(c.title)),
-    value: polishPdfBusinessCopy(sanitizeUserFacingReportText(c.value)),
-    subtitle:
-      c.subtitle != null
-        ? polishPdfBusinessCopy(sanitizeUserFacingReportText(String(c.subtitle)))
-        : c.subtitle,
-  }));
-
-  const vizExecutiveFacts = (raw.vizExecutiveFacts ?? []).map((f) => ({
-    title: polishPdfKpiLabel(sanitizeUserFacingReportText(f.title)),
-    value: polishPdfBusinessCopy(sanitizeUserFacingReportText(f.value)),
-    hint:
-      f.hint != null
-        ? polishPdfBusinessCopy(sanitizeUserFacingReportText(f.hint))
-        : f.hint,
-  }));
-
-  const pdfRankedSignals = (raw.pdfRankedSignals ?? [])
-    .map((r) => ({
-      rank: sanitizeUserFacingReportText(r.rank),
-      category: sanitizeUserFacingReportText(r.category),
-      valueDisplay: sanitizeUserFacingReportText(r.valueDisplay),
-    }))
-    .filter((r) => r.rank.length > 0 && r.category.length > 0 && r.valueDisplay.length > 0);
-
-  const chartThumbnails = raw.chartThumbnails.map((t) => ({
-    ...t,
-    title: sanitizeUserFacingReportText(t.title),
-    kind: sanitizeUserFacingReportText(t.kind),
-  }));
+  const questionClean = polishPdfBusinessCopy(
+    sanitizeUserFacingReportText(raw.question)
+  );
+  const ascendingQ = pdfAscendingFromQuestion(questionClean);
+  const rankingQ = pdfIsRankingQuestion(questionClean);
 
   let chart = raw.chart;
   if (chart) {
+    const coercedKind = pdfCoercePresentationKindForRanking(
+      chart.presentationKind,
+      questionClean
+    );
+    const data = chart.data.map((row) => ({
+      ...row,
+      displayValue: rankingQ
+        ? formatPdfChartRowMetricDisplay(row, coercedKind)
+        : row.displayValue,
+    }));
     chart = {
       ...chart,
-      title: sanitizeUserFacingReportText(chart.title),
+      presentationKind: coercedKind,
+      data,
+      title: resolvePdfChartTitle(
+        questionClean,
+        sanitizeUserFacingReportText(chart.title),
+        chart.alignedMetricDisplay
+          ? sanitizeUserFacingReportText(chart.alignedMetricDisplay)
+          : null,
+        chart.aggregation
+          ? sanitizeUserFacingReportText(chart.aggregation)
+          : null
+      ),
       subtitle: sanitizeUserFacingReportText(chart.subtitle),
       alignedMetric: chart.alignedMetric
         ? sanitizeUserFacingReportText(chart.alignedMetric)
@@ -436,6 +638,136 @@ function sanitizeExecutivePdfExportInput(
           : chart.chartAttribution,
     };
   }
+
+  const trendQ = Boolean(
+    chart?.data.length && pdfIsTrendChart(chart.presentationKind, chart.data)
+  );
+
+  let pdfRankedSignals = (raw.pdfRankedSignals ?? [])
+    .map((r) => ({
+      rank: polishPdfBusinessCopy(sanitizeUserFacingReportText(r.rank)),
+      category: formatPdfCategoryLabel(sanitizeUserFacingReportText(r.category)),
+      valueDisplay: polishPdfBusinessCopy(
+        sanitizeUserFacingReportText(r.valueDisplay)
+      ),
+    }))
+    .filter((r) => r.rank.length > 0 && r.category.length > 0 && r.valueDisplay.length > 0);
+
+  if (chart?.data.length && trendQ) {
+    pdfRankedSignals = pdfTrendRankedSignalsFromChartData(
+      chart.data,
+      chart.presentationKind,
+      3
+    );
+  } else if (chart?.data.length && rankingQ) {
+    const fromChart = pdfRankedSignalsFromChartData(
+      chart.data,
+      chart.presentationKind,
+      ascendingQ,
+      3
+    );
+    if (fromChart.length) pdfRankedSignals = fromChart;
+  }
+
+  const metricHintForNarrative =
+    chart?.alignedMetricDisplay?.trim() ||
+    chart?.alignedMetric?.trim() ||
+    raw.chartAxisLabels?.value?.trim() ||
+    null;
+  const executiveNarrative =
+    pdfRankedSignals.length > 0
+      ? formatPdfRankedSignalsNarrative(
+          pdfRankedSignals,
+          metricHintForNarrative,
+          questionClean
+        )
+      : "";
+
+  let execSummaryLines = raw.execSummaryLines
+    .map((l) => polishPdfBusinessCopy(sLine(l)))
+    .filter((l) => l.length > 0);
+
+  const staleTitle = chart?.title?.trim() ?? null;
+  if (executiveNarrative) {
+    execSummaryLines = execSummaryLines
+      .filter((l) => {
+        const t = l.trim();
+        if (/^name\s+value\b/i.test(t)) return false;
+        if (isStructuredDumpExecutiveLine(t)) return false;
+        const afterColon = t.includes(":")
+          ? t.slice(t.indexOf(":") + 1).trim()
+          : t;
+        if (isStructuredDumpExecutiveLine(afterColon)) return false;
+        if (
+          isStaleStandaloneMetricTitle(
+            afterColon || t,
+            metricHintForNarrative,
+            staleTitle
+          )
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((l) => {
+        if (/^main takeaway:/i.test(l)) {
+          return `Main takeaway: ${executiveNarrative}`;
+        }
+        return l;
+      });
+    if (!execSummaryLines.some((l) => /^main takeaway:/i.test(l))) {
+      execSummaryLines.splice(
+        Math.min(2, execSummaryLines.length),
+        0,
+        `Main takeaway: ${executiveNarrative}`
+      );
+    }
+  }
+
+  const kpiCards = raw.kpiCards.map((c) => ({
+    title: polishPdfKpiLabel(sanitizeUserFacingReportText(c.title)),
+    value: polishPdfBusinessCopy(sanitizeUserFacingReportText(c.value)),
+    subtitle:
+      c.subtitle != null
+        ? polishPdfBusinessCopy(sanitizeUserFacingReportText(String(c.subtitle)))
+        : c.subtitle,
+  }));
+
+  const vizExecutiveFacts =
+    chart?.data.length && trendQ
+      ? buildPdfTrendVizExecutiveFacts(
+          chart.data,
+          chart.alignedMetricDisplay ?? chart.alignedMetric ?? null
+        ).map((f) => ({
+          title: polishPdfKpiLabel(f.title),
+          value: polishPdfBusinessCopy(f.value),
+        }))
+      : chart?.data.length && rankingQ
+        ? buildPdfVizExecutiveFacts(
+            chart.data,
+            chart.presentationKind,
+            ascendingQ,
+            chart.alignedMetricDisplay ?? chart.alignedMetric ?? null,
+            raw.chartAxisLabels?.category ?? null
+          ).map((f) => ({
+            title: polishPdfKpiLabel(f.title),
+            value: polishPdfBusinessCopy(f.value),
+            hint: f.hint ? polishPdfBusinessCopy(f.hint) : undefined,
+          }))
+        : (raw.vizExecutiveFacts ?? []).map((f) => ({
+          title: polishPdfKpiLabel(sanitizeUserFacingReportText(f.title)),
+          value: polishPdfBusinessCopy(sanitizeUserFacingReportText(f.value)),
+          hint:
+            f.hint != null
+              ? polishPdfBusinessCopy(sanitizeUserFacingReportText(f.hint))
+              : f.hint,
+        }));
+
+  const chartThumbnails = raw.chartThumbnails.map((t) => ({
+    ...t,
+    title: sanitizeUserFacingReportText(t.title),
+    kind: sanitizeUserFacingReportText(t.kind),
+  }));
 
   let provenance = raw.provenance;
   if (provenance?.notes) {
@@ -473,8 +805,12 @@ function sanitizeExecutivePdfExportInput(
 
   let insightSections = raw.insightSections;
   if (insightSections) {
+    const sumRaw = sanitizeUserFacingReportText(insightSections.summary);
     const sum = polishPdfBusinessCopy(
-      sanitizeUserFacingReportText(insightSections.summary)
+      executiveNarrative &&
+        (isStructuredDumpExecutiveLine(sumRaw) || /^name\s+value\b/i.test(sumRaw))
+        ? executiveNarrative
+        : sumRaw
     );
     const st = insightSections.statistical
       ? polishPdfBusinessCopy(
@@ -529,25 +865,31 @@ function sanitizeExecutivePdfExportInput(
 
   return {
     ...raw,
-    kpiSectionTitle: sanitizeUserFacingReportText(raw.kpiSectionTitle),
+    kpiSectionTitle: polishPdfExecutiveLabel(
+      sanitizeUserFacingReportText(raw.kpiSectionTitle)
+    ),
     execSummaryLines,
     kpiCards,
-    question: polishPdfBusinessCopy(sanitizeUserFacingReportText(raw.question)),
+    question: questionClean,
     answer,
     insightSections,
-    insightSummary: raw.insightSummary
-      ? polishPdfBusinessCopy(sanitizeUserFacingReportText(raw.insightSummary))
-      : raw.insightSummary,
+    insightSummary: executiveNarrative
+      ? executiveNarrative
+      : raw.insightSummary
+        ? polishPdfBusinessCopy(sanitizeUserFacingReportText(raw.insightSummary))
+        : raw.insightSummary,
     chartInsightBadge: raw.chartInsightBadge
       ? polishPdfBusinessCopy(sanitizeUserFacingReportText(raw.chartInsightBadge))
       : raw.chartInsightBadge,
     pdfRankedSignals: pdfRankedSignals.length ? pdfRankedSignals : undefined,
     vizExecutiveFacts,
-    executiveInsightsBrief: raw.executiveInsightsBrief?.trim()
-      ? polishPdfBusinessCopy(
-          sanitizeUserFacingReportText(raw.executiveInsightsBrief)
-        )
-      : undefined,
+    executiveInsightsBrief: executiveNarrative
+      ? executiveNarrative
+      : raw.executiveInsightsBrief?.trim()
+        ? polishPdfBusinessCopy(
+            sanitizeUserFacingReportText(raw.executiveInsightsBrief)
+          )
+        : undefined,
     provenance,
     chart,
     chartAxisLabels,
@@ -637,25 +979,90 @@ function drawSparkline(
   });
 }
 
+function resolvePdfChartPlotRoot(container: HTMLElement): HTMLElement {
+  const selectors = [
+    ".ai-insights-viz-plot-host .recharts-responsive-container",
+    ".ai-insights-viz-plot .recharts-responsive-container",
+    ".recharts-responsive-container",
+    ".recharts-wrapper",
+  ];
+  for (const sel of selectors) {
+    const el = container.querySelector(sel);
+    if (el instanceof HTMLElement) return el;
+  }
+  return container;
+}
+
+function findPrimaryChartSvg(root: HTMLElement): SVGSVGElement | null {
+  const svgs = [...root.querySelectorAll("svg")].filter(
+    (s): s is SVGSVGElement => s instanceof SVGSVGElement
+  );
+  if (!svgs.length) return null;
+  let best = svgs[0]!;
+  let bestArea = 0;
+  for (const svg of svgs) {
+    const r = svg.getBoundingClientRect();
+    const area = r.width * r.height;
+    if (area > bestArea) {
+      bestArea = area;
+      best = svg;
+    }
+  }
+  return bestArea > 4 ? best : svgs[0] ?? null;
+}
+
+function cloneSvgWithInlineStyles(source: SVGSVGElement): SVGSVGElement {
+  const clone = source.cloneNode(true) as SVGSVGElement;
+  const tagSel =
+    "path,rect,circle,line,text,polygon,polyline,g";
+  const srcEls = source.querySelectorAll(tagSel);
+  const cloneEls = clone.querySelectorAll(tagSel);
+  cloneEls.forEach((el, i) => {
+    const src = srcEls[i];
+    if (!src) return;
+    const cs = window.getComputedStyle(src);
+    const fill = cs.fill;
+    const stroke = cs.stroke;
+    if (fill && fill !== "none" && !fill.includes("rgba(0, 0, 0, 0)")) {
+      el.setAttribute("fill", fill);
+    }
+    if (stroke && stroke !== "none") {
+      el.setAttribute("stroke", stroke);
+    }
+    const sw = cs.strokeWidth;
+    if (sw && sw !== "0px") el.setAttribute("stroke-width", sw);
+    if (el.tagName === "text") {
+      const col = cs.fill || cs.color;
+      if (col) el.setAttribute("fill", col);
+      const fs = cs.fontSize;
+      if (fs) el.setAttribute("font-size", fs);
+    }
+  });
+  return clone;
+}
+
 async function renderChartSvgToPng(
   container: HTMLElement,
   scale = 2
 ): Promise<{ dataUrl: string; width: number; height: number } | null> {
-  const svg = container.querySelector("svg");
+  const plotRoot = resolvePdfChartPlotRoot(container);
+  const svg = findPrimaryChartSvg(plotRoot);
   if (!svg) return null;
 
   const rect = svg.getBoundingClientRect();
   let width = Math.max(1, Math.round(rect.width));
   let height = Math.max(1, Math.round(rect.height));
   if (width <= 2 || height <= 2) {
-    width = Math.max(container.clientWidth || 720, 1);
-    height = Math.max(container.clientHeight || 320, 1);
+    const pr = plotRoot.getBoundingClientRect();
+    width = Math.max(pr.width || plotRoot.clientWidth || 720, 1);
+    height = Math.max(pr.height || plotRoot.clientHeight || 320, 1);
   }
 
-  const clone = svg.cloneNode(true) as SVGElement;
+  const clone = cloneSvgWithInlineStyles(svg);
   clone.setAttribute("width", String(width));
   clone.setAttribute("height", String(height));
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
   const svgString = new XMLSerializer().serializeToString(clone);
 
@@ -664,11 +1071,45 @@ async function renderChartSvgToPng(
   canvas.height = height * scale;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
   const v = await Canvg.fromString(ctx, svgString);
   await v.render();
   return { dataUrl: canvas.toDataURL("image/png"), width, height };
+}
+
+async function captureChartPlotToPng(
+  container: HTMLElement,
+  scale = 2
+): Promise<{ dataUrl: string; width: number; height: number }> {
+  try {
+    const fromSvg = await renderChartSvgToPng(container, scale);
+    if (fromSvg?.dataUrl) return fromSvg;
+  } catch (err) {
+    console.warn("Chart SVG capture for PDF failed:", err);
+  }
+  const plotRoot = resolvePdfChartPlotRoot(container);
+  const { default: html2canvas } = await import("html2canvas");
+  const canvas = await html2canvas(plotRoot, {
+    scale,
+    useCORS: true,
+    backgroundColor: "#ffffff",
+    logging: false,
+    ignoreElements: (el) => {
+      if (!(el instanceof HTMLElement)) return false;
+      return Boolean(
+        el.closest("[aria-hidden='true']") &&
+          !el.closest(".recharts-wrapper")
+      );
+    },
+  });
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    width: Math.max(1, Math.round(canvas.width / scale)),
+    height: Math.max(1, Math.round(canvas.height / scale)),
+  };
 }
 
 function sanitizeFileBase(s: string): string {
@@ -686,6 +1127,88 @@ function chartTypeLabel(kind: ChartKind): string {
   if (kind === "scatter") return "Scatter";
   if (kind === "histogram") return "Histogram";
   return "Bar";
+}
+
+/** Presentation labels for appendix badges and metadata. */
+function pdfChartKindExecutiveLabel(kind: ChartKind | string): string {
+  const k = String(kind ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const map: Record<string, string> = {
+    bar_horizontal: "Horizontal Bar Chart",
+    horizontalbar: "Horizontal Bar Chart",
+    bar: "Category Bar Chart",
+    line: "Trend Line Chart",
+    area: "Trend Area Chart",
+    pie: "Category Distribution",
+    donut: "Share Distribution",
+    scatter: "Relationship Chart",
+    histogram: "Distribution Histogram",
+    auto_dashboard: "Automated Dashboard",
+  };
+  return map[k] ?? polishPdfExecutiveLabel(chartTypeLabel(kind as ChartKind));
+}
+
+function drawPdfChartKindBadge(
+  doc: JsPdfDocument,
+  x: number,
+  y: number,
+  maxW: number,
+  label: string,
+  accent: [number, number, number],
+  panel: [number, number, number]
+) {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6);
+  const text = label.slice(0, 42);
+  const tw = Math.min(maxW - 4, doc.getTextWidth(text) + 4);
+  const bh = 4.2;
+  const fill = mixRgb(panel, accent, 0.35);
+  doc.setFillColor(fill[0], fill[1], fill[2]);
+  doc.setDrawColor(accent[0], accent[1], accent[2]);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(x, y, tw, bh, 0.8, 0.8, "FD");
+  doc.setTextColor(accent[0], accent[1], accent[2]);
+  doc.text(text, x + 2, y + 2.8);
+  doc.setTextColor(0, 0, 0);
+}
+
+function drawPdfSessionThumbnailCard(
+  doc: JsPdfDocument,
+  x: number,
+  yTop: number,
+  w: number,
+  h: number,
+  thumb: PdfChartThumb,
+  accent: [number, number, number],
+  themePanel: [number, number, number],
+  themeLine: [number, number, number],
+  themeInk: [number, number, number],
+  themeMuted: [number, number, number]
+) {
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(themeLine[0], themeLine[1], themeLine[2]);
+  doc.setLineWidth(0.22);
+  doc.roundedRect(x, yTop, w, h, 1.4, 1.4, "FD");
+  const plotH = Math.max(8, h - 16);
+  drawSparkline(doc, x + 2, yTop + 2, w - 4, plotH, thumb.values, accent);
+  const badgeLabel = pdfChartKindExecutiveLabel(thumb.kind);
+  drawPdfChartKindBadge(
+    doc,
+    x + 2,
+    yTop + plotH + 3,
+    w - 4,
+    badgeLabel,
+    accent,
+    themePanel
+  );
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(themeInk[0], themeInk[1], themeInk[2]);
+  const ttl = doc.splitTextToSize(polishPdfExecutiveLabel(thumb.title), w - 4);
+  doc.text(ttl.slice(0, 1), x + 2, yTop + h - 3.5);
+  doc.setTextColor(0, 0, 0);
 }
 
 export function datasetKindLabel(kind: string): string {
@@ -796,11 +1319,23 @@ function isStructuredDumpExecutiveLine(line: string): boolean {
 }
 
 function formatNumericTokensInSignalLine(s: string): string {
-  return s.replace(/\b(-?[\d,]+(?:\.\d+)?)\b/g, (match) => {
-    const n = Number(match.replace(/,/g, ""));
-    if (!Number.isFinite(n)) return match;
-    return formatPdfBusinessNumber(n);
-  });
+  const normalized = normalizePdfDatesInText(s);
+  return normalized.replace(
+    /\b(-?[\d,]+(?:\.\d+)?)\b/g,
+    (match, _g1, offset, full) => {
+      const before = full.slice(Math.max(0, offset - 6), offset);
+      const after = full.slice(offset + match.length, offset + match.length + 4);
+      if (/\d{4}-$/.test(before) || /^-\d{1,2}/.test(after)) {
+        return match.replace(/,/g, "");
+      }
+      const n = Number(match.replace(/,/g, ""));
+      if (!Number.isFinite(n)) return match;
+      if (n >= 1900 && n <= 2100 && /-$/.test(before)) {
+        return String(Math.round(n));
+      }
+      return formatPdfBusinessNumber(n);
+    }
+  );
 }
 
 /** Short category-style label for PDF bullets (drops long metric-prefixed junk). */
@@ -821,6 +1356,386 @@ function extractShortSignalName(rawLabel: string): string {
     if (two.length <= 28) return two;
   }
   return t.length > 28 ? `${t.slice(0, 25)}…` : t;
+}
+
+function pdfAscendingFromQuestion(question: string): boolean | null {
+  const q = question.toLowerCase();
+  if (/\b(lowest|minimum|least|bottom|smallest)\b/.test(q)) return true;
+  if (/\b(highest|maximum|top|largest|greatest)\b/.test(q)) return false;
+  return null;
+}
+
+function pdfIsRankingQuestion(question: string): boolean {
+  const q = question.toLowerCase();
+  return (
+    pdfAscendingFromQuestion(question) !== null ||
+    /\b(rank|ranking|compare|comparison|which\s+\w+\s+has)\b/.test(q)
+  );
+}
+
+function effectivePdfMetricNumber(row: ChartRow): number {
+  const dv = row.displayValue?.trim();
+  if (dv) {
+    const parsed = Number(dv.replace(/[^0-9.-]+/g, ""));
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  const v = Number(row.value);
+  if (!Number.isFinite(v)) return NaN;
+  if (v > 0 && v <= 1) return v * 100;
+  return v;
+}
+
+function formatPdfChartRowMetricDisplay(row: ChartRow, kind: ChartKind): string {
+  const metricKind: ChartKind =
+    kind === "pie" || kind === "donut" ? "bar_horizontal" : kind;
+  const dv = row.displayValue?.trim();
+  const n = effectivePdfMetricNumber(row);
+  if (Number.isFinite(n)) {
+    if (n > 20 && n <= 100) {
+      const rounded = Math.abs(n - Math.round(n)) < 0.05 ? Math.round(n) : n;
+      const pct = `${rounded}%`;
+      if (dv && dv.includes("%")) return dv;
+      return pct;
+    }
+    if (dv && !metricKind.includes("pie")) return dv;
+    return fallbackChartNumericDisplay(metricKind, n);
+  }
+  return dv || fallbackChartNumericDisplay(metricKind, Number(row.value));
+}
+
+function pdfCoercePresentationKindForRanking(
+  kind: ChartKind,
+  question: string
+): ChartKind {
+  if (!pdfIsRankingQuestion(question)) return kind;
+  if (kind === "pie" || kind === "donut") return "bar_horizontal";
+  return kind;
+}
+
+export function resolvePdfChartTitle(
+  question: string,
+  fallbackTitle: string,
+  metricDisplay?: string | null,
+  aggregation?: string | null
+): string {
+  const q = question.toLowerCase();
+  const fb = fallbackTitle.trim();
+  const ascending = pdfAscendingFromQuestion(question);
+  const staleEmployee =
+    /\bemployee\s+count\b/i.test(fb) &&
+    (/\battendance\b/.test(q) || /\battendance\b/i.test(metricDisplay ?? ""));
+
+  if (/\battendance\b/.test(q) && /\bdepartment\b/.test(q)) {
+    if (ascending === true) return "Minimum attendance percent by department";
+    if (ascending === false) return "Maximum attendance percent by department";
+    return "Total attendance percent by department";
+  }
+
+  if (staleEmployee && metricDisplay) {
+    const met = metricDisplay.trim();
+    if (/\battendance\b/i.test(met)) {
+      if (ascending === true) return `Minimum ${met} by department`;
+      if (ascending === false) return `Maximum ${met} by department`;
+      return `${met} by department`;
+    }
+  }
+
+  if (staleEmployee) {
+    return ascending === true
+      ? "Minimum attendance percent by department"
+      : "Total attendance percent by department";
+  }
+
+  if (fb && !staleEmployee) return fb;
+  if (metricDisplay?.trim()) {
+    const agg = (aggregation ?? "").toLowerCase();
+    const prefix =
+      agg === "min" || agg === "minimum"
+        ? "Minimum "
+        : agg === "max" || agg === "maximum"
+          ? "Maximum "
+          : "";
+    return `${prefix}${metricDisplay.trim()} by department`;
+  }
+  return fb || "Chart";
+}
+
+function resolvePdfRankedMetricPhrase(
+  question: string,
+  metricHint: string | null | undefined,
+  preferLow: boolean
+): string {
+  const q = question.toLowerCase();
+  const hint = (metricHint ?? "").toLowerCase();
+  if (/\battendance\b/.test(q) || /\battendance\b/.test(hint)) {
+    if (/\b(lowest|minimum|least)\b/.test(q) || preferLow) {
+      return "minimum attendance percent";
+    }
+    if (/\b(highest|maximum|top)\b/.test(q)) return "maximum attendance percent";
+    return "attendance percent";
+  }
+  const cleaned = normalizePdfMetricPhrase(metricHint);
+  if (cleaned) {
+    return preferLow ? `lowest ${cleaned}` : `highest ${cleaned}`;
+  }
+  return preferLow ? "value" : "value";
+}
+
+function formatPdfTrendRankedNarrative(
+  signals: PdfRankedSignal[],
+  metricHint?: string | null
+): string {
+  const ranked = signals.filter(
+    (s) => !/^gap\b/i.test(s.rank) && !/↔/.test(s.category)
+  );
+  if (!ranked.length) return "";
+  const lead = ranked[0]!;
+  const metric = normalizePdfMetricPhrase(metricHint);
+  const cat0 = formatPdfCategoryLabel(lead.category);
+  const val0 = polishPdfBusinessCopy(lead.valueDisplay);
+  let sentence = `${cat0} has the highest ${metric} at ${val0}`;
+  if (ranked[1]) {
+    const cat1 = formatPdfCategoryLabel(ranked[1].category);
+    const val1 = polishPdfBusinessCopy(ranked[1].valueDisplay);
+    sentence += `, followed by ${cat1} at ${val1}`;
+  }
+  return `${sentence}.`;
+}
+
+/** Executive sentence from ranked chart signals (e.g. lowest attendance by department). */
+export function formatPdfRankedSignalsNarrative(
+  signals: PdfRankedSignal[],
+  metricHint?: string | null,
+  question = ""
+): string {
+  if (!signals.length) return "";
+  const lead = signals[0]!;
+  const leadCat = formatPdfCategoryLabel(lead.category);
+  const trendLike =
+    /^(peak|highest|lowest)\b/i.test(lead.rank) &&
+    (pdfParseIsoDateLabel(lead.category) != null ||
+      /^\d{4}-\d{2}-\d{2}/.test(leadCat));
+  if (trendLike || /peak\s+week/i.test(lead.rank)) {
+    const trendNarrative = formatPdfTrendRankedNarrative(signals, metricHint);
+    if (trendNarrative) return trendNarrative;
+  }
+  const preferLow = /^lowest/i.test(lead.rank.trim());
+  const preferHigh = /^highest/i.test(lead.rank.trim());
+  const metric = resolvePdfRankedMetricPhrase(question, metricHint, preferLow);
+  const leadPhrase = preferLow
+    ? `has the lowest ${metric}`
+    : preferHigh
+      ? `has the highest ${metric}`
+      : `leads with ${metric}`;
+  const leadVal = polishPdfBusinessCopy(lead.valueDisplay);
+  if (signals.length === 1) {
+    return `${leadCat} ${leadPhrase} at ${leadVal}.`;
+  }
+  const followers = signals.slice(1, 3).filter((s) => !/^gap\b/i.test(s.rank));
+  let followText = "";
+  if (followers.length === 1) {
+    followText = `followed by ${formatPdfCategoryLabel(followers[0]!.category)} at ${polishPdfBusinessCopy(followers[0]!.valueDisplay)}`;
+  } else if (followers.length >= 2) {
+    followText = `followed by ${formatPdfCategoryLabel(followers[0]!.category)} at ${polishPdfBusinessCopy(followers[0]!.valueDisplay)} and ${formatPdfCategoryLabel(followers[1]!.category)} at ${polishPdfBusinessCopy(followers[1]!.valueDisplay)}`;
+  }
+  if (!followText) {
+    return `${leadCat} ${leadPhrase} at ${leadVal}.`;
+  }
+  return `${leadCat} ${leadPhrase} at ${leadVal}, ${followText}.`;
+}
+
+function pdfTrendRankedSignalsFromChartData(
+  data: ChartRow[],
+  kind: ChartKind,
+  max = 3
+): PdfRankedSignal[] {
+  const sorted = [...data].sort((a, b) => Number(b.value) - Number(a.value));
+  const fmt = (row: ChartRow) => {
+    const dv = row.displayValue?.trim();
+    if (dv) return polishPdfBusinessCopy(dv);
+    return formatPdfBusinessNumber(Number(row.value));
+  };
+  return sorted.slice(0, max).map((row, i) => ({
+    rank: i === 0 ? "Highest" : i === 1 ? "Second" : "Third",
+    category: formatPdfCategoryLabel(String(row.name ?? "")),
+    valueDisplay: fmt(row),
+  }));
+}
+
+function pdfRankedSignalsFromChartData(
+  data: ChartRow[],
+  kind: ChartKind,
+  ascending: boolean | null,
+  max = 3
+): PdfRankedSignal[] {
+  if (!data.length || kind === "scatter") return [];
+  const dispKind: ChartKind =
+    kind === "pie" || kind === "donut" ? "bar_horizontal" : kind;
+  const merged = new Map<string, ChartRow>();
+  for (const row of data) {
+    const cat = String(row.name ?? "").trim() || "—";
+    const v = effectivePdfMetricNumber(row);
+    if (!Number.isFinite(v)) continue;
+    const prev = merged.get(cat);
+    if (!prev || v > effectivePdfMetricNumber(prev)) {
+      merged.set(cat, row);
+    }
+  }
+  const deduped = [...merged.values()];
+  if (!deduped.length) return [];
+  const preferLow = ascending === true;
+  deduped.sort((a, b) => {
+    const va = effectivePdfMetricNumber(a);
+    const vb = effectivePdfMetricNumber(b);
+    return preferLow ? va - vb : vb - va;
+  });
+  const rankWords = preferLow
+    ? (["Lowest", "Second lowest", "Third lowest"] as const)
+    : ascending === false
+      ? (["Highest", "Second highest", "Third highest"] as const)
+      : (["Highest", "Second", "Third"] as const);
+  return deduped.slice(0, max).map((row, i) => {
+    const v = effectivePdfMetricNumber(row);
+    const valueDisplay = formatPdfChartRowMetricDisplay(row, dispKind);
+    return {
+      rank: rankWords[i] ?? `#${i + 1}`,
+      category: formatPdfCategoryLabel(String(row.name ?? "").trim() || "—"),
+      valueDisplay: polishPdfBusinessCopy(valueDisplay),
+    };
+  });
+}
+
+function buildPdfVizExecutiveFacts(
+  data: ChartRow[],
+  kind: ChartKind,
+  ascending: boolean | null,
+  metricLabel: string | null,
+  categoryLabel: string | null
+): { title: string; value: string; hint?: string }[] {
+  if (!data.length) return [];
+  const scored = data
+    .map((row) => ({
+      row,
+      n: effectivePdfMetricNumber(row),
+    }))
+    .filter((x) => Number.isFinite(x.n));
+  if (!scored.length) return [];
+
+  const preferLow = ascending === true;
+  scored.sort((a, b) => (preferLow ? a.n - b.n : b.n - a.n));
+  const lo = scored[0]!;
+  const mid = scored[1];
+  const hi = scored[scored.length - 1]!;
+  const spread = Math.round(hi.n - lo.n);
+  const fmt = (row: ChartRow) => formatPdfChartRowMetricDisplay(row, kind);
+  const cat = polishPdfKpiLabel(
+    (categoryLabel ?? "department").replace(/^by\s+/i, "").trim() || "department"
+  );
+  const met = normalizePdfMetricPhrase(metricLabel);
+
+  if (preferLow) {
+    return [
+      {
+        title: `Lowest ${cat}`,
+        value: formatPdfCategoryLabel(String(lo.row.name ?? "—")),
+      },
+      { title: `Lowest ${met}`, value: fmt(lo.row) },
+      {
+        title: "Next lowest",
+        value: mid
+          ? `${formatPdfCategoryLabel(String(mid.row.name ?? ""))} ${fmt(mid.row)}`
+          : "—",
+      },
+      {
+        title: "Gap between peak and lowest",
+        value: `${spread} percentage points`,
+      },
+    ];
+  }
+
+  return [
+    {
+      title: `Highest ${cat}`,
+      value: formatPdfCategoryLabel(String(hi.row.name ?? "—")),
+    },
+    { title: `Highest ${met}`, value: fmt(hi.row) },
+    {
+      title: "Next highest",
+      value: mid
+        ? `${formatPdfCategoryLabel(String(mid.row.name ?? ""))} ${fmt(mid.row)}`
+        : "—",
+    },
+    {
+      title: "Gap between peak and lowest",
+      value: `${spread} percentage points`,
+    },
+  ];
+}
+
+function buildPdfTrendVizExecutiveFacts(
+  data: ChartRow[],
+  metricLabel: string | null
+): { title: string; value: string }[] {
+  if (!data.length) return [];
+  const sorted = [...data].sort((a, b) => Number(b.value) - Number(a.value));
+  const peak = sorted[0]!;
+  const low = sorted[sorted.length - 1]!;
+  const second = sorted[1];
+  const spread = Math.round(Number(peak.value) - Number(low.value));
+  const met = normalizePdfMetricPhrase(metricLabel);
+  const fmt = (row: ChartRow) => formatPdfChartRowMetricDisplay(row, "line");
+  return [
+    { title: "Peak period", value: formatPdfCategoryLabel(String(peak.name ?? "")) },
+    { title: `Peak ${met}`, value: fmt(peak) },
+    {
+      title: "Next highest period",
+      value: second
+        ? `${formatPdfCategoryLabel(String(second.name ?? ""))} ${fmt(second)}`
+        : "—",
+    },
+    {
+      title: "Gap between peak and lowest",
+      value: formatPdfBusinessNumber(spread),
+    },
+  ];
+}
+
+function resolvePdfExecutiveNarrative(input: ExecutivePdfExportInput): string {
+  const metricHint =
+    input.chart?.alignedMetricDisplay?.trim() ||
+    input.chart?.alignedMetric?.trim() ||
+    input.chartAxisLabels?.value?.trim() ||
+    null;
+  const q = input.question.trim();
+  if (input.pdfRankedSignals?.length) {
+    const narrative = formatPdfRankedSignalsNarrative(
+      input.pdfRankedSignals,
+      metricHint,
+      q
+    );
+    if (narrative) return narrative;
+  }
+  const candidates = [
+    input.executiveInsightsBrief,
+    input.insightSummary,
+    partitionExecSummaryLines(input.execSummaryLines).takeaway,
+  ];
+  for (const raw of candidates) {
+    const t = polishPdfBusinessCopy(String(raw ?? "").trim());
+    if (!t || isStructuredDumpExecutiveLine(t)) continue;
+    if (/^name\s+value\b/i.test(t)) continue;
+    if (
+      isStaleStandaloneMetricTitle(
+        t,
+        metricHint,
+        input.chart?.title ?? null
+      )
+    ) {
+      continue;
+    }
+    return t;
+  }
+  return "";
 }
 
 function executiveDumpToRankedBullets(
@@ -958,7 +1873,7 @@ function partitionExecSummaryLines(lines: string[]): ExecSummaryPartition {
 
 /** Split narrative prose into scannable executive bullets. */
 function splitProseToInsightBullets(text: string, maxBullets = 7): string[] {
-  const raw = text.trim();
+  const raw = polishPdfBusinessCopy(text).trim();
   if (!raw) return [];
 
   const lines = raw
@@ -974,7 +1889,15 @@ function splitProseToInsightBullets(text: string, maxBullets = 7): string[] {
       .slice(0, maxBullets);
   }
 
-  if (raw.length > 160) {
+  const clauseSplit = raw
+    .split(/(?<=[.!?;])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 12);
+  if (clauseSplit.length >= 2) {
+    return clauseSplit.slice(0, maxBullets);
+  }
+
+  if (raw.length > 120) {
     const sentences = raw
       .split(/(?<=[.!?])\s+/)
       .map((s) => s.trim())
@@ -1156,13 +2079,23 @@ export async function runExecutivePdfExport(
   };
 
   const bodyBullets = (items: string[], fontSize = 9.5) => {
-    const bullets = items.flatMap((t) => splitProseToInsightBullets(t, 6));
+    const bullets = items
+      .flatMap((t) => splitProseToInsightBullets(t, 5))
+      .flatMap((b) => {
+        if (b.length <= 108) return [b];
+        return b
+          .split(/(?<=[;])\s+/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 10)
+          .slice(0, 3);
+      })
+      .slice(0, 6);
     if (!bullets.length) return;
     bullets.forEach((b, i) => {
-      if (i > 0) y += 0.5;
+      if (i > 0) y += 0.65;
       drawExecBullet(b, fontSize);
     });
-    y += 2.5;
+    y += PDF_INSIGHT_PARAGRAPH_GAP_MM;
   };
 
   const drawEvidenceNoteBox = (notes: string[]) => {
@@ -1271,9 +2204,14 @@ export async function runExecutivePdfExport(
       maxRows?: number;
       /** When true, table is not split across pages (caller should start on a fresh page). */
       suppressRowPageBreaks?: boolean;
+      /** BI-style striping and header for data preview / appendix tables. */
+      variant?: "default" | "preview" | "appendix";
     }
   ) => {
-    const fontSize = options?.fontSize ?? 7;
+    const variant = options?.variant ?? "default";
+    const isPreviewTable = variant === "preview";
+    const isPreview = isPreviewTable || variant === "appendix";
+    const fontSize = options?.fontSize ?? (isPreview ? 8 : 7);
     const maxCols = options?.maxCols ?? 7;
     const maxRows = options?.maxRows ?? 14;
     const suppressBreaks = options?.suppressRowPageBreaks === true;
@@ -1288,7 +2226,15 @@ export async function runExecutivePdfExport(
         return s.length > 140 ? `${s.slice(0, 137)}…` : s;
       })
     );
-    const pad = 1.6;
+    const pad = isPreviewTable ? 2.35 : isPreview ? 2.1 : 1.6;
+    const headerFill = isPreview
+      ? mixRgb(
+          theme.panel,
+          theme.accent,
+          variant === "appendix" ? 0.14 : 0.22
+        )
+      : theme.panel;
+    const stripeFill: [number, number, number] = [255, 255, 255];
     const weights = heads.map((head, col) => {
       let w = Math.min(Math.max(head.length, 6), 26);
       for (const row of body) {
@@ -1302,14 +2248,31 @@ export async function runExecutivePdfExport(
 
     if (suppressBreaks) {
       ensurePageSpace(
-        measureMonolithicTableStackMm(doc, contentWidth, heads, body, fontSize) + 2
+        measureMonolithicTableStackMm(
+          doc,
+          contentWidth,
+          heads,
+          body,
+          fontSize,
+          pad,
+          isPreview ? 5 : 4
+        ) + 2
       );
+    }
+
+    const tableTopY = y;
+
+    if (isPreviewTable) {
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+      doc.setLineWidth(0.2);
     }
 
     const drawRow = (
       cells: string[],
       isHeader: boolean,
-      fontStyle: "bold" | "normal"
+      fontStyle: "bold" | "normal",
+      bodyRowIndex: number
     ) => {
       const cellLines = cells.map((cell, i) =>
         doc.splitTextToSize(cell, Math.max(4, colW[i] - pad * 2))
@@ -1318,16 +2281,37 @@ export async function runExecutivePdfExport(
         isHeader ? 3 : 5,
         Math.max(1, ...cellLines.map((lines) => lines.length))
       );
-      const linePitch = fontSize * 0.42 + 1.15;
-      const rowH = maxLines * linePitch + pad * 2;
+      const linePitch =
+        fontSize * 0.42 + (isPreviewTable ? 1.18 : isPreview ? 1.22 : 1.15);
+      const headerPad = isPreviewTable ? 2.6 : pad;
+      const bodyPad = isPreviewTable ? 2.85 : pad;
+      const rowPad = isHeader && isPreviewTable ? headerPad : bodyPad;
+      const rowH = maxLines * linePitch + rowPad * 2;
       if (!suppressBreaks) {
         ensurePageSpace(rowH + 1.2);
       }
       doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-      doc.setLineWidth(0.2);
+      doc.setLineWidth(isHeader && isPreview ? 0.28 : 0.2);
       if (isHeader) {
-        doc.setFillColor(theme.panel[0], theme.panel[1], theme.panel[2]);
+        doc.setFillColor(headerFill[0], headerFill[1], headerFill[2]);
         doc.rect(margin, y, contentWidth, rowH, "FD");
+        if (isPreview) {
+          doc.setDrawColor(theme.accent[0], theme.accent[1], theme.accent[2]);
+          doc.setLineWidth(0.45);
+          doc.line(margin, y + rowH, margin + contentWidth, y + rowH);
+        }
+      } else if (isPreview) {
+        const fill =
+          bodyRowIndex % 2 === 0
+            ? stripeFill
+            : isPreviewTable
+              ? mixRgb(theme.panel, theme.accent, 0.04)
+              : theme.panel;
+        doc.setFillColor(fill[0], fill[1], fill[2]);
+        doc.rect(margin, y, contentWidth, rowH, "F");
+        doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+        doc.setLineWidth(0.18);
+        doc.rect(margin, y, contentWidth, rowH, "S");
       } else {
         doc.rect(margin, y, contentWidth, rowH, "S");
       }
@@ -1335,17 +2319,21 @@ export async function runExecutivePdfExport(
       for (let i = 0; i < n; i++) {
         if (i > 0) {
           doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+          doc.setLineWidth(0.18);
           doc.line(cx, y, cx, y + rowH);
         }
         doc.setFont("helvetica", fontStyle);
-        doc.setFontSize(isHeader ? fontSize + 0.6 : fontSize);
+        doc.setFontSize(isHeader ? fontSize + (isPreview ? 0.5 : 0.6) : fontSize);
         doc.setTextColor(
           isHeader ? theme.ink[0] : theme.body[0],
           isHeader ? theme.ink[1] : theme.body[1],
           isHeader ? theme.ink[2] : theme.body[2]
         );
         const lines = cellLines[i].slice(0, maxLines);
-        let yy = y + pad + (isHeader ? 3.3 : 2.8);
+        let yy =
+          y +
+          rowPad +
+          (isHeader ? (isPreviewTable ? 2.7 : isPreview ? 3.1 : 3.3) : isPreviewTable ? 2.85 : isPreview ? 3 : 2.8);
         lines.forEach((ln: string) => {
           doc.text(ln, cx + pad, yy);
           yy += linePitch;
@@ -1355,15 +2343,160 @@ export async function runExecutivePdfExport(
       y += rowH;
     };
 
-    drawRow(heads, true, "bold");
-    for (const row of body) {
-      drawRow(row, false, "normal");
+    drawRow(heads, true, "bold", 0);
+    body.forEach((row, ri) => {
+      drawRow(row, false, "normal", ri);
+    });
+
+    if (isPreview && y > tableTopY) {
+      doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+      doc.setLineWidth(isPreviewTable ? 0.32 : 0.35);
+      doc.roundedRect(
+        margin,
+        tableTopY,
+        contentWidth,
+        y - tableTopY,
+        isPreviewTable ? 2 : 1.5,
+        isPreviewTable ? 2 : 1.5,
+        isPreviewTable ? "FD" : "S"
+      );
     }
-    y += 3;
+
+    y += isPreviewTable ? 5 : isPreview ? 4 : 3;
     doc.setTextColor(0, 0, 0);
   };
 
   const kindLabel = datasetKindLabel(input.dataset.datasetKind);
+  const genStr = input.generatedAt.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const sourceRaw = (input.dataset.fileName || "").trim() || "—";
+  const sourceShort =
+    sourceRaw.length > 48 ? `${sourceRaw.slice(0, 45)}…` : sourceRaw;
+  const volumeLine =
+    `${input.dataset.rows.toLocaleString()} records × ${input.dataset.colCount} columns` +
+    (input.dataset.sheet ? ` · ${input.dataset.sheet}` : "");
+
+  const drawExecutiveSnapshotPanel = () => {
+    const snapshotKpis = input.kpiCards.slice(0, 3);
+    const dominantInsight = resolvePdfExecutiveNarrative(input);
+
+    if (!snapshotKpis.length && dominantInsight.length < 12) {
+      mutedLine("Dataset profile", kindLabel);
+      mutedLine("Volume", volumeLine);
+      y += 3;
+      return;
+    }
+
+    const panelPad = 4;
+    const kpiRowH = snapshotKpis.length ? 15 : 0;
+    const insightMaxW = contentWidth - 8;
+    const insightLines = dominantInsight
+      ? doc.splitTextToSize(dominantInsight, insightMaxW)
+      : [];
+    const insightLineCount = Math.min(3, insightLines.length);
+    const insightBlockH = insightLineCount
+      ? 5 +
+        insightLineCount * pdfBodyLineHeight(9) +
+        PDF_INSIGHT_PARAGRAPH_GAP_MM
+      : 0;
+    const panelH =
+      panelPad +
+      4.5 +
+      5 +
+      (kpiRowH ? PDF_SNAPSHOT_KPI_TOP_GAP_MM + kpiRowH + 3 : 0) +
+      insightBlockH +
+      panelPad;
+
+    ensurePageSpace(panelH + 5);
+    const panelTop = y;
+    doc.setFillColor(theme.panel[0], theme.panel[1], theme.panel[2]);
+    doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+    doc.setLineWidth(0.28);
+    doc.roundedRect(margin, y, contentWidth, panelH, 1.8, 1.8, "FD");
+    doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
+    doc.rect(margin, y, 2.2, panelH, "F");
+
+    let hy = y + panelPad + 3.5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+    doc.text("EXECUTIVE SNAPSHOT", margin + 4, hy);
+    hy += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
+    const profileLine = `${kindLabel} · ${volumeLine}`;
+    const profileWrap = doc.splitTextToSize(profileLine, contentWidth - 10);
+    doc.text(profileWrap.slice(0, 2), margin + 4, hy);
+    hy +=
+      profileWrap.length * 4.2 +
+      (snapshotKpis.length ? PDF_SNAPSHOT_KPI_TOP_GAP_MM + 1 : 2);
+
+    if (snapshotKpis.length) {
+      const gap = 3;
+      const kw = (contentWidth - 8 - gap * (snapshotKpis.length - 1)) / snapshotKpis.length;
+      snapshotKpis.forEach((card, i) => {
+        const kx = margin + 4 + i * (kw + gap);
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+        doc.setLineWidth(0.2);
+        doc.roundedRect(kx, hy, kw, kpiRowH, 1, 1, "FD");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6.5);
+        doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+        doc.text(
+          doc.splitTextToSize(card.title, kw - 4).slice(0, 1),
+          kx + 2,
+          hy + 4
+        );
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
+        doc.text(
+          doc.splitTextToSize(String(card.value), kw - 4).slice(0, 1),
+          kx + 2,
+          hy + 10
+        );
+      });
+      hy += kpiRowH + 3;
+    }
+
+    if (dominantInsight && insightLineCount > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+      doc.text("Dominant insight", margin + 4, hy);
+      hy += 4.5;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
+      insightLines.slice(0, insightLineCount).forEach((ln: string) => {
+        doc.text(ln, margin + 4, hy);
+        hy += pdfBodyLineHeight(9);
+      });
+    }
+
+    y = panelTop + panelH + 6;
+    doc.setTextColor(0, 0, 0);
+
+    const trendThumb = input.chartThumbnails.find((t) => t.values.length > 1);
+    if (trendThumb) {
+      const sparkH = 14;
+      ensurePageSpace(sparkH + 4);
+      drawSparkline(
+        doc,
+        margin + 4,
+        y,
+        contentWidth - 8,
+        sparkH,
+        trendThumb.values,
+        theme.accent
+      );
+      y += sparkH + 4;
+    }
+  };
 
   /* -------- Cover -------- */
   const coverH = 48;
@@ -1377,7 +2510,7 @@ export async function runExecutivePdfExport(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-  doc.text("Executive insight report", margin + 6, y + 12);
+  doc.text(PDF_REPORT_TITLE, margin + 6, y + 12);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
@@ -1394,10 +2527,6 @@ export async function runExecutivePdfExport(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-  const genStr = input.generatedAt.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
   doc.text(`Generated ${genStr}`, margin + 6, y + 34);
   doc.text(
     `Source: ${input.dataset.fileName || "—"}`,
@@ -1411,16 +2540,10 @@ export async function runExecutivePdfExport(
   const confWrap = doc.splitTextToSize(confLine, contentWidth - 10);
   doc.text(confWrap, margin + 6, y + 41);
 
-  y += coverH + 10;
+  y += coverH + 8;
   doc.setTextColor(0, 0, 0);
 
-  mutedLine("Dataset profile", kindLabel);
-  mutedLine(
-    "Volume",
-    `${input.dataset.rows.toLocaleString()} records × ${input.dataset.colCount} columns` +
-      (input.dataset.sheet ? ` · Sheet: ${input.dataset.sheet}` : "")
-  );
-  y += 3;
+  drawExecutiveSnapshotPanel();
 
   const isChartRankedExecutiveLine = (line: string) =>
     /^(Highest|Second|Third|Largest)\s*:/i.test(line.trim());
@@ -1445,9 +2568,13 @@ export async function runExecutivePdfExport(
       insightSubheading("Question in scope");
       bodyText(partitioned.question, 10);
     }
-    if (partitioned.takeaway) {
+    const takeawayBody =
+      partitioned.takeaway && !isStructuredDumpExecutiveLine(partitioned.takeaway)
+        ? partitioned.takeaway
+        : resolvePdfExecutiveNarrative(input);
+    if (takeawayBody) {
       insightSubheading("Main takeaway");
-      bodyBullets([partitioned.takeaway], 10);
+      bodyBullets([takeawayBody], 10);
     }
     if (partitioned.metrics.length) {
       insightSubheading("Key metrics");
@@ -1464,9 +2591,22 @@ export async function runExecutivePdfExport(
 
     if (input.pdfRankedSignals?.length) {
       insightSubheading("Chart highlights");
-      input.pdfRankedSignals.slice(0, 3).forEach((r) => {
-        drawExecBullet(`${r.rank}: ${r.category} — ${r.valueDisplay}`);
-      });
+      const metricHint =
+        input.chart?.alignedMetricDisplay?.trim() ||
+        input.chart?.alignedMetric?.trim() ||
+        null;
+      const narrative = formatPdfRankedSignalsNarrative(
+        input.pdfRankedSignals.slice(0, 3),
+        metricHint,
+        input.question
+      );
+      if (narrative) {
+        drawExecBullet(narrative);
+      } else {
+        input.pdfRankedSignals.slice(0, 3).forEach((r) => {
+          drawExecBullet(`${r.rank}: ${r.category} — ${r.valueDisplay}`);
+        });
+      }
       y += 1.5;
     }
 
@@ -1479,52 +2619,71 @@ export async function runExecutivePdfExport(
     y = contentTop0;
   }
 
+  const drawKpiCard = (
+    x: number,
+    yPos: number,
+    w: number,
+    h: number,
+    card: { title: string; value: string; subtitle?: string | null }
+  ) => {
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+    doc.setLineWidth(0.22);
+    doc.roundedRect(x, yPos, w, h, 1.6, 1.6, "FD");
+    doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
+    doc.rect(x, yPos, 2.4, h, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.2);
+    doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+    const titleLines = doc.splitTextToSize(card.title, w - 9);
+    doc.text(titleLines.slice(0, 2), x + 5, yPos + 5);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14.5);
+    doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
+    const valLines = doc.splitTextToSize(String(card.value), w - 9);
+    doc.text(valLines.slice(0, 2), x + 5, yPos + 12.5);
+    if (card.subtitle) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.2);
+      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+      const sub = doc.splitTextToSize(String(card.subtitle), w - 9);
+      doc.text(sub.slice(0, 1), x + 5, yPos + h - 4);
+    }
+  };
+
   /* -------- KPIs -------- */
   if (input.includes.includeKPIs) {
     sectionTitle(input.kpiSectionTitle);
     const cards = input.kpiCards;
     if (!cards.length) {
       bodyText(
-        "KPI metrics are not available yet. Upload data or adjust column mapping.",
+        "KPI metrics are not available yet. Upload data or refresh field mapping.",
         10
       );
     } else {
       const gap = 4;
       const colW = (contentWidth - gap) / 2;
-      const cardH = 22;
+      const cardH = 24;
       const rows = Math.ceil(cards.length / 2);
       for (let r = 0; r < rows; r++) {
+        let rowExtra = 0;
+        for (let c = 0; c < 2; c++) {
+          const idx = r * 2 + c;
+          const card = cards[idx];
+          if (!card) continue;
+          const titleLines = doc.splitTextToSize(card.title, colW - 9);
+          rowExtra = Math.max(rowExtra, Math.max(0, titleLines.length - 1));
+        }
+        const rowH = cardH + rowExtra * 3.2;
+        ensurePageSpace(rowH + gap);
         for (let c = 0; c < 2; c++) {
           const idx = r * 2 + c;
           const card = cards[idx];
           const x = margin + c * (colW + gap);
           if (!card) continue;
-          ensurePageSpace(cardH + 3);
-          doc.setFillColor(255, 255, 255);
-          doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-          doc.setLineWidth(0.25);
-          doc.roundedRect(x, y, colW, cardH, 1.5, 1.5, "FD");
-          doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
-          doc.rect(x, y, 2.2, cardH, "F");
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(8);
-          doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-          const titleLines = doc.splitTextToSize(card.title, colW - 8);
-          doc.text(titleLines.slice(0, 2), x + 4, y + 5.5);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(13);
-          doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-          const valLines = doc.splitTextToSize(String(card.value), colW - 8);
-          doc.text(valLines.slice(0, 2), x + 4, y + 12);
-          if (card.subtitle) {
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(7.8);
-            doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-            const sub = doc.splitTextToSize(String(card.subtitle), colW - 8);
-            doc.text(sub.slice(0, 2), x + 4, y + 18.5);
-          }
+          drawKpiCard(x, y, colW, rowH, card);
         }
-        y += cardH + gap;
+        y += rowH + gap;
       }
       y += 2;
     }
@@ -1569,9 +2728,21 @@ export async function runExecutivePdfExport(
         input.includes.includeTechnicalAppendix === true ? 12 : 3;
       let bulletLines: string[] = [];
       if (input.pdfRankedSignals?.length) {
-        bulletLines = input.pdfRankedSignals.slice(0, signalLimit).map(
-          (r) => `${r.category}: ${r.valueDisplay}`
+        const metricHint =
+          input.chart?.alignedMetricDisplay?.trim() ||
+          input.chart?.alignedMetric?.trim() ||
+          input.chartAxisLabels?.value?.trim() ||
+          null;
+        const narrative = formatPdfRankedSignalsNarrative(
+          input.pdfRankedSignals.slice(0, 3),
+          metricHint,
+          input.question
         );
+        bulletLines = narrative
+          ? [narrative]
+          : input.pdfRankedSignals.slice(0, signalLimit).map(
+              (r) => `${r.category}: ${r.valueDisplay}`
+            );
       } else {
         const rawBadge = [input.chartInsightBadge, input.insightSummary]
           .filter(Boolean)
@@ -1611,7 +2782,7 @@ export async function runExecutivePdfExport(
           hy += linePitch;
         });
       });
-      y += boxH + 4;
+      y += boxH + PDF_INSIGHT_PARAGRAPH_GAP_MM;
     }
 
     if (input.insightConfidenceLevel) {
@@ -1640,7 +2811,8 @@ export async function runExecutivePdfExport(
           9.5
         );
         insightSubheading(PDF_INSIGHT_SECTION_LABELS.overview);
-        bodyBullets([sec.summary.trim()], 10);
+        bodyBullets([sec.summary.trim()], 9.5);
+        y += 1;
       }
       const blocks: [string, string | undefined][] = [
         [PDF_INSIGHT_SECTION_LABELS.findings, sec.statistical],
@@ -1650,9 +2822,10 @@ export async function runExecutivePdfExport(
       for (const [heading, body] of blocks) {
         if (!body?.trim()) continue;
         ensureAiBlockFits(heading, 9.5, body.trim(), 9.5);
+        y += 1;
         insightSubheading(heading);
         bodyBullets([body.trim()], 9.5);
-        y += 1.5;
+        y += 2;
       }
     } else if (input.answer.trim()) {
       ensureAiBlockFits("Analysis", 9.5, input.answer.trim(), 9.5);
@@ -1804,95 +2977,186 @@ export async function runExecutivePdfExport(
       const subL = doc.splitTextToSize(ch.subtitle.trim(), contentWidth);
       ensurePageSpace(subL.length * 4.3 + 2);
       doc.text(subL, margin, y);
-      y += subL.length * 4.3 + 4;
+      y += subL.length * 4.3 + 3;
       doc.setTextColor(0, 0, 0);
     }
 
-    if (
-      ch.data.length > 0 &&
-      input.chartAxisLabels &&
-      (input.chartAxisLabels.category.trim() ||
-        input.chartAxisLabels.value.trim())
-    ) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-      ensurePageSpace(5);
-      doc.text("Axes", margin, y);
-      y += 4.5;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-      const pk = input.chart?.presentationKind;
-      const xAxisPdfTitle =
-        pk && pk.length > 0 ? pdfXAxisLineTitle(pk) : "Category";
-      const yAxisPdfTitle =
-        pk && pk.length > 0 ? pdfYAxisLineTitle(pk) : "Value";
-      mutedLine(
-        xAxisPdfTitle,
-        input.chartAxisLabels.category.trim() || "—"
-      );
-      mutedLine(yAxisPdfTitle, input.chartAxisLabels.value.trim() || "—");
-      y += 1;
-    }
-
     if (ch.data.length > 0) {
+      const metaRows: string[][] = [];
+      metaRows.push([
+        "Analysis Type",
+        pdfChartKindExecutiveLabel(ch.presentationKind),
+      ]);
       const mShow =
         ch.alignedMetricDisplay?.trim() || ch.alignedMetric?.trim();
       if (mShow) {
-        mutedLine("Metric", mShow);
+        metaRows.push(["Primary Metric", polishPdfExecutiveLabel(mShow)]);
       }
+      const groupedBy = input.chartAxisLabels?.category?.trim();
+      if (groupedBy) {
+        metaRows.push(["Grouped By", polishPdfExecutiveLabel(groupedBy)]);
+      }
+      const recordsEval =
+        input.provenance?.rowsAnalyzed ?? input.dataset.rows;
+      metaRows.push([
+        "Records Evaluated",
+        Number(recordsEval).toLocaleString(),
+      ]);
+      const attr = ch.chartAttribution?.trim().toLowerCase() ?? "";
+      if (attr.includes("auto") && attr.includes("dashboard")) {
+        metaRows.push(["Source", "Automated dashboard"]);
+      }
+      ensurePageSpace(metaRows.length * 5.5 + 8);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+      doc.text("ANALYSIS CONTEXT", margin, y);
+      y += 5;
+      metaRows.forEach(([label, value]) => {
+        mutedLine(label, value);
+      });
+      y += 2;
     }
 
     const execBrief = input.executiveInsightsBrief?.trim() ?? "";
     const factSlice = (input.vizExecutiveFacts ?? []).slice(0, 6);
     const hasExecFacts = factSlice.length > 0;
+
+    const estimateVizInsightsBlockMm = () => {
+      if (!execBrief && !hasExecFacts) return 0;
+      let h = 6;
+      if (execBrief) {
+        const wrap = doc.splitTextToSize(execBrief, contentWidth - 10);
+        h += Math.min(2, wrap.length) * 4.1 + 3;
+      }
+      if (hasExecFacts) {
+        const gridRows = Math.ceil(factSlice.length / 3);
+        h += 5 + gridRows * 16;
+      }
+      return h + 2;
+    };
+
+    const embedCenteredChartImage = async (cap: HTMLElement) => {
+      const insightsReserve = estimateVizInsightsBlockMm();
+      const availableMm = footerY - y - insightsReserve - 5;
+      const maxImgH = Math.min(
+        158,
+        Math.max(132, availableMm > 40 ? availableMm : footerY - y - 8)
+      );
+      ensurePageSpace(maxImgH + 6);
+      const placeImage = (dataUrl: string, pxW: number, pxH: number) => {
+        let imgWidth = contentWidth;
+        let imgHeight = (pxH * imgWidth) / pxW;
+        if (imgHeight > maxImgH) {
+          imgHeight = maxImgH;
+          imgWidth = (pxW * imgHeight) / pxH;
+        }
+        const imgX = margin + Math.max(0, (contentWidth - imgWidth) / 2);
+        ensurePageSpace(imgHeight + 5);
+        doc.setFillColor(theme.panel[0], theme.panel[1], theme.panel[2]);
+        doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+        doc.setLineWidth(0.22);
+        doc.roundedRect(
+          imgX - 1.5,
+          y - 1.5,
+          imgWidth + 3,
+          imgHeight + 3,
+          1.4,
+          1.4,
+          "FD"
+        );
+        doc.addImage(dataUrl, "PNG", imgX, y, imgWidth, imgHeight);
+        y += imgHeight + 3;
+      };
+      const png = await captureChartPlotToPng(cap, 2);
+      placeImage(png.dataUrl, png.width, png.height);
+    };
+
+    if (ch.data.length === 0) {
+      bodyText(
+        ch.chartAttribution?.trim()
+          ? ch.chartAttribution.trim()
+          : "No chart generated yet. Ask an AI question that creates a chart.",
+        10
+      );
+    } else {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+      });
+      await new Promise<void>((resolve) => setTimeout(resolve, 150));
+      const cap = ch.captureEl;
+      if (!cap) {
+        bodyText("Chart could not be prepared for PDF export.", 10);
+      } else {
+        try {
+          await embedCenteredChartImage(cap);
+        } catch (fallbackErr) {
+          console.warn("Chart image embed failed:", fallbackErr);
+          bodyText(
+            "Chart image could not be embedded. See data summary below.",
+            10
+          );
+        }
+      }
+    }
+
     if (execBrief || hasExecFacts) {
       const gridRows = hasExecFacts ? Math.ceil(factSlice.length / 3) : 0;
-      const briefLines = execBrief
-        ? doc.splitTextToSize(execBrief, contentWidth).length
+      const briefWrap = execBrief
+        ? doc.splitTextToSize(execBrief, contentWidth - 10)
+        : [];
+      const factCardH = 14;
+      const factBlockH = hasExecFacts ? 4 + gridRows * (factCardH + 2) : 0;
+      const briefBlockH = briefWrap.length
+        ? briefWrap.length * 4.1 + 5 + PDF_INSIGHT_PARAGRAPH_GAP_MM
         : 0;
-      const briefH = execBrief ? briefLines * 4.35 + 6 : 0;
-      const gridEstimated = hasExecFacts ? 6 + gridRows * (22 + 4) + 6 : 0;
-      ensurePageSpace(8 + briefH + gridEstimated);
-
+      const panelH = 6 + briefBlockH + factBlockH;
+      ensurePageSpace(panelH + 2);
+      const panelTop = y;
+      doc.setFillColor(theme.panel[0], theme.panel[1], theme.panel[2]);
+      doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+      doc.setLineWidth(0.22);
+      doc.roundedRect(margin, y, contentWidth, panelH, 1.6, 1.6, "FD");
+      let py = y + 4;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-      doc.text("Executive insights", margin, y);
-      y += 5;
-
-      if (execBrief) {
+      doc.text("EXECUTIVE INSIGHTS", margin + 3, py);
+      py += 5;
+      if (execBrief && briefWrap.length) {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-        const wrap = doc.splitTextToSize(execBrief, contentWidth);
-        const lh = 4.35;
-        ensurePageSpace(wrap.length * lh + 2);
-        doc.text(wrap, margin, y);
-        y += wrap.length * lh + (hasExecFacts ? 4 : 6);
+        briefWrap.slice(0, 2).forEach((ln: string) => {
+          doc.text(ln, margin + 3, py);
+          py += 4.1;
+        });
+        py += hasExecFacts ? PDF_SNAPSHOT_KPI_TOP_GAP_MM : PDF_INSIGHT_PARAGRAPH_GAP_MM;
       }
-
       if (hasExecFacts) {
         const factGap = 3;
-        const fw = (contentWidth - factGap * 2) / 3;
-        let fx = margin;
+        const fw = (contentWidth - 6 - factGap * 2) / 3;
+        let fx = margin + 3;
         let rowH = 0;
         factSlice.forEach((fact, i) => {
           if (i > 0 && i % 3 === 0) {
-            fx = margin;
-            y += rowH + 4;
+            fx = margin + 3;
+            py += rowH + 2;
             rowH = 0;
-            ensurePageSpace(18);
           }
           doc.setFillColor(255, 255, 255);
           doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-          doc.roundedRect(fx, y, fw, 14, 1, 1, "FD");
+          doc.roundedRect(fx, py, fw, factCardH, 1, 1, "FD");
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(7);
+          doc.setFontSize(6.5);
           doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-          const ft = doc.splitTextToSize(fact.title, fw - 4);
-          doc.text(ft.slice(0, 2), fx + 2, y + 4);
+          doc.text(
+            doc.splitTextToSize(fact.title, fw - 4).slice(0, 1),
+            fx + 2,
+            py + 3.5
+          );
           doc.setFont("helvetica", "bold");
           doc.setFontSize(9.5);
           doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
@@ -1904,90 +3168,17 @@ export async function runExecutivePdfExport(
               )
               .slice(0, 1),
             fx + 2,
-            y + 10
+            py + 9
           );
-          rowH = Math.max(rowH, 14);
+          rowH = Math.max(rowH, factCardH);
           fx += fw + factGap;
         });
-        y += rowH + 8;
-      } else {
-        y += 2;
       }
-    }
-
-    if (ch.data.length === 0) {
-      bodyText(
-        ch.chartAttribution?.trim()
-          ? ch.chartAttribution.trim()
-          : "No chart generated yet. Ask an AI question that creates a chart.",
-        10
-      );
+      y = panelTop + panelH + 2;
+      doc.setTextColor(0, 0, 0);
     } else {
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
-      const cap = ch.captureEl;
-      if (!cap) {
-        bodyText("Chart could not be prepared for PDF export.", 10);
-      } else {
-        const maxImgH = 118;
-        ensurePageSpace(maxImgH + 10);
-        try {
-          const png = await renderChartSvgToPng(cap, 2);
-          if (!png) throw new Error("Chart SVG not found");
-          let imgWidth = contentWidth;
-          let imgHeight = (png.height * imgWidth) / png.width;
-          if (imgHeight > maxImgH) {
-            imgHeight = maxImgH;
-            imgWidth = (png.width * imgHeight) / png.height;
-          }
-          const imgX = margin + Math.max(0, (contentWidth - imgWidth) / 2);
-          ensurePageSpace(imgHeight + 4);
-          doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-          doc.setLineWidth(0.3);
-          doc.roundedRect(imgX - 0.5, y - 1.5, imgWidth + 1.5, imgHeight + 3, 1, 1, "S");
-          doc.addImage(png.dataUrl, "PNG", imgX, y, imgWidth, imgHeight);
-          y += imgHeight + 2;
-        } catch (chartCaptureError) {
-          console.warn("Chart SVG capture for PDF failed:", chartCaptureError);
-          try {
-            const { default: html2canvas } = await import("html2canvas");
-            const canvas = await html2canvas(cap, {
-              scale: 2,
-              useCORS: true,
-              backgroundColor: "#ffffff",
-            });
-            let imgWidth = contentWidth;
-            let imgHeight = (canvas.height * imgWidth) / canvas.width;
-            if (imgHeight > maxImgH) {
-              imgHeight = maxImgH;
-              imgWidth = (canvas.width * imgHeight) / canvas.height;
-            }
-            const imgX = margin + Math.max(0, (contentWidth - imgWidth) / 2);
-            ensurePageSpace(imgHeight + 4);
-            doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-            doc.roundedRect(imgX - 0.5, y - 1.5, imgWidth + 1.5, imgHeight + 3, 1, 1, "S");
-            doc.addImage(
-              canvas.toDataURL("image/png"),
-              "PNG",
-              imgX,
-              y,
-              imgWidth,
-              imgHeight
-            );
-            y += imgHeight + 2;
-          } catch (fallbackErr) {
-            console.warn("html2canvas fallback also failed:", fallbackErr);
-            bodyText(
-              "Chart image could not be embedded. See data summary below.",
-              10
-            );
-          }
-        }
-      }
+      y += 2;
     }
-
-    y += 2;
     doc.setTextColor(0, 0, 0);
   }
 
@@ -2021,7 +3212,9 @@ export async function runExecutivePdfExport(
             contentWidth,
             previewHeads,
             previewBody,
-            7
+            8,
+            2.1,
+            5
           )
         : 0;
     const sectionReserve = 30 + introBlockH + previewTableH + 12;
@@ -2044,13 +3237,14 @@ export async function runExecutivePdfExport(
         );
       }
       drawDataTable(previewHeads, previewBody, {
-        fontSize: 7,
+        variant: "preview",
+        fontSize: 8,
         maxCols: 7,
         maxRows: 12,
         suppressRowPageBreaks: true,
       });
     }
-    y += 2;
+    y += 4;
   }
 
   /* -------- Data quality -------- */
@@ -2181,111 +3375,156 @@ export async function runExecutivePdfExport(
       y = contentTop0;
       sectionTitle("Technical appendix");
       bodyText(
-        "Plot construction details, raw series samples, and engine metadata for audit or hand-off to data teams. Omit when sharing with non-technical stakeholders.",
+        "Reference metadata for audit and data-team handoff. Omit this section for executive-only distribution.",
         8.5
       );
 
-      if (chAp?.chartAttribution?.trim()) {
+      const appendixSubheading = (title: string) => {
+        y += 2;
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(8.5);
-        doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-        ensurePageSpace(5);
-        doc.text("Visualization source note", margin, y);
-        y += 4.5;
-        doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-        bodyParagraphs(chAp.chartAttribution!.trim());
+        doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
+        doc.text(title, margin, y);
+        y += 5;
+        doc.setTextColor(0, 0, 0);
+      };
+
+      if (input.provenance || input.mappingConfidence) {
+        appendixSubheading("Analysis metadata");
+        const metaRows: string[][] = [];
+        if (input.provenance) {
+          metaRows.push(["Analysis confidence", input.provenance.confidence]);
+          metaRows.push([
+            "Records evaluated",
+            String(input.provenance.rowsAnalyzed),
+          ]);
+          metaRows.push([
+            "Visualized categories",
+            String(input.provenance.chartPoints),
+          ]);
+          if (input.provenance.aggregation) {
+            metaRows.push(["Aggregation", String(input.provenance.aggregation)]);
+          }
+        }
+        metaRows.push(["Field mapping confidence", input.mappingConfidence]);
+        drawDataTable(["Field", "Value"], metaRows, {
+          variant: "appendix",
+          fontSize: 8,
+          maxCols: 2,
+          maxRows: 8,
+          suppressRowPageBreaks: true,
+        });
       }
 
-      if (input.provenance) {
-        mutedLine("Analysis confidence", input.provenance.confidence);
-        mutedLine("Records analyzed", String(input.provenance.rowsAnalyzed));
-        mutedLine("Visualized categories", String(input.provenance.chartPoints));
-        if (input.provenance.aggregation) {
-          mutedLine("Aggregation (engine)", String(input.provenance.aggregation));
-        }
+      if (chAp?.chartAttribution?.trim()) {
+        appendixSubheading("Visualization source");
+        bodyText(chAp.chartAttribution!.trim(), 9);
       }
-      mutedLine("Dataset mapping confidence", input.mappingConfidence);
 
       if (provNotesAp) {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8.5);
-        doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-        ensurePageSpace(5);
-        doc.text("Provenance notes", margin, y);
-        y += 4.5;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-        bodyParagraphs(provNotesAp);
+        appendixSubheading("Provenance notes");
+        bodyBullets([provNotesAp], 9);
       }
 
       if (thumbsAp.length >= 1) {
-        sectionTitle("Session charts (sparkline thumbnails)");
-        const thumbW = (contentWidth - 3 * 3) / 4;
-        const thumbH = 16;
+        appendixSubheading("Session chart thumbnails");
+        const thumbGap = 3;
+        const thumbW = (contentWidth - thumbGap * 3) / 4;
+        const thumbH = 22;
         let tx = margin;
         thumbsAp.slice(0, 4).forEach((t, i) => {
           if (i > 0 && i % 4 === 0) {
             tx = margin;
-            y += thumbH + 14;
-            ensurePageSpace(thumbH + 16);
+            y += thumbH + thumbGap + 2;
+            ensurePageSpace(thumbH + thumbGap + 6);
           }
-          drawSparkline(doc, tx, y, thumbW, thumbH, t.values, theme.accent);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(7);
-          doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-          const ttl = doc.splitTextToSize(t.title, thumbW);
-          doc.text(ttl.slice(0, 2), tx, y + thumbH + 4);
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(6.5);
-          doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-          doc.text(t.kind.slice(0, 28), tx, y + thumbH + 8.5);
-          tx += thumbW + 3;
+          drawPdfSessionThumbnailCard(
+            doc,
+            tx,
+            y,
+            thumbW,
+            thumbH,
+            t,
+            theme.accent,
+            theme.panel,
+            theme.line,
+            theme.ink,
+            theme.muted
+          );
+          tx += thumbW + thumbGap;
         });
-        y += thumbH + 14;
+        y += thumbH + 6;
       }
 
       if (chAp && hasSeries) {
-        sectionTitle("Chart specification");
-        mutedLine("Chart type", chartTypeLabel(chAp.presentationKind));
+        const specRows: string[][] = [
+          [
+            "Analysis Type",
+            pdfChartKindExecutiveLabel(chAp.presentationKind),
+          ],
+        ];
         if (chAp.alignedMetric) {
           const mShow = chAp.alignedMetricDisplay?.trim() || chAp.alignedMetric;
-          mutedLine("Metric (aligned)", mShow);
+          specRows.push(["Primary Metric", polishPdfExecutiveLabel(mShow)]);
         }
         if (chAp.aggregation) {
-          mutedLine("Aggregation", String(chAp.aggregation));
+          specRows.push(["Aggregation", String(chAp.aggregation)]);
         }
-        mutedLine("Series points", String(chAp.data.length));
-        const chartLines = chAp.data.slice(0, 24).map((row) => {
-          const v =
-            row.displayValue?.trim() ||
-            fallbackChartNumericDisplay(
-              chAp.presentationKind,
-              Number(row.value)
-            );
+        specRows.push(["Series points", String(chAp.data.length)]);
+        const seriesRows = chAp.data.slice(0, 20).map((row) => {
+          const v = formatPdfChartRowMetricDisplay(row, chAp.presentationKind);
           if (chAp.presentationKind === "scatter") {
             const xStr =
               row.displayX?.trim() ||
               (typeof row.x === "number" && Number.isFinite(row.x)
                 ? String(row.x)
                 : "—");
-            return `${String(row.name)}: x=${xStr} y=${v}`;
+            return [String(row.name), `x=${xStr}, y=${v}`];
           }
-          return `${String(row.name)}: ${v}`;
+          return [formatPdfCategoryLabel(String(row.name)), v];
         });
-        const block = chartLines.join("\n");
-        const wrapped = doc.splitTextToSize(block, contentWidth);
-        const lh = 4.2;
-        ensurePageSpace(wrapped.length * lh + 4);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-        doc.text(wrapped, margin, y);
-        y += wrapped.length * lh + 2;
-        if (chAp.data.length > 24) {
-          bodyText(`Showing first 24 of ${chAp.data.length} series points.`, 8);
+        const seriesHeads =
+          chAp.presentationKind === "scatter"
+            ? ["Point", "Coordinates"]
+            : ["Category", "Value"];
+        const specTableH = measureMonolithicTableStackMm(
+          doc,
+          contentWidth,
+          ["Property", "Value"],
+          specRows,
+          8,
+          2.1,
+          5
+        );
+        const seriesTableH = measureMonolithicTableStackMm(
+          doc,
+          contentWidth,
+          seriesHeads,
+          seriesRows,
+          7.5,
+          2.1,
+          5
+        );
+        const blockH = 5 + specTableH + 5 + seriesTableH + 8;
+        ensurePageSpace(blockH);
+        appendixSubheading("Chart specification");
+        drawDataTable(["Property", "Value"], specRows, {
+          variant: "appendix",
+          fontSize: 8,
+          maxCols: 2,
+          maxRows: 8,
+          suppressRowPageBreaks: true,
+        });
+        appendixSubheading("Series sample");
+        drawDataTable(seriesHeads, seriesRows, {
+          variant: "appendix",
+          fontSize: 7.5,
+          maxCols: 2,
+          maxRows: 20,
+          suppressRowPageBreaks: true,
+        });
+        if (chAp.data.length > 20) {
+          bodyText(`Showing first 20 of ${chAp.data.length} series points.`, 8);
         }
       }
     }
@@ -2293,52 +3532,43 @@ export async function runExecutivePdfExport(
 
   /* -------- Running header / footer every page -------- */
   const totalPages = doc.getNumberOfPages();
-  const sourceRaw = (input.dataset.fileName || "").trim() || "—";
-  const sourceShort =
-    sourceRaw.length > 52 ? `${sourceRaw.slice(0, 49)}…` : sourceRaw;
-  const shortTitle = "Executive insight report";
+  const footerBaseline = pageHeight - 5.8;
+  const footerMuted: [number, number, number] = [148, 163, 184];
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
-    doc.rect(0, 0, pageWidth, 1.4, "F");
+    doc.rect(0, 0, pageWidth, 1.2, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-    doc.text(company, margin, margin + 1);
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
+    doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
+    doc.text(company, margin, margin + 2.5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
     doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-    doc.text(shortTitle, margin, margin + 5);
-    const rightW = doc.getTextWidth(genStr);
-    doc.text(genStr, pageWidth - margin - rightW, margin + 1);
+    doc.text(PDF_REPORT_TITLE, margin, margin + 6.5);
 
     doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-    doc.setLineWidth(0.25);
-    doc.line(margin, pageHeight - footerBand + 2, pageWidth - margin, pageHeight - footerBand + 2);
+    doc.setLineWidth(0.12);
+    doc.line(
+      margin,
+      pageHeight - footerBand + 0.8,
+      pageWidth - margin,
+      pageHeight - footerBand + 0.8
+    );
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-    const footParts: string[] = [`Source: ${sourceShort}`, `Generated ${genStr}`];
-    if (input.includes.includeTechnicalAppendix) {
-      footParts.push(`Mapping: ${input.mappingConfidence}`);
-      if (input.provenance) {
-        footParts.push(`Analysis: ${input.provenance.confidence}`);
-      }
-    }
-    const footLeft = footParts.join("   ·   ");
-    const fl = doc.splitTextToSize(footLeft, contentWidth - 28);
-    doc.text(fl, margin, pageHeight - 8);
-    doc.setFont("helvetica", "italic");
     doc.setFontSize(6.5);
-    doc.setTextColor(180, 190, 200);
-    doc.text("AI Data Analyst App", pageWidth / 2, pageHeight - 4.5, {
+    doc.setTextColor(footerMuted[0], footerMuted[1], footerMuted[2]);
+    doc.text(sourceShort, margin, footerBaseline, {
+      maxWidth: contentWidth * 0.38,
+    });
+    doc.text("Generated by AI Data Analyst", pageWidth / 2, footerBaseline, {
       align: "center",
     });
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-    doc.text(`Page ${i} / ${totalPages}`, pageWidth - margin - 18, pageHeight - 8);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Page ${i} / ${totalPages}`, pageWidth - margin, footerBaseline, {
+      align: "right",
+    });
     doc.setTextColor(0, 0, 0);
   }
 

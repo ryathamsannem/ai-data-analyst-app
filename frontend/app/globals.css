@@ -407,8 +407,40 @@ body {
 
 .dark .export-tab-page .export-tab-download-btn:hover {
   box-shadow:
-    0 2px 8px -4px color-mix(in srgb, var(--accent) 30%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 4px -2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Off-screen PDF chart capture — print-light BI styling (softer grid, tighter padding) */
+.pdf-chart-capture {
+  --chart-axis-line: #e8edf3;
+  --chart-axis-tick: #64748b;
+  --chart-axis-label: #475569;
+  --overview-dash-grid-stroke: #e8edf3;
+  --overview-dash-grid-opacity: 0.16;
+}
+
+.pdf-chart-capture .recharts-cartesian-grid line {
+  stroke: var(--chart-axis-line);
+  opacity: var(--overview-dash-grid-opacity, 0.16);
+}
+
+.pdf-chart-capture .recharts-text {
+  fill: var(--chart-axis-tick);
+  font-size: 11px;
+}
+
+.pdf-chart-capture .recharts-cartesian-axis-tick-value {
+  font-size: 10.5px;
+}
+
+.pdf-chart-capture .recharts-wrapper {
+  margin-inline: auto;
+}
+
+.pdf-chart-capture .ai-insights-viz-chart-frame {
+  border-color: rgb(226 232 240 / 0.85);
+  box-shadow: none;
 }
 
 /* Session chart surface: smooth reveal on Charts tab (respect reduced motion). */

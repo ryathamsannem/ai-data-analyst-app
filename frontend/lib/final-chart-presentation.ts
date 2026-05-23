@@ -132,7 +132,7 @@ function barFamilyKindFromRows(args: {
         sum <= 1.02 &&
         values.every((v) => v <= 1 && v >= 0)));
 
-  if (shareLike) {
+  if (shareLike && shareCompositionAllowed(title, question)) {
     return n <= 4 ? "pie" : "donut";
   }
 
@@ -153,6 +153,18 @@ function barFamilyKindFromRows(args: {
   }
 
   return "bar_horizontal";
+}
+
+/** Radial charts only for composition/share questions — not min/max ranking. */
+function shareCompositionAllowed(title: string, question?: string): boolean {
+  const blob = `${title} ${question ?? ""}`.toLowerCase();
+  if (rankIntentFromText(title, question)) return false;
+  if (/\b(lowest|minimum|least|highest|maximum|top|bottom|rank|ranking)\b/.test(blob)) {
+    return false;
+  }
+  return /\b(share|composition|mix|split|portion|breakdown|distribution of|percent of total|percentage of total)\b/.test(
+    blob
+  );
 }
 
 /**
