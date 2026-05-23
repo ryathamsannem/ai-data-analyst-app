@@ -7,9 +7,60 @@ import { Canvg } from "canvg";
 import type { ChartKind, ChartRow } from "./chart-types";
 import { fallbackChartNumericDisplay } from "./chart-types";
 import { pdfXAxisLineTitle, pdfYAxisLineTitle } from "@/lib/chart-semantic-metadata";
-import { AI_INSIGHT_SECTION_LABELS } from "@/lib/ux-narrative";
 
 type JsPdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
+
+/** PDF-only insight section labels (executive report tone). */
+const PDF_INSIGHT_SECTION_LABELS = {
+  overview: "Executive overview",
+  findings: "Key findings",
+  interpretation: "Business interpretation",
+  actions: "Recommended actions",
+  methodology: "How this was calculated",
+} as const;
+
+const PDF_BUSINESS_COPY_REPLACEMENTS: readonly [RegExp, string][] = [
+  [/The dataset contains ([\d,]+) rows/gi, "The dataset contains $1 records"],
+  [/\bRows in analysis\b/gi, "Records analyzed"],
+  [/\bChart series points\b/gi, "Visualized categories"],
+  [/\bRows in current filtered view\b/gi, "Records in filtered view"],
+  [/\bTotal Rows\b/g, "Records in dataset"],
+  [/\blimited evidence in this cohort\b/gi, "directional findings in this cohort"],
+  [/\bdirectional read — limited evidence\b/gi, "Directional findings"],
+  [/\bEvidence is limited\b/gi, "Evidence strength: Limited"],
+  [/\btreat takeaways as directional, not definitive\b/gi, "treat findings as directional, not definitive"],
+  [/\bUse cautious language\b/gi, "Use measured language"],
+  [/\bchart points\b/gi, "visualized categories"],
+  [/\brows analyzed\b/gi, "records analyzed"],
+];
+
+/** Polish user-facing PDF copy — terminology only; no layout changes. */
+export function polishPdfBusinessCopy(raw: string | null | undefined): string {
+  if (raw == null) return "";
+  let t = String(raw).replace(/\s+/g, " ").trim();
+  for (const [re, repl] of PDF_BUSINESS_COPY_REPLACEMENTS) {
+    t = t.replace(re, repl);
+  }
+  return t;
+}
+
+function polishPdfKpiLabel(title: string): string {
+  const key = title.trim().toLowerCase();
+  const exact: Record<string, string> = {
+    "rows in analysis": "Records analyzed",
+    "chart series points": "Visualized categories",
+    "rows in current filtered view": "Records in filtered view",
+    "total rows": "Records in dataset",
+  };
+  if (exact[key]) return exact[key];
+  return polishPdfBusinessCopy(title);
+}
+
+function polishPdfConfidenceLevel(level: Confidence): string {
+  if (level === "High") return "High";
+  if (level === "Medium") return "Moderate";
+  return "Limited";
+}
 
 /**
  * Height (mm) of a non-split table: must match `drawDataTable` row measurement
@@ -328,19 +379,26 @@ function sanitizeExecutivePdfExportInput(
   raw: ExecutivePdfExportInput
 ): ExecutivePdfExportInput {
   const sLine = (line: string) => sanitizeUserFacingReportText(line);
-  const execSummaryLines = raw.execSummaryLines.map(sLine).filter((l) => l.length > 0);
+  const execSummaryLines = raw.execSummaryLines
+    .map((l) => polishPdfBusinessCopy(sLine(l)))
+    .filter((l) => l.length > 0);
 
   const kpiCards = raw.kpiCards.map((c) => ({
-    title: sanitizeUserFacingReportText(c.title),
-    value: sanitizeUserFacingReportText(c.value),
+    title: polishPdfKpiLabel(sanitizeUserFacingReportText(c.title)),
+    value: polishPdfBusinessCopy(sanitizeUserFacingReportText(c.value)),
     subtitle:
-      c.subtitle != null ? sanitizeUserFacingReportText(String(c.subtitle)) : c.subtitle,
+      c.subtitle != null
+        ? polishPdfBusinessCopy(sanitizeUserFacingReportText(String(c.subtitle)))
+        : c.subtitle,
   }));
 
   const vizExecutiveFacts = (raw.vizExecutiveFacts ?? []).map((f) => ({
-    title: sanitizeUserFacingReportText(f.title),
-    value: sanitizeUserFacingReportText(f.value),
-    hint: f.hint != null ? sanitizeUserFacingReportText(f.hint) : f.hint,
+    title: polishPdfKpiLabel(sanitizeUserFacingReportText(f.title)),
+    value: polishPdfBusinessCopy(sanitizeUserFacingReportText(f.value)),
+    hint:
+      f.hint != null
+        ? polishPdfBusinessCopy(sanitizeUserFacingReportText(f.hint))
+        : f.hint,
   }));
 
   const pdfRankedSignals = (raw.pdfRankedSignals ?? [])
@@ -407,7 +465,7 @@ function sanitizeExecutivePdfExportInput(
     };
   }
 
-  let answer = sanitizeUserFacingReportText(raw.answer);
+  let answer = polishPdfBusinessCopy(sanitizeUserFacingReportText(raw.answer));
   if (!answer.trim() && raw.answer.trim().length > 80) {
     answer =
       "The narrative was omitted from this PDF because it contained internal technical context. Ask the assistant again for a concise business summary suitable for export.";
@@ -415,15 +473,23 @@ function sanitizeExecutivePdfExportInput(
 
   let insightSections = raw.insightSections;
   if (insightSections) {
-    const sum = sanitizeUserFacingReportText(insightSections.summary);
+    const sum = polishPdfBusinessCopy(
+      sanitizeUserFacingReportText(insightSections.summary)
+    );
     const st = insightSections.statistical
-      ? sanitizeUserFacingReportText(insightSections.statistical)
+      ? polishPdfBusinessCopy(
+          sanitizeUserFacingReportText(insightSections.statistical)
+        )
       : undefined;
     const hy = insightSections.hypotheses
-      ? sanitizeUserFacingReportText(insightSections.hypotheses)
+      ? polishPdfBusinessCopy(
+          sanitizeUserFacingReportText(insightSections.hypotheses)
+        )
       : undefined;
     const rec = insightSections.recommendations
-      ? sanitizeUserFacingReportText(insightSections.recommendations)
+      ? polishPdfBusinessCopy(
+          sanitizeUserFacingReportText(insightSections.recommendations)
+        )
       : undefined;
     const meth = insightSections.methodology
       ? sanitizeUserFacingReportText(insightSections.methodology)
@@ -466,19 +532,21 @@ function sanitizeExecutivePdfExportInput(
     kpiSectionTitle: sanitizeUserFacingReportText(raw.kpiSectionTitle),
     execSummaryLines,
     kpiCards,
-    question: sanitizeUserFacingReportText(raw.question),
+    question: polishPdfBusinessCopy(sanitizeUserFacingReportText(raw.question)),
     answer,
     insightSections,
     insightSummary: raw.insightSummary
-      ? sanitizeUserFacingReportText(raw.insightSummary)
+      ? polishPdfBusinessCopy(sanitizeUserFacingReportText(raw.insightSummary))
       : raw.insightSummary,
     chartInsightBadge: raw.chartInsightBadge
-      ? sanitizeUserFacingReportText(raw.chartInsightBadge)
+      ? polishPdfBusinessCopy(sanitizeUserFacingReportText(raw.chartInsightBadge))
       : raw.chartInsightBadge,
     pdfRankedSignals: pdfRankedSignals.length ? pdfRankedSignals : undefined,
     vizExecutiveFacts,
     executiveInsightsBrief: raw.executiveInsightsBrief?.trim()
-      ? sanitizeUserFacingReportText(raw.executiveInsightsBrief)
+      ? polishPdfBusinessCopy(
+          sanitizeUserFacingReportText(raw.executiveInsightsBrief)
+        )
       : undefined,
     provenance,
     chart,
@@ -510,7 +578,7 @@ function drawConfidenceChip(
   level: Confidence
 ): number {
   const rgb = confidenceFill(level);
-  const text = `${label}: ${level}`;
+  const text = `${label}: ${polishPdfConfidenceLevel(level)}`;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   const w = doc.getTextWidth(text) + 5;
@@ -833,6 +901,92 @@ function highlightSignalsToBulletLines(raw: string, max: number): string[] {
     .map((r) => `${r.cat}: ${formatPdfBusinessNumber(r.n)}`);
 }
 
+type ExecSummaryPartition = {
+  scope: string[];
+  question: string;
+  takeaway: string;
+  evidence: string[];
+  metrics: string[];
+  other: string[];
+};
+
+function partitionExecSummaryLines(lines: string[]): ExecSummaryPartition {
+  const scope: string[] = [];
+  let question = "";
+  let takeaway = "";
+  const evidence: string[] = [];
+  const metrics: string[] = [];
+  const other: string[] = [];
+
+  for (const line of lines) {
+    const s = line.trim();
+    if (!s) continue;
+    if (/^question:/i.test(s)) {
+      question = s.replace(/^question:\s*/i, "").trim();
+      continue;
+    }
+    if (/^main takeaway:/i.test(s)) {
+      takeaway = s.replace(/^main takeaway:\s*/i, "").trim();
+      continue;
+    }
+    if (/^the dataset contains/i.test(s)) {
+      scope.push(s);
+      continue;
+    }
+    if (
+      /treat (takeaways|findings)|evidence strength|directional findings|mapping is still|moderate sample|qualify strong claims|filtered row|measured language|visualized categor/i.test(
+        s
+      )
+    ) {
+      evidence.push(s);
+      continue;
+    }
+    if (/^upload data/i.test(s)) {
+      other.push(s);
+      continue;
+    }
+    const colon = s.indexOf(":");
+    if (colon > 0 && colon < 52 && !isStructuredDumpExecutiveLine(s)) {
+      metrics.push(s);
+      continue;
+    }
+    other.push(s);
+  }
+
+  return { scope, question, takeaway, evidence, metrics, other };
+}
+
+/** Split narrative prose into scannable executive bullets. */
+function splitProseToInsightBullets(text: string, maxBullets = 7): string[] {
+  const raw = text.trim();
+  if (!raw) return [];
+
+  const lines = raw
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const explicit = lines.filter(
+    (l) => /^[-•*]\s+/.test(l) || /^\d+[.)]\s+/.test(l)
+  );
+  if (explicit.length >= 2) {
+    return explicit
+      .map((l) => l.replace(/^[-•*]\s+/, "").replace(/^\d+[.)]\s+/, "").trim())
+      .slice(0, maxBullets);
+  }
+
+  if (raw.length > 160) {
+    const sentences = raw
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 14);
+    if (sentences.length >= 2) {
+      return sentences.slice(0, maxBullets);
+    }
+  }
+
+  return [raw];
+}
+
 export async function runExecutivePdfExport(
   rawInput: ExecutivePdfExportInput
 ): Promise<void> {
@@ -881,28 +1035,30 @@ export async function runExecutivePdfExport(
 
   const sectionTitle = (title: string) => {
     ensurePageSpace(16);
-    y += 3;
+    y += 4;
     doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
     doc.rect(margin, y - 3.5, 1.2, 9, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12.5);
     doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
     doc.text(title, margin + 3.5, y + 2.5);
-    y += 8;
+    y += 9;
     ruleFull(y);
-    y += 6;
+    y += 7;
     doc.setTextColor(0, 0, 0);
   };
+
+  const pdfBodyLineHeight = (fontSize: number) => fontSize * 0.42 + 1.52;
 
   const bodyText = (text: string, fontSize = 10, color = theme.body) => {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(fontSize);
     doc.setTextColor(color[0], color[1], color[2]);
     const lines = doc.splitTextToSize(text, contentWidth);
-    const lineH = fontSize * 0.42 + 1.45;
-    ensurePageSpace(lines.length * lineH + 2);
+    const lineH = pdfBodyLineHeight(fontSize);
+    ensurePageSpace(lines.length * lineH + 2.5);
     doc.text(lines, margin, y);
-    y += lines.length * lineH + 2;
+    y += lines.length * lineH + 2.5;
     doc.setTextColor(0, 0, 0);
   };
 
@@ -951,17 +1107,138 @@ export async function runExecutivePdfExport(
     return h;
   };
 
+  const estimateBulletBodyHeightMm = (text: string, fontSize = 9.5) => {
+    const bullets = splitProseToInsightBullets(text, 7);
+    const lh = pdfBodyLineHeight(fontSize);
+    let h = 0;
+    bullets.forEach((b, i) => {
+      if (i > 0) h += 0.5;
+      const lines = doc.splitTextToSize(`• ${b}`, contentWidth - 5);
+      h += lines.length * lh + 1.25;
+    });
+    return h + 3;
+  };
+
   /** Keep subsection title with its body; start on a new page if the block would break awkwardly. */
   const ensureAiBlockFits = (
     subsectionTitle: string,
     titleFontSize: number,
     body: string,
-    bodyFontSize = 10
+    bodyFontSize = 9.5
   ) => {
     const titleLineH = titleFontSize * 0.42 + 1.45;
     const titleH = subsectionTitle.trim() ? titleLineH + 6 : 0;
-    const bodyH = estimateInsightBodyHeightMm(body, bodyFontSize);
+    const bodyH = estimateBulletBodyHeightMm(body, bodyFontSize);
     ensurePageSpace(titleH + bodyH + 10);
+  };
+
+  const insightSubheading = (title: string) => {
+    ensurePageSpace(9);
+    y += 1.5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
+    doc.text(title, margin, y);
+    y += 5.5;
+    doc.setTextColor(0, 0, 0);
+  };
+
+  const drawExecBullet = (text: string, fontSize = 9.5) => {
+    const wrapped = doc.splitTextToSize(`• ${text}`, contentWidth - 5);
+    const lh = pdfBodyLineHeight(fontSize);
+    ensurePageSpace(wrapped.length * lh + 2.5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(fontSize);
+    doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
+    doc.text(wrapped, margin + 2, y);
+    y += wrapped.length * lh + 1.25;
+    doc.setTextColor(0, 0, 0);
+  };
+
+  const bodyBullets = (items: string[], fontSize = 9.5) => {
+    const bullets = items.flatMap((t) => splitProseToInsightBullets(t, 6));
+    if (!bullets.length) return;
+    bullets.forEach((b, i) => {
+      if (i > 0) y += 0.5;
+      drawExecBullet(b, fontSize);
+    });
+    y += 2.5;
+  };
+
+  const drawEvidenceNoteBox = (notes: string[]) => {
+    if (!notes.length) return;
+    const polished = notes.map((n) => polishPdfBusinessCopy(n)).filter(Boolean);
+    if (!polished.length) return;
+    const linePitch = pdfBodyLineHeight(9);
+    let contentH = 0;
+    polished.forEach((note) => {
+      const wrapped = doc.splitTextToSize(note, contentWidth - 12);
+      contentH += wrapped.length * linePitch;
+    });
+    const boxH = contentH + 9;
+    ensurePageSpace(boxH + 4);
+    doc.setFillColor(theme.panel[0], theme.panel[1], theme.panel[2]);
+    doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(margin, y, contentWidth, boxH, 1.2, 1.2, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+    doc.text("Evidence strength", margin + 3, y + 4.5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    let hy = y + 8.5;
+    polished.forEach((note) => {
+      const wrapped = doc.splitTextToSize(note, contentWidth - 12);
+      wrapped.forEach((ln: string) => {
+        doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
+        doc.text(ln, margin + 3, hy);
+        hy += linePitch;
+      });
+    });
+    y += boxH + 4;
+    doc.setTextColor(0, 0, 0);
+  };
+
+  const renderLegacyExecSummaryLine = (line: string) => {
+    const stripped = line.trim();
+    const colonIdx = stripped.indexOf(":");
+    const afterColon =
+      colonIdx > 0 && colonIdx < 72 ? stripped.slice(colonIdx + 1).trim() : "";
+    const dumpScan =
+      afterColon.length > 30 && isStructuredDumpExecutiveLine(afterColon)
+        ? afterColon
+        : stripped;
+
+    if (
+      input.pdfRankedSignals?.length &&
+      isStructuredDumpExecutiveLine(dumpScan)
+    ) {
+      return;
+    }
+
+    if (isStructuredDumpExecutiveLine(dumpScan)) {
+      const pairs = peelTrailingNumericPairs(dumpScan, 8);
+      if (pairs.length === 0) {
+        const cleaned = formatNumericTokensInSignalLine(dumpScan);
+        drawExecBullet(cleaned);
+        return;
+      }
+      const bullets = executiveDumpToRankedBullets(pairs, 3);
+      if (bullets.length > 0) {
+        bullets.forEach((b) => drawExecBullet(b));
+        return;
+      }
+      const rows = executiveDumpToSignalValueRows(pairs, 3);
+      ensurePageSpace(rows.length * 7 + 22);
+      drawDataTable(["Signal", "Value"], rows, {
+        fontSize: 8,
+        maxCols: 2,
+        maxRows: 3,
+      });
+      return;
+    }
+    drawExecBullet(stripped);
   };
 
   const mutedLine = (label: string, value: string) => {
@@ -1140,7 +1417,7 @@ export async function runExecutivePdfExport(
   mutedLine("Dataset profile", kindLabel);
   mutedLine(
     "Volume",
-    `${input.dataset.rows.toLocaleString()} rows × ${input.dataset.colCount} columns` +
+    `${input.dataset.rows.toLocaleString()} records × ${input.dataset.colCount} columns` +
       (input.dataset.sheet ? ` · Sheet: ${input.dataset.sheet}` : "")
   );
   y += 3;
@@ -1153,83 +1430,49 @@ export async function runExecutivePdfExport(
   if (!input.execSummaryLines.length) {
     bodyText("No executive summary could be assembled for this export.", 10);
   } else {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
     const execLinesForLoop =
       input.pdfRankedSignals?.length && input.pdfRankedSignals.length > 0
         ? input.execSummaryLines.filter((l) => !isChartRankedExecutiveLine(l))
         : input.execSummaryLines;
 
-    execLinesForLoop.forEach((line) => {
-      const stripped = line.trim();
-      const colonIdx = stripped.indexOf(":");
-      const afterColon =
-        colonIdx > 0 && colonIdx < 72 ? stripped.slice(colonIdx + 1).trim() : "";
-      const dumpScan =
-        afterColon.length > 30 && isStructuredDumpExecutiveLine(afterColon)
-          ? afterColon
-          : stripped;
+    const partitioned = partitionExecSummaryLines(execLinesForLoop);
 
-      if (
-        input.pdfRankedSignals?.length &&
-        isStructuredDumpExecutiveLine(dumpScan)
-      ) {
-        return;
-      }
-
-      if (isStructuredDumpExecutiveLine(dumpScan)) {
-        const pairs = peelTrailingNumericPairs(dumpScan, 8);
-        if (pairs.length === 0) {
-          const cleaned = formatNumericTokensInSignalLine(dumpScan);
-          const wrapped = doc.splitTextToSize(`• ${cleaned}`, contentWidth - 4);
-          const lh = 4.85;
-          ensurePageSpace(wrapped.length * lh + 3);
-          doc.text(wrapped, margin + 2, y);
-          y += wrapped.length * lh + 1.5;
-          return;
-        }
-        const bullets = executiveDumpToRankedBullets(pairs, 3);
-        if (bullets.length > 0) {
-          bullets.forEach((b) => {
-            const wrapped = doc.splitTextToSize(`• ${b}`, contentWidth - 4);
-            const lh = 4.85;
-            ensurePageSpace(wrapped.length * lh + 3);
-            doc.text(wrapped, margin + 2, y);
-            y += wrapped.length * lh + 1.5;
-          });
-          return;
-        }
-        const rows = executiveDumpToSignalValueRows(pairs, 3);
-        ensurePageSpace(rows.length * 7 + 22);
-        drawDataTable(
-          ["Signal", "Value"],
-          rows,
-          { fontSize: 8, maxCols: 2, maxRows: 3 }
-        );
-        return;
-      }
-      const wrapped = doc.splitTextToSize(`• ${line}`, contentWidth - 4);
-      const lh = 4.85;
-      ensurePageSpace(wrapped.length * lh + 3);
-      doc.text(wrapped, margin + 2, y);
-      y += wrapped.length * lh + 1.5;
-    });
+    if (partitioned.scope.length) {
+      insightSubheading("Scope");
+      partitioned.scope.forEach((s) => bodyText(s, 9.5));
+    }
+    if (partitioned.question) {
+      insightSubheading("Question in scope");
+      bodyText(partitioned.question, 10);
+    }
+    if (partitioned.takeaway) {
+      insightSubheading("Main takeaway");
+      bodyBullets([partitioned.takeaway], 10);
+    }
+    if (partitioned.metrics.length) {
+      insightSubheading("Key metrics");
+      partitioned.metrics.forEach((m) => drawExecBullet(m));
+      y += 1.5;
+    }
+    if (partitioned.evidence.length) {
+      drawEvidenceNoteBox(partitioned.evidence);
+    }
+    if (partitioned.other.length) {
+      insightSubheading("Supporting signals");
+      partitioned.other.forEach((line) => renderLegacyExecSummaryLine(line));
+    }
 
     if (input.pdfRankedSignals?.length) {
+      insightSubheading("Chart highlights");
       input.pdfRankedSignals.slice(0, 3).forEach((r) => {
-        const b = `${r.rank}: ${r.category} — ${r.valueDisplay}`;
-        const wrapped = doc.splitTextToSize(`• ${b}`, contentWidth - 4);
-        const lh = 4.85;
-        ensurePageSpace(wrapped.length * lh + 3);
-        doc.text(wrapped, margin + 2, y);
-        y += wrapped.length * lh + 1.5;
+        drawExecBullet(`${r.rank}: ${r.category} — ${r.valueDisplay}`);
       });
+      y += 1.5;
     }
 
     doc.setTextColor(0, 0, 0);
   }
-  y += 4;
+  y += 5;
 
   if (input.includes.includeKPIs && y > contentTop0 + 118) {
     doc.addPage();
@@ -1375,7 +1618,7 @@ export async function runExecutivePdfExport(
       const lvl = String(input.insightConfidenceLevel).toLowerCase();
       const mapped: Confidence =
         lvl === "high" ? "High" : lvl === "medium" ? "Medium" : "Low";
-      drawConfidenceChip(doc, margin, y + 2, "Narrative", mapped);
+      drawConfidenceChip(doc, margin, y + 2, "Insight confidence", mapped);
       y += 7;
     }
 
@@ -1390,45 +1633,31 @@ export async function runExecutivePdfExport(
 
     if (hasStructured && sec) {
       if (sec.summary?.trim()) {
-        ensureAiBlockFits("Summary", 9, sec.summary.trim(), 10);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-        doc.text("Summary", margin, y);
-        y += 5;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-        bodyParagraphs(sec.summary.trim());
+        ensureAiBlockFits(
+          PDF_INSIGHT_SECTION_LABELS.overview,
+          9.5,
+          sec.summary.trim(),
+          9.5
+        );
+        insightSubheading(PDF_INSIGHT_SECTION_LABELS.overview);
+        bodyBullets([sec.summary.trim()], 10);
       }
       const blocks: [string, string | undefined][] = [
-        [AI_INSIGHT_SECTION_LABELS.statistical, sec.statistical],
-        [AI_INSIGHT_SECTION_LABELS.hypotheses, sec.hypotheses],
-        [AI_INSIGHT_SECTION_LABELS.recommendations, sec.recommendations],
+        [PDF_INSIGHT_SECTION_LABELS.findings, sec.statistical],
+        [PDF_INSIGHT_SECTION_LABELS.interpretation, sec.hypotheses],
+        [PDF_INSIGHT_SECTION_LABELS.actions, sec.recommendations],
       ];
       for (const [heading, body] of blocks) {
         if (!body?.trim()) continue;
-        ensureAiBlockFits(heading, 9.5, body.trim(), 10);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9.5);
-        doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-        doc.text(heading, margin, y);
-        y += 5;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-        bodyParagraphs(body.trim());
-        y += 2;
+        ensureAiBlockFits(heading, 9.5, body.trim(), 9.5);
+        insightSubheading(heading);
+        bodyBullets([body.trim()], 9.5);
+        y += 1.5;
       }
     } else if (input.answer.trim()) {
-      ensureAiBlockFits("Analysis", 9, input.answer.trim(), 10);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-      doc.text("Analysis", margin, y);
-      y += 5;
-      doc.setFont("helvetica", "normal");
-      bodyParagraphs(input.answer);
+      ensureAiBlockFits("Analysis", 9.5, input.answer.trim(), 9.5);
+      insightSubheading("Analysis");
+      bodyBullets([input.answer.trim()], 9.5);
     } else {
       bodyText(
         "No AI answer yet. Ask a question in AI Insights before exporting.",
@@ -1971,8 +2200,8 @@ export async function runExecutivePdfExport(
 
       if (input.provenance) {
         mutedLine("Analysis confidence", input.provenance.confidence);
-        mutedLine("Rows analyzed", String(input.provenance.rowsAnalyzed));
-        mutedLine("Plotted points", String(input.provenance.chartPoints));
+        mutedLine("Records analyzed", String(input.provenance.rowsAnalyzed));
+        mutedLine("Visualized categories", String(input.provenance.chartPoints));
         if (input.provenance.aggregation) {
           mutedLine("Aggregation (engine)", String(input.provenance.aggregation));
         }
