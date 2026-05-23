@@ -5,8 +5,19 @@
 
 import { Canvg } from "canvg";
 import type { ChartKind, ChartRow } from "./chart-types";
-import { fallbackChartNumericDisplay } from "./chart-types";
 import { pdfXAxisLineTitle, pdfYAxisLineTitle } from "@/lib/chart-semantic-metadata";
+import {
+  formatExecutiveMetricValue,
+  formatRawMetricValue,
+  metricFormatUsesPercent,
+  readChartRowRawValue,
+  type MetricFormatContext,
+} from "@/lib/metric-value-format";
+import {
+  formatPdfGeneratedTimestamp,
+  normalizePdfIsoDatesInText,
+  parsePdfIsoDateLabel,
+} from "@/lib/pdf-date-format";
 
 type JsPdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
 
@@ -95,49 +106,9 @@ function collapsePdfDuplicateWords(raw: string): string {
   return t;
 }
 
-/** Fix locale-broken dates (2,026-2-4) and normalize to YYYY-MM-DD. */
-function normalizePdfDatesInText(raw: string): string {
-  let t = raw;
-  t = t.replace(
-    /(\d{1,4}(?:,\d{3})*)-(\d{1,2})-(\d{1,2})\b/g,
-    (_, y, m, d) => {
-      const year = String(y).replace(/,/g, "");
-      const mm = String(m).padStart(2, "0");
-      const dd = String(d).padStart(2, "0");
-      return `${year}-${mm}-${dd}`;
-    }
-  );
-  t = t.replace(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g, (_, y, m, d) => {
-    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  });
-  return t;
-}
-
-function pdfParseIsoDateLabel(label: string): string | null {
-  const t = label.trim();
-  if (!t) return null;
-  const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const broken = t.match(/^(\d{1,4}(?:,\d{3})*)-(\d{1,2})-(\d{1,2})/);
-  if (broken) {
-    const year = broken[1].replace(/,/g, "");
-    return `${year}-${String(broken[2]).padStart(2, "0")}-${String(broken[3]).padStart(2, "0")}`;
-  }
-  const parsed = Date.parse(t);
-  if (!Number.isNaN(parsed) && /[/-]/.test(t)) {
-    const d = new Date(parsed);
-    if (d.getFullYear() >= 1990 && d.getFullYear() <= 2100) {
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${d.getFullYear()}-${mm}-${dd}`;
-    }
-  }
-  return null;
-}
-
 /** Category axis label for PDF (dates stay YYYY-MM-DD, no thousands separators). */
 function formatPdfCategoryLabel(raw: string): string {
-  const iso = pdfParseIsoDateLabel(raw);
+  const iso = parsePdfIsoDateLabel(raw);
   if (iso) return iso;
   return polishPdfBusinessCopy(humanizePdfDumpLabel(raw));
 }
@@ -154,7 +125,7 @@ function pdfIsTrendChart(kind: ChartKind, data: ChartRow[]): boolean {
   if (data.length < 2) return false;
   const sample = data.slice(0, Math.min(8, data.length));
   const dateHits = sample.filter((r) =>
-    pdfParseIsoDateLabel(String(r.name ?? ""))
+    parsePdfIsoDateLabel(String(r.name ?? ""))
   ).length;
   return dateHits >= Math.max(2, Math.ceil(sample.length * 0.4));
 }
@@ -197,7 +168,7 @@ export function polishPdfBusinessCopy(raw: string | null | undefined): string {
     t = t.replace(re, repl);
   }
   t = collapsePdfDuplicateWords(t);
-  t = normalizePdfDatesInText(t);
+  t = normalizePdfIsoDatesInText(t);
   return t.trim();
 }
 
@@ -321,6 +292,229 @@ function measureMonolithicTableStackMm(
   measureRow(heads, true);
   for (const row of body) measureRow(row, false);
   return totalH + outerFrameMm;
+}
+
+/** Data preview excerpt limits (structured PDF table — not screenshots). */
+const PDF_DATA_PREVIEW_MAX_ROWS = 10;
+const PDF_DATA_PREVIEW_MAX_COLS = 7;
+
+/** Print-safe palette — light surfaces regardless of app UI theme. */
+const PDF_PREVIEW_TABLE_THEME = {
+  headerBg: [241, 245, 249] as [number, number, number],
+  headerInk: [15, 23, 42] as [number, number, number],
+  bodyInk: [51, 65, 85] as [number, number, number],
+  border: [203, 213, 225] as [number, number, number],
+  stripe: [248, 250, 252] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+};
+
+function truncatePdfPreviewColumnLabel(label: string, maxLen = 28): string {
+  const s = String(label ?? "").trim();
+  if (!s) return "—";
+  return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
+}
+
+function formatPdfPreviewCellValue(value: unknown, maxChars = 56): string {
+  if (value === null || value === undefined) return "—";
+  let s = String(value).replace(/\s+/g, " ").trim();
+  if (!s) return "—";
+  const isoOnly = parsePdfIsoDateLabel(s);
+  if (isoOnly) s = isoOnly;
+  else s = normalizePdfIsoDatesInText(s);
+  return s.length > maxChars ? `${s.slice(0, maxChars - 1)}…` : s;
+}
+
+function ellipsizePdfCellToWidth(
+  doc: JsPdfDocument,
+  text: string,
+  maxWidthMm: number,
+  fontSize: number,
+  fontStyle: "normal" | "bold" = "normal"
+): string {
+  const t = text || "—";
+  doc.setFont("helvetica", fontStyle);
+  doc.setFontSize(fontSize);
+  const innerW = Math.max(2, maxWidthMm);
+  if (doc.getTextWidth(t) <= innerW) return t;
+  const ell = "…";
+  let lo = 0;
+  let hi = t.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    const candidate = `${t.slice(0, mid)}${ell}`;
+    if (doc.getTextWidth(candidate) <= innerW) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo > 0 ? `${t.slice(0, lo)}${ell}` : ell;
+}
+
+function computePdfPreviewColumnWidths(
+  doc: JsPdfDocument,
+  contentWidth: number,
+  headers: string[],
+  body: string[][],
+  fontSize: number
+): number[] {
+  const n = headers.length;
+  if (n === 0) return [];
+  const pad = 2.1;
+  const weights = headers.map((head, col) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(fontSize + 0.5);
+    let w = doc.getTextWidth(truncatePdfPreviewColumnLabel(head)) + pad * 2;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(fontSize);
+    for (const row of body) {
+      const cell = formatPdfPreviewCellValue(row[col]);
+      w = Math.max(
+        w,
+        Math.min(doc.getTextWidth(cell) + pad * 2, contentWidth * 0.38)
+      );
+    }
+    return Math.max(w, 12);
+  });
+  const total = weights.reduce((a, b) => a + b, 0) || 1;
+  return weights.map((w) => (w / total) * contentWidth);
+}
+
+function measurePdfDataPreviewTableStackMm(
+  headers: string[],
+  bodyRowCount: number
+): number {
+  const n = Math.min(headers.length, PDF_DATA_PREVIEW_MAX_COLS);
+  const rows = Math.min(bodyRowCount, PDF_DATA_PREVIEW_MAX_ROWS);
+  if (n === 0 || rows === 0) return 0;
+  const fontSize = 7.5;
+  const headerH = fontSize * 0.42 + 1.18 + 5.4;
+  const bodyRowH = fontSize * 0.42 + 1.12 + 4.6;
+  return headerH + rows * bodyRowH + 5;
+}
+
+/** Native jsPDF table for Data preview — no html2canvas. */
+function drawPdfDataPreviewTable(args: {
+  doc: JsPdfDocument;
+  margin: number;
+  contentWidth: number;
+  y: number;
+  footerY: number;
+  contentTopY: number;
+  accent: [number, number, number];
+  headers: string[];
+  body: string[][];
+}): number {
+  const { doc, margin, contentWidth, footerY, contentTopY, accent, headers, body } =
+    args;
+  let y = args.y;
+  const T = PDF_PREVIEW_TABLE_THEME;
+  const n = Math.min(headers.length, PDF_DATA_PREVIEW_MAX_COLS);
+  if (n === 0) return y;
+
+  const heads = headers.slice(0, n).map((h) => truncatePdfPreviewColumnLabel(h));
+  const rows = body
+    .slice(0, PDF_DATA_PREVIEW_MAX_ROWS)
+    .map((r) =>
+      Array.from({ length: n }, (_, i) => formatPdfPreviewCellValue(r[i]))
+    );
+  if (rows.length === 0) return y;
+
+  const fontSize = 7.5;
+  const pad = 2.15;
+  const headerFontSize = fontSize + 0.5;
+  const headerRowH = headerFontSize * 0.42 + 1.18 + 5.4;
+  const bodyRowH = fontSize * 0.42 + 1.12 + 4.6;
+  const colW = computePdfPreviewColumnWidths(doc, contentWidth, heads, rows, fontSize);
+
+  let segmentTopY = y;
+
+  const strokeSegmentFrame = (top: number, bottom: number) => {
+    if (bottom <= top + 0.5) return;
+    doc.setDrawColor(T.border[0], T.border[1], T.border[2]);
+    doc.setLineWidth(0.32);
+    doc.roundedRect(margin, top, contentWidth, bottom - top, 1.8, 1.8, "S");
+  };
+
+  const startNewTablePage = () => {
+    strokeSegmentFrame(segmentTopY, y);
+    doc.addPage();
+    y = contentTopY;
+    segmentTopY = y;
+  };
+
+  const drawHeaderRow = () => {
+    if (y + headerRowH > footerY - 3) {
+      startNewTablePage();
+    }
+    doc.setFillColor(T.headerBg[0], T.headerBg[1], T.headerBg[2]);
+    doc.setDrawColor(T.border[0], T.border[1], T.border[2]);
+    doc.setLineWidth(0.22);
+    doc.rect(margin, y, contentWidth, headerRowH, "F");
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.setLineWidth(0.48);
+    doc.line(margin, y + headerRowH, margin + contentWidth, y + headerRowH);
+
+    let cx = margin;
+    for (let i = 0; i < n; i++) {
+      if (i > 0) {
+        doc.setDrawColor(T.border[0], T.border[1], T.border[2]);
+        doc.setLineWidth(0.18);
+        doc.line(cx, y, cx, y + headerRowH);
+      }
+      const label = ellipsizePdfCellToWidth(
+        doc,
+        heads[i],
+        colW[i] - pad * 2,
+        headerFontSize,
+        "bold"
+      );
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(headerFontSize);
+      doc.setTextColor(T.headerInk[0], T.headerInk[1], T.headerInk[2]);
+      doc.text(label, cx + pad, y + headerRowH - 2.15);
+      cx += colW[i];
+    }
+    y += headerRowH;
+  };
+
+  const drawBodyRow = (cells: string[], rowIndex: number) => {
+    if (y + bodyRowH > footerY - 3) {
+      startNewTablePage();
+      drawHeaderRow();
+    }
+
+    const fill = rowIndex % 2 === 0 ? T.white : T.stripe;
+    doc.setFillColor(fill[0], fill[1], fill[2]);
+    doc.setDrawColor(T.border[0], T.border[1], T.border[2]);
+    doc.setLineWidth(0.16);
+    doc.rect(margin, y, contentWidth, bodyRowH, "FD");
+
+    let cx = margin;
+    for (let i = 0; i < n; i++) {
+      if (i > 0) {
+        doc.setDrawColor(T.border[0], T.border[1], T.border[2]);
+        doc.setLineWidth(0.16);
+        doc.line(cx, y, cx, y + bodyRowH);
+      }
+      const display = ellipsizePdfCellToWidth(
+        doc,
+        cells[i] ?? "—",
+        colW[i] - pad * 2,
+        fontSize,
+        "normal"
+      );
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(fontSize);
+      doc.setTextColor(T.bodyInk[0], T.bodyInk[1], T.bodyInk[2]);
+      doc.text(display, cx + pad, y + bodyRowH - 1.9);
+      cx += colW[i];
+    }
+    y += bodyRowH;
+  };
+
+  drawHeaderRow();
+  rows.forEach((row, ri) => drawBodyRow(row, ri));
+  strokeSegmentFrame(segmentTopY, y);
+  doc.setTextColor(0, 0, 0);
+  return y + 4;
 }
 
 export const REPORT_BRANDING_STORAGE_KEY = "ai-data-analyst-report-branding-v1";
@@ -477,6 +671,8 @@ export type ExecutivePdfExportInput = {
     alignedMetric?: string | null;
     alignedMetricDisplay?: string | null;
     aggregation?: string | null;
+    /** API rounding hint (`pct_1`, `money_0`, …) for metric formatting. */
+    roundingHint?: string | null;
     /** e.g. auto-dashboard vs AI no-chart placeholder */
     chartAttribution?: string | null;
   } | null;
@@ -602,10 +798,14 @@ function sanitizeExecutivePdfExportInput(
       chart.presentationKind,
       questionClean
     );
+    const metricCtxDraft = pdfChartMetricFormatContext(
+      { ...chart, presentationKind: coercedKind },
+      questionClean
+    );
     const data = chart.data.map((row) => ({
       ...row,
       displayValue: rankingQ
-        ? formatPdfChartRowMetricDisplay(row, coercedKind)
+        ? formatPdfChartRowMetricDisplay(row, metricCtxDraft)
         : row.displayValue,
     }));
     chart = {
@@ -657,6 +857,7 @@ function sanitizeExecutivePdfExportInput(
     pdfRankedSignals = pdfTrendRankedSignalsFromChartData(
       chart.data,
       chart.presentationKind,
+      pdfChartMetricFormatContext(chart, questionClean),
       3
     );
   } else if (chart?.data.length && rankingQ) {
@@ -664,6 +865,7 @@ function sanitizeExecutivePdfExportInput(
       chart.data,
       chart.presentationKind,
       ascendingQ,
+      pdfChartMetricFormatContext(chart, questionClean),
       3
     );
     if (fromChart.length) pdfRankedSignals = fromChart;
@@ -733,22 +935,27 @@ function sanitizeExecutivePdfExportInput(
         : c.subtitle,
   }));
 
+  const chartMetricCtx = chart
+    ? pdfChartMetricFormatContext(chart, questionClean)
+    : null;
   const vizExecutiveFacts =
-    chart?.data.length && trendQ
+    chart?.data.length && trendQ && chartMetricCtx
       ? buildPdfTrendVizExecutiveFacts(
           chart.data,
-          chart.alignedMetricDisplay ?? chart.alignedMetric ?? null
+          chart.alignedMetricDisplay ?? chart.alignedMetric ?? null,
+          chartMetricCtx
         ).map((f) => ({
           title: polishPdfKpiLabel(f.title),
           value: polishPdfBusinessCopy(f.value),
         }))
-      : chart?.data.length && rankingQ
+      : chart?.data.length && rankingQ && chartMetricCtx
         ? buildPdfVizExecutiveFacts(
             chart.data,
             chart.presentationKind,
             ascendingQ,
             chart.alignedMetricDisplay ?? chart.alignedMetric ?? null,
-            raw.chartAxisLabels?.category ?? null
+            raw.chartAxisLabels?.category ?? null,
+            chartMetricCtx
           ).map((f) => ({
             title: polishPdfKpiLabel(f.title),
             value: polishPdfBusinessCopy(f.value),
@@ -1319,7 +1526,7 @@ function isStructuredDumpExecutiveLine(line: string): boolean {
 }
 
 function formatNumericTokensInSignalLine(s: string): string {
-  const normalized = normalizePdfDatesInText(s);
+  const normalized = normalizePdfIsoDatesInText(s);
   return normalized.replace(
     /\b(-?[\d,]+(?:\.\d+)?)\b/g,
     (match, _g1, offset, full) => {
@@ -1373,34 +1580,47 @@ function pdfIsRankingQuestion(question: string): boolean {
   );
 }
 
-function effectivePdfMetricNumber(row: ChartRow): number {
-  const dv = row.displayValue?.trim();
-  if (dv) {
-    const parsed = Number(dv.replace(/[^0-9.-]+/g, ""));
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  }
-  const v = Number(row.value);
-  if (!Number.isFinite(v)) return NaN;
-  if (v > 0 && v <= 1) return v * 100;
-  return v;
+function pdfChartMetricFormatContext(
+  chart: NonNullable<ExecutivePdfExportInput["chart"]>,
+  question: string
+): MetricFormatContext {
+  return {
+    presentationKind: chart.presentationKind,
+    roundingHint: chart.roundingHint ?? null,
+    metricLabel: chart.alignedMetricDisplay?.trim() || chart.alignedMetric?.trim() || null,
+    chartTitle: chart.title,
+    question,
+  };
 }
 
-function formatPdfChartRowMetricDisplay(row: ChartRow, kind: ChartKind): string {
-  const metricKind: ChartKind =
-    kind === "pie" || kind === "donut" ? "bar_horizontal" : kind;
-  const dv = row.displayValue?.trim();
-  const n = effectivePdfMetricNumber(row);
-  if (Number.isFinite(n)) {
-    if (n > 20 && n <= 100) {
-      const rounded = Math.abs(n - Math.round(n)) < 0.05 ? Math.round(n) : n;
-      const pct = `${rounded}%`;
-      if (dv && dv.includes("%")) return dv;
-      return pct;
+function effectivePdfMetricNumber(
+  row: ChartRow,
+  ctx: MetricFormatContext
+): number {
+  const raw = readChartRowRawValue(row);
+  if (!Number.isFinite(raw)) {
+    const dv = row.displayValue?.trim();
+    if (dv) {
+      const parsed = Number(dv.replace(/[^0-9.-]+/g, ""));
+      if (Number.isFinite(parsed)) return parsed;
     }
-    if (dv && !metricKind.includes("pie")) return dv;
-    return fallbackChartNumericDisplay(metricKind, n);
+    return NaN;
   }
-  return dv || fallbackChartNumericDisplay(metricKind, Number(row.value));
+  return raw;
+}
+
+function formatPdfChartRowMetricDisplay(
+  row: ChartRow,
+  ctx: MetricFormatContext
+): string {
+  return formatExecutiveMetricValue(row, ctx);
+}
+
+function formatPdfAppendixSeriesValue(
+  row: ChartRow,
+  ctx: MetricFormatContext
+): string {
+  return formatRawMetricValue(row, ctx);
 }
 
 function pdfCoercePresentationKindForRanking(
@@ -1513,7 +1733,7 @@ export function formatPdfRankedSignalsNarrative(
   const leadCat = formatPdfCategoryLabel(lead.category);
   const trendLike =
     /^(peak|highest|lowest)\b/i.test(lead.rank) &&
-    (pdfParseIsoDateLabel(lead.category) != null ||
+    (parsePdfIsoDateLabel(lead.category) != null ||
       /^\d{4}-\d{2}-\d{2}/.test(leadCat));
   if (trendLike || /peak\s+week/i.test(lead.rank)) {
     const trendNarrative = formatPdfTrendRankedNarrative(signals, metricHint);
@@ -1547,14 +1767,14 @@ export function formatPdfRankedSignalsNarrative(
 function pdfTrendRankedSignalsFromChartData(
   data: ChartRow[],
   kind: ChartKind,
+  ctx: MetricFormatContext,
   max = 3
 ): PdfRankedSignal[] {
-  const sorted = [...data].sort((a, b) => Number(b.value) - Number(a.value));
-  const fmt = (row: ChartRow) => {
-    const dv = row.displayValue?.trim();
-    if (dv) return polishPdfBusinessCopy(dv);
-    return formatPdfBusinessNumber(Number(row.value));
-  };
+  const sorted = [...data].sort(
+    (a, b) => readChartRowRawValue(b) - readChartRowRawValue(a)
+  );
+  const fmt = (row: ChartRow) =>
+    polishPdfBusinessCopy(formatPdfChartRowMetricDisplay(row, ctx));
   return sorted.slice(0, max).map((row, i) => ({
     rank: i === 0 ? "Highest" : i === 1 ? "Second" : "Third",
     category: formatPdfCategoryLabel(String(row.name ?? "")),
@@ -1566,18 +1786,17 @@ function pdfRankedSignalsFromChartData(
   data: ChartRow[],
   kind: ChartKind,
   ascending: boolean | null,
+  ctx: MetricFormatContext,
   max = 3
 ): PdfRankedSignal[] {
   if (!data.length || kind === "scatter") return [];
-  const dispKind: ChartKind =
-    kind === "pie" || kind === "donut" ? "bar_horizontal" : kind;
   const merged = new Map<string, ChartRow>();
   for (const row of data) {
     const cat = String(row.name ?? "").trim() || "—";
-    const v = effectivePdfMetricNumber(row);
+    const v = effectivePdfMetricNumber(row, ctx);
     if (!Number.isFinite(v)) continue;
     const prev = merged.get(cat);
-    if (!prev || v > effectivePdfMetricNumber(prev)) {
+    if (!prev || v > effectivePdfMetricNumber(prev, ctx)) {
       merged.set(cat, row);
     }
   }
@@ -1585,8 +1804,8 @@ function pdfRankedSignalsFromChartData(
   if (!deduped.length) return [];
   const preferLow = ascending === true;
   deduped.sort((a, b) => {
-    const va = effectivePdfMetricNumber(a);
-    const vb = effectivePdfMetricNumber(b);
+    const va = effectivePdfMetricNumber(a, ctx);
+    const vb = effectivePdfMetricNumber(b, ctx);
     return preferLow ? va - vb : vb - va;
   });
   const rankWords = preferLow
@@ -1595,8 +1814,7 @@ function pdfRankedSignalsFromChartData(
       ? (["Highest", "Second highest", "Third highest"] as const)
       : (["Highest", "Second", "Third"] as const);
   return deduped.slice(0, max).map((row, i) => {
-    const v = effectivePdfMetricNumber(row);
-    const valueDisplay = formatPdfChartRowMetricDisplay(row, dispKind);
+    const valueDisplay = formatPdfChartRowMetricDisplay(row, ctx);
     return {
       rank: rankWords[i] ?? `#${i + 1}`,
       category: formatPdfCategoryLabel(String(row.name ?? "").trim() || "—"),
@@ -1610,13 +1828,14 @@ function buildPdfVizExecutiveFacts(
   kind: ChartKind,
   ascending: boolean | null,
   metricLabel: string | null,
-  categoryLabel: string | null
+  categoryLabel: string | null,
+  metricCtx: MetricFormatContext
 ): { title: string; value: string; hint?: string }[] {
   if (!data.length) return [];
   const scored = data
     .map((row) => ({
       row,
-      n: effectivePdfMetricNumber(row),
+      n: effectivePdfMetricNumber(row, metricCtx),
     }))
     .filter((x) => Number.isFinite(x.n));
   if (!scored.length) return [];
@@ -1627,7 +1846,10 @@ function buildPdfVizExecutiveFacts(
   const mid = scored[1];
   const hi = scored[scored.length - 1]!;
   const spread = Math.round(hi.n - lo.n);
-  const fmt = (row: ChartRow) => formatPdfChartRowMetricDisplay(row, kind);
+  const spreadLabel = metricFormatUsesPercent(metricCtx)
+    ? `${spread} percentage points`
+    : formatPdfBusinessNumber(spread);
+  const fmt = (row: ChartRow) => formatPdfChartRowMetricDisplay(row, metricCtx);
   const cat = polishPdfKpiLabel(
     (categoryLabel ?? "department").replace(/^by\s+/i, "").trim() || "department"
   );
@@ -1640,15 +1862,26 @@ function buildPdfVizExecutiveFacts(
         value: formatPdfCategoryLabel(String(lo.row.name ?? "—")),
       },
       { title: `Lowest ${met}`, value: fmt(lo.row) },
-      {
-        title: "Next lowest",
-        value: mid
-          ? `${formatPdfCategoryLabel(String(mid.row.name ?? ""))} ${fmt(mid.row)}`
-          : "—",
-      },
+      ...(mid
+        ? [
+            {
+              title: "Next lowest category",
+              value: formatPdfCategoryLabel(String(mid.row.name ?? "")),
+            },
+            {
+              title: `Next lowest ${met}`,
+              value: fmt(mid.row),
+            },
+          ]
+        : [
+            {
+              title: "Next lowest category",
+              value: "—",
+            },
+          ]),
       {
         title: "Gap between peak and lowest",
-        value: `${spread} percentage points`,
+        value: spreadLabel,
       },
     ];
   }
@@ -1659,40 +1892,67 @@ function buildPdfVizExecutiveFacts(
       value: formatPdfCategoryLabel(String(hi.row.name ?? "—")),
     },
     { title: `Highest ${met}`, value: fmt(hi.row) },
-    {
-      title: "Next highest",
-      value: mid
-        ? `${formatPdfCategoryLabel(String(mid.row.name ?? ""))} ${fmt(mid.row)}`
-        : "—",
-    },
+    ...(mid
+      ? [
+          {
+            title: "Next highest category",
+            value: formatPdfCategoryLabel(String(mid.row.name ?? "")),
+          },
+          {
+            title: `Next highest ${met}`,
+            value: fmt(mid.row),
+          },
+        ]
+      : [
+          {
+            title: "Next highest category",
+            value: "—",
+          },
+        ]),
     {
       title: "Gap between peak and lowest",
-      value: `${spread} percentage points`,
+      value: spreadLabel,
     },
   ];
 }
 
 function buildPdfTrendVizExecutiveFacts(
   data: ChartRow[],
-  metricLabel: string | null
+  metricLabel: string | null,
+  metricCtx: MetricFormatContext
 ): { title: string; value: string }[] {
   if (!data.length) return [];
-  const sorted = [...data].sort((a, b) => Number(b.value) - Number(a.value));
+  const sorted = [...data].sort(
+    (a, b) => readChartRowRawValue(b) - readChartRowRawValue(a)
+  );
   const peak = sorted[0]!;
   const low = sorted[sorted.length - 1]!;
   const second = sorted[1];
-  const spread = Math.round(Number(peak.value) - Number(low.value));
+  const spread = Math.round(
+    readChartRowRawValue(peak) - readChartRowRawValue(low)
+  );
   const met = normalizePdfMetricPhrase(metricLabel);
-  const fmt = (row: ChartRow) => formatPdfChartRowMetricDisplay(row, "line");
+  const fmt = (row: ChartRow) => formatPdfChartRowMetricDisplay(row, metricCtx);
   return [
     { title: "Peak period", value: formatPdfCategoryLabel(String(peak.name ?? "")) },
     { title: `Peak ${met}`, value: fmt(peak) },
-    {
-      title: "Next highest period",
-      value: second
-        ? `${formatPdfCategoryLabel(String(second.name ?? ""))} ${fmt(second)}`
-        : "—",
-    },
+    ...(second
+      ? [
+          {
+            title: "Next highest period",
+            value: formatPdfCategoryLabel(String(second.name ?? "")),
+          },
+          {
+            title: `Next highest ${met}`,
+            value: fmt(second),
+          },
+        ]
+      : [
+          {
+            title: "Next highest period",
+            value: "—",
+          },
+        ]),
     {
       title: "Gap between peak and lowest",
       value: formatPdfBusinessNumber(spread),
@@ -2358,7 +2618,7 @@ export async function runExecutivePdfExport(
         y - tableTopY,
         isPreviewTable ? 2 : 1.5,
         isPreviewTable ? 2 : 1.5,
-        isPreviewTable ? "FD" : "S"
+        "S"
       );
     }
 
@@ -2367,10 +2627,7 @@ export async function runExecutivePdfExport(
   };
 
   const kindLabel = datasetKindLabel(input.dataset.datasetKind);
-  const genStr = input.generatedAt.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const genStr = formatPdfGeneratedTimestamp(input.generatedAt);
   const sourceRaw = (input.dataset.fileName || "").trim() || "—";
   const sourceShort =
     sourceRaw.length > 48 ? `${sourceRaw.slice(0, 45)}…` : sourceRaw;
@@ -3185,8 +3442,12 @@ export async function runExecutivePdfExport(
   /* -------- Preview -------- */
   if (input.includes.includeDataPreview) {
     const { rows: preview, columns: cols } = input.preview;
-    const maxCols = cols.length ? Math.min(cols.length, 7) : 0;
-    const maxPreviewRows = preview.length ? Math.min(preview.length, 12) : 0;
+    const maxCols = cols.length
+      ? Math.min(cols.length, PDF_DATA_PREVIEW_MAX_COLS)
+      : 0;
+    const excerptRowCount = preview.length
+      ? Math.min(preview.length, PDF_DATA_PREVIEW_MAX_ROWS)
+      : 0;
     const introBlockH =
       12 +
       (cols.length > maxCols ? 22 : 0) +
@@ -3195,27 +3456,15 @@ export async function runExecutivePdfExport(
     let previewHeads: string[] = [];
     let previewBody: string[][] = [];
     if (preview.length && cols.length) {
-      previewHeads = cols.slice(0, maxCols);
-      previewBody = preview.slice(0, maxPreviewRows).map((row) =>
-        previewHeads.map((c) => {
-          const v = row[c];
-          if (v === null || v === undefined) return "—";
-          const s = String(v);
-          return s.length > 80 ? `${s.slice(0, 77)}…` : s;
-        })
+      const previewColKeys = cols.slice(0, maxCols);
+      previewHeads = previewColKeys;
+      previewBody = preview.slice(0, excerptRowCount).map((row) =>
+        previewColKeys.map((c) => formatPdfPreviewCellValue(row[c]))
       );
     }
     const previewTableH =
       previewBody.length > 0
-        ? measureMonolithicTableStackMm(
-            doc,
-            contentWidth,
-            previewHeads,
-            previewBody,
-            8,
-            2.1,
-            5
-          )
+        ? measurePdfDataPreviewTableStackMm(previewHeads, previewBody.length)
         : 0;
     const sectionReserve = 30 + introBlockH + previewTableH + 12;
     if (y + sectionReserve > footerY - 6) {
@@ -3227,21 +3476,25 @@ export async function runExecutivePdfExport(
       bodyText("No preview rows available. Upload data to include a preview section.", 10);
     } else {
       bodyText(
-        `Sample excerpt: ${maxPreviewRows} rows × ${previewHeads.length} columns.`,
+        `Sample excerpt: ${excerptRowCount} rows × ${previewHeads.length} columns (structured table).`,
         9
       );
       if (cols.length > previewHeads.length) {
         bodyText(
-          `Showing first ${maxCols} columns only; remaining columns hidden to fit PDF width.`,
+          `Showing first ${maxCols} columns only; remaining columns omitted to fit PDF width.`,
           8.5
         );
       }
-      drawDataTable(previewHeads, previewBody, {
-        variant: "preview",
-        fontSize: 8,
-        maxCols: 7,
-        maxRows: 12,
-        suppressRowPageBreaks: true,
+      y = drawPdfDataPreviewTable({
+        doc,
+        margin,
+        contentWidth,
+        y,
+        footerY,
+        contentTopY: contentTop0,
+        accent: theme.accent,
+        headers: previewHeads,
+        body: previewBody,
       });
     }
     y += 4;
@@ -3471,8 +3724,12 @@ export async function runExecutivePdfExport(
           specRows.push(["Aggregation", String(chAp.aggregation)]);
         }
         specRows.push(["Series points", String(chAp.data.length)]);
+        const appendixMetricCtx = pdfChartMetricFormatContext(
+          chAp,
+          input.question
+        );
         const seriesRows = chAp.data.slice(0, 20).map((row) => {
-          const v = formatPdfChartRowMetricDisplay(row, chAp.presentationKind);
+          const v = formatPdfAppendixSeriesValue(row, appendixMetricCtx);
           if (chAp.presentationKind === "scatter") {
             const xStr =
               row.displayX?.trim() ||

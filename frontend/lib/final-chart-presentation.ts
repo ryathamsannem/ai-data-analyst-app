@@ -156,7 +156,7 @@ function barFamilyKindFromRows(args: {
 }
 
 /** Radial charts only for composition/share questions — not min/max ranking. */
-function shareCompositionAllowed(title: string, question?: string): boolean {
+export function shareCompositionAllowed(title: string, question?: string): boolean {
   const blob = `${title} ${question ?? ""}`.toLowerCase();
   if (rankIntentFromText(title, question)) return false;
   if (/\b(lowest|minimum|least|highest|maximum|top|bottom|rank|ranking)\b/.test(blob)) {
