@@ -18,6 +18,25 @@ import {
   normalizePdfIsoDatesInText,
   parsePdfIsoDateLabel,
 } from "@/lib/pdf-date-format";
+import {
+  PDF_CHART_CAPTURE_SCALE,
+  PDF_EMPTY_STATES,
+  PDF_ENTERPRISE_COLORS,
+  PDF_RADIUS,
+  PDF_SPACING,
+  PDF_TABLE_THEME,
+  PDF_TYPE,
+  buildPdfExportTheme,
+  computePdfChartEmbedDimensions,
+  pdfCellLooksNumeric,
+  pdfDrawEnterprisePanel,
+  pdfDrawEnterpriseRunningChrome,
+  pdfDrawInsetSectionDivider,
+  pdfDrawPanelKicker,
+  pdfDrawPremiumEmptyState,
+  pdfDrawSoftRule,
+  pdfLineHeight,
+} from "@/lib/pdf-enterprise-style";
 
 type JsPdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
 
@@ -76,10 +95,10 @@ const PDF_BUSINESS_COPY_REPLACEMENTS: readonly [RegExp, string][] = [
   [/\bGap\s*\([^)]*↔[^)]*\)/gi, "Gap between peak and lowest"],
 ];
 
-/** ~12–18px in mm — spacing below insight paragraphs in PDF. */
-const PDF_INSIGHT_PARAGRAPH_GAP_MM = 4.5;
-/** Extra space before KPI rows in executive snapshot (~14px). */
-const PDF_SNAPSHOT_KPI_TOP_GAP_MM = 4;
+/** Spacing below insight paragraphs in PDF (~14–18px). */
+const PDF_INSIGHT_PARAGRAPH_GAP_MM = 5;
+/** Extra space before KPI rows in executive snapshot. */
+const PDF_SNAPSHOT_KPI_TOP_GAP_MM = PDF_SPACING.panelPad;
 
 /** Strip control chars and fix common PDF encoding glitches. */
 function sanitizePdfSpecialCharacters(raw: string): string {
@@ -345,15 +364,67 @@ function measureMonolithicTableStackMm(
 const PDF_DATA_PREVIEW_MAX_ROWS = 10;
 const PDF_DATA_PREVIEW_MAX_COLS = 7;
 
-/** Print-safe palette — light surfaces regardless of app UI theme. */
-const PDF_PREVIEW_TABLE_THEME = {
-  headerBg: [241, 245, 249] as [number, number, number],
-  headerInk: [15, 23, 42] as [number, number, number],
-  bodyInk: [51, 65, 85] as [number, number, number],
-  border: [203, 213, 225] as [number, number, number],
-  stripe: [248, 250, 252] as [number, number, number],
-  white: [255, 255, 255] as [number, number, number],
-};
+const PDF_PREVIEW_TABLE_THEME = PDF_TABLE_THEME;
+
+/** Readable numbers for executive bullets, signal callouts, and tables. */
+function formatPdfBusinessNumber(n: number): string {
+  if (!Number.isFinite(n)) return String(n);
+  const abs = Math.abs(n);
+  const asInt = Math.round(n);
+  if (abs >= 1000 && Math.abs(n - asInt) < 1e-5) {
+    return asInt.toLocaleString();
+  }
+  if (abs >= 1_000_000) {
+    return n.toLocaleString(undefined, {
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+    });
+  }
+  if (abs >= 1000) {
+    return n.toLocaleString(undefined, {
+      maximumFractionDigits: 1,
+      minimumFractionDigits: 0,
+    });
+  }
+  if (abs >= 100) {
+    return n.toLocaleString(undefined, {
+      maximumFractionDigits: 1,
+      minimumFractionDigits: 0,
+    });
+  }
+  if (abs >= 10) {
+    return n.toLocaleString(undefined, {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    });
+  }
+  if (abs >= 1) {
+    return n.toLocaleString(undefined, {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+    });
+  }
+  return n.toLocaleString(undefined, {
+    maximumFractionDigits: 4,
+    minimumFractionDigits: 0,
+  });
+}
+
+/** Consistent dates and numbers for PDF table cells. */
+function formatPdfTableCellValue(value: unknown, maxChars = 140): string {
+  if (value === null || value === undefined) return "—";
+  let s = String(value).replace(/\s+/g, " ").trim();
+  if (!s) return "—";
+  const isoOnly = parsePdfIsoDateLabel(s);
+  if (isoOnly) s = isoOnly;
+  else s = normalizePdfIsoDatesInText(s);
+  const plainNum = s.replace(/,/g, "");
+  if (/^-?[\d]+(\.\d+)?$/.test(plainNum)) {
+    const n = Number(plainNum);
+    if (Number.isFinite(n)) s = formatPdfBusinessNumber(n);
+  }
+  return s.length > maxChars ? `${s.slice(0, maxChars - 1)}…` : s;
+}
 
 function truncatePdfPreviewColumnLabel(label: string, maxLen = 28): string {
   const s = String(label ?? "").trim();
@@ -362,13 +433,7 @@ function truncatePdfPreviewColumnLabel(label: string, maxLen = 28): string {
 }
 
 function formatPdfPreviewCellValue(value: unknown, maxChars = 56): string {
-  if (value === null || value === undefined) return "—";
-  let s = String(value).replace(/\s+/g, " ").trim();
-  if (!s) return "—";
-  const isoOnly = parsePdfIsoDateLabel(s);
-  if (isoOnly) s = isoOnly;
-  else s = normalizePdfIsoDatesInText(s);
-  return s.length > maxChars ? `${s.slice(0, maxChars - 1)}…` : s;
+  return formatPdfTableCellValue(value, maxChars);
 }
 
 function ellipsizePdfCellToWidth(
@@ -415,7 +480,7 @@ function computePdfPreviewColumnWidths(
       const cell = formatPdfPreviewCellValue(row[col]);
       w = Math.max(
         w,
-        Math.min(doc.getTextWidth(cell) + pad * 2, contentWidth * 0.38)
+        Math.min(doc.getTextWidth(cell) + pad * 2, contentWidth * 0.3)
       );
     }
     return Math.max(w, 12);
@@ -465,11 +530,22 @@ function drawPdfDataPreviewTable(args: {
   if (rows.length === 0) return y;
 
   const fontSize = 7.5;
-  const pad = 2.15;
-  const headerFontSize = fontSize + 0.5;
-  const headerRowH = headerFontSize * 0.42 + 1.18 + 5.4;
-  const bodyRowH = fontSize * 0.42 + 1.12 + 4.6;
+  const pad = 2.35;
+  const headerFontSize = fontSize + 0.65;
+  const headerRowH = headerFontSize * 0.42 + 1.25 + 6;
+  const bodyRowH = fontSize * 0.42 + 1.15 + 4.85;
   const colW = computePdfPreviewColumnWidths(doc, contentWidth, heads, rows, fontSize);
+  const numericCols = Array.from({ length: n }, (_, col) => {
+    let hits = 0;
+    let seen = 0;
+    for (const row of rows.slice(0, 8)) {
+      const v = row[col];
+      if (!v || v === "—") continue;
+      seen++;
+      if (pdfCellLooksNumeric(v)) hits++;
+    }
+    return seen > 0 && hits / seen >= 0.55;
+  });
 
   let segmentTopY = y;
 
@@ -491,12 +567,15 @@ function drawPdfDataPreviewTable(args: {
     if (y + headerRowH > footerY - 3) {
       startNewTablePage();
     }
-    doc.setFillColor(T.headerBg[0], T.headerBg[1], T.headerBg[2]);
+    const headerBg = mixRgb(T.headerBg, accent, 0.12);
+    doc.setFillColor(headerBg[0], headerBg[1], headerBg[2]);
     doc.setDrawColor(T.border[0], T.border[1], T.border[2]);
-    doc.setLineWidth(0.22);
+    doc.setLineWidth(0.2);
     doc.rect(margin, y, contentWidth, headerRowH, "F");
     doc.setDrawColor(accent[0], accent[1], accent[2]);
-    doc.setLineWidth(0.48);
+    doc.setLineWidth(0.55);
+    doc.line(margin, y, margin + contentWidth, y);
+    doc.setLineWidth(0.5);
     doc.line(margin, y + headerRowH, margin + contentWidth, y + headerRowH);
 
     let cx = margin;
@@ -514,9 +593,9 @@ function drawPdfDataPreviewTable(args: {
         "bold"
       );
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(headerFontSize);
+      doc.setFontSize(headerFontSize + 0.15);
       doc.setTextColor(T.headerInk[0], T.headerInk[1], T.headerInk[2]);
-      doc.text(label, cx + pad, y + headerRowH - 2.15);
+      doc.text(label, cx + pad, y + headerRowH - 2.1);
       cx += colW[i];
     }
     y += headerRowH;
@@ -533,6 +612,9 @@ function drawPdfDataPreviewTable(args: {
     doc.setDrawColor(T.border[0], T.border[1], T.border[2]);
     doc.setLineWidth(0.16);
     doc.rect(margin, y, contentWidth, bodyRowH, "FD");
+    doc.setDrawColor(T.border[0], T.border[1], T.border[2]);
+    doc.setLineWidth(0.14);
+    doc.line(margin, y + bodyRowH, margin + contentWidth, y + bodyRowH);
 
     let cx = margin;
     for (let i = 0; i < n; i++) {
@@ -551,7 +633,10 @@ function drawPdfDataPreviewTable(args: {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(fontSize);
       doc.setTextColor(T.bodyInk[0], T.bodyInk[1], T.bodyInk[2]);
-      doc.text(display, cx + pad, y + bodyRowH - 1.9);
+      const textX = numericCols[i] ? cx + colW[i] - pad : cx + pad;
+      doc.text(display, textX, y + bodyRowH - 1.95, {
+        align: numericCols[i] ? "right" : "left",
+      });
       cx += colW[i];
     }
     y += bodyRowH;
@@ -561,7 +646,100 @@ function drawPdfDataPreviewTable(args: {
   rows.forEach((row, ri) => drawBodyRow(row, ri));
   strokeSegmentFrame(segmentTopY, y);
   doc.setTextColor(0, 0, 0);
-  return y + 4;
+  return y + PDF_SPACING.tableAfter;
+}
+
+/** Compact appendix list — chart title, type, sparkline preview per row. */
+function drawPdfAppendixThumbnailList(
+  doc: JsPdfDocument,
+  margin: number,
+  yTop: number,
+  contentWidth: number,
+  thumbs: PdfChartThumb[],
+  accent: [number, number, number],
+  themeLine: [number, number, number],
+  themeInk: [number, number, number],
+  themeMuted: [number, number, number],
+  themePanel: [number, number, number]
+): number {
+  const slice = thumbs.slice(0, 8);
+  if (!slice.length) return yTop;
+
+  const rowH = 16;
+  const headerH = 6;
+  const sparkW = 34;
+  const tableH = headerH + slice.length * rowH + 2;
+  const tableTop = yTop;
+
+  doc.setFillColor(
+    PDF_ENTERPRISE_COLORS.panel[0],
+    PDF_ENTERPRISE_COLORS.panel[1],
+    PDF_ENTERPRISE_COLORS.panel[2]
+  );
+  doc.setDrawColor(themeLine[0], themeLine[1], themeLine[2]);
+  doc.setLineWidth(0.22);
+  doc.roundedRect(margin, tableTop, contentWidth, tableH, PDF_RADIUS.table, PDF_RADIUS.table, "FD");
+  doc.setFillColor(accent[0], accent[1], accent[2]);
+  doc.rect(margin, tableTop, 1.4, tableH, "F");
+
+  let ry = tableTop + 3.2;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(PDF_TYPE.caption);
+  doc.setTextColor(themeMuted[0], themeMuted[1], themeMuted[2]);
+  doc.text("Chart", margin + 5, ry);
+  doc.text("Type", margin + contentWidth * 0.48, ry);
+  doc.text("Preview", margin + contentWidth - sparkW - 4, ry);
+  ry += 2.8;
+  pdfDrawSoftRule(
+    doc,
+    margin + 4,
+    ry,
+    margin + contentWidth - 4,
+    PDF_ENTERPRISE_COLORS.lineSoft,
+    0.16
+  );
+  ry += 2.2;
+
+  const typeColX = margin + contentWidth * 0.48;
+  const sparkX = margin + contentWidth - sparkW - 4;
+  const titleMaxW = typeColX - margin - 10;
+
+  slice.forEach((thumb, ri) => {
+    const rowY = ry;
+    if (ri % 2 === 1) {
+      doc.setFillColor(
+        PDF_TABLE_THEME.stripe[0],
+        PDF_TABLE_THEME.stripe[1],
+        PDF_TABLE_THEME.stripe[2]
+      );
+      doc.rect(margin + 1.4, rowY, contentWidth - 1.4, rowH, "F");
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(themeInk[0], themeInk[1], themeInk[2]);
+    doc.text(
+      doc.splitTextToSize(polishPdfExecutiveLabel(thumb.title), titleMaxW).slice(0, 1),
+      margin + 5,
+      rowY + 5.2
+    );
+    drawPdfChartKindBadge(
+      doc,
+      typeColX,
+      rowY + 4.2,
+      contentWidth * 0.22,
+      pdfChartKindExecutiveLabel(thumb.kind),
+      accent,
+      themePanel
+    );
+    drawSparkline(doc, sparkX, rowY + 3, sparkW, 9.5, thumb.values, accent);
+    doc.setDrawColor(themeLine[0], themeLine[1], themeLine[2]);
+    doc.setLineWidth(0.12);
+    doc.line(margin + 4, rowY + rowH, margin + contentWidth - 4, rowY + rowH);
+    ry += rowH;
+  });
+
+  doc.setTextColor(0, 0, 0);
+  return tableTop + tableH + PDF_SPACING.blockTight;
 }
 
 export const REPORT_BRANDING_STORAGE_KEY = "ai-data-analyst-report-branding-v1";
@@ -1220,9 +1398,17 @@ function drawSparkline(
   const n = Math.min(vals.length, 48);
   const slice = vals.length > n ? vals.slice(-n) : vals;
   const step = w / Math.max(slice.length, 1);
-  doc.setFillColor(248, 250, 252);
+  doc.setFillColor(
+    PDF_TABLE_THEME.stripe[0],
+    PDF_TABLE_THEME.stripe[1],
+    PDF_TABLE_THEME.stripe[2]
+  );
   doc.rect(x, yTop, w, h, "F");
-  doc.setDrawColor(226, 232, 240);
+  doc.setDrawColor(
+    PDF_TABLE_THEME.border[0],
+    PDF_TABLE_THEME.border[1],
+    PDF_TABLE_THEME.border[2]
+  );
   doc.rect(x, yTop, w, h, "S");
   const pad = 1.2;
   const innerH = h - pad * 2;
@@ -1317,11 +1503,22 @@ async function renderChartSvgToPng(
     height = Math.max(pr.height || plotRoot.clientHeight || 320, 1);
   }
 
+  const plotBox = plotRoot.getBoundingClientRect();
+  if (width < 320 && plotBox.width > width) {
+    width = Math.max(width, Math.round(Math.min(plotBox.width, 960)));
+    height = Math.max(height, Math.round(Math.min(plotBox.height, 540)));
+  }
+  const vbPad = 6;
   const clone = cloneSvgWithInlineStyles(svg);
   clone.setAttribute("width", String(width));
   clone.setAttribute("height", String(height));
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  clone.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  clone.setAttribute(
+    "viewBox",
+    `${-vbPad} ${-vbPad} ${width + vbPad * 2} ${height + vbPad * 2}`
+  );
+  clone.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  clone.setAttribute("overflow", "visible");
 
   const svgString = new XMLSerializer().serializeToString(clone);
 
@@ -1351,11 +1548,27 @@ async function captureChartPlotToPng(
   }
   const plotRoot = resolvePdfChartPlotRoot(container);
   const { default: html2canvas } = await import("html2canvas");
+  const capW = Math.max(
+    plotRoot.scrollWidth,
+    plotRoot.clientWidth,
+    plotRoot.getBoundingClientRect().width,
+    480
+  );
+  const capH = Math.max(
+    plotRoot.scrollHeight,
+    plotRoot.clientHeight,
+    plotRoot.getBoundingClientRect().height,
+    260
+  );
   const canvas = await html2canvas(plotRoot, {
     scale,
     useCORS: true,
     backgroundColor: "#ffffff",
     logging: false,
+    width: capW,
+    height: capH,
+    windowWidth: capW,
+    windowHeight: capH,
     ignoreElements: (el) => {
       if (!(el instanceof HTMLElement)) return false;
       return Boolean(
@@ -1446,27 +1659,52 @@ function drawPdfSessionThumbnailCard(
   themeInk: [number, number, number],
   themeMuted: [number, number, number]
 ) {
-  doc.setFillColor(255, 255, 255);
+  const pad = 2.4;
+  doc.setFillColor(
+    PDF_ENTERPRISE_COLORS.card[0],
+    PDF_ENTERPRISE_COLORS.card[1],
+    PDF_ENTERPRISE_COLORS.card[2]
+  );
   doc.setDrawColor(themeLine[0], themeLine[1], themeLine[2]);
   doc.setLineWidth(0.22);
-  doc.roundedRect(x, yTop, w, h, 1.4, 1.4, "FD");
-  const plotH = Math.max(8, h - 16);
-  drawSparkline(doc, x + 2, yTop + 2, w - 4, plotH, thumb.values, accent);
+  doc.roundedRect(x, yTop, w, h, PDF_RADIUS.thumb, PDF_RADIUS.thumb, "FD");
+  doc.setFillColor(accent[0], accent[1], accent[2]);
+  doc.rect(x, yTop, 1.3, h, "F");
+
+  let cy = yTop + pad;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.75);
+  doc.setTextColor(themeInk[0], themeInk[1], themeInk[2]);
+  const ttl = doc.splitTextToSize(
+    polishPdfExecutiveLabel(thumb.title),
+    w - pad * 2 - 1
+  );
+  doc.text(ttl.slice(0, 1), x + pad, cy + 2.2);
+  cy += 5.5;
+
   const badgeLabel = pdfChartKindExecutiveLabel(thumb.kind);
+  const badgeH = 4.4;
+  const plotH = Math.max(9, h - (cy - yTop) - badgeH - pad - 1.5);
+  drawSparkline(doc, x + pad, cy, w - pad * 2, plotH, thumb.values, accent);
+  cy += plotH + 1.8;
+
   drawPdfChartKindBadge(
     doc,
-    x + 2,
-    yTop + plotH + 3,
-    w - 4,
+    x + pad,
+    cy,
+    w - pad * 2,
     badgeLabel,
     accent,
     themePanel
   );
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(6.5);
-  doc.setTextColor(themeInk[0], themeInk[1], themeInk[2]);
-  const ttl = doc.splitTextToSize(polishPdfExecutiveLabel(thumb.title), w - 4);
-  doc.text(ttl.slice(0, 1), x + 2, yTop + h - 3.5);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.setTextColor(themeMuted[0], themeMuted[1], themeMuted[2]);
+  const pts =
+    thumb.values.length > 1
+      ? `${thumb.values.length} points`
+      : "Single value";
+  doc.text(pts, x + pad, yTop + h - 2.2);
   doc.setTextColor(0, 0, 0);
 }
 
@@ -1485,50 +1723,6 @@ export function datasetKindLabel(kind: string): string {
   if (map[k]) return map[k];
   if (!k) return "General business";
   return k.charAt(0).toUpperCase() + k.slice(1);
-}
-
-/** Readable numbers for executive bullets, signal callouts, and mini-tables. */
-function formatPdfBusinessNumber(n: number): string {
-  if (!Number.isFinite(n)) return String(n);
-  const abs = Math.abs(n);
-  const asInt = Math.round(n);
-  if (abs >= 1000 && Math.abs(n - asInt) < 1e-5) {
-    return asInt.toLocaleString();
-  }
-  if (abs >= 1_000_000) {
-    return n.toLocaleString(undefined, {
-      maximumFractionDigits: 0,
-      minimumFractionDigits: 0,
-    });
-  }
-  if (abs >= 1000) {
-    return n.toLocaleString(undefined, {
-      maximumFractionDigits: 1,
-      minimumFractionDigits: 0,
-    });
-  }
-  if (abs >= 100) {
-    return n.toLocaleString(undefined, {
-      maximumFractionDigits: 1,
-      minimumFractionDigits: 0,
-    });
-  }
-  if (abs >= 10) {
-    return n.toLocaleString(undefined, {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 0,
-    });
-  }
-  if (abs >= 1) {
-    return n.toLocaleString(undefined, {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 0,
-    });
-  }
-  return n.toLocaleString(undefined, {
-    maximumFractionDigits: 4,
-    minimumFractionDigits: 0,
-  });
 }
 
 function humanizePdfDumpLabel(s: string): string {
@@ -2248,64 +2442,82 @@ export async function runExecutivePdfExport(
     "Analytics workspace";
   const tagline = input.branding.tagline.trim();
 
-  const theme = {
-    ink: [15, 23, 42] as [number, number, number],
-    muted: [71, 85, 105] as [number, number, number],
-    body: [51, 65, 85] as [number, number, number],
-    line: [226, 232, 240] as [number, number, number],
-    panel: [248, 250, 252] as [number, number, number],
-    highlight: [236, 253, 245] as [number, number, number],
-    accent,
-  };
+  /** Print-safe palette — same for app light/dark UI (see buildPdfExportTheme). */
+  const theme = buildPdfExportTheme(accent);
 
   let y = contentTop0;
 
   const ensurePageSpace = (neededHeight: number) => {
-    if (y + neededHeight > footerY - 3) {
+    if (y + neededHeight > footerY - PDF_SPACING.pageSafe) {
       doc.addPage();
       y = contentTop0;
     }
   };
 
   const ruleFull = (yy: number) => {
-    doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-    doc.setLineWidth(0.35);
-    doc.line(margin, yy, pageWidth - margin, yy);
+    pdfDrawSoftRule(doc, margin, yy, pageWidth - margin, theme.lineSoft, 0.28);
   };
 
   const sectionTitle = (title: string) => {
-    ensurePageSpace(16);
-    y += 4;
+    ensurePageSpace(18);
+    y += PDF_SPACING.sectionBefore;
     doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
-    doc.rect(margin, y - 3.5, 1.2, 9, "F");
+    doc.rect(margin, y - 3.5, 1.25, 9.5, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(12.5);
+    doc.setFontSize(PDF_TYPE.section);
     doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-    doc.text(title, margin + 3.5, y + 2.5);
-    y += 9;
+    doc.text(title, margin + 4, y + 2.6);
+    y += 9.5;
     ruleFull(y);
-    y += 7;
+    y += PDF_SPACING.sectionAfterRule;
     doc.setTextColor(0, 0, 0);
   };
 
-  const pdfBodyLineHeight = (fontSize: number) => fontSize * 0.42 + 1.52;
+  const pdfBodyLineHeight = (fontSize: number) => pdfLineHeight(fontSize);
 
-  const bodyText = (text: string, fontSize = 10, color = theme.body) => {
+  const bodyText = (
+    text: string,
+    fontSize: number = PDF_TYPE.body,
+    color = theme.body
+  ) => {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(fontSize);
     doc.setTextColor(color[0], color[1], color[2]);
     const lines = doc.splitTextToSize(text, contentWidth);
     const lineH = pdfBodyLineHeight(fontSize);
-    ensurePageSpace(lines.length * lineH + 2.5);
+    ensurePageSpace(lines.length * lineH + PDF_SPACING.paragraphAfter);
     doc.text(lines, margin, y);
-    y += lines.length * lineH + 2.5;
+    y += lines.length * lineH + PDF_SPACING.paragraphAfter;
     doc.setTextColor(0, 0, 0);
+  };
+
+  const drawPremiumEmptyState = (title: string, body: string) => {
+    ensurePageSpace(28);
+    const bottom = pdfDrawPremiumEmptyState(
+      doc,
+      margin,
+      y,
+      contentWidth,
+      title,
+      body,
+      {
+        panel: theme.panel,
+        line: theme.line,
+        ink: theme.ink,
+        muted: theme.muted,
+        accent: theme.accent,
+      }
+    );
+    y = bottom + PDF_SPACING.emptyStateAfter;
   };
 
   const bodyParagraphs = (text: string) => {
     const raw = text.trim();
     if (!raw) {
-      bodyText("(No narrative provided.)", 10);
+      drawPremiumEmptyState(
+        PDF_EMPTY_STATES.narrative.title,
+        PDF_EMPTY_STATES.narrative.body
+      );
       return;
     }
     const byBlank = raw
@@ -2317,8 +2529,8 @@ export async function runExecutivePdfExport(
         ? byBlank
         : raw.split("\n").map((s) => s.trim()).filter(Boolean);
     paras.forEach((p, i) => {
-      if (i > 0) y += 2;
-      bodyText(p, 10);
+      if (i > 0) y += PDF_SPACING.paragraphAfter * 0.5;
+      bodyText(p, PDF_TYPE.body);
     });
   };
 
@@ -2372,26 +2584,74 @@ export async function runExecutivePdfExport(
     ensurePageSpace(titleH + bodyH + 10);
   };
 
-  const insightSubheading = (title: string) => {
-    ensurePageSpace(9);
-    y += 1.5;
+  const insightSubheading = (title: string, bodyReserveMm = 12) => {
+    ensurePageSpace(
+      PDF_SPACING.subsectionBefore + PDF_SPACING.subsectionAfter + bodyReserveMm
+    );
+    y += PDF_SPACING.subsectionBefore;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
+    doc.setFontSize(PDF_TYPE.subsection);
     doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
     doc.text(title, margin, y);
-    y += 5.5;
+    pdfDrawSoftRule(doc, margin, y + 1.8, margin + 28, theme.lineSoft, 0.2);
+    y += PDF_SPACING.subsectionAfter;
     doc.setTextColor(0, 0, 0);
   };
 
   const drawExecBullet = (text: string, fontSize = 9.5) => {
-    const wrapped = doc.splitTextToSize(`• ${text}`, contentWidth - 5);
+    const wrapped = doc.splitTextToSize(`• ${text}`, contentWidth - 8);
     const lh = pdfBodyLineHeight(fontSize);
     ensurePageSpace(wrapped.length * lh + 2.5);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(fontSize);
     doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-    doc.text(wrapped, margin + 2, y);
-    y += wrapped.length * lh + 1.25;
+    doc.text(wrapped, margin + 3, y);
+    y += wrapped.length * lh + PDF_SPACING.bulletGap;
+    doc.setTextColor(0, 0, 0);
+  };
+
+  const execSummaryBreather = () => {
+    y += PDF_SPACING.execSummaryBlock * 0.45;
+    pdfDrawInsetSectionDivider(
+      doc,
+      margin + 6,
+      y,
+      pageWidth - margin - 6,
+      theme.lineSoft
+    );
+    y += PDF_SPACING.execSummaryBlock * 0.55;
+  };
+
+  const drawMainTakeawayCallout = (text: string) => {
+    const polished = polishPdfBusinessCopy(text);
+    if (!polished) return;
+    const lines = doc.splitTextToSize(polished, contentWidth - 14);
+    const lh = pdfBodyLineHeight(PDF_TYPE.body);
+    const boxH = PDF_SPACING.panelPad + lines.length * lh + PDF_SPACING.panelPad;
+    ensurePageSpace(boxH + 6);
+    pdfDrawEnterprisePanel(doc, margin, y, contentWidth, boxH, {
+      fill: theme.card,
+      border: theme.line,
+      accent: theme.accent,
+      radius: 1.6,
+    });
+    pdfDrawPanelKicker(
+      doc,
+      margin + 4,
+      y + PDF_SPACING.panelPad,
+      "Main takeaway",
+      theme.muted,
+      theme.accent
+    );
+    let cy = y + PDF_SPACING.panelPad + 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(PDF_TYPE.body);
+    doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
+    lines.forEach((ln: string) => {
+      doc.text(ln, margin + 5, cy);
+      cy += lh;
+    });
+    y += boxH + PDF_SPACING.subsectionAfter;
     doc.setTextColor(0, 0, 0);
   };
 
@@ -2409,7 +2669,7 @@ export async function runExecutivePdfExport(
       .slice(0, 6);
     if (!bullets.length) return;
     bullets.forEach((b, i) => {
-      if (i > 0) y += 0.65;
+      if (i > 0) y += PDF_SPACING.bulletGap;
       drawExecBullet(b, fontSize);
     });
     y += PDF_INSIGHT_PARAGRAPH_GAP_MM;
@@ -2431,22 +2691,20 @@ export async function runExecutivePdfExport(
     doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
     doc.setLineWidth(0.25);
     doc.roundedRect(margin, y, contentWidth, boxH, 1.2, 1.2, "FD");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-    doc.text("Evidence strength", margin + 3, y + 4.5);
+    pdfDrawPanelKicker(doc, margin + 3, y + 4.5, "Evidence strength", theme.muted, theme.accent);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     let hy = y + 8.5;
-    polished.forEach((note) => {
-      const wrapped = doc.splitTextToSize(note, contentWidth - 12);
+    polished.forEach((note, ni) => {
+      if (ni > 0) hy += PDF_SPACING.bulletGap + 0.5;
+      const wrapped = doc.splitTextToSize(note, contentWidth - 14);
       wrapped.forEach((ln: string) => {
         doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-        doc.text(ln, margin + 3, hy);
+        doc.text(ln, margin + 5, hy);
         hy += linePitch;
       });
     });
-    y += boxH + 4;
+    y += boxH + PDF_SPACING.subsectionBefore;
     doc.setTextColor(0, 0, 0);
   };
 
@@ -2492,14 +2750,16 @@ export async function runExecutivePdfExport(
   };
 
   const mutedLine = (label: string, value: string) => {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    ensurePageSpace(pdfLineHeight(PDF_TYPE.bodySmall) + 2);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(PDF_TYPE.label);
     doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-    ensurePageSpace(5.5);
     doc.text(label, margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(PDF_TYPE.bodySmall);
     doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-    doc.text(value, margin + 48, y);
-    y += 4.8;
+    doc.text(value, margin + 50, y);
+    y += pdfLineHeight(PDF_TYPE.bodySmall) + PDF_SPACING.blockTight;
     doc.setTextColor(0, 0, 0);
   };
 
@@ -2536,22 +2796,20 @@ export async function runExecutivePdfExport(
     if (n === 0) return;
     const heads = headers.slice(0, n).map((h) => String(h ?? "").slice(0, 80));
     const body = rows.slice(0, maxRows).map((r) =>
-      Array.from({ length: n }, (_, i) => {
-        const v = r[i];
-        if (v === null || v === undefined) return "—";
-        const s = String(v);
-        return s.length > 140 ? `${s.slice(0, 137)}…` : s;
-      })
+      Array.from({ length: n }, (_, i) => formatPdfTableCellValue(r[i]))
     );
-    const pad = isPreviewTable ? 2.35 : isPreview ? 2.1 : 1.6;
+    const pad = isPreviewTable ? 2.35 : isPreview ? 2.25 : 1.6;
     const headerFill = isPreview
-      ? mixRgb(
-          theme.panel,
-          theme.accent,
-          variant === "appendix" ? 0.14 : 0.22
-        )
+      ? variant === "appendix"
+        ? PDF_TABLE_THEME.headerBg
+        : mixRgb(theme.panel, theme.accent, 0.22)
       : theme.panel;
-    const stripeFill: [number, number, number] = [255, 255, 255];
+    const stripeOdd: [number, number, number] = PDF_TABLE_THEME.white;
+    const stripeEven: [number, number, number] = isPreview
+      ? PDF_TABLE_THEME.stripe
+      : theme.panel;
+    const valueColRight =
+      isPreview && (n === 2 || heads[n - 1]?.toLowerCase() === "value");
     const weights = heads.map((head, col) => {
       let w = Math.min(Math.max(head.length, 6), 26);
       for (const row of body) {
@@ -2599,12 +2857,18 @@ export async function runExecutivePdfExport(
         Math.max(1, ...cellLines.map((lines) => lines.length))
       );
       const linePitch =
-        fontSize * 0.42 + (isPreviewTable ? 1.18 : isPreview ? 1.22 : 1.15);
-      const headerPad = isPreviewTable ? 2.6 : pad;
-      const bodyPad = isPreviewTable ? 2.85 : pad;
+        fontSize * 0.42 + (isPreviewTable ? 1.18 : isPreview ? 1.24 : 1.15);
+      const headerPad = isPreviewTable ? 2.6 : isPreview ? 2.5 : pad;
+      const bodyPad = isPreviewTable ? 2.85 : isPreview ? 2.65 : pad;
       const rowPad = isHeader && isPreviewTable ? headerPad : bodyPad;
       const rowH = maxLines * linePitch + rowPad * 2;
-      if (!suppressBreaks) {
+      if (!suppressBreaks && !isHeader) {
+        const pagesBefore = doc.getNumberOfPages();
+        ensurePageSpace(rowH + 1.2);
+        if (doc.getNumberOfPages() > pagesBefore) {
+          drawRow(heads, true, "bold", 0);
+        }
+      } else if (!suppressBreaks) {
         ensurePageSpace(rowH + 1.2);
       }
       doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
@@ -2618,12 +2882,7 @@ export async function runExecutivePdfExport(
           doc.line(margin, y + rowH, margin + contentWidth, y + rowH);
         }
       } else if (isPreview) {
-        const fill =
-          bodyRowIndex % 2 === 0
-            ? stripeFill
-            : isPreviewTable
-              ? mixRgb(theme.panel, theme.accent, 0.04)
-              : theme.panel;
+        const fill = bodyRowIndex % 2 === 0 ? stripeOdd : stripeEven;
         doc.setFillColor(fill[0], fill[1], fill[2]);
         doc.rect(margin, y, contentWidth, rowH, "F");
         doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
@@ -2640,19 +2899,26 @@ export async function runExecutivePdfExport(
           doc.line(cx, y, cx, y + rowH);
         }
         doc.setFont("helvetica", fontStyle);
-        doc.setFontSize(isHeader ? fontSize + (isPreview ? 0.5 : 0.6) : fontSize);
-        doc.setTextColor(
-          isHeader ? theme.ink[0] : theme.body[0],
-          isHeader ? theme.ink[1] : theme.body[1],
-          isHeader ? theme.ink[2] : theme.body[2]
-        );
+        doc.setFontSize(isHeader ? fontSize + (isPreview ? 0.55 : 0.6) : fontSize);
+        const headerInk = isHeader
+          ? isPreview
+            ? PDF_TABLE_THEME.headerInk
+            : theme.ink
+          : theme.body;
+        doc.setTextColor(headerInk[0], headerInk[1], headerInk[2]);
         const lines = cellLines[i].slice(0, maxLines);
+        const rightAlign =
+          !isHeader &&
+          (valueColRight
+            ? i === n - 1
+            : isPreview && pdfCellLooksNumeric(cells[i] ?? ""));
         let yy =
           y +
           rowPad +
           (isHeader ? (isPreviewTable ? 2.7 : isPreview ? 3.1 : 3.3) : isPreviewTable ? 2.85 : isPreview ? 3 : 2.8);
+        const textX = rightAlign ? cx + colW[i] - pad : cx + pad;
         lines.forEach((ln: string) => {
-          doc.text(ln, cx + pad, yy);
+          doc.text(ln, textX, yy, { align: rightAlign ? "right" : "left" });
           yy += linePitch;
         });
         cx += colW[i];
@@ -2673,13 +2939,83 @@ export async function runExecutivePdfExport(
         tableTopY,
         contentWidth,
         y - tableTopY,
-        isPreviewTable ? 2 : 1.5,
-        isPreviewTable ? 2 : 1.5,
+        isPreviewTable ? PDF_RADIUS.table : PDF_RADIUS.card,
+        isPreviewTable ? PDF_RADIUS.table : PDF_RADIUS.card,
         "S"
       );
     }
 
-    y += isPreviewTable ? 5 : isPreview ? 4 : 3;
+    y += isPreviewTable ? PDF_SPACING.tableAfter : isPreview ? PDF_SPACING.tableAfter - 1 : 3;
+    doc.setTextColor(0, 0, 0);
+  };
+
+  /** Compact KPI-style metadata grid for technical appendix. */
+  const drawAppendixFactGrid = (
+    items: { label: string; value: string }[],
+    columns: 2 | 3 = 2
+  ) => {
+    if (!items.length) return;
+    const cols = columns;
+    const gap = PDF_SPACING.appendixGridGap;
+    const colW = (contentWidth - gap * (cols - 1)) / cols;
+    const cardH = 15.5;
+    const rows = Math.ceil(items.length / cols);
+    const blockH = rows * cardH + Math.max(0, rows - 1) * gap;
+    ensurePageSpace(blockH + PDF_SPACING.subsectionBefore);
+
+    let fx = margin;
+    let row = 0;
+    items.forEach((item, i) => {
+      if (i > 0 && i % cols === 0) {
+        fx = margin;
+        y += cardH + gap;
+        row++;
+        ensurePageSpace(cardH + gap + 4);
+      }
+      pdfDrawEnterprisePanel(doc, fx, y, colW, cardH, {
+        fill: theme.card,
+        border: theme.line,
+        accent: theme.accent,
+        radius: 1.4,
+      });
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(PDF_TYPE.factLabel);
+      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+      const lbl = doc.splitTextToSize(item.label, colW - 8);
+      doc.text(lbl.slice(0, 2), fx + 4, y + 4.5);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(PDF_TYPE.factValue);
+      doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
+      const val = formatPdfTableCellValue(item.value, 48);
+      const valLines = doc.splitTextToSize(val, colW - 8);
+      doc.text(valLines.slice(0, 2), fx + 4, y + 9.5);
+      fx += colW + gap;
+    });
+    y += cardH + PDF_SPACING.tableAfter;
+    doc.setTextColor(0, 0, 0);
+  };
+
+  const drawAppendixNotePanel = (title: string, body: string) => {
+    const lines = doc.splitTextToSize(body, contentWidth - 14);
+    const lh = pdfLineHeight(PDF_TYPE.bodySmall);
+    const boxH = PDF_SPACING.panelPad + 4 + lines.length * lh + PDF_SPACING.panelPad;
+    ensurePageSpace(boxH + 4);
+    pdfDrawEnterprisePanel(doc, margin, y, contentWidth, boxH, {
+      fill: theme.panel,
+      border: theme.line,
+      accent: theme.accent,
+      radius: 1.5,
+    });
+    pdfDrawPanelKicker(doc, margin + 4, y + PDF_SPACING.panelPad, title, theme.muted, theme.accent);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(PDF_TYPE.bodySmall);
+    doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
+    let hy = y + PDF_SPACING.panelPad + 5;
+    lines.forEach((ln: string) => {
+      doc.text(ln, margin + 5, hy);
+      hy += lh;
+    });
+    y += boxH + PDF_SPACING.subsectionBefore;
     doc.setTextColor(0, 0, 0);
   };
 
@@ -2703,8 +3039,8 @@ export async function runExecutivePdfExport(
       return;
     }
 
-    const panelPad = 4;
-    const kpiRowH = snapshotKpis.length ? 15 : 0;
+    const panelPad = PDF_SPACING.panelPad;
+    const kpiRowH = snapshotKpis.length ? 17 : 0;
     const insightMaxW = contentWidth - 8;
     const insightLines = dominantInsight
       ? doc.splitTextToSize(dominantInsight, insightMaxW)
@@ -2712,87 +3048,98 @@ export async function runExecutivePdfExport(
     const insightLineCount = Math.min(3, insightLines.length);
     const insightBlockH = insightLineCount
       ? 5 +
-        insightLineCount * pdfBodyLineHeight(9) +
+        insightLineCount * pdfBodyLineHeight(PDF_TYPE.body) +
         PDF_INSIGHT_PARAGRAPH_GAP_MM
       : 0;
+    const lowDataNoteH =
+      input.dataset.rows > 0 && input.dataset.rows < 15 ? 10 : 0;
     const panelH =
       panelPad +
       4.5 +
       5 +
+      lowDataNoteH +
       (kpiRowH ? PDF_SNAPSHOT_KPI_TOP_GAP_MM + kpiRowH + 3 : 0) +
       insightBlockH +
       panelPad;
 
     ensurePageSpace(panelH + 5);
     const panelTop = y;
-    doc.setFillColor(theme.panel[0], theme.panel[1], theme.panel[2]);
-    doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-    doc.setLineWidth(0.28);
-    doc.roundedRect(margin, y, contentWidth, panelH, 1.8, 1.8, "FD");
-    doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
-    doc.rect(margin, y, 2.2, panelH, "F");
+    pdfDrawEnterprisePanel(doc, margin, y, contentWidth, panelH, {
+      fill: theme.panel,
+      border: theme.line,
+      accent: theme.accent,
+    });
 
     let hy = y + panelPad + 3.5;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-    doc.text("EXECUTIVE SNAPSHOT", margin + 4, hy);
-    hy += 5;
+    pdfDrawPanelKicker(doc, margin + 4, hy, "Executive snapshot", theme.muted, theme.accent);
+    hy += 5.5;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
+    doc.setFontSize(PDF_TYPE.bodySmall);
     doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
     const profileLine = `${kindLabel} · ${volumeLine}`;
     const profileWrap = doc.splitTextToSize(profileLine, contentWidth - 10);
     doc.text(profileWrap.slice(0, 2), margin + 4, hy);
     hy +=
-      profileWrap.length * 4.2 +
+      profileWrap.length * pdfLineHeight(PDF_TYPE.bodySmall) +
       (snapshotKpis.length ? PDF_SNAPSHOT_KPI_TOP_GAP_MM + 1 : 2);
+    if (input.dataset.rows > 0 && input.dataset.rows < 15) {
+      hy += 2;
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(PDF_TYPE.caption);
+      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+      const lowNote = doc.splitTextToSize(
+        PDF_EMPTY_STATES.lowData.body,
+        contentWidth - 10
+      );
+      doc.text(lowNote.slice(0, 2), margin + 4, hy);
+      hy += lowNote.length * pdfLineHeight(PDF_TYPE.caption) + 1;
+      doc.setFont("helvetica", "normal");
+    }
 
     if (snapshotKpis.length) {
       const gap = 3;
       const kw = (contentWidth - 8 - gap * (snapshotKpis.length - 1)) / snapshotKpis.length;
       snapshotKpis.forEach((card, i) => {
         const kx = margin + 4 + i * (kw + gap);
-        doc.setFillColor(255, 255, 255);
+        doc.setFillColor(theme.card[0], theme.card[1], theme.card[2]);
         doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
         doc.setLineWidth(0.2);
-        doc.roundedRect(kx, hy, kw, kpiRowH, 1, 1, "FD");
+        doc.roundedRect(kx, hy, kw, kpiRowH, 1.2, 1.2, "FD");
+        doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
+        doc.rect(kx, hy, 1.8, kpiRowH, "F");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(6.5);
+        doc.setFontSize(PDF_TYPE.kpiLabel);
         doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
         doc.text(
-          doc.splitTextToSize(card.title, kw - 4).slice(0, 1),
-          kx + 2,
-          hy + 4
+          doc.splitTextToSize(card.title, kw - 6).slice(0, 1),
+          kx + 4,
+          hy + 4.5
         );
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
+        doc.setFontSize(PDF_TYPE.snapshotValue);
         doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
         doc.text(
-          doc.splitTextToSize(String(card.value), kw - 4).slice(0, 1),
-          kx + 2,
-          hy + 10
+          doc.splitTextToSize(String(card.value), kw - 6).slice(0, 1),
+          kx + 4,
+          hy + 11.5
         );
       });
-      hy += kpiRowH + 3;
+      hy += kpiRowH + 4;
     }
 
     if (dominantInsight && insightLineCount > 0) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-      doc.text("Dominant insight", margin + 4, hy);
-      hy += 4.5;
+      pdfDrawPanelKicker(doc, margin + 4, hy, "Dominant insight", theme.muted, theme.accent);
+      hy += 5;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(PDF_TYPE.body);
       doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
       insightLines.slice(0, insightLineCount).forEach((ln: string) => {
         doc.text(ln, margin + 4, hy);
-        hy += pdfBodyLineHeight(9);
+        hy += pdfBodyLineHeight(PDF_TYPE.body);
       });
     }
 
-    y = panelTop + panelH + 6;
+    y = panelTop + panelH + PDF_SPACING.snapshotAfter;
     doc.setTextColor(0, 0, 0);
 
     const trendThumb = input.chartThumbnails.find((t) => t.values.length > 1);
@@ -2815,31 +3162,33 @@ export async function runExecutivePdfExport(
   /* -------- Cover -------- */
   const coverH = 48;
   ensurePageSpace(coverH + 28);
-  doc.setFillColor(theme.panel[0], theme.panel[1], theme.panel[2]);
-  doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-  doc.roundedRect(margin, y, contentWidth, coverH, 2, 2, "FD");
-  doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
-  doc.rect(margin, y, 2.8, coverH, "F");
+  pdfDrawEnterprisePanel(doc, margin, y, contentWidth, coverH, {
+    fill: theme.panel,
+    border: theme.line,
+    accent: theme.accent,
+    radius: 2,
+    accentWidth: 2.8,
+  });
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
+  doc.setFontSize(PDF_TYPE.coverTitle);
   doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
   doc.text(PDF_REPORT_TITLE, margin + 6, y + 12);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(PDF_TYPE.coverCompany);
   doc.setTextColor(theme.accent[0], theme.accent[1], theme.accent[2]);
   doc.text(company, margin + 6, y + 20);
   if (tagline) {
     doc.setFont("helvetica", "italic");
-    doc.setFontSize(9.5);
+    doc.setFontSize(PDF_TYPE.bodySmall);
     doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
     const tl = doc.splitTextToSize(tagline, contentWidth - 10).slice(0, 2);
     doc.text(tl, margin + 6, y + 26);
   }
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(PDF_TYPE.coverMeta);
   doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
   doc.text(`Generated ${genStr}`, margin + 6, y + 34);
   doc.text(
@@ -2865,7 +3214,10 @@ export async function runExecutivePdfExport(
   /* -------- Executive summary -------- */
   sectionTitle("Executive summary");
   if (!input.execSummaryLines.length) {
-    bodyText("No executive summary could be assembled for this export.", 10);
+    drawPremiumEmptyState(
+      PDF_EMPTY_STATES.executiveSummary.title,
+      PDF_EMPTY_STATES.executiveSummary.body
+    );
   } else {
     const execLinesForLoop =
       input.pdfRankedSignals?.length && input.pdfRankedSignals.length > 0
@@ -2876,34 +3228,45 @@ export async function runExecutivePdfExport(
 
     if (partitioned.scope.length) {
       insightSubheading("Scope");
-      partitioned.scope.forEach((s) => bodyText(s, 9.5));
+      partitioned.scope.forEach((s) => bodyText(s, PDF_TYPE.bodySmall));
     }
     if (partitioned.question) {
+      if (partitioned.scope.length) execSummaryBreather();
       insightSubheading("Question in scope");
-      bodyText(partitioned.question, 10);
+      bodyText(partitioned.question, PDF_TYPE.body);
     }
     const takeawayBody =
       partitioned.takeaway && !isStructuredDumpExecutiveLine(partitioned.takeaway)
         ? partitioned.takeaway
         : resolvePdfExecutiveNarrative(input);
     if (takeawayBody) {
-      insightSubheading("Main takeaway");
-      bodyBullets([polishPdfBusinessCopy(takeawayBody)], 10);
+      if (partitioned.scope.length || partitioned.question) execSummaryBreather();
+      drawMainTakeawayCallout(takeawayBody);
     }
     if (partitioned.metrics.length) {
+      if (
+        partitioned.scope.length ||
+        partitioned.question ||
+        takeawayBody
+      ) {
+        execSummaryBreather();
+      }
       insightSubheading("Key metrics");
       partitioned.metrics.forEach((m) => drawExecBullet(m));
-      y += 1.5;
+      y += PDF_SPACING.subsectionBefore;
     }
     if (partitioned.evidence.length) {
+      execSummaryBreather();
       drawEvidenceNoteBox(partitioned.evidence);
     }
     if (partitioned.other.length) {
+      execSummaryBreather();
       insightSubheading("Supporting signals");
       partitioned.other.forEach((line) => renderLegacyExecSummaryLine(line));
     }
 
     if (input.pdfRankedSignals?.length) {
+      execSummaryBreather();
       insightSubheading("Chart highlights");
       const metricHint =
         input.chart?.alignedMetricDisplay?.trim() ||
@@ -2923,17 +3286,49 @@ export async function runExecutivePdfExport(
           drawExecBullet(`${r.rank}: ${r.category} — ${r.valueDisplay}`);
         });
       }
-      y += 1.5;
+      y += PDF_SPACING.subsectionBefore;
     }
+
+    execSummaryBreather();
+    insightSubheading("Confidence", 10);
+    drawConfidenceChip(
+      doc,
+      margin,
+      y + 2,
+      "Field mapping",
+      input.mappingConfidence
+    );
+    y += 7;
 
     doc.setTextColor(0, 0, 0);
   }
-  y += 5;
+  y += PDF_SPACING.sectionBefore;
 
   if (input.includes.includeKPIs && y > contentTop0 + 118) {
     doc.addPage();
     y = contentTop0;
   }
+
+  const measureKpiRowHeightMm = (
+    pair: Array<
+      { title: string; value: string; subtitle?: string | null } | undefined
+    >,
+    colW: number
+  ) => {
+    let titleExtra = 0;
+    let hasSubtitle = false;
+    for (const card of pair) {
+      if (!card) continue;
+      const titleLines = doc.splitTextToSize(card.title, colW - 12);
+      titleExtra = Math.max(titleExtra, Math.max(0, titleLines.length - 1));
+      if (card.subtitle?.trim()) hasSubtitle = true;
+    }
+    return (
+      PDF_SPACING.kpiMinHeight +
+      titleExtra * pdfLineHeight(PDF_TYPE.kpiLabel) +
+      (hasSubtitle ? 4 : 0)
+    );
+  };
 
   const drawKpiCard = (
     x: number,
@@ -2942,28 +3337,36 @@ export async function runExecutivePdfExport(
     h: number,
     card: { title: string; value: string; subtitle?: string | null }
   ) => {
-    doc.setFillColor(255, 255, 255);
+    doc.setFillColor(theme.card[0], theme.card[1], theme.card[2]);
     doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
     doc.setLineWidth(0.22);
-    doc.roundedRect(x, yPos, w, h, 1.6, 1.6, "FD");
+    doc.roundedRect(x, yPos, w, h, PDF_RADIUS.card, PDF_RADIUS.card, "FD");
     doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
-    doc.rect(x, yPos, 2.4, h, "F");
+    doc.rect(x, yPos, 2.6, h, "F");
+    const innerX = x + PDF_SPACING.kpiPadSide;
+    const innerW = w - PDF_SPACING.kpiPadSide * 2 - 2;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.2);
+    doc.setFontSize(PDF_TYPE.kpiLabel);
     doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-    const titleLines = doc.splitTextToSize(card.title, w - 9);
-    doc.text(titleLines.slice(0, 2), x + 5, yPos + 5);
+    const titleLines = doc.splitTextToSize(card.title, innerW);
+    const titleUsed = Math.min(2, titleLines.length);
+    doc.text(titleLines.slice(0, 2), innerX, yPos + PDF_SPACING.kpiPadTop);
+    const valueY =
+      yPos +
+      PDF_SPACING.kpiPadTop +
+      titleUsed * pdfLineHeight(PDF_TYPE.kpiLabel) +
+      1.5;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14.5);
+    doc.setFontSize(PDF_TYPE.kpiValue);
     doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-    const valLines = doc.splitTextToSize(String(card.value), w - 9);
-    doc.text(valLines.slice(0, 2), x + 5, yPos + 12.5);
-    if (card.subtitle) {
+    const valLines = doc.splitTextToSize(String(card.value), innerW);
+    doc.text(valLines.slice(0, 2), innerX, valueY);
+    if (card.subtitle?.trim()) {
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.2);
+      doc.setFontSize(PDF_TYPE.kpiSubtitle);
       doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-      const sub = doc.splitTextToSize(String(card.subtitle), w - 9);
-      doc.text(sub.slice(0, 1), x + 5, yPos + h - 4);
+      const sub = doc.splitTextToSize(String(card.subtitle), innerW);
+      doc.text(sub.slice(0, 1), innerX, yPos + h - PDF_SPACING.kpiPadBottom);
     }
   };
 
@@ -2972,36 +3375,27 @@ export async function runExecutivePdfExport(
     sectionTitle(input.kpiSectionTitle);
     const cards = input.kpiCards;
     if (!cards.length) {
-      bodyText(
-        "KPI metrics are not available yet. Upload data or refresh field mapping.",
-        10
+      drawPremiumEmptyState(
+        PDF_EMPTY_STATES.kpi.title,
+        PDF_EMPTY_STATES.kpi.body
       );
     } else {
-      const gap = 4;
+      const gap = PDF_SPACING.cardGap;
       const colW = (contentWidth - gap) / 2;
-      const cardH = 24;
       const rows = Math.ceil(cards.length / 2);
       for (let r = 0; r < rows; r++) {
-        let rowExtra = 0;
+        const pair = [cards[r * 2], cards[r * 2 + 1]];
+        const rowH = measureKpiRowHeightMm(pair, colW);
+        ensurePageSpace(rowH + gap + PDF_SPACING.pageSafe);
         for (let c = 0; c < 2; c++) {
-          const idx = r * 2 + c;
-          const card = cards[idx];
-          if (!card) continue;
-          const titleLines = doc.splitTextToSize(card.title, colW - 9);
-          rowExtra = Math.max(rowExtra, Math.max(0, titleLines.length - 1));
-        }
-        const rowH = cardH + rowExtra * 3.2;
-        ensurePageSpace(rowH + gap);
-        for (let c = 0; c < 2; c++) {
-          const idx = r * 2 + c;
-          const card = cards[idx];
+          const card = pair[c];
           const x = margin + c * (colW + gap);
           if (!card) continue;
           drawKpiCard(x, y, colW, rowH, card);
         }
         y += rowH + gap;
       }
-      y += 2;
+      y += PDF_SPACING.sectionTail;
     }
   }
 
@@ -3011,28 +3405,28 @@ export async function runExecutivePdfExport(
     {
       const q =
         input.question.trim() || "No question was recorded for this export.";
-      const qFont = 10.5;
+      const qFont = PDF_TYPE.question;
       const ql = doc.splitTextToSize(q, contentWidth);
-      const lineH = qFont * 0.42 + 1.45;
-      const labelH = 9 * 0.42 + 1.45 + 5;
-      const questionBlockH = labelH + ql.length * lineH + 6;
+      const lineH = pdfLineHeight(qFont);
+      const labelH = pdfLineHeight(PDF_TYPE.label) + PDF_SPACING.blockTight;
+      const questionBlockH = labelH + ql.length * lineH + PDF_SPACING.subsectionBefore;
       ensurePageSpace(questionBlockH);
     }
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(PDF_TYPE.label);
     doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
     doc.text("Business question", margin, y);
-    y += 5;
+    y += pdfLineHeight(PDF_TYPE.label);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10.5);
+    doc.setFontSize(PDF_TYPE.question);
     doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
     {
       const q =
         input.question.trim() || "No question was recorded for this export.";
       const ql = doc.splitTextToSize(q, contentWidth);
-      const lineH = 10.5 * 0.42 + 1.45;
+      const lineH = pdfLineHeight(PDF_TYPE.question);
       doc.text(ql, margin, y);
-      y += ql.length * lineH + 5;
+      y += ql.length * lineH + PDF_SPACING.subsectionBefore;
     }
 
     if (
@@ -3073,30 +3467,43 @@ export async function runExecutivePdfExport(
           if (fb) bulletLines = [fb.slice(0, 180) + (fb.length > 180 ? "…" : "")];
         }
       }
-      const linePitch = 4.65;
+      const linePitch = PDF_SPACING.insightLineGap;
       let contentH = 0;
       bulletLines.forEach((bl) => {
-        const wrapped = doc.splitTextToSize(`• ${bl}`, contentWidth - 14);
+        const wrapped = doc.splitTextToSize(`• ${bl}`, contentWidth - 16);
         contentH += wrapped.length * linePitch;
       });
       if (contentH < linePitch) contentH = linePitch;
-      const boxH = contentH + 10;
+      const boxH = contentH + PDF_SPACING.panelPad * 2 + 2;
       ensurePageSpace(boxH + 6);
-      doc.setFillColor(254, 252, 232);
-      doc.setDrawColor(250, 204, 21);
-      doc.setLineWidth(0.35);
-      doc.roundedRect(margin, y, contentWidth, boxH, 1.2, 1.2, "FD");
+      doc.setFillColor(
+        PDF_ENTERPRISE_COLORS.highlightWash[0],
+        PDF_ENTERPRISE_COLORS.highlightWash[1],
+        PDF_ENTERPRISE_COLORS.highlightWash[2]
+      );
+      doc.setDrawColor(
+        PDF_ENTERPRISE_COLORS.highlightBorder[0],
+        PDF_ENTERPRISE_COLORS.highlightBorder[1],
+        PDF_ENTERPRISE_COLORS.highlightBorder[2]
+      );
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, y, contentWidth, boxH, 1.4, 1.4, "FD");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(120, 53, 15);
-      doc.text("Highlighted signals", margin + 3, y + 4.5);
+      doc.setFontSize(PDF_TYPE.caption);
+      doc.setTextColor(
+        PDF_ENTERPRISE_COLORS.highlightInk[0],
+        PDF_ENTERPRISE_COLORS.highlightInk[1],
+        PDF_ENTERPRISE_COLORS.highlightInk[2]
+      );
+      doc.text("Highlighted signals", margin + 5, y + PDF_SPACING.panelPad);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9.5);
-      let hy = y + 9;
-      bulletLines.forEach((bl) => {
-        const wrapped = doc.splitTextToSize(`• ${bl}`, contentWidth - 14);
+      doc.setFontSize(PDF_TYPE.bodySmall);
+      let hy = y + PDF_SPACING.panelPad + 5;
+      bulletLines.forEach((bl, bi) => {
+        if (bi > 0) hy += PDF_SPACING.bulletGap;
+        const wrapped = doc.splitTextToSize(`• ${bl}`, contentWidth - 16);
         wrapped.forEach((ln: string) => {
-          doc.text(ln, margin + 3, hy);
+          doc.text(ln, margin + 5, hy);
           hy += linePitch;
         });
       });
@@ -3108,10 +3515,10 @@ export async function runExecutivePdfExport(
       const mapped: Confidence =
         lvl === "high" ? "High" : lvl === "medium" ? "Medium" : "Low";
       drawConfidenceChip(doc, margin, y + 2, "Insight confidence", mapped);
-      y += 7;
+      y += pdfLineHeight(PDF_TYPE.caption);
     }
 
-    y += 6;
+    y += PDF_SPACING.subsectionBefore;
     const sec = input.insightSections;
     const hasStructured =
       sec &&
@@ -3128,9 +3535,8 @@ export async function runExecutivePdfExport(
           sec.summary.trim(),
           9.5
         );
-        insightSubheading(PDF_INSIGHT_SECTION_LABELS.overview);
-        bodyBullets([sec.summary.trim()], 9.5);
-        y += 1;
+        insightSubheading(PDF_INSIGHT_SECTION_LABELS.overview, 18);
+        bodyBullets([sec.summary.trim()], PDF_TYPE.bodySmall);
       }
       const blocks: [string, string | undefined][] = [
         [PDF_INSIGHT_SECTION_LABELS.findings, sec.statistical],
@@ -3140,22 +3546,22 @@ export async function runExecutivePdfExport(
       for (const [heading, body] of blocks) {
         if (!body?.trim()) continue;
         ensureAiBlockFits(heading, 9.5, body.trim(), 9.5);
-        y += 1;
+        y += PDF_SPACING.bulletGap;
         insightSubheading(heading);
         bodyBullets([body.trim()], 9.5);
-        y += 2;
+        y += PDF_SPACING.subsectionBefore;
       }
     } else if (input.answer.trim()) {
       ensureAiBlockFits("Analysis", 9.5, input.answer.trim(), 9.5);
       insightSubheading("Analysis");
       bodyBullets([input.answer.trim()], 9.5);
     } else {
-      bodyText(
-        "No AI answer yet. Ask a question in AI Insights before exporting.",
-        10
+      drawPremiumEmptyState(
+        PDF_EMPTY_STATES.aiInsight.title,
+        PDF_EMPTY_STATES.aiInsight.body
       );
     }
-    y += 3;
+    y += PDF_SPACING.subsectionAfter;
   }
 
   /* -------- AI conversation context (thread / filters) -------- */
@@ -3258,46 +3664,73 @@ export async function runExecutivePdfExport(
     const ch = input.chart;
     sectionTitle("Visualization");
     const pdfChartHeading =
-      ch.data.length === 0
-        ? "No chart"
-        : ch.title.trim() ||
-          (ch.presentationKind === "line" || ch.presentationKind === "area"
-            ? "Trend view"
-            : ch.presentationKind === "pie" || ch.presentationKind === "donut"
-              ? "Mix / share"
-              : ch.presentationKind === "scatter"
-                ? "Relationship view"
-                : ch.presentationKind === "bar_horizontal"
-                  ? "Ranking view"
-                  : "Category comparison");
+      ch.title.trim() ||
+      (ch.presentationKind === "line" || ch.presentationKind === "area"
+        ? "Trend view"
+        : ch.presentationKind === "pie" || ch.presentationKind === "donut"
+          ? "Mix / share"
+          : ch.presentationKind === "scatter"
+            ? "Relationship view"
+            : ch.presentationKind === "bar_horizontal"
+              ? "Ranking view"
+              : "Category comparison");
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-    ensurePageSpace(7);
-    doc.text(pdfChartHeading, margin, y);
-    y += 7;
-    if (ch.data.length === 0 && ch.chartAttribution?.trim()) {
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(8.5);
-      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-      const attrLines = doc.splitTextToSize(ch.chartAttribution.trim(), contentWidth);
-      ensurePageSpace(attrLines.length * 4 + 2);
-      doc.text(attrLines, margin, y);
-      y += attrLines.length * 4 + 3;
-      doc.setFont("helvetica", "normal");
+    const drawChartPresentationHeader = () => {
+      const subtitle = ch.subtitle.trim();
+      const attr =
+        ch.data.length === 0 && ch.chartAttribution?.trim()
+          ? ch.chartAttribution.trim()
+          : "";
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(PDF_TYPE.chartTitle);
+      const titleLines = doc.splitTextToSize(pdfChartHeading, contentWidth - 12);
+      let subLines: string[] = [];
+      if (subtitle) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(PDF_TYPE.caption);
+        subLines = doc.splitTextToSize(subtitle, contentWidth - 12);
+      } else if (attr) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(PDF_TYPE.caption);
+        subLines = doc.splitTextToSize(attr, contentWidth - 12);
+      }
+      const lhT = pdfLineHeight(PDF_TYPE.chartTitle);
+      const lhS = subLines.length ? pdfLineHeight(PDF_TYPE.caption) : 0;
+      const boxH =
+        PDF_SPACING.panelPad +
+        titleLines.length * lhT +
+        (subLines.length ? 2 + subLines.length * lhS : 0) +
+        PDF_SPACING.panelPad;
+      ensurePageSpace(boxH + PDF_SPACING.chartHeaderAfter);
+      pdfDrawEnterprisePanel(doc, margin, y, contentWidth, boxH, {
+        fill: theme.panel,
+        border: theme.line,
+        accent: theme.accent,
+        radius: 1.6,
+      });
+      let cy = y + PDF_SPACING.panelPad;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(PDF_TYPE.chartTitle);
+      doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
+      titleLines.forEach((ln: string) => {
+        doc.text(ln, margin + 5, cy);
+        cy += lhT;
+      });
+      if (subLines.length) {
+        cy += 1;
+        doc.setFont("helvetica", attr ? "italic" : "normal");
+        doc.setFontSize(PDF_TYPE.caption);
+        doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+        subLines.slice(0, 3).forEach((ln: string) => {
+          doc.text(ln, margin + 5, cy);
+          cy += lhS;
+        });
+      }
+      y += boxH + PDF_SPACING.chartHeaderAfter;
       doc.setTextColor(0, 0, 0);
-    }
-    if (ch.data.length > 0 && ch.subtitle.trim()) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-      const subL = doc.splitTextToSize(ch.subtitle.trim(), contentWidth);
-      ensurePageSpace(subL.length * 4.3 + 2);
-      doc.text(subL, margin, y);
-      y += subL.length * 4.3 + 3;
-      doc.setTextColor(0, 0, 0);
-    }
+    };
+
+    drawChartPresentationHeader();
 
     if (ch.data.length > 0) {
       const metaRows: string[][] = [];
@@ -3325,31 +3758,29 @@ export async function runExecutivePdfExport(
         metaRows.push(["Source", "Automated dashboard"]);
       }
       ensurePageSpace(metaRows.length * 5.5 + 8);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-      doc.text("ANALYSIS CONTEXT", margin, y);
-      y += 5;
+      pdfDrawPanelKicker(doc, margin, y, "Analysis context", theme.muted, theme.accent);
+      y += 5.5;
       metaRows.forEach(([label, value]) => {
         mutedLine(label, value);
       });
-      y += 2;
+      y += PDF_SPACING.blockTight;
     }
 
     const execBrief = input.executiveInsightsBrief?.trim() ?? "";
     const factSlice = (input.vizExecutiveFacts ?? []).slice(0, 6);
     const hasExecFacts = factSlice.length > 0;
+    const vizInsightsFollow = Boolean(execBrief || hasExecFacts);
 
     const estimateVizInsightsBlockMm = () => {
       if (!execBrief && !hasExecFacts) return 0;
       let h = 6;
       if (execBrief) {
         const wrap = doc.splitTextToSize(execBrief, contentWidth - 10);
-        h += Math.min(2, wrap.length) * 4.1 + 3;
+        h += Math.min(2, wrap.length) * PDF_SPACING.insightLineGap + 3;
       }
       if (hasExecFacts) {
         const gridRows = Math.ceil(factSlice.length / 3);
-        h += 5 + gridRows * 16;
+        h += 5 + gridRows * 17;
       }
       return h + 2;
     };
@@ -3359,43 +3790,66 @@ export async function runExecutivePdfExport(
       const availableMm = footerY - y - insightsReserve - 5;
       const maxImgH = Math.min(
         158,
-        Math.max(132, availableMm > 40 ? availableMm : footerY - y - 8)
+        Math.max(
+          88,
+          availableMm > 48 ? availableMm : Math.max(72, footerY - y - 12)
+        )
       );
       ensurePageSpace(maxImgH + 6);
       const placeImage = (dataUrl: string, pxW: number, pxH: number) => {
-        let imgWidth = contentWidth;
-        let imgHeight = (pxH * imgWidth) / pxW;
-        if (imgHeight > maxImgH) {
-          imgHeight = maxImgH;
-          imgWidth = (pxW * imgHeight) / pxH;
-        }
+        const sized = computePdfChartEmbedDimensions(
+          pxW,
+          pxH,
+          contentWidth,
+          maxImgH
+        );
+        const imgWidth = sized.widthMm;
+        const imgHeight = sized.heightMm;
         const imgX = margin + Math.max(0, (contentWidth - imgWidth) / 2);
-        ensurePageSpace(imgHeight + 5);
+        const framePad = PDF_SPACING.chartFramePad;
+        ensurePageSpace(imgHeight + framePad * 2 + PDF_SPACING.chartAfter);
         doc.setFillColor(theme.panel[0], theme.panel[1], theme.panel[2]);
         doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
         doc.setLineWidth(0.22);
         doc.roundedRect(
-          imgX - 1.5,
-          y - 1.5,
-          imgWidth + 3,
-          imgHeight + 3,
-          1.4,
-          1.4,
+          imgX - framePad - 0.5,
+          y - framePad - 0.5,
+          imgWidth + framePad * 2 + 1,
+          imgHeight + framePad * 2 + 1,
+          PDF_RADIUS.card,
+          PDF_RADIUS.card,
           "FD"
         );
+        doc.setFillColor(theme.card[0], theme.card[1], theme.card[2]);
+        doc.roundedRect(
+          imgX - 0.25,
+          y - 0.25,
+          imgWidth + 0.5,
+          imgHeight + 0.5,
+          PDF_RADIUS.tableCell,
+          PDF_RADIUS.tableCell,
+          "F"
+        );
         doc.addImage(dataUrl, "PNG", imgX, y, imgWidth, imgHeight);
-        y += imgHeight + 3;
+        y +=
+          imgHeight +
+          framePad +
+          (vizInsightsFollow
+            ? PDF_SPACING.chartAfterWithInsights
+            : PDF_SPACING.chartAfter);
+        if (!vizInsightsFollow) {
+          pdfDrawSoftRule(doc, margin, y, pageWidth - margin, theme.lineSoft, 0.18);
+          y += PDF_SPACING.chartRuleAfter;
+        }
       };
-      const png = await captureChartPlotToPng(cap, 2);
+      const png = await captureChartPlotToPng(cap, PDF_CHART_CAPTURE_SCALE);
       placeImage(png.dataUrl, png.width, png.height);
     };
 
     if (ch.data.length === 0) {
-      bodyText(
-        ch.chartAttribution?.trim()
-          ? ch.chartAttribution.trim()
-          : "No chart generated yet. Ask an AI question that creates a chart.",
-        10
+      drawPremiumEmptyState(
+        PDF_EMPTY_STATES.chart.title,
+        PDF_EMPTY_STATES.chart.body
       );
     } else {
       await new Promise<void>((resolve) => {
@@ -3406,97 +3860,115 @@ export async function runExecutivePdfExport(
       await new Promise<void>((resolve) => setTimeout(resolve, 150));
       const cap = ch.captureEl;
       if (!cap) {
-        bodyText("Chart could not be prepared for PDF export.", 10);
+        drawPremiumEmptyState(
+          PDF_EMPTY_STATES.chartCapture.title,
+          PDF_EMPTY_STATES.chartCapture.body
+        );
       } else {
         try {
           await embedCenteredChartImage(cap);
         } catch (fallbackErr) {
           console.warn("Chart image embed failed:", fallbackErr);
-          bodyText(
-            "Chart image could not be embedded. See data summary below.",
-            10
+          drawPremiumEmptyState(
+            PDF_EMPTY_STATES.chartEmbedFailed.title,
+            PDF_EMPTY_STATES.chartEmbedFailed.body
           );
         }
       }
     }
 
     if (execBrief || hasExecFacts) {
-      const gridRows = hasExecFacts ? Math.ceil(factSlice.length / 3) : 0;
+      const factCols = 3;
+      const factGap = PDF_SPACING.appendixGridGap;
+      const factCardH = 15.5;
+      const gridRows = hasExecFacts ? Math.ceil(factSlice.length / factCols) : 0;
       const briefWrap = execBrief
         ? doc.splitTextToSize(execBrief, contentWidth - 10)
         : [];
-      const factCardH = 14;
-      const factBlockH = hasExecFacts ? 4 + gridRows * (factCardH + 2) : 0;
-      const briefBlockH = briefWrap.length
-        ? briefWrap.length * 4.1 + 5 + PDF_INSIGHT_PARAGRAPH_GAP_MM
+      const briefLines = Math.min(2, briefWrap.length);
+      const factBlockH = hasExecFacts
+        ? PDF_SPACING.panelPad +
+          gridRows * factCardH +
+          Math.max(0, gridRows - 1) * factGap
         : 0;
-      const panelH = 6 + briefBlockH + factBlockH;
-      ensurePageSpace(panelH + 2);
+      const briefBlockH = briefLines
+        ? briefLines * PDF_SPACING.insightLineGap + PDF_SPACING.panelPad
+        : 0;
+      const panelH =
+        PDF_SPACING.panelPad +
+        4 +
+        briefBlockH +
+        (briefBlockH && factBlockH ? 3 : 0) +
+        factBlockH +
+        PDF_SPACING.panelPad;
+      ensurePageSpace(panelH + PDF_SPACING.pageSafe);
       const panelTop = y;
-      doc.setFillColor(theme.panel[0], theme.panel[1], theme.panel[2]);
-      doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-      doc.setLineWidth(0.22);
-      doc.roundedRect(margin, y, contentWidth, panelH, 1.6, 1.6, "FD");
-      let py = y + 4;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-      doc.text("EXECUTIVE INSIGHTS", margin + 3, py);
-      py += 5;
+      pdfDrawEnterprisePanel(doc, margin, y, contentWidth, panelH, {
+        fill: theme.panel,
+        border: theme.line,
+        accent: theme.accent,
+      });
+      let py = y + 3.5;
+      pdfDrawPanelKicker(
+        doc,
+        margin + 3,
+        py,
+        "Executive insights",
+        theme.muted,
+        theme.accent
+      );
+      py += 4.5;
       if (execBrief && briefWrap.length) {
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
+        doc.setFontSize(PDF_TYPE.body);
+        doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
         briefWrap.slice(0, 2).forEach((ln: string) => {
-          doc.text(ln, margin + 3, py);
-          py += 4.1;
+          doc.text(ln, margin + 5, py);
+          py += PDF_SPACING.insightLineGap;
         });
-        py += hasExecFacts ? PDF_SNAPSHOT_KPI_TOP_GAP_MM : PDF_INSIGHT_PARAGRAPH_GAP_MM;
+        py += hasExecFacts ? 3 : PDF_SPACING.blockTight;
       }
       if (hasExecFacts) {
-        const factGap = 3;
-        const fw = (contentWidth - 6 - factGap * 2) / 3;
+        const fw = (contentWidth - 6 - factGap * (factCols - 1)) / factCols;
         let fx = margin + 3;
-        let rowH = 0;
         factSlice.forEach((fact, i) => {
-          if (i > 0 && i % 3 === 0) {
+          if (i > 0 && i % factCols === 0) {
             fx = margin + 3;
-            py += rowH + 2;
-            rowH = 0;
+            py += factCardH + factGap;
           }
-          doc.setFillColor(255, 255, 255);
+          doc.setFillColor(theme.card[0], theme.card[1], theme.card[2]);
           doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-          doc.roundedRect(fx, py, fw, factCardH, 1, 1, "FD");
+          doc.setLineWidth(0.18);
+          doc.roundedRect(fx, py, fw, factCardH, PDF_RADIUS.tableCell, PDF_RADIUS.tableCell, "FD");
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(6.5);
+          doc.setFontSize(PDF_TYPE.factLabel);
           doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
           doc.text(
-            doc.splitTextToSize(fact.title, fw - 4).slice(0, 1),
-            fx + 2,
-            py + 3.5
+            doc.splitTextToSize(fact.title, fw - 5).slice(0, 1),
+            fx + 2.5,
+            py + 3.8
           );
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(9.5);
+          doc.setFontSize(PDF_TYPE.factValue);
           doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
           doc.text(
             doc
               .splitTextToSize(
                 formatNumericTokensInSignalLine(String(fact.value)),
-                fw - 4
+                fw - 5
               )
               .slice(0, 1),
-            fx + 2,
-            py + 9
+            fx + 2.5,
+            py + 9.5
           );
-          rowH = Math.max(rowH, factCardH);
           fx += fw + factGap;
         });
+        py += factCardH;
       }
-      y = panelTop + panelH + 2;
+      y = panelTop + panelH + PDF_SPACING.blockTight;
       doc.setTextColor(0, 0, 0);
-    } else {
-      y += 2;
     }
+
     doc.setTextColor(0, 0, 0);
   }
 
@@ -3534,11 +4006,15 @@ export async function runExecutivePdfExport(
     }
     sectionTitle("Data preview");
     if (!preview.length || !cols.length) {
-      bodyText("No preview rows available. Upload data to include a preview section.", 10);
+      drawPremiumEmptyState(
+        PDF_EMPTY_STATES.preview.title,
+        PDF_EMPTY_STATES.preview.body
+      );
     } else {
+      y += PDF_SPACING.tableBefore;
       bodyText(
-        `Sample excerpt: ${excerptRowCount} rows × ${previewHeads.length} columns (structured table).`,
-        9
+        `Sample excerpt: ${formatPdfBusinessNumber(excerptRowCount)} rows × ${formatPdfBusinessNumber(previewHeads.length)} columns (structured table).`,
+        PDF_TYPE.bodySmall
       );
       if (cols.length > previewHeads.length) {
         bodyText(
@@ -3580,9 +4056,9 @@ export async function runExecutivePdfExport(
         : null;
 
     if (!input.profile) {
-      bodyText(
-        "Column profile was not loaded. Re-upload or refresh to see missing-value totals.",
-        10
+      drawPremiumEmptyState(
+        PDF_EMPTY_STATES.dataQuality.title,
+        PDF_EMPTY_STATES.dataQuality.body
       );
     } else {
       const { duplicates, note } = input.previewDuplicates();
@@ -3679,95 +4155,106 @@ export async function runExecutivePdfExport(
         Boolean(chAp?.chartAttribution?.trim()) ||
         Boolean(chAp?.alignedMetric) ||
         Boolean(chAp?.aggregation));
-    if (
+    const appendixHasContent =
+      hasChartMeta ||
+      thumbsAp.length > 0 ||
+      Boolean(provNotesAp) ||
+      Boolean(input.provenance);
+    doc.addPage();
+    y = contentTop0;
+    sectionTitle("Technical appendix");
+    bodyText(
+      "Reference metadata for audit and data-team handoff. Omit this section for executive-only distribution.",
+      PDF_TYPE.bodySmall
+    );
+    y += PDF_SPACING.subsectionBefore;
+    if (!appendixHasContent) {
+      drawPremiumEmptyState(
+        PDF_EMPTY_STATES.appendix.title,
+        PDF_EMPTY_STATES.appendix.body
+      );
+    } else if (
       hasChartMeta ||
       thumbsAp.length > 0 ||
       provNotesAp ||
       Boolean(input.provenance)
     ) {
-      doc.addPage();
-      y = contentTop0;
-      sectionTitle("Technical appendix");
-      bodyText(
-        "Reference metadata for audit and data-team handoff. Omit this section for executive-only distribution.",
-        8.5
-      );
 
       const appendixSubheading = (title: string) => {
-        y += 2;
+        y += PDF_SPACING.appendixBlock;
+        doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
+        doc.rect(margin, y - 2.2, 1.1, 3.6, "F");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
+        doc.setFontSize(PDF_TYPE.appendixHeading);
         doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-        doc.text(title, margin, y);
-        y += 5;
+        doc.text(title, margin + 2.8, y);
+        pdfDrawSoftRule(doc, margin, y + 1.6, pageWidth - margin, theme.lineSoft, 0.18);
+        y += PDF_SPACING.subsectionAfter;
         doc.setTextColor(0, 0, 0);
       };
 
       if (input.provenance || input.mappingConfidence) {
         appendixSubheading("Analysis metadata");
-        const metaRows: string[][] = [];
+        const metaItems: { label: string; value: string }[] = [];
         if (input.provenance) {
-          metaRows.push(["Analysis confidence", input.provenance.confidence]);
-          metaRows.push([
-            "Records evaluated",
-            String(input.provenance.rowsAnalyzed),
-          ]);
-          metaRows.push([
-            "Visualized categories",
-            String(input.provenance.chartPoints),
-          ]);
+          metaItems.push({
+            label: "Analysis confidence",
+            value: polishPdfConfidenceLevel(input.provenance.confidence),
+          });
+          metaItems.push({
+            label: "Records evaluated",
+            value: formatPdfBusinessNumber(input.provenance.rowsAnalyzed),
+          });
+          metaItems.push({
+            label: "Visualized categories",
+            value: formatPdfBusinessNumber(input.provenance.chartPoints),
+          });
           if (input.provenance.aggregation) {
-            metaRows.push(["Aggregation", String(input.provenance.aggregation)]);
+            metaItems.push({
+              label: "Aggregation",
+              value: String(input.provenance.aggregation),
+            });
           }
         }
-        metaRows.push(["Field mapping confidence", input.mappingConfidence]);
-        drawDataTable(["Field", "Value"], metaRows, {
-          variant: "appendix",
-          fontSize: 8,
-          maxCols: 2,
-          maxRows: 8,
-          suppressRowPageBreaks: true,
+        metaItems.push({
+          label: "Field mapping",
+          value: polishPdfConfidenceLevel(input.mappingConfidence),
         });
+        drawAppendixFactGrid(metaItems, metaItems.length >= 5 ? 3 : 2);
       }
 
       if (chAp?.chartAttribution?.trim()) {
         appendixSubheading("Visualization source");
-        bodyText(chAp.chartAttribution!.trim(), 9);
+        drawAppendixNotePanel(
+          "Source",
+          polishPdfBusinessCopy(chAp.chartAttribution!.trim())
+        );
       }
 
       if (provNotesAp) {
         appendixSubheading("Provenance notes");
-        bodyBullets([provNotesAp], 9);
+        drawAppendixNotePanel("Notes", polishPdfBusinessCopy(provNotesAp));
       }
 
       if (thumbsAp.length >= 1) {
         appendixSubheading("Session chart thumbnails");
-        const thumbGap = 3;
-        const thumbW = (contentWidth - thumbGap * 3) / 4;
-        const thumbH = 22;
-        let tx = margin;
-        thumbsAp.slice(0, 4).forEach((t, i) => {
-          if (i > 0 && i % 4 === 0) {
-            tx = margin;
-            y += thumbH + thumbGap + 2;
-            ensurePageSpace(thumbH + thumbGap + 6);
-          }
-          drawPdfSessionThumbnailCard(
-            doc,
-            tx,
-            y,
-            thumbW,
-            thumbH,
-            t,
-            theme.accent,
-            theme.panel,
-            theme.line,
-            theme.ink,
-            theme.muted
-          );
-          tx += thumbW + thumbGap;
-        });
-        y += thumbH + 6;
+        const rowH = 16;
+        const headerH = 6;
+        const listH = headerH + Math.min(thumbsAp.length, 8) * rowH + 2;
+        ensurePageSpace(listH + PDF_SPACING.thumbRowAfter);
+        y = drawPdfAppendixThumbnailList(
+          doc,
+          margin,
+          y,
+          contentWidth,
+          thumbsAp,
+          theme.accent,
+          theme.line,
+          theme.ink,
+          theme.muted,
+          theme.panel
+        );
+        y += PDF_SPACING.blockTight;
       }
 
       if (chAp && hasSeries) {
@@ -3805,34 +4292,29 @@ export async function runExecutivePdfExport(
           chAp.presentationKind === "scatter"
             ? ["Point", "Coordinates"]
             : ["Category", "Value"];
-        const specTableH = measureMonolithicTableStackMm(
-          doc,
-          contentWidth,
-          ["Property", "Value"],
-          specRows,
-          8,
-          2.1,
-          5
-        );
+        const specItems = specRows.map(([label, value]) => ({
+          label,
+          value,
+        }));
         const seriesTableH = measureMonolithicTableStackMm(
           doc,
           contentWidth,
           seriesHeads,
           seriesRows,
           7.5,
-          2.1,
+          2.25,
           5
         );
-        const blockH = 5 + specTableH + 5 + seriesTableH + 8;
+        const specGridRows = Math.ceil(specItems.length / 2);
+        const blockH =
+          specGridRows * 15.5 +
+          Math.max(0, specGridRows - 1) * PDF_SPACING.appendixGridGap +
+          PDF_SPACING.appendixBlock +
+          seriesTableH +
+          14;
         ensurePageSpace(blockH);
         appendixSubheading("Chart specification");
-        drawDataTable(["Property", "Value"], specRows, {
-          variant: "appendix",
-          fontSize: 8,
-          maxCols: 2,
-          maxRows: 8,
-          suppressRowPageBreaks: true,
-        });
+        drawAppendixFactGrid(specItems, specItems.length >= 4 ? 3 : 2);
         appendixSubheading("Series sample");
         drawDataTable(seriesHeads, seriesRows, {
           variant: "appendix",
@@ -3842,7 +4324,10 @@ export async function runExecutivePdfExport(
           suppressRowPageBreaks: true,
         });
         if (chAp.data.length > 20) {
-          bodyText(`Showing first 20 of ${chAp.data.length} series points.`, 8);
+          bodyText(
+            `Showing first 20 of ${chAp.data.length} series points.`,
+            PDF_TYPE.caption
+          );
         }
       }
     }
@@ -3850,44 +4335,26 @@ export async function runExecutivePdfExport(
 
   /* -------- Running header / footer every page -------- */
   const totalPages = doc.getNumberOfPages();
-  const footerBaseline = pageHeight - 5.8;
-  const footerMuted: [number, number, number] = [148, 163, 184];
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    doc.setFillColor(theme.accent[0], theme.accent[1], theme.accent[2]);
-    doc.rect(0, 0, pageWidth, 1.2, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-    doc.text(company, margin, margin + 2.5);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
-    doc.text(PDF_REPORT_TITLE, margin, margin + 6.5);
-
-    doc.setDrawColor(theme.line[0], theme.line[1], theme.line[2]);
-    doc.setLineWidth(0.12);
-    doc.line(
+    pdfDrawEnterpriseRunningChrome(doc, {
+      pageIndex: i,
+      totalPages,
+      pageWidth,
+      pageHeight,
       margin,
-      pageHeight - footerBand + 0.8,
-      pageWidth - margin,
-      pageHeight - footerBand + 0.8
-    );
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
-    doc.setTextColor(footerMuted[0], footerMuted[1], footerMuted[2]);
-    doc.text(sourceShort, margin, footerBaseline, {
-      maxWidth: contentWidth * 0.38,
+      contentWidth,
+      headerBand,
+      footerBand,
+      company,
+      reportTitle: PDF_REPORT_TITLE,
+      sourceLabel: sourceShort,
+      accent: theme.accent,
+      ink: theme.ink,
+      muted: theme.muted,
+      line: theme.line,
+      lineSoft: theme.lineSoft,
     });
-    doc.text("Generated by AI Data Analyst", pageWidth / 2, footerBaseline, {
-      align: "center",
-    });
-    doc.setFont("helvetica", "normal");
-    doc.text(`Page ${i} / ${totalPages}`, pageWidth - margin, footerBaseline, {
-      align: "right",
-    });
-    doc.setTextColor(0, 0, 0);
   }
 
   const base = sanitizeFileBase(input.branding.companyName || "analytics-brief");
