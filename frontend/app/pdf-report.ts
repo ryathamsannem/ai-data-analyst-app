@@ -95,15 +95,42 @@ function sanitizePdfSpecialCharacters(raw: string): string {
     .trim();
 }
 
-/** Collapse any consecutive duplicate words globally. */
+/** Collapse consecutive duplicate words globally (case-insensitive). */
 function collapsePdfDuplicateWords(raw: string): string {
-  let t = raw;
+  let t = raw.replace(/\s+/g, " ").trim();
   for (let pass = 0; pass < 8; pass++) {
-    const next = t.replace(/\b([\w][\w'-]*)\s+\1\b/gi, "$1");
+    const words = t.split(/\s+/).filter(Boolean);
+    if (words.length < 2) break;
+    const out: string[] = [];
+    for (const w of words) {
+      const prev = out[out.length - 1];
+      if (prev && prev.toLowerCase() === w.toLowerCase()) continue;
+      out.push(w);
+    }
+    const next = out.join(" ");
     if (next === t) break;
     t = next;
   }
   return t;
+}
+
+const PDF_RANKING_LEAD_RE =
+  /^(?:(?:highest|high|lowest|low|maximum|max|minimum|min|top|bottom|peak|largest|smallest|least)\s+)+/i;
+
+function stripLeadingRankingQualifiers(phrase: string): string {
+  let m = phrase.trim();
+  let prev = "";
+  while (m !== prev) {
+    prev = m;
+    m = m.replace(PDF_RANKING_LEAD_RE, "").trim();
+  }
+  return m;
+}
+
+function metricPhraseStartsWithRanking(phrase: string): boolean {
+  return /^(?:highest|high|lowest|low|maximum|max|minimum|min|top|bottom|peak|largest|smallest|least)\b/i.test(
+    phrase.trim()
+  );
 }
 
 /** Category axis label for PDF (dates stay YYYY-MM-DD, no thousands separators). */
@@ -115,9 +142,29 @@ function formatPdfCategoryLabel(raw: string): string {
 
 function normalizePdfMetricPhrase(metricHint: string | null | undefined): string {
   let m = polishPdfBusinessCopy(String(metricHint ?? "").trim());
-  m = m.replace(/^(highest|lowest|maximum|minimum)\s+/i, "");
+  m = stripLeadingRankingQualifiers(m);
   m = m.replace(/^total\s+/i, "total ");
-  return m.trim() || "value";
+  return collapsePdfDuplicateWords(m.trim()) || "value";
+}
+
+/** Verb phrase for ranked narratives — avoids "highest highest …" when metric already ranks. */
+function pdfRankedVerbPhrase(
+  metric: string,
+  preferLow: boolean,
+  preferHigh: boolean
+): string {
+  const m = metric.trim() || "value";
+  if (preferLow) {
+    return metricPhraseStartsWithRanking(m)
+      ? `has the ${m}`
+      : `has the lowest ${m}`;
+  }
+  if (preferHigh) {
+    return metricPhraseStartsWithRanking(m)
+      ? `has the ${m}`
+      : `has the highest ${m}`;
+  }
+  return `leads with ${m}`;
 }
 
 function pdfIsTrendChart(kind: ChartKind, data: ChartRow[]): boolean {
@@ -878,10 +925,12 @@ function sanitizeExecutivePdfExportInput(
     null;
   const executiveNarrative =
     pdfRankedSignals.length > 0
-      ? formatPdfRankedSignalsNarrative(
-          pdfRankedSignals,
-          metricHintForNarrative,
-          questionClean
+      ? polishPdfBusinessCopy(
+          formatPdfRankedSignalsNarrative(
+            pdfRankedSignals,
+            metricHintForNarrative,
+            questionClean
+          )
         )
       : "";
 
@@ -988,18 +1037,21 @@ function sanitizeExecutivePdfExportInput(
   if (conversationAppendix) {
     conversationAppendix = {
       questionThread: conversationAppendix.questionThread
-        .map((q) => sanitizeUserFacingReportText(q))
+        .map((q) => polishPdfBusinessCopy(sanitizeUserFacingReportText(q)))
         .filter((q) => q.length > 0),
       inheritedFilters: conversationAppendix.inheritedFilters
-        .map((f) => sanitizeUserFacingReportText(f))
+        .map((f) => polishPdfBusinessCopy(sanitizeUserFacingReportText(f)))
         .filter((f) => f.length > 0),
       activeDrillPath: conversationAppendix.activeDrillPath
-        .map((d) => sanitizeUserFacingReportText(d))
+        .map((d) => polishPdfBusinessCopy(sanitizeUserFacingReportText(d)))
         .filter((d) => d.length > 0),
       inheritedAssumptionNote:
         conversationAppendix.inheritedAssumptionNote != null
-          ? sanitizeUserFacingReportText(conversationAppendix.inheritedAssumptionNote) ||
-            null
+          ? polishPdfBusinessCopy(
+              sanitizeUserFacingReportText(
+                conversationAppendix.inheritedAssumptionNote
+              )
+            ) || null
           : conversationAppendix.inheritedAssumptionNote,
     };
   }
@@ -1527,7 +1579,7 @@ function isStructuredDumpExecutiveLine(line: string): boolean {
 
 function formatNumericTokensInSignalLine(s: string): string {
   const normalized = normalizePdfIsoDatesInText(s);
-  return normalized.replace(
+  const formatted = normalized.replace(
     /\b(-?[\d,]+(?:\.\d+)?)\b/g,
     (match, _g1, offset, full) => {
       const before = full.slice(Math.max(0, offset - 6), offset);
@@ -1543,6 +1595,7 @@ function formatNumericTokensInSignalLine(s: string): string {
       return formatPdfBusinessNumber(n);
     }
   );
+  return collapsePdfDuplicateWords(formatted);
 }
 
 /** Short category-style label for PDF bullets (drops long metric-prefixed junk). */
@@ -1695,10 +1748,15 @@ function resolvePdfRankedMetricPhrase(
     return "attendance percent";
   }
   const cleaned = normalizePdfMetricPhrase(metricHint);
-  if (cleaned) {
-    return preferLow ? `lowest ${cleaned}` : `highest ${cleaned}`;
+  if (!cleaned || cleaned === "value") {
+    return preferLow ? "lowest value" : "highest value";
   }
-  return preferLow ? "value" : "value";
+  if (preferLow) {
+    return metricPhraseStartsWithRanking(cleaned)
+      ? cleaned
+      : `lowest ${cleaned}`;
+  }
+  return metricPhraseStartsWithRanking(cleaned) ? cleaned : `highest ${cleaned}`;
 }
 
 function formatPdfTrendRankedNarrative(
@@ -1713,13 +1771,14 @@ function formatPdfTrendRankedNarrative(
   const metric = normalizePdfMetricPhrase(metricHint);
   const cat0 = formatPdfCategoryLabel(lead.category);
   const val0 = polishPdfBusinessCopy(lead.valueDisplay);
-  let sentence = `${cat0} has the highest ${metric} at ${val0}`;
+  const leadPhrase = pdfRankedVerbPhrase(metric, false, true);
+  let sentence = `${cat0} ${leadPhrase} at ${val0}`;
   if (ranked[1]) {
     const cat1 = formatPdfCategoryLabel(ranked[1].category);
     const val1 = polishPdfBusinessCopy(ranked[1].valueDisplay);
     sentence += `, followed by ${cat1} at ${val1}`;
   }
-  return `${sentence}.`;
+  return polishPdfBusinessCopy(`${sentence}.`);
 }
 
 /** Executive sentence from ranked chart signals (e.g. lowest attendance by department). */
@@ -1737,19 +1796,15 @@ export function formatPdfRankedSignalsNarrative(
       /^\d{4}-\d{2}-\d{2}/.test(leadCat));
   if (trendLike || /peak\s+week/i.test(lead.rank)) {
     const trendNarrative = formatPdfTrendRankedNarrative(signals, metricHint);
-    if (trendNarrative) return trendNarrative;
+    if (trendNarrative) return polishPdfBusinessCopy(trendNarrative);
   }
   const preferLow = /^lowest/i.test(lead.rank.trim());
   const preferHigh = /^highest/i.test(lead.rank.trim());
   const metric = resolvePdfRankedMetricPhrase(question, metricHint, preferLow);
-  const leadPhrase = preferLow
-    ? `has the lowest ${metric}`
-    : preferHigh
-      ? `has the highest ${metric}`
-      : `leads with ${metric}`;
+  const leadPhrase = pdfRankedVerbPhrase(metric, preferLow, preferHigh);
   const leadVal = polishPdfBusinessCopy(lead.valueDisplay);
   if (signals.length === 1) {
-    return `${leadCat} ${leadPhrase} at ${leadVal}.`;
+    return polishPdfBusinessCopy(`${leadCat} ${leadPhrase} at ${leadVal}.`);
   }
   const followers = signals.slice(1, 3).filter((s) => !/^gap\b/i.test(s.rank));
   let followText = "";
@@ -1759,9 +1814,9 @@ export function formatPdfRankedSignalsNarrative(
     followText = `followed by ${formatPdfCategoryLabel(followers[0]!.category)} at ${polishPdfBusinessCopy(followers[0]!.valueDisplay)} and ${formatPdfCategoryLabel(followers[1]!.category)} at ${polishPdfBusinessCopy(followers[1]!.valueDisplay)}`;
   }
   if (!followText) {
-    return `${leadCat} ${leadPhrase} at ${leadVal}.`;
+    return polishPdfBusinessCopy(`${leadCat} ${leadPhrase} at ${leadVal}.`);
   }
-  return `${leadCat} ${leadPhrase} at ${leadVal}, ${followText}.`;
+  return polishPdfBusinessCopy(`${leadCat} ${leadPhrase} at ${leadVal}, ${followText}.`);
 }
 
 function pdfTrendRankedSignalsFromChartData(
@@ -1973,7 +2028,7 @@ function resolvePdfExecutiveNarrative(input: ExecutivePdfExportInput): string {
       metricHint,
       q
     );
-    if (narrative) return narrative;
+    if (narrative) return polishPdfBusinessCopy(narrative);
   }
   const candidates = [
     input.executiveInsightsBrief,
@@ -2054,7 +2109,7 @@ function highlightSignalsToBulletLines(raw: string, max: number): string[] {
     peelTrailingNumericPairs(ch, 32).forEach((p) => allPairs.push(p));
   }
   if (!allPairs.length) {
-    const one = formatNumericTokensInSignalLine(t);
+    const one = polishPdfBusinessCopy(formatNumericTokensInSignalLine(t));
     return one ? [one.slice(0, 200) + (one.length > 200 ? "…" : "")] : [];
   }
   const scored = allPairs.map(([lbl, vs]) => {
@@ -2062,7 +2117,7 @@ function highlightSignalsToBulletLines(raw: string, max: number): string[] {
     return { cat: extractShortSignalName(lbl), n };
   }).filter((x) => Number.isFinite(x.n) && x.cat.length > 0);
   if (!scored.length) {
-    return [formatNumericTokensInSignalLine(t)].slice(0, max);
+    return [polishPdfBusinessCopy(formatNumericTokensInSignalLine(t))].slice(0, max);
   }
   const byCat = new Map<string, number>();
   for (const row of scored) {
@@ -2073,7 +2128,9 @@ function highlightSignalsToBulletLines(raw: string, max: number): string[] {
   rows.sort((a, b) => b.n - a.n);
   return rows
     .slice(0, max)
-    .map((r) => `${r.cat}: ${formatPdfBusinessNumber(r.n)}`);
+    .map((r) =>
+      polishPdfBusinessCopy(`${r.cat}: ${formatPdfBusinessNumber(r.n)}`)
+    );
 }
 
 type ExecSummaryPartition = {
@@ -2831,7 +2888,7 @@ export async function runExecutivePdfExport(
         : resolvePdfExecutiveNarrative(input);
     if (takeawayBody) {
       insightSubheading("Main takeaway");
-      bodyBullets([takeawayBody], 10);
+      bodyBullets([polishPdfBusinessCopy(takeawayBody)], 10);
     }
     if (partitioned.metrics.length) {
       insightSubheading("Key metrics");
@@ -2852,10 +2909,12 @@ export async function runExecutivePdfExport(
         input.chart?.alignedMetricDisplay?.trim() ||
         input.chart?.alignedMetric?.trim() ||
         null;
-      const narrative = formatPdfRankedSignalsNarrative(
-        input.pdfRankedSignals.slice(0, 3),
-        metricHint,
-        input.question
+      const narrative = polishPdfBusinessCopy(
+        formatPdfRankedSignalsNarrative(
+          input.pdfRankedSignals.slice(0, 3),
+          metricHint,
+          input.question
+        )
       );
       if (narrative) {
         drawExecBullet(narrative);
@@ -2990,10 +3049,12 @@ export async function runExecutivePdfExport(
           input.chart?.alignedMetric?.trim() ||
           input.chartAxisLabels?.value?.trim() ||
           null;
-        const narrative = formatPdfRankedSignalsNarrative(
-          input.pdfRankedSignals.slice(0, 3),
-          metricHint,
-          input.question
+        const narrative = polishPdfBusinessCopy(
+          formatPdfRankedSignalsNarrative(
+            input.pdfRankedSignals.slice(0, 3),
+            metricHint,
+            input.question
+          )
         );
         bulletLines = narrative
           ? [narrative]
