@@ -24,6 +24,12 @@ build/
 # Cursor
 .cursor/
 
+# Full local project backups (large); manifests and README tracked
+project_backups/**/*
+!project_backups/README.md
+!project_backups/**/BACKUP_MANIFEST.md
+!project_backups/**/BACKUP_SOURCE.txt
+
 # Python cache
 .pytest_cache/
 

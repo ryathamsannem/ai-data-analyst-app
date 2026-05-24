@@ -1,6 +1,8 @@
 # AI Data Analyst App — Project Architecture Summary
 
-**Recovery snapshot:** May 2026 — stable SaaS baseline **after** UI refinements (dark/light polish, Charts stabilization, Data Preview metadata cleanup, filter/button consistency). **Before** Export/PDF finalization.
+**Recovery snapshot:** May 2026 — stable SaaS baseline **after** UI refinements and **PDF Export Phase 2** (enterprise PDF layout, native preview table, appendix polish, footer). Checkpoint branch: `stable/pdf-export-phase2` · backup: `project_backups/stable_export_pdf_phase2_backup_2026-05-21/`.
+
+**PDF baseline:** [`PDF_EXPORT_STABLE_BASELINE.md`](PDF_EXPORT_STABLE_BASELINE.md) · **Recovery:** [`RECOVERY_INSTRUCTIONS.md`](RECOVERY_INSTRUCTIONS.md)
 
 **Agent rules:** [`AGENTS.md`](AGENTS.md) · **UI rules:** [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md)
 
@@ -31,7 +33,7 @@
 
 | Area | Status |
 |------|--------|
-| **Export / PDF** | **NOT finalized** — functional but not production-polished; next phase |
+| **Export / PDF** | **Stable baseline (Phase 2)** — enterprise polish; incremental fixes only |
 
 ---
 
@@ -51,7 +53,10 @@
 ```
 frontend/app/layout.tsx              → fonts, ThemeScript, globals.css
 frontend/app/page.tsx                → single client SPA (~12k lines): all tabs + logic
-frontend/app/pdf-report.ts           → jsPDF + Canvg (Export — pending polish)
+frontend/app/pdf-report.ts           → jsPDF + Canvg (Export — stable Phase 2)
+frontend/lib/pdf-enterprise-style.ts → PDF tokens, footer, chart embed sizing
+frontend/lib/pdf-date-format.ts      → ISO date normalization in PDF
+frontend/lib/metric-value-format.ts  → raw vs display metrics (appendix)
 frontend/app/components/home/        → charts, filters, overview, data preview
 frontend/app/components/               → insight shells, answer body, executive panel
 frontend/components/app-shell/       → sidebar, header, workspace scroll
@@ -68,7 +73,7 @@ backend/main.py                      → upload, filters, dashboard, preview, /a
 | `preview` | Data Preview | `/preview` |
 | `insights` | AI Insights | `/ask` |
 | `charts` | Charts | `ChartSessionProvider` only |
-| `export` | Export | Client PDF (`pdf-report.ts`) — **pending** |
+| `export` | Export | Client PDF (`pdf-report.ts`) — **stable Phase 2** |
 
 **No per-tab URLs** — `activeTab` in `HomeInner` inside `AppShell`.
 
@@ -84,7 +89,7 @@ backend/main.py                      → upload, filters, dashboard, preview, /a
 | Data | Upload, mapping modal, filters, `autoDashboard` |
 | AI Insights | `askAI`, insight gates, answer parsing |
 | Charts | `chartHistory`, timeline, `renderDatasetChart` session path |
-| Export | `downloadReport`, capture refs — **not finalized** |
+| Export | `downloadReport`, capture refs — **stable Phase 2** |
 | Viewport | `viewportH` / `viewportW` (resize debounce ~140ms) |
 
 **Performance (preserve):** `React.memo`, `useMemo`, `useCallback`, `useDeferredValue` (Data Preview search).
@@ -196,17 +201,19 @@ Tokens: `ovCard`, `ovFilterControl` from `overview-ui.ts`.
 
 ---
 
-## 9. Export / PDF (pending)
+## 9. Export / PDF (stable Phase 2)
 
 | Item | Current state |
 |------|----------------|
 | UI | Export tab — branding, toggles, preview summary (`activeTab === "export"`) |
-| Engine | `pdf-report.ts` — jsPDF, SVG-first chart embed |
-| Capture | `chartCaptureSessionRef`, `chartCaptureInsightRef` (860px off-screen) |
+| Engine | `pdf-report.ts` — `runExecutivePdfExport`, jsPDF + Canvg SVG-first embed |
+| Tokens | `pdf-enterprise-style.ts` — spacing, typography, footer, empty states |
+| Capture | `chartCaptureSessionRef`, `chartCaptureInsightRef` (off-screen) |
+| Preview table | Native `drawPdfDataPreviewTable` (not screenshot) |
 | Validation | `validateExportMatchesContract` before export |
-| Gap | Not aligned to final product polish; dark capture fallback; static import |
+| Theme | Print-safe light PDF (independent of app dark mode) |
 
-**Do not treat Export as frozen** until the dedicated phase completes.
+**Full detail:** [`PDF_EXPORT_STABLE_BASELINE.md`](PDF_EXPORT_STABLE_BASELINE.md). Treat export as **frozen** unless user requests PDF changes.
 
 ---
 
@@ -278,11 +285,12 @@ Tokens: `ovCard`, `ovFilterControl` from `overview-ui.ts`.
 
 | Item | Notes |
 |------|--------|
-| **Export / PDF** | Primary next phase — layout, dark capture, code-split, WYSIWYG parity |
+| PDF code-split | jsPDF/html2canvas still static import — optional optimization |
 | Monolithic `page.tsx` | Structural extract optional; not blocking |
 | No deep links per tab | By design today |
-| PDF static import | Not code-split |
 | Overview grid max-width | Optional 1600px cap — verify before changing |
+
+See [`CURRENT_BUG_STATUS.md`](CURRENT_BUG_STATUS.md) for resolved vs remaining polish.
 
 ---
 
@@ -304,10 +312,10 @@ Tokens: `ovCard`, `ovFilterControl` from `overview-ui.ts`.
 
 ## 13. Recommended next work
 
-1. **Export / PDF phase** — polish UI, capture parity, narrative blocks, dark mode PDF charts.
-2. Regression: upload → filter → Insights (outlier + grouped) → Charts timeline → PDF (session + insight).
-3. Incremental only elsewhere — see [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md).
+1. Branch from **`stable/pdf-export-phase2`** for new features.
+2. Regression: upload → filter → Insights → Charts timeline → PDF (all sections + appendix on/off).
+3. Incremental only — see [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) and [`AGENTS.md`](AGENTS.md).
 
 ---
 
-*Last updated: May 2026 — pre–Export/PDF enhancement recovery point.*
+*Last updated: 2026-05-21 — PDF Export Phase 2 stable recovery point.*
