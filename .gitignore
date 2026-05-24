@@ -24,10 +24,14 @@ build/
 # Cursor
 .cursor/
 
-# Full local project backups (large); manifests and README tracked
-project_backups/stable_export_pdf_phase2_backup_*/
+# Full local project backups — ignore copied source trees only; track manifests
+project_backups/stable_export_pdf_phase2_backup_*/frontend/
+project_backups/stable_export_pdf_phase2_backup_*/backend/
+project_backups/stable_export_pdf_phase2_backup_*/tests/
+project_backups/stable_export_pdf_phase2_backup_*/*.md
 !project_backups/stable_export_pdf_phase2_backup_*/BACKUP_MANIFEST.md
-!project_backups/stable_export_pdf_phase2_backup_*/BACKUP_SOURCE.txt
+project_backups/stable_export_pdf_phase2_backup_*/*.frontend
+project_backups/stable_export_pdf_phase2_backup_*/*.backend
 
 # Python cache
 .pytest_cache/
