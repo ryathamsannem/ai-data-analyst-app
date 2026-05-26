@@ -55,6 +55,23 @@ export const ovBtnPrimaryAccent = "saas-btn-accent";
 
 export const ovBtnPrimaryAccentSm = "saas-btn-accent saas-btn-premium--sm";
 
+/** Overview upload — accepted extensions and validation. */
+export const OVERVIEW_UPLOAD_ACCEPT =
+  ".csv,.xlsx,.xls,.parquet,.json,.jsonl";
+
+export const OVERVIEW_UPLOAD_EXT_PATTERN =
+  /\.(csv|xlsx|xls|parquet|json|jsonl)$/i;
+
+export const OVERVIEW_UPLOAD_FORMAT_HINT =
+  "Supports CSV, Excel, JSON, and Parquet datasets";
+
+/** Selected-file kicker in Overview upload dropzone (muted label). */
+export const ovUploadSelectedKicker =
+  "text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)] opacity-55 dark:opacity-50";
+
+export const OVERVIEW_UPLOAD_INVALID_MSG =
+  "Please choose a supported dataset file (.csv, .xlsx, .xls, .parquet, .json, .jsonl).";
+
 /** Overview upload drop zone (idle / active toggled in JSX). */
 export const ovUploadDropzone = "overview-upload-dropzone";
 

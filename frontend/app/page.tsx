@@ -306,20 +306,22 @@ import { FilterPanel } from "./components/home/filter-panel";
 import { type MainNavTabId } from "./components/home/main-nav-tabs";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
+import { OverviewUploadSelectedState } from "./components/home/overview-upload-selected-state";
 import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-summary";
 import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
 import {
   ovBtnPrimaryAccent,
   ovBtnSecondary,
   ovBtnSecondarySm,
+  OVERVIEW_UPLOAD_ACCEPT,
+  OVERVIEW_UPLOAD_EXT_PATTERN,
+  OVERVIEW_UPLOAD_FORMAT_HINT,
+  OVERVIEW_UPLOAD_INVALID_MSG,
   ovCapabilityChip,
   ovDatasetEmptyInset,
   ovUploadDropzone,
   ovUploadDropzoneActive,
   ovUploadDropzoneIdle,
-  ovUploadSelectedName,
-  ovUploadSelectedSize,
-  ovUploadSelectedWrap,
   ovChartCell,
   ovChartGrid,
   ovChartInner,
@@ -6873,7 +6875,29 @@ function HomeInner() {
 
       if (!response.ok) {
         const maybeJson = await response.json().catch(() => null);
-        throw new Error(maybeJson?.detail || "Upload failed");
+        const detail =
+          maybeJson &&
+          typeof maybeJson === "object" &&
+          "detail" in maybeJson
+            ? (maybeJson as { detail: unknown }).detail
+            : null;
+        const message =
+          typeof detail === "string"
+            ? detail
+            : Array.isArray(detail)
+              ? detail
+                  .map((item) =>
+                    item &&
+                    typeof item === "object" &&
+                    "msg" in item &&
+                    typeof (item as { msg: unknown }).msg === "string"
+                      ? (item as { msg: string }).msg
+                      : null
+                  )
+                  .filter(Boolean)
+                  .join(" ") || "Upload failed"
+              : "Upload failed";
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -7042,9 +7066,9 @@ function HomeInner() {
   };
 
   const assignOverviewPickedFile = useCallback((next: File) => {
-    const ok = /\.(csv|xlsx|xls)$/i.test(next.name);
+    const ok = OVERVIEW_UPLOAD_EXT_PATTERN.test(next.name);
     if (!ok) {
-      setError("Please choose a CSV or Excel file (.csv, .xlsx, .xls).");
+      setError(OVERVIEW_UPLOAD_INVALID_MSG);
       return;
     }
     setError("");
@@ -10023,35 +10047,39 @@ function HomeInner() {
                         </h2>
                         {columns.length > 0 ? (
                           <p className={`mt-1 ${ovSectionDesc}`}>
-                            CSV or Excel — replaces the dataset in this session.
+                            CSV, Excel, JSON, or Parquet — replaces the dataset in this session.
                           </p>
                         ) : null}
                       </div>
-                      {file ? (
-                        <div className={ovUploadSelectedWrap}>
-                          <span className={ovDataLabel}>Selected:</span>{" "}
-                          <span className={ovUploadSelectedName}>{file.name}</span>{" "}
-                          <span className={ovUploadSelectedSize}>
-                            ({formatBytes(file.size)})
-                          </span>
-                        </div>
-                      ) : null}
                     </div>
 
                     <div className="mt-4">
                       <input
                         ref={overviewFileInputRef}
                         type="file"
-                        accept=".csv,.xlsx,.xls"
+                        accept={OVERVIEW_UPLOAD_ACCEPT}
                         className="sr-only"
-                        aria-label="Choose CSV or Excel file"
+                        aria-label="Choose dataset file (CSV, Excel, JSON, or Parquet)"
                         onChange={(e) => {
                           const next = e.target.files?.[0];
                           if (next) assignOverviewPickedFile(next);
                         }}
                       />
                       <div
-                        role="presentation"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={
+                          file
+                            ? `Selected file ${file.name}. Click to choose a different file.`
+                            : "Choose a dataset file. Drag and drop or click to browse."
+                        }
+                        onClick={() => overviewFileInputRef.current?.click()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            overviewFileInputRef.current?.click();
+                          }
+                        }}
                         onDragOver={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -10084,51 +10112,62 @@ function HomeInner() {
                           const next = e.dataTransfer.files?.[0];
                           if (next) assignOverviewPickedFile(next);
                         }}
-                        className={`${ovUploadDropzone} rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-8 ${
+                        className={`${ovUploadDropzone} rounded-xl border-2 border-dashed transition-colors ${
+                          file ? "p-3 sm:p-4" : "p-6 sm:p-8 text-center"
+                        } ${
                           overviewDropActive
                             ? ovUploadDropzoneActive
                             : ovUploadDropzoneIdle
                         }`}
                       >
-                        <div className="overview-upload-dropzone__icon" aria-hidden>
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.75"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                            <polyline points="17 8 12 3 7 8" />
-                            <line x1="12" y1="3" x2="12" y2="15" />
-                          </svg>
-                        </div>
-                        <p className="text-sm font-medium text-foreground">
-                          Drag and drop a file here
-                        </p>
-                        <p className={`mt-1 text-xs ${ovMuted}`}>
-                          .csv, .xlsx, or .xls
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => overviewFileInputRef.current?.click()}
-                          className={`mt-4 ${ovBtnSecondarySm}`}
-                        >
-                          Choose file
-                        </button>
+                        {file ? (
+                          <OverviewUploadSelectedState
+                            fileName={file.name}
+                            fileSizeLabel={formatBytes(file.size)}
+                          />
+                        ) : (
+                          <>
+                            <div className="overview-upload-dropzone__icon" aria-hidden>
+                              <svg
+                                width="17"
+                                height="17"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.75"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                              </svg>
+                            </div>
+                            <p className="text-sm font-medium text-foreground">
+                              Drag and drop a file here
+                            </p>
+                            <p className={`mt-1 text-xs ${ovMuted}`}>
+                              {OVERVIEW_UPLOAD_FORMAT_HINT}
+                            </p>
+                          </>
+                        )}
                       </div>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <div
+                        className={`overview-upload-actions flex flex-wrap items-center gap-3 ${
+                          file ? "mt-5" : "mt-3"
+                        }`}
+                      >
                         <button
                           type="button"
-                          onClick={uploadFile}
+                          onClick={() => {
+                            if (loading || !file) return;
+                            void uploadFile();
+                          }}
                           disabled={loading || !file}
                           className={ovBtnPrimaryAccent}
                         >
-                          {loading ? "Uploading..." : "Upload File"}
+                          {loading ? "Uploading..." : "Upload Dataset"}
                         </button>
                         {columns.length > 0 ? (
                           <button

@@ -912,7 +912,17 @@ body {
 
 /* —— Overview tab —— */
 .overview-upload-dropzone {
+  cursor: pointer;
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent);
+}
+
+.overview-upload-dropzone:hover:not(:focus-visible) {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border-default));
+}
+
+.overview-upload-dropzone:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 2px;
 }
 
 .dark .overview-upload-dropzone {
@@ -923,19 +933,227 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.125rem;
+  height: 2.125rem;
   margin: 0 auto 0.75rem;
-  border-radius: 0.75rem;
+  border-radius: 0.65rem;
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border-default));
-  background: color-mix(in srgb, var(--accent-wash) 55%, var(--surface-elevated));
-  color: color-mix(in srgb, var(--accent) 75%, var(--text-muted));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-wash) 65%, var(--surface-elevated)) 0%,
+    color-mix(in srgb, var(--accent) 6%, var(--surface-elevated)) 100%
+  );
+  color: color-mix(in srgb, var(--accent) 78%, #6366f1);
+  box-shadow: 0 2px 8px -6px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .dark .overview-upload-dropzone__icon {
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--insights-border-soft));
-  background: color-mix(in srgb, var(--accent-wash) 35%, var(--insights-layer-inset));
-  color: color-mix(in srgb, var(--accent) 65%, var(--insights-text-muted));
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-wash) 50%, var(--insights-layer-inset)) 0%,
+    color-mix(in srgb, #6366f1 16%, #1e1b4b) 100%
+  );
+  color: color-mix(in srgb, #c4b5fd 88%, #a5b4fc);
+  box-shadow: 0 0 18px -8px var(--accent-glow);
+}
+
+/* Overview upload — compact dataset confirmation card */
+.overview-upload-selected {
+  position: relative;
+  width: 90%;
+  max-width: 90%;
+  margin-inline: auto;
+  padding: 0.5rem 0.625rem 0.4375rem 0.6875rem;
+  text-align: left;
+  border-radius: 0.625rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border-default));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-wash) 62%, var(--surface-elevated)) 0%,
+    color-mix(in srgb, #6366f1 3%, var(--surface-inset)) 100%
+  );
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--accent) 7%, transparent),
+    0 0 16px -12px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.overview-upload-selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.4375rem;
+  bottom: 0.4375rem;
+  width: 2px;
+  border-radius: 0 1px 1px 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 70%, #6366f1) 0%,
+    color-mix(in srgb, var(--accent) 35%, #8b5cf6) 100%
+  );
+  opacity: 0.72;
+}
+
+.dark .overview-upload-selected::before {
+  opacity: 0.65;
+}
+
+.dark .overview-upload-selected {
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--insights-border-soft));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-wash) 32%, var(--insights-layer-inset)) 0%,
+    color-mix(in srgb, #1e1b4b 22%, var(--insights-layer-inset)) 100%
+  );
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 3%, transparent),
+    0 0 18px -14px color-mix(in srgb, var(--accent-glow) 65%, transparent);
+}
+
+.overview-upload-selected__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.overview-upload-selected__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: 0.0625rem;
+  border-radius: 0.4375rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  background: color-mix(in srgb, var(--accent-wash) 45%, var(--surface-elevated));
+  color: color-mix(in srgb, var(--accent) 75%, #6366f1);
+}
+
+.dark .overview-upload-selected__icon {
+  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
+  background: color-mix(in srgb, var(--accent-wash) 32%, var(--insights-layer-inset));
+  color: color-mix(in srgb, #c4b5fd 85%, #a5b4fc);
+}
+
+.overview-upload-selected__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.overview-upload-selected__name {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+
+.dark .overview-upload-selected__name {
+  color: #f8fafc;
+}
+
+.overview-upload-selected__chip {
+  flex-shrink: 0;
+  align-self: center;
+  margin-top: 0;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent-wash) 48%, transparent);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--accent) 72%, var(--foreground));
+}
+
+.dark .overview-upload-selected__chip {
+  color: color-mix(in srgb, #c4b5fd 88%, var(--insights-text-secondary));
+}
+
+.overview-upload-selected__meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.1875rem;
+  min-width: 0;
+}
+
+.overview-upload-selected__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  min-width: 0;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text-muted);
+}
+
+.dark .overview-upload-selected__meta {
+  color: var(--insights-text-muted);
+}
+
+.overview-upload-selected__meta-sep {
+  padding-inline: 0.0625rem;
+  opacity: 0.5;
+  user-select: none;
+}
+
+.overview-upload-selected__hint {
+  margin: 0.3125rem 0 0 2.375rem;
+  font-size: 0.5625rem;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+  opacity: 0.68;
+}
+
+.dark .overview-upload-selected__hint {
+  color: var(--insights-text-muted);
+  opacity: 0.62;
+}
+
+/* Overview upload — restrained primary CTA glow */
+.overview-upload-actions .saas-btn-accent {
+  box-shadow: 0 2px 8px -4px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.overview-upload-actions .saas-btn-accent:hover {
+  box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.dark .overview-upload-actions .saas-btn-accent {
+  box-shadow: 0 2px 10px -5px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.dark .overview-upload-actions .saas-btn-accent:hover {
+  box-shadow: 0 4px 16px -8px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+@media (max-width: 380px) {
+  .overview-upload-selected__meta-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .overview-upload-selected__hint {
+    margin-left: 0;
+    padding-left: 2.375rem;
+  }
 }
 
 .saas-btn-accent:disabled {
