@@ -61,9 +61,9 @@ export const ovDashboardControlH = "overview-filter-control";
 export const ovDashboardFilterBtn =
   "overview-filter-clear-btn saas-btn-premium inline-flex shrink-0 items-center justify-center leading-none";
 
-/** Dataset ready / data setup secondary actions — slightly compact vs filter row. */
+/** Dataset ready / data setup secondary actions — aligned with compact filter density. */
 export const ovOverviewSecondaryBtn =
-  "saas-btn-premium inline-flex h-[48px] min-h-[48px] shrink-0 items-center justify-center !py-0 px-4 text-sm font-semibold leading-none box-border";
+  "saas-btn-premium inline-flex h-[44px] min-h-[44px] shrink-0 items-center justify-center !py-0 px-3.5 text-[0.8125rem] font-medium leading-none box-border";
 
 export function formatOverviewFilenameMiddle(name: string, maxLen = 52): string {
   if (!name || name.length <= maxLen) return name;
@@ -136,7 +136,7 @@ export const ovDataValueMono = "overview-data-value-mono";
 
 export const ovDataHint = "text-xs font-normal text-[color:var(--text-subtle)]";
 
-export const ovFilterClearBtn = `${ovDashboardFilterBtn} min-w-[8.25rem]`;
+export const ovFilterClearBtn = `${ovDashboardFilterBtn} min-w-[7.5rem]`;
 
 /** Centered section shell — max 1600px; pairs with `.overview-chart-grid` in globals.css */
 export const ovChartsWrap = "overview-charts-wrap";

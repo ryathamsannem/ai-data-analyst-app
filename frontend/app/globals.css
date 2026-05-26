@@ -1006,54 +1006,74 @@ body {
   border-radius: 0.625rem;
 }
 
-/* Overview tab — compact 46px filter row */
+/* Overview tab — compact 43px filter row (Linear / Vercel density) */
 .overview-interactive-filters .overview-filter-control,
 .overview-interactive-filters select.overview-filter-control {
   box-sizing: border-box;
-  height: 46px;
-  min-height: 46px;
-  max-height: 46px;
-  padding: 0 0.625rem;
-  font-size: 0.8125rem;
-  line-height: 1.2;
-  border-radius: 0.5rem;
+  height: 43px !important;
+  min-height: 43px !important;
+  max-height: 43px !important;
+  padding: 0 0.5rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500;
+  line-height: 1.15;
+  border-radius: 0.4375rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .overview-interactive-filters .overview-filter-date-bar {
   box-sizing: border-box;
-  height: 46px;
-  min-height: 46px;
-  max-height: 46px;
-  padding: 0 0.125rem;
-  border-radius: 0.5rem;
+  height: 43px !important;
+  min-height: 43px !important;
+  max-height: 43px !important;
+  padding: 0 !important;
+  border-radius: 0.4375rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.overview-interactive-filters .overview-filter-date-bar:focus-within {
+  --tw-ring-offset-width: 0px;
 }
 
 .overview-interactive-filters .overview-filter-date-bar label {
   min-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .overview-interactive-filters .overview-filter-date-bar input[type="date"] {
   box-sizing: border-box;
-  height: 28px;
-  min-height: 28px;
-  max-height: 28px;
-  padding: 0;
-  font-size: 0.8125rem;
-  line-height: 1;
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  padding: 0 !important;
+  font-size: 0.75rem !important;
+  font-weight: 500;
+  line-height: 1.15;
 }
 
-.overview-interactive-filters .overview-filter-clear-btn {
+.overview-interactive-filters
+  .overview-filter-date-bar
+  input[type="date"]::-webkit-calendar-picker-indicator {
+  width: 13px;
+  height: 13px;
+  margin: 0 0.125rem 0 0;
+  padding: 0;
+  opacity: 0.62;
+  cursor: pointer;
+}
+
+.overview-interactive-filters .overview-filter-clear-btn.saas-btn-premium {
   box-sizing: border-box;
-  height: 46px;
-  min-height: 46px;
-  max-height: 46px;
-  padding: 0 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1;
-  border-radius: 0.5rem;
+  height: 43px !important;
+  min-height: 43px !important;
+  max-height: 43px !important;
+  padding: 0 0.625rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  line-height: 1.15;
+  border-radius: 0.4375rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 /* Overview upload — compact dataset confirmation card */

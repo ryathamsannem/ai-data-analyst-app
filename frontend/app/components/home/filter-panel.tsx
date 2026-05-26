@@ -63,8 +63,13 @@ function FilterPanelInner({
   const selectChevron =
     "appearance-none bg-[length:0.75rem] bg-[position:right_0.75rem_center] bg-no-repeat pr-10 " +
     "bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%3E%3Cpath%20d%3D%22M1%202l5%204%205-4%22%20stroke%3D%22%2394a3b8%22%20fill%3D%22none%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')]";
+  const selectChevronCompact =
+    "appearance-none bg-[length:0.625rem] bg-[position:right_0.5rem_center] bg-no-repeat pr-7 " +
+    "bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%3E%3Cpath%20d%3D%22M1%202l5%204%205-4%22%20stroke%3D%22%2394a3b8%22%20fill%3D%22none%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')]";
   /** Native date picker only (no duplicate custom calendar icon). */
-  const dateInputInner = isDashboard
+  const dateInputInner = useOverviewCompact
+    ? "overview-filter-date-input w-full min-w-0 border-0 bg-transparent p-0 font-medium text-foreground outline-none cursor-pointer"
+    : isDashboard
     ? "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-foreground outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80"
     :
         "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-slate-900 outline-none " +
@@ -113,7 +118,7 @@ function FilterPanelInner({
               e.target.value.trim() ? e.target.value : null
             )
           }
-          className={`${controlBase} ${selectChevron}`}
+          className={`${controlBase} ${useOverviewCompact ? selectChevronCompact : selectChevron}`}
         >
           <option value="">All</option>
           {cfg.values.map((v) => (
@@ -154,7 +159,7 @@ function FilterPanelInner({
       : "";
 
   const shellCls = isDashboard
-    ? `${filterShellClass} space-y-3 p-4 sm:p-5 ${ovCard}`
+    ? `${filterShellClass} ${useOverviewCompact ? "space-y-2.5" : "space-y-3"} p-4 sm:p-5 ${ovCard}`
     : "space-y-4 rounded-2xl border border-slate-200/55 bg-white/95 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.045)] backdrop-blur-[2px] sm:p-5";
 
   const dateBarCls = isDashboard
@@ -213,11 +218,13 @@ function FilterPanelInner({
         {hasDateDim && dateCfg?.column !== undefined ? (
           <div className={`min-w-0 sm:col-span-2 lg:col-span-3 flex flex-col ${fieldGap}`}>
             <span className={labelCls}>Date range</span>
-            <div className="flex flex-wrap items-stretch gap-2">
+            <div
+              className={`flex flex-wrap items-stretch ${useOverviewCompact ? "gap-1.5" : "gap-2"}`}
+            >
               <div className={`${dateBarCls} min-w-0 flex-1 basis-[min(100%,11rem)]`}>
                 <label
                   className={`flex h-full min-h-0 min-w-0 flex-1 cursor-pointer items-center border-r ${
-                    useOverviewCompact ? "px-1.5" : isDashboard ? "px-2" : "px-2 py-2"
+                    useOverviewCompact ? "px-1" : isDashboard ? "px-2" : "px-2 py-2"
                   } ${
                     isDashboard
                       ? "border-[color:var(--border-default)]"
@@ -234,7 +241,7 @@ function FilterPanelInner({
                 </label>
                 <label
                   className={`flex h-full min-h-0 min-w-0 flex-1 cursor-pointer items-center ${
-                    useOverviewCompact ? "px-1.5" : "px-2"
+                    useOverviewCompact ? "px-1" : "px-2"
                   } ${isDashboard ? "" : "py-2"}`}
                 >
                   <input
