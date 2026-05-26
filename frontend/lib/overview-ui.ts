@@ -55,6 +55,22 @@ export const ovBtnPrimaryAccent = "saas-btn-accent";
 
 export const ovBtnPrimaryAccentSm = "saas-btn-accent saas-btn-premium--sm";
 
+/** Overview upload drop zone (idle / active toggled in JSX). */
+export const ovUploadDropzone = "overview-upload-dropzone";
+
+export const ovUploadDropzoneIdle =
+  "border-[color:var(--border-default)] bg-[color:var(--surface-inset)]";
+
+export const ovUploadDropzoneActive =
+  "border-[color:var(--accent)] bg-[color:var(--accent-wash)]";
+
+/** Dataset card empty state — subtle inset + capability chips. */
+export const ovDatasetEmptyInset =
+  "mt-3 rounded-xl border border-dashed border-[color:var(--border-default)] bg-[color:color-mix(in_srgb,var(--surface-inset)_92%,transparent)] px-3 py-3 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:color-mix(in_srgb,var(--insights-layer-inset)_65%,transparent)]";
+
+export const ovCapabilityChip =
+  "inline-flex items-center rounded-full border border-[color:var(--border-default)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_75%,var(--surface-subtle))] px-2.5 py-0.5 text-[10px] font-medium text-[color:var(--text-muted)] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]";
+
 /** Upload zone — selected file metadata (theme-aware). */
 export const ovUploadSelectedWrap =
   "text-sm text-[color:var(--text-muted)] sm:text-right";

@@ -312,6 +312,11 @@ import {
   ovBtnPrimaryAccent,
   ovBtnSecondary,
   ovBtnSecondarySm,
+  ovCapabilityChip,
+  ovDatasetEmptyInset,
+  ovUploadDropzone,
+  ovUploadDropzoneActive,
+  ovUploadDropzoneIdle,
   ovUploadSelectedName,
   ovUploadSelectedSize,
   ovUploadSelectedWrap,
@@ -9947,7 +9952,7 @@ function HomeInner() {
           {activeTab === "overview" && (
             <>
             {columns.length === 0 ? (
-              <p className={`mb-5 max-w-2xl text-[15px] leading-relaxed ${ovMuted}`}>
+              <p className={`mb-3 max-w-2xl text-[15px] leading-relaxed ${ovMuted}`}>
                 Upload your CSV or Excel file and ask AI questions about your business data.
               </p>
             ) : null}
@@ -10079,12 +10084,28 @@ function HomeInner() {
                           const next = e.dataTransfer.files?.[0];
                           if (next) assignOverviewPickedFile(next);
                         }}
-                        className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-8 ${
+                        className={`${ovUploadDropzone} rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-8 ${
                           overviewDropActive
-                            ? "border-[color:var(--accent)] bg-[color:var(--accent-wash)]"
-                            : "border-[color:var(--border-default)] bg-[color:var(--surface-inset)]"
+                            ? ovUploadDropzoneActive
+                            : ovUploadDropzoneIdle
                         }`}
                       >
+                        <div className="overview-upload-dropzone__icon" aria-hidden>
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.75"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                          </svg>
+                        </div>
                         <p className="text-sm font-medium text-foreground">
                           Drag and drop a file here
                         </p>
@@ -10104,7 +10125,7 @@ function HomeInner() {
                         <button
                           type="button"
                           onClick={uploadFile}
-                          disabled={loading}
+                          disabled={loading || !file}
                           className={ovBtnPrimaryAccent}
                         >
                           {loading ? "Uploading..." : "Upload File"}
@@ -10132,9 +10153,18 @@ function HomeInner() {
                   <section className={`min-w-0 p-5 order-1 ${ovCardElevated}`}>
                     <h2 className={ovSectionTitle}>Dataset</h2>
                     {columns.length === 0 ? (
-                      <p className={`mt-2 text-sm ${ovMuted}`}>
-                        Upload a dataset to see KPIs, preview, charts, and insights.
-                      </p>
+                      <>
+                        <p className={`mt-2 text-sm ${ovMuted}`}>
+                          Upload a dataset to see KPIs, preview, charts, and insights.
+                        </p>
+                        <div className={ovDatasetEmptyInset} aria-hidden>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className={ovCapabilityChip}>KPIs</span>
+                            <span className={ovCapabilityChip}>Charts</span>
+                            <span className={ovCapabilityChip}>AI Insights</span>
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <div className="mt-3 space-y-2 text-sm text-foreground">
                         {uploadMeta?.name && (

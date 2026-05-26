@@ -911,6 +911,47 @@ body {
 }
 
 /* —— Overview tab —— */
+.overview-upload-dropzone {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent);
+}
+
+.dark .overview-upload-dropzone {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent);
+}
+
+.overview-upload-dropzone__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0 auto 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border-default));
+  background: color-mix(in srgb, var(--accent-wash) 55%, var(--surface-elevated));
+  color: color-mix(in srgb, var(--accent) 75%, var(--text-muted));
+}
+
+.dark .overview-upload-dropzone__icon {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--insights-border-soft));
+  background: color-mix(in srgb, var(--accent-wash) 35%, var(--insights-layer-inset));
+  color: color-mix(in srgb, var(--accent) 65%, var(--insights-text-muted));
+}
+
+.saas-btn-accent:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  transform: none;
+  filter: none;
+  box-shadow: none;
+}
+
+.saas-btn-accent:disabled:hover {
+  transform: none;
+  filter: none;
+  box-shadow: none;
+}
+
 .overview-data-label {
   color: var(--text-muted);
 }
