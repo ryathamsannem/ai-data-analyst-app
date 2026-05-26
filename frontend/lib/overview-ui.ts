@@ -51,6 +51,35 @@ export const ovBtnSecondary = "saas-btn-premium";
 
 export const ovBtnSecondarySm = "saas-btn-premium saas-btn-premium--sm";
 
+/** Overview Interactive filters shell — pairs with globals `.overview-interactive-filters`. */
+export const ovInteractiveFiltersShell = "overview-interactive-filters";
+
+/** Dashboard filter controls (height in globals.css). */
+export const ovDashboardControlH = "overview-filter-control";
+
+/** Clear filters — height/typography in globals.css per shell class. */
+export const ovDashboardFilterBtn =
+  "overview-filter-clear-btn saas-btn-premium inline-flex shrink-0 items-center justify-center leading-none";
+
+/** Dataset ready / data setup secondary actions — slightly compact vs filter row. */
+export const ovOverviewSecondaryBtn =
+  "saas-btn-premium inline-flex h-[48px] min-h-[48px] shrink-0 items-center justify-center !py-0 px-4 text-sm font-semibold leading-none box-border";
+
+export function formatOverviewFilenameMiddle(name: string, maxLen = 52): string {
+  if (!name || name.length <= maxLen) return name;
+  const match = name.match(/^(.+?)(\.[^./\\]+)?$/);
+  const base = match?.[1] ?? name;
+  const ext = match?.[2] ?? "";
+  const ellipsis = "...";
+  const room = maxLen - ext.length - ellipsis.length;
+  if (room < 6) {
+    return `${name.slice(0, Math.max(1, maxLen - ellipsis.length))}${ellipsis}`;
+  }
+  const headLen = Math.ceil(room * 0.58);
+  const tailLen = Math.floor(room * 0.42);
+  return `${base.slice(0, headLen)}${ellipsis}${base.slice(-tailLen)}${ext}`;
+}
+
 export const ovBtnPrimaryAccent = "saas-btn-accent";
 
 export const ovBtnPrimaryAccentSm = "saas-btn-accent saas-btn-premium--sm";
@@ -107,8 +136,7 @@ export const ovDataValueMono = "overview-data-value-mono";
 
 export const ovDataHint = "text-xs font-normal text-[color:var(--text-subtle)]";
 
-export const ovFilterClearBtn =
-  "saas-btn-premium h-[52px] w-full text-sm font-semibold";
+export const ovFilterClearBtn = `${ovDashboardFilterBtn} min-w-[8.25rem]`;
 
 /** Centered section shell — max 1600px; pairs with `.overview-chart-grid` in globals.css */
 export const ovChartsWrap = "overview-charts-wrap";

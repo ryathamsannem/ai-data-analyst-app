@@ -311,8 +311,10 @@ import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-s
 import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
 import {
   ovBtnPrimaryAccent,
+  formatOverviewFilenameMiddle,
   ovBtnSecondary,
   ovBtnSecondarySm,
+  ovOverviewSecondaryBtn,
   OVERVIEW_UPLOAD_ACCEPT,
   OVERVIEW_UPLOAD_EXT_PATTERN,
   OVERVIEW_UPLOAD_FORMAT_HINT,
@@ -9937,6 +9939,7 @@ function HomeInner() {
                 onDateStart={setDashDateStart}
                 onDateEnd={setDashDateEnd}
                 appearance="dashboard"
+                overviewFilterCompact={activeTab === "overview"}
               />
             </div>
           ) : null}
@@ -9994,14 +9997,21 @@ function HomeInner() {
                           Dataset ready
                         </span>
                       </div>
-                      <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="min-w-0">
+                      <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-6">
+                        <div className="min-w-0 sm:col-span-2 lg:col-span-2">
                           <dt className={ovMuted}>File</dt>
-                          <dd className="truncate font-medium text-foreground" title={uploadMeta?.name || ""}>
-                            {uploadMeta?.name || "—"}
+                          <dd
+                            className="min-w-0 font-medium text-foreground"
+                            title={uploadMeta?.name || undefined}
+                          >
+                            <span className="block min-w-0">
+                              {uploadMeta?.name
+                                ? formatOverviewFilenameMiddle(uploadMeta.name, 56)
+                                : "—"}
+                            </span>
                             {uploadMeta?.size_bytes != null ? (
-                              <span className={`ml-1 font-normal ${ovMuted}`}>
-                                ({formatBytes(uploadMeta.size_bytes)})
+                              <span className={`mt-0.5 block text-xs font-normal ${ovMuted}`}>
+                                {formatBytes(uploadMeta.size_bytes)}
                               </span>
                             ) : null}
                           </dd>
@@ -10030,7 +10040,7 @@ function HomeInner() {
                         type="button"
                         onClick={openOverviewReplaceUpload}
                         title="Upload a new CSV or Excel file (replaces the dataset in this session)"
-                        className={ovBtnSecondary}
+                        className={ovOverviewSecondaryBtn}
                       >
                         Replace file
                       </button>
@@ -10260,7 +10270,7 @@ function HomeInner() {
                     <button
                       type="button"
                       onClick={() => setMappingModalOpen(true)}
-                      className={`shrink-0 ${ovBtnSecondarySm}`}
+                      className={`shrink-0 ${ovOverviewSecondaryBtn}`}
                     >
                       Review mapping
                     </button>

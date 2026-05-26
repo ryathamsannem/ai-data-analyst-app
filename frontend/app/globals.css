@@ -958,6 +958,104 @@ body {
   box-shadow: 0 0 18px -8px var(--accent-glow);
 }
 
+/* Dashboard filters (AI Insights etc.) — 50px control row */
+.dashboard-interactive-filters .overview-filter-control,
+.dashboard-interactive-filters select.overview-filter-control {
+  box-sizing: border-box;
+  height: 50px;
+  min-height: 50px;
+  max-height: 50px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-radius: 0.625rem;
+}
+
+.dashboard-interactive-filters .overview-filter-date-bar {
+  box-sizing: border-box;
+  height: 50px;
+  min-height: 50px;
+  max-height: 50px;
+  padding: 0 0.25rem;
+  border-radius: 0.625rem;
+}
+
+.dashboard-interactive-filters .overview-filter-date-bar label {
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.dashboard-interactive-filters .overview-filter-date-bar input[type="date"] {
+  box-sizing: border-box;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.dashboard-interactive-filters .overview-filter-clear-btn {
+  box-sizing: border-box;
+  height: 50px;
+  min-height: 50px;
+  max-height: 50px;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  border-radius: 0.625rem;
+}
+
+/* Overview tab — compact 46px filter row */
+.overview-interactive-filters .overview-filter-control,
+.overview-interactive-filters select.overview-filter-control {
+  box-sizing: border-box;
+  height: 46px;
+  min-height: 46px;
+  max-height: 46px;
+  padding: 0 0.625rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  border-radius: 0.5rem;
+}
+
+.overview-interactive-filters .overview-filter-date-bar {
+  box-sizing: border-box;
+  height: 46px;
+  min-height: 46px;
+  max-height: 46px;
+  padding: 0 0.125rem;
+  border-radius: 0.5rem;
+}
+
+.overview-interactive-filters .overview-filter-date-bar label {
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.overview-interactive-filters .overview-filter-date-bar input[type="date"] {
+  box-sizing: border-box;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  padding: 0;
+  font-size: 0.8125rem;
+  line-height: 1;
+}
+
+.overview-interactive-filters .overview-filter-clear-btn {
+  box-sizing: border-box;
+  height: 46px;
+  min-height: 46px;
+  max-height: 46px;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 0.5rem;
+}
+
 /* Overview upload — compact dataset confirmation card */
 .overview-upload-selected {
   position: relative;
