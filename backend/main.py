@@ -22,6 +22,12 @@ import time
 import uuid
 
 from analytics_metadata import build_insight_title, build_metric_label
+from services.file_parsers import (
+    detect_dataset_format,
+    is_excel_filename,
+    load_dataframe_from_upload,
+    unsupported_format_message,
+)
 
 load_dotenv()
 
@@ -4915,22 +4921,25 @@ async def upload_file(file: UploadFile = File(...)):
         "date": None,
     }
 
-    lower_name = uploaded_file_name.lower()
-    if lower_name.endswith(".csv"):
+    fmt = detect_dataset_format(uploaded_file_name)
+    if fmt in ("csv", "parquet", "json", "jsonl"):
         try:
-            df = pd.read_csv(BytesIO(uploaded_file_bytes))
-        except Exception:
-            raise HTTPException(status_code=400, detail="Unable to read CSV file.")
+            df, sheet_label = load_dataframe_from_upload(
+                uploaded_file_bytes, uploaded_file_name
+            )
+        except ValueError as exc:
+            logger.warning("Upload rejected (%s): %s", uploaded_file_name, exc)
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         df = clean_dataframe(df)
         if df.empty:
             raise HTTPException(status_code=400, detail="Uploaded file has no data.")
-        selected_sheet_name = "CSV"
+        selected_sheet_name = sheet_label
         dataset_profile = build_profile(df)
         apply_semantic_column_mapping(df, dataset_profile)
-        available_sheet_names = ["CSV"]
-        return build_upload_response(["CSV"])
+        available_sheet_names = [sheet_label]
+        return build_upload_response([sheet_label])
 
-    if lower_name.endswith(".xlsx") or lower_name.endswith(".xls"):
+    if fmt == "excel":
         try:
             excel_file = pd.ExcelFile(BytesIO(uploaded_file_bytes))
         except Exception:
@@ -4962,7 +4971,21 @@ async def upload_file(file: UploadFile = File(...)):
 
         return build_upload_response(sheet_names)
 
-    raise HTTPException(status_code=400, detail="Unsupported file type. Upload CSV or Excel (.xlsx/.xls).")
+    logger.warning("Upload rejected (%s): unsupported format", uploaded_file_name)
+    raise HTTPException(status_code=400, detail=unsupported_format_message())
+
+
+@app.on_event("startup")
+def _log_parquet_upload_support() -> None:
+    try:
+        import pyarrow
+
+        logger.info("Parquet upload support enabled (pyarrow %s)", pyarrow.__version__)
+    except ImportError:
+        logger.warning(
+            "Parquet uploads disabled — install pyarrow in this environment: "
+            "pip install \"pyarrow>=15.0.0\" then restart the backend."
+        )
 
 
 @app.post("/select-sheet")
@@ -4972,7 +4995,7 @@ def select_sheet(data: SheetRequest):
     if uploaded_file_bytes is None:
         raise HTTPException(status_code=400, detail="Please upload an Excel file first.")
 
-    if uploaded_file_name.lower().endswith(".csv"):
+    if not is_excel_filename(uploaded_file_name or ""):
         raise HTTPException(status_code=400, detail="Sheet selection is available only for Excel files.")
 
     excel_file = pd.ExcelFile(BytesIO(uploaded_file_bytes))

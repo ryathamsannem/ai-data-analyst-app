@@ -1,0 +1,4 @@
+﻿Backup: stable_export_pdf_phase2_backup_2026-05-21
+Created: 2026-05-24T16:16:49.8885360+05:30
+Git branch: DEV
+Git commit: 10a400d1c8b693a2a3fc339cd601dcbc1dab82ec

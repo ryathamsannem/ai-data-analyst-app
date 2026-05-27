@@ -1,9 +1,9 @@
 # Charts Tab — Stable Baseline
 
-> **Canonical doc (May 2026):** [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) — standard baseline after polish revert.  
+> **Canonical doc (May 2026):** [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) — standard baseline before Export/PDF work.  
 > Also see [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md).
 
-This file is retained for older links. Prefer **CHARTS_TAB_STABLE_SUMMARY** for recovery before Export/PDF work.
+This file is retained for older links only.
 
 ---
 

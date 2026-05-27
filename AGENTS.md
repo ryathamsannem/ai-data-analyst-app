@@ -2,9 +2,9 @@
 
 Follow these rules in all future changes unless the user explicitly overrides them.
 
-**Stable baseline docs (May 2026):** [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`LATEST_STABLE_UI_SNAPSHOT.md`](LATEST_STABLE_UI_SNAPSHOT.md)
+**Stable baseline docs (May 2026):** [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`LATEST_STABLE_UI_SNAPSHOT.md`](LATEST_STABLE_UI_SNAPSHOT.md) · [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) · [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) · [`DATA_PREVIEW_STABLE_SUMMARY.md`](DATA_PREVIEW_STABLE_SUMMARY.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md)
 
-Treat these as the **production snapshot** before further Charts tab work. Future changes should be **incremental** — fix the narrowest layer; do not broad-redesign working regions.
+Treat these as the **production snapshot** before **Export/PDF** finalization. Future changes should be **incremental** — fix the narrowest layer; do not broad-redesign working regions.
 
 ## 1. UI direction
 
@@ -58,7 +58,9 @@ Treat these as the **production snapshot** before further Charts tab work. Futur
 - **Reset conversation:** disabled until `hasActiveAiConversation`; clears AI session charts, not dataset/filters/auto-dashboard history.
 - **Suggested Questions:** scrollable left panel; click **prefills** question only (no auto-send).
 - **AI Read on this chart:** `SmartChartInsightPanel` — gated on question match in Insights; always on when intel active on Charts tab.
-- **Charts tab:** timeline + preview layout, shared `ChartRenderer` with `insightMode=false`; incremental polish only per [`CHARTS_TAB_BASELINE.md`](CHARTS_TAB_BASELINE.md).
+- **Charts tab:** timeline + preview layout, shared `ChartRenderer` with `insightMode=false`; see [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md).
+- **Dataset metadata:** full card on Overview only; compact strip on Data Preview; header badge elsewhere — see [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) §7.
+- **Export/PDF:** not finalized — next phase; do not regress capture refs or insight gates.
 
 ---
 
