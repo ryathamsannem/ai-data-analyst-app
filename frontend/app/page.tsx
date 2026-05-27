@@ -302,6 +302,18 @@ import {
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
 import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
+import { DataPreviewColumnHeader } from "./components/home/data-preview-column-header";
+import { DataPreviewCopyCell } from "./components/home/data-preview-copy-cell";
+import {
+  cycleDataPreviewSort,
+  sortDataPreviewRows,
+  type DataPreviewSortState,
+} from "@/lib/data-preview-sort";
+import {
+  DATA_PREVIEW_MISSING_LABEL,
+  isMissingValue,
+  previewCellSearchToken,
+} from "@/lib/data-preview-missing";
 import { FilterPanel } from "./components/home/filter-panel";
 import { type MainNavTabId } from "./components/home/main-nav-tabs";
 import { AppShell } from "@/components/app-shell/app-shell";
@@ -361,14 +373,13 @@ import {
   dpBadgeClean,
   dpBadgeId,
   dpBadgeMissing,
-  dpBadgeType,
   dpBadgeUnique,
   dpBtnGhost,
   dpCell,
   dpCellNull,
   dpCellSticky,
   dpControl,
-  dpPreviewHeaderMain,
+  dpPreviewHeaderIntro,
   dpEmptySearch,
   dpEmptyState,
   dpInsightsPanel,
@@ -382,10 +393,14 @@ import {
   dpTable,
   dpTableScroll,
   dpTableShell,
-  dpThBtn,
-  dpThMeta,
-  dpThName,
+  dpPaginationBar,
+  dpPaginationBtn,
+  dpPaginationInner,
+  dpPaginationMeta,
+  dpPaginationNav,
+  dpPaginationPill,
   dpSearchWrap,
+  dpToolbarMatchMeta,
   dpToolbarRow,
 } from "@/lib/data-preview-ui";
 import { SmartChartInsightPanel } from "./components/SmartChartInsightPanel";
@@ -2991,12 +3006,6 @@ type PreviewRow = {
   [key: string]: string | number | null;
 };
 
-/** Lowercase search token for a preview cell (empty → "null"). */
-function normalizePreviewCellForSearch(v: string | number | null | undefined): string {
-  if (v === null || v === undefined || v === "") return "null";
-  return String(v).toLowerCase();
-}
-
 function previewRowMatchesSearch(
   row: PreviewRow,
   cols: string[],
@@ -3004,7 +3013,7 @@ function previewRowMatchesSearch(
 ): boolean {
   if (!qLower) return true;
   for (const c of cols) {
-    if (normalizePreviewCellForSearch(row[c]).includes(qLower)) return true;
+    if (previewCellSearchToken(row[c]).includes(qLower)) return true;
   }
   return false;
 }
@@ -3014,7 +3023,7 @@ function dataPreviewCellMatchesQuery(
   qLower: string
 ): boolean {
   if (!qLower) return false;
-  return normalizePreviewCellForSearch(value).includes(qLower);
+  return previewCellSearchToken(value).includes(qLower);
 }
 
 /** Case-insensitive highlight of every occurrence of `query` in `text`. */
@@ -5312,7 +5321,7 @@ function previewValuesSuggestIdentifierPattern(
   const samples: string[] = [];
   for (const row of preview) {
     const v = row[col];
-    if (isPreviewCellEmpty(v)) continue;
+    if (isMissingValue(v)) continue;
     samples.push(String(v).trim());
     if (samples.length >= maxSamples) break;
   }
@@ -5369,10 +5378,6 @@ type ColumnQualityBadge = {
   className: string;
 };
 
-function isPreviewCellEmpty(v: unknown): boolean {
-  return v === null || v === undefined || v === "";
-}
-
 function previewColumnUniqueStats(
   preview: PreviewRow[],
   col: string
@@ -5381,7 +5386,7 @@ function previewColumnUniqueStats(
   let nonNull = 0;
   for (const row of preview) {
     const v = row[col];
-    if (isPreviewCellEmpty(v)) continue;
+    if (isMissingValue(v)) continue;
     nonNull += 1;
     set.add(String(v));
   }
@@ -5391,7 +5396,7 @@ function previewColumnUniqueStats(
 function parsePreviewCellToTimestamp(
   v: string | number | null | undefined
 ): number | null {
-  if (isPreviewCellEmpty(v)) return null;
+  if (isMissingValue(v)) return null;
   if (typeof v === "number") {
     if (!Number.isFinite(v)) return null;
     if (v > 1e12 && v < 1e15) return v;
@@ -5417,7 +5422,7 @@ function computeCategoricalTopFromPreview(
   const counts = new Map<string, number>();
   for (const row of preview) {
     const cell = row[col];
-    if (isPreviewCellEmpty(cell)) continue;
+    if (isMissingValue(cell)) continue;
     const key = String(cell);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
@@ -6245,6 +6250,8 @@ function HomeInner() {
     useState(false);
   const [dataPreviewTableHeaderElevated, setDataPreviewTableHeaderElevated] =
     useState(false);
+  const [dataPreviewPageIndex, setDataPreviewPageIndex] = useState(0);
+  const [dataPreviewSort, setDataPreviewSort] = useState<DataPreviewSortState>(null);
   const dataPreviewTableScrollRef = useRef<HTMLDivElement | null>(null);
   const dataPreviewTableSurfaceRef = useRef<HTMLDivElement | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -7819,9 +7826,81 @@ function HomeInner() {
     return preview.filter((row) => previewRowMatchesSearch(row, columns, q));
   }, [preview, columns, deferredDataPreviewSearch]);
 
+  const dataPreviewSortedRows = useMemo(
+    () =>
+      sortDataPreviewRows(
+        dataPreviewFilteredRows,
+        dataPreviewSort,
+        profile?.column_types
+      ),
+    [dataPreviewFilteredRows, dataPreviewSort, profile?.column_types]
+  );
+
+  const dataPreviewPaginationActive = previewRowLimit !== "all";
+
+  const dataPreviewFilteredCount = dataPreviewFilteredRows.length;
+
+  const dataPreviewPageSize = useMemo(() => {
+    if (!dataPreviewPaginationActive) {
+      return Math.max(1, dataPreviewSortedRows.length);
+    }
+    return previewRowLimit;
+  }, [
+    dataPreviewPaginationActive,
+    previewRowLimit,
+    dataPreviewSortedRows.length,
+  ]);
+
+  const dataPreviewPageCount = useMemo(() => {
+    if (!dataPreviewPaginationActive) return 1;
+    return Math.max(1, Math.ceil(dataPreviewFilteredCount / dataPreviewPageSize));
+  }, [
+    dataPreviewPaginationActive,
+    dataPreviewFilteredCount,
+    dataPreviewPageSize,
+  ]);
+
+  const dataPreviewSortKey = dataPreviewSort
+    ? `${dataPreviewSort.column}\u0000${dataPreviewSort.direction}`
+    : "";
+
+  const dataPreviewSafePageIndex = Math.min(
+    dataPreviewPageIndex,
+    Math.max(0, dataPreviewPageCount - 1)
+  );
+
+  const dataPreviewPageRows = useMemo(() => {
+    const start = dataPreviewSafePageIndex * dataPreviewPageSize;
+    return dataPreviewSortedRows.slice(start, start + dataPreviewPageSize);
+  }, [
+    dataPreviewSortedRows,
+    dataPreviewSafePageIndex,
+    dataPreviewPageSize,
+  ]);
+
+  const dataPreviewRangeStart =
+    dataPreviewFilteredCount === 0
+      ? 0
+      : dataPreviewSafePageIndex * dataPreviewPageSize + 1;
+
+  const dataPreviewRangeEnd =
+    dataPreviewFilteredCount === 0
+      ? 0
+      : Math.min(
+          (dataPreviewSafePageIndex + 1) * dataPreviewPageSize,
+          dataPreviewFilteredCount
+        );
+
+  /** Reset to page 1 when sort, search, or rows-per-page changes. */
+  useEffect(() => {
+    setDataPreviewPageIndex(0);
+  }, [deferredDataPreviewSearch, previewRowLimit, dataPreviewSortKey]);
+
   useEffect(() => {
     setDataPreviewSearchQuery("");
     setDataPreviewSuggestionsExpanded(false);
+    setDataPreviewPageIndex(0);
+    setDataPreviewSort(null);
   }, [selectedSheet, uploadMeta?.name]);
 
   useEffect(() => {
@@ -10562,23 +10641,16 @@ function HomeInner() {
           )}
 
         {activeTab === "preview" && columns.length > 0 && (
-          <section className="mb-6 min-w-0">
-            <div className="mb-5 flex flex-col gap-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className={dpPreviewHeaderMain}>
+          <section className="mb-6 min-w-0 w-full">
+            <div className="mb-5 flex min-w-0 flex-col gap-4">
+              <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className={dpPreviewHeaderIntro}>
                   <h2 className={dpSectionTitle}>Data Preview</h2>
                   <p className={dpSectionDesc}>
                     Showing first {preview.length} of {rows} rows in this window. Missing
                     values are highlighted. AI highlights important column quality signals
                     automatically.
                   </p>
-                  <DataPreviewDatasetContext
-                    fileName={uploadMeta?.name}
-                    fileSizeBytes={uploadMeta?.size_bytes}
-                    rows={rows}
-                    columnCount={columns.length}
-                    sheetLabel={selectedSheet.trim() || null}
-                  />
                 </div>
                 <div className="flex shrink-0 items-center gap-2.5">
                   <label className="text-sm font-medium text-[color:var(--text-muted)]" htmlFor="preview-row-limit">
@@ -10590,6 +10662,7 @@ function HomeInner() {
                     onChange={async (e) => {
                       const val = e.target.value === "all" ? "all" : Number(e.target.value);
                       setPreviewRowLimit(val);
+                      setDataPreviewPageIndex(0);
                       await fetchPreviewRows(val);
                     }}
                     className={dpControl}
@@ -10602,7 +10675,14 @@ function HomeInner() {
                   </select>
                 </div>
               </div>
-              <div className={dpToolbarRow}>
+              <DataPreviewDatasetContext
+                fileName={uploadMeta?.name}
+                fileSizeBytes={uploadMeta?.size_bytes}
+                rows={rows}
+                columnCount={columns.length}
+                sheetLabel={selectedSheet.trim() || null}
+              />
+              <div className={`${dpToolbarRow} min-w-0 w-full`}>
                 <div className={dpSearchWrap}>
                   <div className="relative min-w-0 flex-1">
                     <span
@@ -10645,10 +10725,7 @@ function HomeInner() {
                   ) : null}
                 </div>
                 {deferredDataPreviewSearch ? (
-                  <p
-                    className="shrink-0 text-xs font-medium tabular-nums text-[color:var(--text-muted)] sm:ml-auto"
-                    aria-live="polite"
-                  >
+                  <p className={dpToolbarMatchMeta} aria-live="polite">
                     {dataPreviewFilteredRows.length} of {preview.length} loaded row
                     {preview.length === 1 ? "" : "s"} match
                   </p>
@@ -10742,66 +10819,72 @@ function HomeInner() {
                           previewColumnHeaderSecondaryMap.get(col) ?? null;
                         const dt = profile?.column_types?.[col];
                         const elevated = dataPreviewTableHeaderElevated;
+                        const sortActive = dataPreviewSort?.column === col;
                         const thExtra = [
                           elevated ? "data-preview-th--elevated" : "",
                           colIdx === 0 ? "data-preview-th--sticky-col" : "",
+                          sortActive ? "data-preview-th--sorted" : "",
                         ]
                           .filter(Boolean)
                           .join(" ");
                         return (
-                        <th key={col} className={thExtra || undefined}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            const r = e.currentTarget.getBoundingClientRect();
-                            setDataPreviewProfileOpen((prev) =>
-                              prev?.column === col
-                                ? null
-                                : {
-                                    column: col,
-                                    anchor: {
-                                      top: r.top,
-                                      left: r.left,
-                                      right: r.right,
-                                      bottom: r.bottom,
-                                      width: r.width,
-                                      height: r.height,
-                                    },
-                                  }
-                            );
-                          }}
-                          className={dpThBtn}
-                          aria-expanded={dataPreviewProfileOpen?.column === col}
-                          title="Column profile"
-                        >
-                          <span className={dpThName}>{col}</span>
-                          <div className={dpThMeta}>
-                            <span className={dpBadgeType}>
-                              {dataPreviewHeaderTypeLabel(dt)}
-                            </span>
-                            {secondary ? (
-                              <span title={secondary.title} className={secondary.className}>
-                                {secondary.label}
-                              </span>
-                            ) : null}
-                          </div>
-                        </button>
-                      </th>
+                          <th key={col} className={thExtra || undefined}>
+                            <DataPreviewColumnHeader
+                              column={col}
+                              typeLabel={dataPreviewHeaderTypeLabel(dt)}
+                              secondary={
+                                secondary
+                                  ? {
+                                      label: secondary.label,
+                                      title: secondary.title,
+                                      className: secondary.className,
+                                    }
+                                  : null
+                              }
+                              sort={dataPreviewSort}
+                              profileOpen={dataPreviewProfileOpen?.column === col}
+                              onSort={(column) => {
+                                setDataPreviewSort((prev) =>
+                                  cycleDataPreviewSort(prev, column)
+                                );
+                                setDataPreviewPageIndex(0);
+                              }}
+                              onOpenProfile={(column, e) => {
+                                const r = e.currentTarget.getBoundingClientRect();
+                                setDataPreviewProfileOpen((prev) =>
+                                  prev?.column === column
+                                    ? null
+                                    : {
+                                        column,
+                                        anchor: {
+                                          top: r.top,
+                                          left: r.left,
+                                          right: r.right,
+                                          bottom: r.bottom,
+                                          width: r.width,
+                                          height: r.height,
+                                        },
+                                      }
+                                );
+                              }}
+                            />
+                          </th>
                         );
                       })}
                   </tr>
                 </thead>
 
                 <tbody>
-                  {dataPreviewFilteredRows.map((row, index) => {
+                  {dataPreviewPageRows.map((row, index) => {
                     const qLower = deferredDataPreviewSearch.toLowerCase();
                     return (
                       <tr key={index} className="group">
                         {columns.map((col, colIdx) => {
                           const raw = row[col];
-                          const emptyCell =
-                            raw === null || raw === undefined || raw === "";
-                          const displayText = emptyCell ? "NULL" : String(raw);
+                          const emptyCell = isMissingValue(raw);
+                          const displayText = emptyCell
+                            ? DATA_PREVIEW_MISSING_LABEL
+                            : String(raw);
                           const showHighlight =
                             qLower.length > 0 &&
                             dataPreviewCellMatchesQuery(raw, qLower);
@@ -10811,30 +10894,34 @@ function HomeInner() {
                             : isFirstCol
                               ? dpCellSticky
                               : dpCell;
-                          return (
+                          return emptyCell ? (
                             <td
                               key={col}
-                              title={emptyCell ? undefined : displayText}
                               className={cellClass}
                             >
-                              {emptyCell ? (
-                                <span className={dpNullPill}>
-                                  {showHighlight
-                                    ? highlightSearchInText(
-                                        displayText,
-                                        deferredDataPreviewSearch
-                                      )
-                                    : displayText}
-                                </span>
-                              ) : showHighlight ? (
-                                highlightSearchInText(
-                                  displayText,
-                                  deferredDataPreviewSearch
-                                )
-                              ) : (
-                                displayText
-                              )}
+                              <span className={dpNullPill}>
+                                {showHighlight
+                                  ? highlightSearchInText(
+                                      displayText,
+                                      deferredDataPreviewSearch
+                                    )
+                                  : displayText}
+                              </span>
                             </td>
+                          ) : (
+                            <DataPreviewCopyCell
+                              key={col}
+                              className={cellClass}
+                              copyValue={displayText}
+                              title={displayText}
+                            >
+                              {showHighlight
+                                ? highlightSearchInText(
+                                    displayText,
+                                    deferredDataPreviewSearch
+                                  )
+                                : displayText}
+                            </DataPreviewCopyCell>
                           );
                         })}
                       </tr>
@@ -10845,6 +10932,77 @@ function HomeInner() {
                 )}
               </div>
             </div>
+            {!previewLoading && dataPreviewFilteredCount > 0 ? (
+              <div className={dpPaginationBar}>
+                <div
+                  className={`${dpPaginationInner}${
+                    dataPreviewPaginationActive && dataPreviewPageCount > 1
+                      ? ""
+                      : " data-preview-pagination__inner--static"
+                  }`}
+                >
+                  <p className={dpPaginationMeta}>
+                    {dataPreviewPageCount === 1 ? (
+                      <>
+                        Showing all{" "}
+                        {dataPreviewFilteredCount.toLocaleString()}{" "}
+                        row{dataPreviewFilteredCount === 1 ? "" : "s"}
+                      </>
+                    ) : dataPreviewPaginationActive ? (
+                      <>
+                        Showing {dataPreviewRangeStart.toLocaleString()}–
+                        {dataPreviewRangeEnd.toLocaleString()} of{" "}
+                        {dataPreviewFilteredCount.toLocaleString()} row
+                        {dataPreviewFilteredCount === 1 ? "" : "s"} · Page{" "}
+                        {dataPreviewSafePageIndex + 1} of{" "}
+                        {dataPreviewPageCount}
+                      </>
+                    ) : (
+                      <>
+                        Showing all {dataPreviewFilteredCount.toLocaleString()}{" "}
+                        row{dataPreviewFilteredCount === 1 ? "" : "s"}
+                      </>
+                    )}
+                  </p>
+                  {dataPreviewPaginationActive && dataPreviewPageCount > 1 ? (
+                    <div className={dpPaginationNav}>
+                      <button
+                        type="button"
+                        className={dpPaginationBtn}
+                        disabled={dataPreviewSafePageIndex <= 0}
+                        onClick={() =>
+                          setDataPreviewPageIndex((p) => Math.max(0, p - 1))
+                        }
+                        aria-label="Previous page"
+                      >
+                        Previous
+                      </button>
+                      <span
+                        className={dpPaginationPill}
+                        aria-label={`Page ${dataPreviewSafePageIndex + 1} of ${dataPreviewPageCount}`}
+                      >
+                        {dataPreviewSafePageIndex + 1} / {dataPreviewPageCount}
+                      </span>
+                      <button
+                        type="button"
+                        className={dpPaginationBtn}
+                        disabled={
+                          dataPreviewSafePageIndex >= dataPreviewPageCount - 1
+                        }
+                        onClick={() =>
+                          setDataPreviewPageIndex((p) =>
+                            Math.min(dataPreviewPageCount - 1, p + 1)
+                          )
+                        }
+                        aria-label="Next page"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             {previewLoading && preview.length > 0 ? (
               <p className={`mt-2 ${dpEmptyState}`}>Refreshing preview rows…</p>
             ) : null}
