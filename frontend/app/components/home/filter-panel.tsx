@@ -68,7 +68,7 @@ function FilterPanelInner({
     "bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%3E%3Cpath%20d%3D%22M1%202l5%204%205-4%22%20stroke%3D%22%2394a3b8%22%20fill%3D%22none%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')]";
   /** Native date picker only (no duplicate custom calendar icon). */
   const dateInputInner = useOverviewCompact
-    ? "overview-filter-date-input w-full min-w-0 border-0 bg-transparent p-0 font-medium text-foreground outline-none cursor-pointer"
+    ? "overview-filter-date-input w-full min-w-0 border-0 bg-transparent p-0 font-semibold text-foreground outline-none cursor-pointer"
     : isDashboard
     ? "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-foreground outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80"
     :

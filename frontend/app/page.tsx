@@ -253,11 +253,6 @@ import {
   aiInsightsVizTitle,
 } from "@/lib/ai-insights-ui";
 import {
-  btnPrimary,
-  btnPrimarySm,
-  btnSecondary,
-} from "@/lib/ui-buttons";
-import {
   exportTabAdvancedDivider,
   exportTabAdvancedStack,
   exportTabCheckboxInput,
@@ -7121,6 +7116,11 @@ function HomeInner() {
     clearAiInsightSession();
   }, [clearAiInsightSession]);
 
+  const canAskAi = useMemo(
+    () => Boolean(question.trim()) && !loading && columns.length > 0,
+    [question, loading, columns.length]
+  );
+
   const hasActiveAiConversation = useMemo(() => {
     if (
       hasValidAIAnswer ||
@@ -10018,7 +10018,7 @@ function HomeInner() {
                 onDateStart={setDashDateStart}
                 onDateEnd={setDashDateEnd}
                 appearance="dashboard"
-                overviewFilterCompact={activeTab === "overview"}
+                overviewFilterCompact
               />
             </div>
           ) : null}
@@ -11247,7 +11247,7 @@ function HomeInner() {
                     type="button"
                     onClick={resetAiConversation}
                     disabled={!hasActiveAiConversation}
-                    className={`${btnSecondary} ${aiInsightsAskResetBtn}`}
+                    className={aiInsightsAskResetBtn}
                     title={
                       hasActiveAiConversation
                         ? "Clears the question, answer, insight cards, AI chart, follow-up chips, and thread memory. Your file, filters, auto-dashboard, and non-AI chart history stay."
@@ -11291,9 +11291,10 @@ function HomeInner() {
                     />
                     <div className={aiInsightsAskActionsRow}>
                       <button
+                        type="button"
                         onClick={() => void askAI()}
-                        disabled={loading}
-                        className={`${btnPrimary} ${aiInsightsAskSubmitBtn}`}
+                        disabled={!canAskAi}
+                        className={aiInsightsAskSubmitBtn}
                       >
                         {loading ? "Thinking..." : "Ask AI"}
                       </button>

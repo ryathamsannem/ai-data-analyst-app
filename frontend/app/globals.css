@@ -374,6 +374,11 @@ body {
   transform: translateY(0);
 }
 
+.saas-btn-accent:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 2px;
+}
+
 .dark .saas-btn-accent {
   background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
   color: #f8fafc;
@@ -1285,7 +1290,7 @@ body {
   max-height: 43px !important;
   padding: 0 0.5rem !important;
   font-size: 0.75rem !important;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.15;
   border-radius: 0.4375rem;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -1318,7 +1323,7 @@ body {
   max-height: 24px !important;
   padding: 0 !important;
   font-size: 0.75rem !important;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.15;
 }
 
@@ -1340,7 +1345,7 @@ body {
   max-height: 43px !important;
   padding: 0 0.625rem !important;
   font-size: 0.75rem !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
   line-height: 1.15;
   border-radius: 0.4375rem;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
@@ -1686,6 +1691,52 @@ body {
   transform: translateY(-1px);
   border-color: var(--border-strong);
   box-shadow: var(--shadow-md);
+}
+
+/* AI Insights visualization card — Overview chart-card design language (full-size plot unchanged) */
+.ai-insights-page .ai-insights-viz-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  border-radius: 1rem;
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  padding: 1.25rem 1.5rem 1rem;
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+:root .ai-insights-page .ai-insights-viz-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-color: #cbd5e1;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 4px 12px -4px rgba(15, 23, 42, 0.08),
+    0 14px 32px -16px rgba(15, 23, 42, 0.12);
+}
+
+.dark .ai-insights-page .ai-insights-viz-card {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--surface-elevated-card) 90%, var(--accent-wash)) 0%,
+    var(--card) 60%
+  );
+  border-color: var(--card-border);
+  box-shadow: var(--shadow-card);
+}
+
+.ai-insights-page .ai-insights-viz-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.ai-insights-page .ai-insights-viz-card .ai-insights-viz-header {
+  margin-bottom: 0.5rem;
 }
 
 .overview-dash-chart-card__head {
@@ -2195,38 +2246,97 @@ body {
   box-shadow: 0 0 0 1px color-mix(in srgb, #818cf8 16%, transparent);
 }
 
-/* Ask AI submit — premium hover lift (size unchanged) */
-.ai-insights-page .ai-insights-ask-submit:not(:disabled) {
-  transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.ai-insights-page .ai-insights-ask-submit:not(:disabled):hover {
-  transform: translateY(-2px);
-  filter: brightness(1.03);
+/* AI Insights — secondary premium actions (Reset, Export): purple/indigo accent */
+.ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--border-default));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-wash) 78%, var(--surface-elevated)) 0%,
+    var(--surface-elevated) 100%
+  );
   box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.08),
-    0 8px 18px -6px color-mix(in srgb, var(--accent) 42%, transparent);
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-.ai-insights-page .ai-insights-ask-submit:not(:disabled):active {
-  transform: translateY(0);
-  filter: brightness(0.98);
-  transition-duration: 0.14s;
-}
-
-.dark .ai-insights-page .ai-insights-ask-submit:not(:disabled) {
+.ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border-strong));
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.2),
-    0 4px 14px -4px rgba(99, 102, 241, 0.45);
+    0 4px 14px -4px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.dark .ai-insights-page .ai-insights-ask-submit:not(:disabled):hover {
+/* Dark — secondary actions: match Overview saas-btn-premium (Replace file / Review mapping) */
+.dark
+  .ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-default));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-wash) 88%, var(--surface-elevated)) 0%,
+    color-mix(in srgb, var(--accent) 10%, var(--surface-elevated)) 100%
+  );
+  color: var(--foreground);
   box-shadow:
-    0 3px 6px rgba(0, 0, 0, 0.24),
-    0 10px 22px -8px rgba(99, 102, 241, 0.52);
+    0 1px 2px rgba(0, 0, 0, 0.22),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 2px 14px -6px color-mix(in srgb, var(--accent-glow) 50%, transparent);
+}
+
+.dark
+  .ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--border-strong));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-wash) 100%, var(--surface-elevated)) 0%,
+    color-mix(in srgb, var(--accent) 16%, var(--surface-elevated)) 100%
+  );
+  color: var(--foreground);
+  box-shadow:
+    0 4px 16px -4px color-mix(in srgb, var(--accent-glow) 58%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.dark
+  .ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  outline-offset: 2px;
+}
+
+/* AI Insights — Ask AI disabled (clearly inactive) */
+.ai-insights-page .ai-insights-ask-submit:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--border-default) 88%, transparent) !important;
+  background: color-mix(
+    in srgb,
+    var(--surface-subtle) 65%,
+    var(--surface-elevated)
+  ) !important;
+  color: color-mix(in srgb, var(--text-muted) 90%, var(--foreground)) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+
+.ai-insights-page .ai-insights-ask-submit:disabled:hover {
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+.dark .ai-insights-page .ai-insights-ask-submit:disabled {
+  border-color: var(--insights-border-soft) !important;
+  background: color-mix(
+    in srgb,
+    var(--insights-layer-inset) 82%,
+    var(--insights-layer-panel)
+  ) !important;
+  color: var(--insights-text-muted) !important;
 }
 
 .dark .ai-insights-page .ai-insights-executive {
@@ -2359,12 +2469,15 @@ body {
 /* Light mode only — dark uses solid layer tokens above */
 
 /* Shared chart viz — visualization stage (light + dark) */
+.ai-insights-page .ai-insights-viz-card .ai-insights-viz-chart-frame,
 .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame,
 .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame {
-  background: color-mix(in srgb, var(--surface-inset) 28%, var(--surface-elevated));
+  border-radius: 0.75rem;
+  border-color: color-mix(in srgb, var(--border-default) 72%, var(--card-border));
+  background: color-mix(in srgb, var(--surface-inset) 32%, var(--surface-elevated));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 1px 2px rgba(15, 23, 42, 0.04);
+    0 1px 2px rgba(15, 23, 42, 0.05);
   height: auto;
 }
 
@@ -2397,11 +2510,12 @@ body {
   margin-inline: auto;
 }
 
+.dark .ai-insights-page .ai-insights-viz-card .ai-insights-viz-chart-frame,
 .dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame,
 .dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame {
   background: color-mix(in srgb, var(--insights-layer-card) 72%, var(--insights-layer-inset));
   border-color: var(--insights-border-soft);
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-text,
