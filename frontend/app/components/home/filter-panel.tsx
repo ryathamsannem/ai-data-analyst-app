@@ -17,6 +17,7 @@ import {
   ovSectionDesc,
   ovSectionTitle,
 } from "@/lib/overview-ui";
+import { FilterDateField } from "./filter-date-field";
 
 function FilterPanelInner({
   dashboardFilters,
@@ -66,15 +67,12 @@ function FilterPanelInner({
   const selectChevronCompact =
     "appearance-none bg-[length:0.625rem] bg-[position:right_0.5rem_center] bg-no-repeat pr-7 " +
     "bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%3E%3Cpath%20d%3D%22M1%202l5%204%205-4%22%20stroke%3D%22%2394a3b8%22%20fill%3D%22none%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')]";
-  /** Native date picker only (no duplicate custom calendar icon). */
   const dateInputInner = useOverviewCompact
     ? "overview-filter-date-input w-full min-w-0 border-0 bg-transparent p-0 font-semibold text-foreground outline-none cursor-pointer"
     : isDashboard
-    ? "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-foreground outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-80"
-    :
-        "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-slate-900 outline-none " +
-          "[color-scheme:light] cursor-pointer " +
-          "[&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100";
+      ? "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-semibold text-foreground outline-none cursor-pointer"
+      :
+          "w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-slate-900 outline-none cursor-pointer";
 
   const labelCls = isDashboard
     ? `block min-h-[18px] ${ovFilterLabel}`
@@ -222,8 +220,8 @@ function FilterPanelInner({
               className={`flex flex-wrap items-stretch ${useOverviewCompact ? "gap-1.5" : "gap-2"}`}
             >
               <div className={`${dateBarCls} min-w-0 flex-1 basis-[min(100%,11rem)]`}>
-                <label
-                  className={`flex h-full min-h-0 min-w-0 flex-1 cursor-pointer items-center border-r ${
+                <div
+                  className={`flex h-full min-h-0 min-w-0 flex-1 items-center border-r ${
                     useOverviewCompact ? "px-1" : isDashboard ? "px-2" : "px-2 py-2"
                   } ${
                     isDashboard
@@ -231,27 +229,25 @@ function FilterPanelInner({
                       : "border-slate-200/80"
                   }`}
                 >
-                  <input
-                    type="date"
+                  <FilterDateField
                     value={dateStart}
-                    onChange={(e) => onDateStart(e.target.value)}
-                    className={dateInputInner}
-                    aria-label="From date"
+                    onChange={onDateStart}
+                    ariaLabel="From date"
+                    inputClassName={dateInputInner}
                   />
-                </label>
-                <label
-                  className={`flex h-full min-h-0 min-w-0 flex-1 cursor-pointer items-center ${
+                </div>
+                <div
+                  className={`flex h-full min-h-0 min-w-0 flex-1 items-center ${
                     useOverviewCompact ? "px-1" : "px-2"
                   } ${isDashboard ? "" : "py-2"}`}
                 >
-                  <input
-                    type="date"
+                  <FilterDateField
                     value={dateEnd}
-                    onChange={(e) => onDateEnd(e.target.value)}
-                    className={dateInputInner}
-                    aria-label="To date"
+                    onChange={onDateEnd}
+                    ariaLabel="To date"
+                    inputClassName={dateInputInner}
                   />
-                </label>
+                </div>
               </div>
               {isDashboard ? (
                 <button type="button" onClick={onClearAll} className={clearBtnCls}>
