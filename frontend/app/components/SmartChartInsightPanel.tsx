@@ -40,25 +40,11 @@ export function SmartChartInsightPanel(props: {
 
       <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:items-start sm:gap-2.5">
         <div className={aiInsightsSmartReadRecCard}>
-          <p className={aiInsightsSmartReadRecLabel}>Recommended view</p>
+          <p className={aiInsightsSmartReadRecLabel}>Chart view</p>
           <p className={aiInsightsSmartReadRecValue}>{intel.recommendedLabel}</p>
-          {!intel.alignsWithRecommendation ? (
-            <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-muted)] dark:text-[color:var(--insights-text-muted)]">
-              For this question the assistant often starts from{" "}
-              <span className="font-medium text-[var(--foreground)] dark:text-[color:var(--insights-text-secondary)]">
-                {intel.suggestedLabel}
-              </span>
-              . You are viewing{" "}
-              <span className="font-medium text-[var(--foreground)] dark:text-[color:var(--insights-text-secondary)]">
-                {intel.currentLabel}
-              </span>
-              —both can be valid depending on emphasis.
-            </p>
-          ) : (
-            <p className="mt-1.5 text-xs leading-relaxed text-emerald-900/85 dark:text-emerald-200/85">
-              Matches the chart type used for this view.
-            </p>
-          )}
+          <p className="mt-1.5 text-xs leading-relaxed text-emerald-900/85 dark:text-emerald-200/85">
+            Matches the chart type used for this view.
+          </p>
         </div>
       </div>
 

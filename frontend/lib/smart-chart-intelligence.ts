@@ -342,6 +342,42 @@ function recommendCore(args: RecommendArgs): {
   };
 }
 
+function blurbForRenderedChart(params: {
+  kind: ChartKind;
+  histogramStyle: boolean;
+  valueAxis: string;
+  categoryAxis: string;
+  groupedDualMetric?: boolean;
+}): string {
+  const met = params.valueAxis.trim() || "your metric";
+  const dim = params.categoryAxis.trim() || "each category";
+  if (params.groupedDualMetric) {
+    return `Grouped side-by-side bars compare ${met} within each ${dim} so both measures are visible per category.`;
+  }
+  if (params.kind === "histogram") {
+    return `Bins ${met} into ranges to show spread and tail behavior across the cohort.`;
+  }
+  if (params.kind === "bar_horizontal") {
+    return `Horizontal bars rank ${dim} by ${met} — easiest when labels are long or you are comparing many groups.`;
+  }
+  if (params.kind === "line") {
+    return `Line chart shows how ${met} moves across ordered ${dim} periods.`;
+  }
+  if (params.kind === "area") {
+    return `Area chart emphasizes trend and movement of ${met} across ${dim}.`;
+  }
+  if (params.kind === "scatter") {
+    return `Scatter plot relates two numeric measures to surface correlation patterns.`;
+  }
+  if (params.kind === "pie" || params.kind === "donut") {
+    return `Shows how ${met} splits across a modest set of ${dim} segments (part-to-whole).`;
+  }
+  if (params.histogramStyle && params.kind === "bar") {
+    return `Vertical bars show how ${met} spreads across ${dim} buckets.`;
+  }
+  return `Vertical bars compare ${met} side-by-side across ${dim}.`;
+}
+
 function buildWhyThisChart(params: {
   currentLabel: string;
   categoryAxis: string;
@@ -349,10 +385,15 @@ function buildWhyThisChart(params: {
   routing: ChartRoutingRec;
   answerSummary?: string;
   semanticContext?: SemanticMetricContext | null;
+  chartBlurb?: string;
 }): string {
   const expl = params.routing?.selectionExplanation?.trim();
   const dim = params.categoryAxis.trim() || "categories";
   const met = params.valueAxis.trim() || "values";
+
+  if (params.chartBlurb?.trim()) {
+    return params.chartBlurb.trim();
+  }
 
   if (params.semanticContext) {
     const narrative = buildChartNarrative(params.semanticContext, {
@@ -364,7 +405,7 @@ function buildWhyThisChart(params: {
 
   if (expl && expl.length > 0) {
     const clipped = expl.length > 320 ? `${expl.slice(0, 317)}…` : expl;
-    return `${clipped} The view is rendered as ${params.currentLabel.toLowerCase()} using “${met}” by “${dim}”.`;
+    return `${clipped} Rendered as ${params.currentLabel.toLowerCase()} using “${met}” by “${dim}”.`;
   }
   const hint = params.answerSummary?.trim();
   const base = `This ${params.currentLabel.toLowerCase()} maps “${met}” across “${dim}”, which matches how the assistant structured the answer for your question.`;
@@ -382,106 +423,83 @@ export function computeSmartChartIntel(params: {
   apiChartType: string;
   presentationKind: ChartKind;
   stackedOrMultiSeries: boolean;
+  multiSeriesLayout?: string | null;
   categoryAxis: string;
   valueAxis: string;
   routing: ChartRoutingRec;
   answerSummary?: string;
   semanticContext?: SemanticMetricContext | null;
 }): SmartChartIntel | null {
-  if (!params.rows.length || params.stackedOrMultiSeries) {
-    if (params.stackedOrMultiSeries && params.rows.length) {
-      const cur = params.presentationKind;
-      const curLab = presentationLabel(cur, false);
-      return {
-        active: true,
-        recommendedKind: cur,
-        histogramStyle: false,
-        recommendedLabel: curLab,
-        recommendationBlurb:
-          "Each stack shows sub-parts within a category — useful for mix effects while keeping the same cohort.",
-        currentKind: cur,
-        currentLabel: curLab,
-        suggestedKind: cur,
-        suggestedLabel: curLab,
-        alignsWithRecommendation: true,
-        whyThisChart: buildWhyThisChart({
-          currentLabel: curLab,
+  if (!params.rows.length) {
+    return null;
+  }
+
+  const currentKind = params.presentationKind || "bar";
+  const histogramStyle = false;
+  const currentLabel = presentationLabel(currentKind, histogramStyle);
+  const groupedDual = params.multiSeriesLayout === "grouped_bar";
+  const chartBlurb = blurbForRenderedChart({
+    kind: currentKind,
+    histogramStyle,
+    valueAxis: params.valueAxis,
+    categoryAxis: params.categoryAxis,
+    groupedDualMetric: groupedDual,
+  });
+
+  if (params.stackedOrMultiSeries) {
+    const stackedBlurb = groupedDual
+      ? chartBlurb
+      : "Each stack shows sub-parts within a category — useful for mix effects while keeping the same cohort.";
+    return {
+      active: true,
+      recommendedKind: currentKind,
+      histogramStyle: false,
+      recommendedLabel: currentLabel,
+      recommendationBlurb: stackedBlurb,
+      currentKind,
+      currentLabel,
+      suggestedKind: currentKind,
+      suggestedLabel: currentLabel,
+      alignsWithRecommendation: true,
+      whyThisChart: buildWhyThisChart({
+        currentLabel: currentLabel,
+        categoryAxis: params.categoryAxis,
+        valueAxis: params.valueAxis,
+        routing: params.routing,
+        answerSummary: params.answerSummary,
+        semanticContext: params.semanticContext,
+        chartBlurb: stackedBlurb,
+      }),
+      anomalyNote: detectNumericAnomalies(params.rows, currentKind),
+    };
+  }
+
+  const routingExpl = params.routing?.selectionExplanation?.trim() ?? "";
+  const whyThisChart =
+    routingExpl.length > 12
+      ? buildWhyThisChart({
+          currentLabel,
           categoryAxis: params.categoryAxis,
           valueAxis: params.valueAxis,
           routing: params.routing,
           answerSummary: params.answerSummary,
           semanticContext: params.semanticContext,
-        }),
-        anomalyNote: detectNumericAnomalies(params.rows, params.presentationKind),
-      };
-    }
-    return null;
-  }
-
-  const lockedTimeSeries =
-    params.presentationKind === "line" ||
-    params.presentationKind === "area" ||
-    params.semanticContext?.chartType === "line" ||
-    params.semanticContext?.chartType === "area" ||
-    /\bweekly\b/i.test(params.semanticContext?.dimensionLabel ?? "") ||
-    rowsLookTemporal(params.rows);
-
-  const rec: { kind: ChartKind; histogramStyle: boolean; blurb: string } =
-    lockedTimeSeries
-    ? {
-        kind: params.presentationKind === "area" ? "area" : "line",
-        histogramStyle: false,
-        blurb: `Shows how ${(params.valueAxis ?? "").trim() || "your metric"} moves across ordered time buckets so trend and turning points read naturally.`,
-      }
-    : recommendCore({
-        question: params.question,
-        columns: params.columns,
-        rows: params.rows,
-        apiChartType: params.apiChartType,
-        valueAxis: params.valueAxis,
-        categoryAxis: params.categoryAxis,
-      });
-
-  const currentKind = params.presentationKind || "bar";
-  const currentLabel = presentationLabel(
-    currentKind,
-    Boolean(rec.histogramStyle && currentKind === "bar")
-  );
-  const suggestedKind: ChartKind = lockedTimeSeries
-    ? currentKind === "area"
-      ? "area"
-      : "line"
-    : rec.kind;
-  const suggestedLabel = presentationLabel(
-    suggestedKind,
-    lockedTimeSeries ? false : rec.histogramStyle
-  );
-  const alignsStrict =
-    lockedTimeSeries || kindsStrictPresentationMatch(rec.kind, currentKind);
-
-  const recommendationBlurb = alignsStrict
-    ? rec.blurb
-    : `You are viewing ${currentLabel.toLowerCase()}. Related note: ${rec.blurb}`;
+          chartBlurb,
+        })
+      : chartBlurb;
 
   return {
     active: true,
     recommendedKind: currentKind,
-    histogramStyle: Boolean(rec.histogramStyle && currentKind === "bar"),
+    histogramStyle,
     recommendedLabel: currentLabel,
-    recommendationBlurb,
+    recommendationBlurb: chartBlurb,
     currentKind,
     currentLabel,
-    suggestedKind,
-    suggestedLabel,
-    alignsWithRecommendation: alignsStrict,
-    whyThisChart: buildWhyThisChart({
-      currentLabel,
-      categoryAxis: params.categoryAxis,
-      valueAxis: params.valueAxis,
-      routing: params.routing,
-      answerSummary: params.answerSummary,
-      semanticContext: params.semanticContext,
-    }),
+    suggestedKind: currentKind,
+    suggestedLabel: currentLabel,
+    alignsWithRecommendation: true,
+    whyThisChart,
     anomalyNote: detectNumericAnomalies(params.rows, currentKind),
   };
 }

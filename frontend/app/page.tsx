@@ -1734,6 +1734,52 @@ function buildChartAxisPresentationBundle(args: {
     };
   }
   const ms = vizClean?.multiSeries;
+  if (ms?.layout === "grouped_bar" && ms.seriesKeys?.length) {
+    const full = ms.stackAxisTitle?.trim() || base.valueAxis;
+    const refined: ChartAxes = {
+      categoryAxis: ms.categoryAxisTitle?.trim() || base.categoryAxis,
+      valueAxis: full,
+      valueAxisCompact: compactAxisLabelFromFullPhrase(full),
+    };
+    const categoryAxis = resolveSemanticCategoryAxisForCharts({
+      presentationKind: args.presentationKind,
+      chartTitle: args.chartTitle,
+      grainTitleHint: norm.grainHintTitle,
+      viz: vizClean,
+      analysis: args.analysis,
+      preferAnalysisForCategory: args.preferAnalysisForCategory,
+      refinedCategoryFallback: refined.categoryAxis,
+    });
+    const axes = { ...refined, categoryAxis };
+    const mergedAxes = mergeInsightAxesWithAlignedAnalysis({
+      axes,
+      presentationKind: args.presentationKind,
+      viz: vizClean,
+      analysis: args.analysis,
+      preferAligned: args.preferAnalysisForCategory,
+      grainHintTitle: norm.grainHintTitle,
+      rawChartTitle: args.chartTitle,
+      mode: "category_only",
+    });
+    const outAxes = {
+      ...mergedAxes,
+      valueAxis: refined.valueAxis,
+      valueAxisCompact: refined.valueAxisCompact,
+    };
+    return {
+      axes: outAxes,
+      header: buildChartSemanticHeader({
+        presentationKind: args.presentationKind,
+        chartTitle: args.chartTitle,
+        grainTitleHint: norm.grainHintTitle,
+        viz: vizClean,
+        analysis: args.analysis,
+        preferAnalysisForCategory: args.preferAnalysisForCategory,
+        refinedCategoryFallback: outAxes.categoryAxis,
+        refinedMetricLabel: outAxes.valueAxis,
+      }),
+    };
+  }
   if (ms?.layout === "stacked_bar" && ms.seriesKeys?.length) {
     const full = ms.stackAxisTitle
       ? `Total (${ms.stackAxisTitle} stacked)`
@@ -2440,8 +2486,11 @@ function hydrateVisualizationFromApi(raw: unknown): {
     o.multiSeries && typeof o.multiSeries === "object"
       ? (o.multiSeries as Record<string, unknown>)
       : null;
+  const multiLayout = multiObj ? String(multiObj.layout ?? "").trim() : "";
+  const isMultiMetricBar =
+    multiLayout === "stacked_bar" || multiLayout === "grouped_bar";
   const stackedSeriesKeys =
-    multiObj && String(multiObj.layout ?? "") === "stacked_bar"
+    multiObj && isMultiMetricBar
       ? Array.isArray(multiObj.seriesKeys)
         ? (multiObj.seriesKeys as unknown[]).map((k) => String(k))
         : []
@@ -2457,7 +2506,7 @@ function hydrateVisualizationFromApi(raw: unknown): {
       }
     }
     const multiSeriesPersisted: NonNullable<StoredVisualization["multiSeries"]> = {
-      layout: "stacked_bar",
+      layout: multiLayout === "grouped_bar" ? "grouped_bar" : "stacked_bar",
       seriesKeys: stackedSeriesKeys,
       seriesLabels,
       categoryAxisTitle:
@@ -2695,6 +2744,78 @@ type VizInsightDatum = {
   x?: number;
   formattedX?: string;
 };
+
+function isMultiMetricBarLayout(
+  layout: string | undefined | null
+): layout is "stacked_bar" | "grouped_bar" {
+  return layout === "stacked_bar" || layout === "grouped_bar";
+}
+
+/** Executive signal cards for grouped revenue vs spend (etc.) by category. */
+function buildGroupedMetricExecutiveInsights(
+  chartData: ChartRow[],
+  ms: NonNullable<StoredVisualization["multiSeries"]>,
+  dimLabel: string,
+  roundingHint?: string
+): ExecutiveVizInsightCard[] {
+  const keys = ms.seriesKeys.filter((k) => k.trim()).slice(0, 2);
+  if (!keys.length || !chartData.length) return [];
+
+  const stripes = [
+    "bg-emerald-500",
+    "bg-sky-500",
+    "bg-rose-500",
+    "bg-amber-500",
+  ] as const;
+  const dim = shortenLabel(dimLabel, 36) || "Category";
+  const out: ExecutiveVizInsightCard[] = [];
+
+  keys.forEach((k, ki) => {
+    const seriesLabel = ms.seriesLabels[k]?.trim() || k;
+    let iMax = 0;
+    chartData.forEach((r, i) => {
+      const v = Number(r[k]);
+      const cur = Number(chartData[iMax]![k]);
+      if (Number.isFinite(v) && (!Number.isFinite(cur) || v > cur)) iMax = i;
+    });
+    const top = chartData[iMax]!;
+    const topVal = Number(top[k]);
+    out.push({
+      key: `dual-top-${k}`,
+      title: `Highest ${seriesLabel}`,
+      value: shortenLabel(String(top.name ?? ""), 44),
+      hint: Number.isFinite(topVal)
+        ? formatDerivedInsightNumber(topVal, roundingHint, false)
+        : undefined,
+      dotClass: stripes[ki % stripes.length]!,
+    });
+  });
+
+  if (keys.length >= 2) {
+    const [ka, kb] = keys;
+    let iLead = 0;
+    chartData.forEach((r, i) => {
+      const sumA = Number(r[ka!]) + Number(r[kb!]);
+      const sumB = Number(chartData[iLead]![ka!]) + Number(chartData[iLead]![kb!]);
+      if (Number.isFinite(sumA) && Number.isFinite(sumB) && sumA > sumB) iLead = i;
+    });
+    const lead = chartData[iLead]!;
+    const va = Number(lead[ka!]);
+    const vb = Number(lead[kb!]);
+    if (Number.isFinite(va) && Number.isFinite(vb) && vb > 1e-9) {
+      const ratio = va / vb;
+      out.push({
+        key: "dual-ratio-lead",
+        title: `${ms.seriesLabels[ka!] ?? ka} / ${ms.seriesLabels[kb!] ?? kb}`,
+        value: formatDerivedInsightNumber(ratio, "ratio_1", false),
+        hint: `On ${shortenLabel(String(lead.name ?? ""), 32)} (${dim})`,
+        dotClass: "bg-violet-500",
+      });
+    }
+  }
+
+  return out.slice(0, 4);
+}
 
 /** Pairs visualization.labels with values + display strings — no prose parsing. */
 function zipStoredVisualizationPairs(
@@ -3044,7 +3165,7 @@ function highlightSearchInText(text: string, query: string): ReactNode {
     nodes.push(
       <mark
         key={`h-${found}-${slice.slice(0, 12)}`}
-        className="rounded bg-amber-100/95 px-0.5 text-inherit ring-1 ring-amber-200/80"
+        className="data-preview-search-highlight rounded bg-amber-100/95 px-0.5 text-inherit ring-1 ring-amber-200/80"
       >
         {slice}
       </mark>
@@ -8325,7 +8446,7 @@ function HomeInner() {
         rows: sortedChartData,
         kind: presentationChartKind,
         stackedBar: Boolean(
-          visualization?.multiSeries?.layout === "stacked_bar" &&
+          isMultiMetricBarLayout(visualization?.multiSeries?.layout) &&
             (visualization?.multiSeries?.seriesKeys?.length ?? 0) > 0
         ),
         chartHeight: chartHeightMain,
@@ -8454,8 +8575,10 @@ function HomeInner() {
           visualization?.chartType ?? "bar"
         ),
         presentationKind: sessionRenderedChartKind,
-        stackedOrMultiSeries:
-          visualization?.multiSeries?.layout === "stacked_bar",
+        stackedOrMultiSeries: isMultiMetricBarLayout(
+          visualization?.multiSeries?.layout
+        ),
+        multiSeriesLayout: visualization?.multiSeries?.layout ?? null,
         categoryAxis: chartAxisLabels.categoryAxis,
         valueAxis: chartAxisLabels.valueAxis,
         routing: chartRoutingRecommendation,
@@ -8510,6 +8633,12 @@ function HomeInner() {
   ]);
 
   const insightDisplayChartTitle = useMemo(() => {
+    if (
+      insightVisualization?.multiSeries?.layout === "grouped_bar" &&
+      insightVisualization.title?.trim()
+    ) {
+      return insightVisualization.title.trim();
+    }
     const fromContract = getCanonicalChartTitle({
       rawTitle: insightChartTitle,
       chartType: insightSnapshot?.chartKind ?? insightChartType,
@@ -8775,7 +8904,7 @@ function HomeInner() {
         rows: sortedInsightChartData,
         kind: insightPresentationChartKind,
         stackedBar: Boolean(
-          insightVisualization?.multiSeries?.layout === "stacked_bar" &&
+          isMultiMetricBarLayout(insightVisualization?.multiSeries?.layout) &&
             (insightVisualization?.multiSeries?.seriesKeys?.length ?? 0) > 0
         ),
         chartHeight: insightShellPlotHeight,
@@ -8831,6 +8960,19 @@ function HomeInner() {
         insightVisualization?.roundingHint
       );
     }
+    const ms = insightVisualization?.multiSeries;
+    if (
+      ms?.layout === "grouped_bar" &&
+      ms.seriesKeys.length >= 2 &&
+      insightChartData.length
+    ) {
+      return buildGroupedMetricExecutiveInsights(
+        insightChartData,
+        ms,
+        insightChartAxisLabels.categoryAxis,
+        insightVisualization?.roundingHint
+      );
+    }
     if (!insightVisualization?.labels?.length) return [];
     const pairs = zipStoredVisualizationPairs(insightVisualization);
     return buildExecutiveVizInsights(
@@ -8846,6 +8988,7 @@ function HomeInner() {
     insightRenderedChartKind,
     insightChartAxisLabels.categoryAxis,
     insightChartAxisLabels.valueAxis,
+    insightChartData,
   ]);
 
   const insightChartRoutingRecommendation = useMemo(
@@ -8875,8 +9018,10 @@ function HomeInner() {
           insightVisualization?.chartType ?? "bar"
         ),
         presentationKind: insightRenderedChartKind,
-        stackedOrMultiSeries:
-          insightVisualization?.multiSeries?.layout === "stacked_bar",
+        stackedOrMultiSeries: isMultiMetricBarLayout(
+          insightVisualization?.multiSeries?.layout
+        ),
+        multiSeriesLayout: insightVisualization?.multiSeries?.layout ?? null,
         categoryAxis: insightChartAxisLabels.categoryAxis,
         valueAxis: insightChartAxisLabels.valueAxis,
         routing: insightChartRoutingRecommendation,
@@ -9864,8 +10009,9 @@ function HomeInner() {
           question: lastAskedQuestion,
           metadata: {
             groupCount: sortedChartData.length,
-            stackedOrMultiSeries:
-              visualization?.multiSeries?.layout === "stacked_bar",
+            stackedOrMultiSeries: isMultiMetricBarLayout(
+              visualization?.multiSeries?.layout
+            ),
             histogramStyle: sessionSmartChartIntel?.histogramStyle ?? false,
             routingExplanation:
               chartRoutingRecommendation?.selectionExplanation ?? null,
