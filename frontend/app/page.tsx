@@ -81,12 +81,12 @@ import {
   chartsTabTitle,
   chartsTabTimelineColumn,
   chartsTabPreviewHeaderSticky,
+  chartsTabPngExportRoot,
   chartsTabSessionPlotSurface,
   chartsTabVizHeaderZone,
   chartsTabVizKicker,
 } from "@/lib/charts-tab-ui";
 import { ChartsTabChartReason } from "@/app/components/home/charts-tab-chart-reason";
-import { ChartsTabIntelligenceStrip } from "@/app/components/home/charts-tab-intelligence-strip";
 import { ChartsTabPlotTransition } from "@/app/components/home/charts-tab-plot-transition";
 import { generateChartReason } from "@/lib/generate-chart-reason";
 import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
@@ -6124,6 +6124,7 @@ function HomeInner() {
   /** Off-screen charts for PDF/PNG capture (session vs AI insight bundles). */
   const chartCaptureSessionRef = useRef<HTMLDivElement | null>(null);
   const chartCaptureInsightRef = useRef<HTMLDivElement | null>(null);
+  const chartsTabPngExportRef = useRef<HTMLDivElement | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [aiAnswerByChartId, setAiAnswerByChartId] =
@@ -6687,48 +6688,36 @@ function HomeInner() {
   };
 
   const downloadChartPng = useCallback(async () => {
+    const exportRoot = chartsTabPngExportRef.current;
+    if (!exportRoot) {
+      setError("Chart is not available to download.");
+      return;
+    }
+    if (!exportRoot.querySelector("svg")) {
+      setError("Chart is not available to download.");
+      return;
+    }
+
     try {
       setError("");
-      const container = chartCaptureSessionRef.current;
-      if (!container) return;
+      const { captureElementToPng } = await import("@/lib/chart-png-capture");
+      const { dataUrl } = await captureElementToPng(exportRoot, {
+        scale: 3,
+        ignoreElement: (el) =>
+          el instanceof HTMLElement &&
+          (el.classList.contains("charts-tab-preview-shimmer") ||
+            el.getAttribute("aria-hidden") === "true"),
+      });
 
-      const svg = container.querySelector("svg");
-      if (!svg) {
-        setError("Chart is not available to download.");
-        return;
-      }
-
-      const rect = svg.getBoundingClientRect();
-      const width = Math.max(1, Math.round(rect.width));
-      const height = Math.max(1, Math.round(rect.height));
-
-      const clone = svg.cloneNode(true) as SVGElement;
-      clone.setAttribute("width", String(width));
-      clone.setAttribute("height", String(height));
-      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-
-      const svgString = new XMLSerializer().serializeToString(clone);
-      const canvas = document.createElement("canvas");
-      const scale = 2;
-      canvas.width = width * scale;
-      canvas.height = height * scale;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-
-      const v = await Canvg.fromString(ctx, svgString);
-      await v.render();
-
-      const url = canvas.toDataURL("image/png");
       const a = document.createElement("a");
-      a.href = url;
-      a.download = "chart.png";
+      a.href = dataUrl;
+      a.download = `${sanitizeChartExportFilename(chartTitle || "chart")}.png`;
       a.click();
     } catch (err) {
       console.error("Chart PNG download failed:", err);
       setError("Unable to download chart image.");
     }
-  }, []);
+  }, [chartTitle]);
 
   const setQuestionAndResetInsightState = useCallback(
     (value: string) => {
@@ -9890,27 +9879,6 @@ function HomeInner() {
     />
   );
 
-  const sessionChartIntelAxisLabel = useMemo(() => {
-    const h = sessionChartSemanticHeader;
-    if (h.mode === "scatter") {
-      return `${h.xLabel} · ${h.yLabel}`;
-    }
-    return h.detailLabel?.trim() || h.roleLabel?.trim() || null;
-  }, [sessionChartSemanticHeader]);
-
-  const sessionChartIntelSourceLabel = useMemo(() => {
-    const src = activeSnapshot?.source;
-    if (src === "ai") return "AI";
-    if (src === "auto_dashboard") return "Auto Dashboard";
-    return null;
-  }, [activeSnapshot?.source]);
-
-  const sessionChartIntelNote = useMemo(() => {
-    const w = visualization?.partialVisualizationWarning?.trim();
-    if (!w) return null;
-    return w.length > 160 ? `${w.slice(0, 157)}…` : w;
-  }, [visualization?.partialVisualizationWarning]);
-
   const sessionChartReason = useMemo(
     () =>
       generateChartReason(
@@ -11071,79 +11039,71 @@ function HomeInner() {
               >
                 {chartData.length > 0 ? (
                   <div className={chartsTabVizPreviewCard}>
-                    <div className={chartsTabPreviewHeaderSticky}>
-                      <div
-                        ref={chartsSessionHeadingRef}
-                        className="w-full min-w-0 scroll-mt-28"
-                      >
-                        <div className="mx-auto min-w-0 max-w-4xl">
-                          {chartHeadingBlock ?? (
-                            <div className={chartsTabVizHeaderZone}>
-                              <p className={chartsTabVizKicker}>Chart preview</p>
-                              <h3 className={aiInsightsVizTitle}>Visualization</h3>
-                              {chartSubtitle ? (
-                                <p className={aiInsightsVizSubtitle}>
-                                  {chartSubtitle}
-                                </p>
-                              ) : null}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div
-                        title={sessionChartMetadataLine}
-                        className={`${aiInsightsVizChipsWrap} mt-1`}
-                      >
-                        <ChartContextSummary
-                          renderedKind={sessionRenderedChartKind}
-                          metricLabel={chartAxisLabels.valueAxis}
-                          semanticHeader={sessionChartSemanticHeader}
-                          badgeCompact={sessionChartMetadataBadgeCompact}
-                          leadInsight={chartInsightBadge ?? undefined}
-                          compactChips
-                        />
-                      </div>
-                      <ChartsTabIntelligenceStrip
-                        sourceLabel={sessionChartIntelSourceLabel}
-                        chartTypeLabel={presentationKindUiLabel(
-                          sessionRenderedChartKind
-                        )}
-                        measureLabel={chartAxisLabels.valueAxis}
-                        axisLabel={sessionChartIntelAxisLabel}
-                        highlight={chartInsightBadge ?? null}
-                        note={sessionChartIntelNote}
-                      />
-                      <ChartsTabChartReason
-                        chartId={activeChartId}
-                        reason={sessionChartReason}
-                      />
-                    </div>
-                    <ChartsTabPlotTransition
-                      chartId={activeChartId}
-                      plotHeightPx={chartHeightMain}
-                    >
-                      <div
-                        className={chartsTabVizSessionFrame}
-                        style={
-                          {
-                            "--insights-viz-plot-h": `${chartHeightMain}px`,
-                          } as CSSProperties
-                        }
-                      >
-                        <ChartInsightViewportWrapper
-                          chartKind={sessionRenderedChartKind}
-                          sessionMode
+                    <div ref={chartsTabPngExportRef} className={chartsTabPngExportRoot}>
+                      <div className={chartsTabPreviewHeaderSticky}>
+                        <div
+                          ref={chartsSessionHeadingRef}
+                          className="w-full min-w-0 scroll-mt-28"
                         >
-                          <div className={chartsTabSessionPlotSurface}>
-                            {renderDatasetChart(
-                              chartHeightMain,
-                              false,
-                              false
+                          <div className="mx-auto min-w-0 max-w-4xl">
+                            {chartHeadingBlock ?? (
+                              <div className={chartsTabVizHeaderZone}>
+                                <p className={chartsTabVizKicker}>Chart preview</p>
+                                <h3 className={aiInsightsVizTitle}>Visualization</h3>
+                                {chartSubtitle ? (
+                                  <p className={aiInsightsVizSubtitle}>
+                                    {chartSubtitle}
+                                  </p>
+                                ) : null}
+                              </div>
                             )}
                           </div>
-                        </ChartInsightViewportWrapper>
+                        </div>
+                        <div
+                          title={sessionChartMetadataLine}
+                          className={`${aiInsightsVizChipsWrap} mt-1`}
+                        >
+                          <ChartContextSummary
+                            renderedKind={sessionRenderedChartKind}
+                            metricLabel={chartAxisLabels.valueAxis}
+                            semanticHeader={sessionChartSemanticHeader}
+                            badgeCompact={sessionChartMetadataBadgeCompact}
+                            leadInsight={chartInsightBadge ?? undefined}
+                            compactChips
+                          />
+                        </div>
+                        <ChartsTabChartReason
+                          chartId={activeChartId}
+                          reason={sessionChartReason}
+                        />
                       </div>
-                    </ChartsTabPlotTransition>
+                      <ChartsTabPlotTransition
+                        chartId={activeChartId}
+                        plotHeightPx={chartHeightMain}
+                      >
+                        <div
+                          className={chartsTabVizSessionFrame}
+                          style={
+                            {
+                              "--insights-viz-plot-h": `${chartHeightMain}px`,
+                            } as CSSProperties
+                          }
+                        >
+                          <ChartInsightViewportWrapper
+                            chartKind={sessionRenderedChartKind}
+                            sessionMode
+                          >
+                            <div className={chartsTabSessionPlotSurface}>
+                              {renderDatasetChart(
+                                chartHeightMain,
+                                false,
+                                false
+                              )}
+                            </div>
+                          </ChartInsightViewportWrapper>
+                        </div>
+                      </ChartsTabPlotTransition>
+                    </div>
                     <div className={chartsTabSmartReadWrap}>
                       <SmartChartInsightPanel
                         intel={sessionSmartChartIntel}

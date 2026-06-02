@@ -30,31 +30,37 @@ export type InsightChartLayoutMetrics = {
 /**
  * Charts tab session preview — responsive height with less vertical dead space than legacy 300–500px floor.
  */
+/** ~12% taller plot after Charts tab duplicate metadata row removal. */
+const CHARTS_TAB_PLOT_HEIGHT_BOOST = 1.12;
+
 export function resolveChartsTabPreviewPlotHeight(
   pointCount: number,
   kind: ChartKind,
   viewportInnerH: number
 ): number {
   const n = Math.max(1, pointCount);
-  const cap = Math.round(Math.min(Math.max(viewportInnerH, 320) * 0.42, 440));
+  const cap = Math.round(Math.min(Math.max(viewportInnerH, 320) * 0.47, 500));
   const floor = 196;
+  const boostedCap = Math.round(cap * CHARTS_TAB_PLOT_HEIGHT_BOOST);
+  const fit = (h: number) =>
+    Math.min(boostedCap, Math.round(h * CHARTS_TAB_PLOT_HEIGHT_BOOST));
 
   if (kind === "bar_horizontal") {
     const slot = 26;
     const extra = Math.max(0, n - 3) * slot;
-    return Math.min(cap, Math.max(240, 248 + extra));
+    return fit(Math.min(cap, Math.max(240, 248 + extra)));
   }
   if (kind === "pie" || kind === "donut" || kind === "scatter") {
-    return Math.min(cap, Math.max(260, 292));
+    return fit(Math.min(cap, Math.max(260, 292)));
   }
   if (kind === "line" || kind === "area") {
-    return Math.min(cap, Math.max(272, 300));
+    return fit(Math.min(cap, Math.max(272, 300)));
   }
   if (kind === "bar" || kind === "histogram") {
     const extra = Math.min(28, Math.max(0, n - 5) * 5);
-    return Math.min(cap, Math.max(228, 252 + extra));
+    return fit(Math.min(cap, Math.max(228, 252 + extra)));
   }
-  return Math.min(cap, Math.max(floor, 268));
+  return fit(Math.min(cap, Math.max(floor, 268)));
 }
 
 export function getInsightLayoutMetrics(kind: ChartKind): InsightChartLayoutMetrics {

@@ -3,6 +3,8 @@
  * Do not use on Overview, Charts, or Export tabs except where noted.
  */
 
+import { saasSecondaryActionFont } from "@/lib/ui-buttons";
+
 export const aiInsightsPage = "ai-insights-page";
 
 export const aiInsightsOuterShell =
@@ -36,7 +38,7 @@ export const aiInsightsAskHeaderRow =
 
 /** Shared Insights actions — premium SaaS (`saas-btn-*` in globals.css). */
 export const aiInsightsActionBtn =
-  "ai-insights-action-btn saas-btn-premium saas-btn-premium--sm inline-flex shrink-0 items-center justify-center font-semibold";
+  `ai-insights-action-btn saas-btn-premium saas-btn-premium--sm inline-flex shrink-0 items-center justify-center ${saasSecondaryActionFont}`;
 
 /** Primary Insights CTA — accent gradient, same radius/glow family as premium buttons. */
 export const aiInsightsActionBtnPrimary =

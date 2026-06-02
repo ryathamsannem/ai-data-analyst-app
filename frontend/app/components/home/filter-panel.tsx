@@ -17,6 +17,7 @@ import {
   ovSectionDesc,
   ovSectionTitle,
 } from "@/lib/overview-ui";
+import { saasSecondaryActionFont } from "@/lib/ui-buttons";
 import { FilterDateField } from "./filter-date-field";
 
 function FilterPanelInner({
@@ -168,7 +169,7 @@ function FilterPanelInner({
 
   const clearBtnCls = isDashboard
     ? ovFilterClearBtn
-    : `saas-btn-premium ${controlH} w-full inline-flex items-center justify-center px-4 text-sm font-semibold`;
+    : `saas-btn-premium ${controlH} w-full inline-flex items-center justify-center px-4 text-sm ${saasSecondaryActionFont}`;
 
   const filterChipCls = isDashboard
     ? "inline-flex items-center gap-1.5 rounded-full border border-[color:var(--accent-muted)] bg-[color:var(--accent-wash)] px-3 py-1 text-xs font-medium text-foreground transition duration-150 hover:border-[color:var(--accent)] hover:bg-[color:var(--accent-wash)]"
