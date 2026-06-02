@@ -83,6 +83,7 @@ import {
   chartsTabPreviewHeaderSticky,
   chartsTabPngExportRoot,
   chartsTabSessionPlotSurface,
+  chartsTabVizPlotStage,
   chartsTabVizHeaderZone,
   chartsTabVizKicker,
 } from "@/lib/charts-tab-ui";
@@ -347,6 +348,8 @@ import {
   ovDashChartTitle,
   ovDashInsightChip,
   ovDashInsightChips,
+  overviewPngExportHeader,
+  overviewPngExportRoot,
   ovDataHint,
   ovDataLabel,
   ovDataValue,
@@ -432,7 +435,6 @@ import {
   type ChartInsightAnswerStore,
 } from "@/lib/chart-insight-answers";
 import { useDevRenderCount } from "@/lib/dev-render-count";
-import { Canvg } from "canvg";
 import {
   datasetKindLabel,
   loadReportBranding,
@@ -3994,49 +3996,6 @@ function sanitizeChartExportFilename(title: string): string {
   return slug || "auto_dashboard_chart";
 }
 
-/** PNG export for an in-page chart container (does not use session capture ref). */
-async function exportDashboardMiniChartAsPng(
-  root: HTMLElement | null,
-  titleForFilename: string
-): Promise<void> {
-  if (!root) {
-    throw new Error("Chart area is not ready.");
-  }
-  const svg = root.querySelector("svg");
-  if (!svg) {
-    throw new Error("Chart is not available to export.");
-  }
-
-  const rect = svg.getBoundingClientRect();
-  const width = Math.max(1, Math.round(rect.width));
-  const height = Math.max(1, Math.round(rect.height));
-
-  const clone = svg.cloneNode(true) as SVGElement;
-  clone.setAttribute("width", String(width));
-  clone.setAttribute("height", String(height));
-  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-
-  const svgString = new XMLSerializer().serializeToString(clone);
-  const canvas = document.createElement("canvas");
-  const scale = 2;
-  canvas.width = width * scale;
-  canvas.height = height * scale;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Unable to create export canvas.");
-  }
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
-
-  const v = await Canvg.fromString(ctx, svgString);
-  await v.render();
-
-  const url = canvas.toDataURL("image/png");
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${sanitizeChartExportFilename(titleForFilename)}.png`;
-  a.click();
-}
-
 /** Plot band heights — keep in sync with `--overview-chart-plot-min-h` in globals.css */
 const OVERVIEW_DASH_PLOT_HEIGHT_MOBILE = 300;
 const OVERVIEW_DASH_PLOT_HEIGHT_DESKTOP = 340;
@@ -4265,7 +4224,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   /** Surface export failures (e.g. missing SVG). */
   onChartExportError?: (message: string) => void;
 }) {
-  const chartCaptureRef = useRef<HTMLDivElement | null>(null);
+  const overviewPngExportRef = useRef<HTMLDivElement | null>(null);
   const [exportingPng, setExportingPng] = useState(false);
   const dashGrid = useOverviewDashGridStyle();
   const drillPrimary = chart.interaction?.drillDimensions.find(
@@ -4835,8 +4794,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       aria-label={canonicalTitle}
       className={`${ovDashChartCard} group ${loadingPulse ? "animate-pulse opacity-[0.92]" : ""}`}
     >
-      <header className={ovDashChartHead}>
-        <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
+      <div ref={overviewPngExportRef} className={overviewPngExportRoot}>
+        <header className={`${ovDashChartHead} ${overviewPngExportHeader}`}>
+          <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
         <div className={ovDashChartActions} onClick={(e) => e.stopPropagation()}>
           {onViewInChartsTab && snapshotId ? (
             <button
@@ -4866,13 +4826,25 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             onClick={async () => {
               setExportingPng(true);
               try {
-                await exportDashboardMiniChartAsPng(
-                  chartCaptureRef.current,
-                  canonicalTitle
+                const exportRoot = overviewPngExportRef.current;
+                if (!exportRoot?.querySelector("svg")) {
+                  throw new Error("Chart is not available to export.");
+                }
+                const { captureElementToPng } = await import(
+                  "@/lib/chart-png-capture"
                 );
+                const { dataUrl } = await captureElementToPng(exportRoot, {
+                  scale: 3,
+                });
+                const a = document.createElement("a");
+                a.href = dataUrl;
+                a.download = `${sanitizeChartExportFilename(canonicalTitle)}.png`;
+                a.click();
               } catch (err) {
                 onChartExportError?.(
-                  err instanceof Error ? err.message : "Unable to export chart image."
+                  err instanceof Error
+                    ? err.message
+                    : "Unable to export chart image."
                 );
               } finally {
                 setExportingPng(false);
@@ -4885,10 +4857,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             {exportingPng ? "…" : "PNG"}
           </button>
         </div>
-      </header>
-      <div
-        ref={chartCaptureRef}
-        role={onViewInChartsTab && snapshotId ? "button" : undefined}
+        </header>
+        <div
+          role={onViewInChartsTab && snapshotId ? "button" : undefined}
         tabIndex={onViewInChartsTab && snapshotId ? 0 : undefined}
         onClick={() => {
           if (snapshotId && onViewInChartsTab) onViewInChartsTab(snapshotId);
@@ -4911,22 +4882,25 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             : undefined
         }
       >
-        <div className={ovDashChartPlotInner}>{chartBody}</div>
-      </div>
-      {overviewInsightChips.length > 0 ? (
-        <footer className={ovDashChartFooter}>
-          <div className={ovDashInsightChips}>
-            {overviewInsightChips.map((chip) => (
-              <span
-                key={chip.key}
-                className={`${ovDashInsightChip} overview-dash-insight-chip--${chip.key}`}
-              >
-                {chip.text}
-              </span>
-            ))}
+          <div className={`${ovDashChartPlotInner} ${chartsTabVizPlotStage}`}>
+            {chartBody}
           </div>
-        </footer>
-      ) : null}
+        </div>
+        {overviewInsightChips.length > 0 ? (
+          <footer className={ovDashChartFooter}>
+            <div className={ovDashInsightChips}>
+              {overviewInsightChips.map((chip) => (
+                <span
+                  key={chip.key}
+                  className={`${ovDashInsightChip} overview-dash-insight-chip--${chip.key}`}
+                >
+                  {chip.text}
+                </span>
+              ))}
+            </div>
+          </footer>
+        ) : null}
+      </div>
     </div>
   );
 });

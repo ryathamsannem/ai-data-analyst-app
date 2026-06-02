@@ -17,6 +17,9 @@ const GAP_AFTER_TITLE = 4;
 const GAP_AFTER_SUBTITLE = 5;
 const GAP_AFTER_CHIPS = 6;
 const CHIP_ROW_GAP = 5;
+// Overview summary chips in PNG ("Top / Lowest / Gap") look cramped at default gap.
+// Only used for the PNG header render (not on-screen layout).
+const OVERVIEW_SUMMARY_CHIP_ROW_GAP = 14;
 const CHIP_H = 22;
 const CHIP_PAD_X = 7;
 const CHIP_INNER_GAP = 4;
@@ -101,6 +104,9 @@ function resolveCssColorForExport(value: string): string {
 
 function resolvePlotRoot(container: HTMLElement): HTMLElement {
   const selectors = [
+    ".overview-chart-plot-inner .recharts-responsive-container",
+    ".overview-chart-plot-inner .recharts-wrapper",
+    ".overview-chart-plot .recharts-responsive-container",
     ".charts-tab-viz-plot-stage .recharts-responsive-container",
     ".charts-tab-viz-plot-stage .recharts-wrapper",
     ".ai-insights-viz-plot .recharts-responsive-container",
@@ -111,7 +117,9 @@ function resolvePlotRoot(container: HTMLElement): HTMLElement {
     const el = container.querySelector(sel);
     if (el instanceof HTMLElement) return el;
   }
-  const plotStage = container.querySelector(".charts-tab-viz-plot-stage");
+  const plotStage =
+    container.querySelector(".charts-tab-viz-plot-stage") ??
+    container.querySelector(".overview-chart-plot-inner");
   if (plotStage instanceof HTMLElement) return plotStage;
   return container;
 }
@@ -293,7 +301,29 @@ function parseReasonFromNote(note: Element | null): ExportReasonBlock | null {
   return { label, body };
 }
 
-function extractHeaderContent(header: HTMLElement): {
+function extractOverviewInsightChips(sourceRoot: HTMLElement): ExportChip[] {
+  const chips: ExportChip[] = [];
+  const row = sourceRoot.querySelector(".overview-dash-insight-chips");
+  if (!row) return chips;
+  row.querySelectorAll(":scope > span").forEach((span) => {
+    const text = span.textContent?.trim();
+    if (text) chips.push({ label: "", value: text, mono: true });
+  });
+  return chips;
+}
+
+function findExportHeaderZone(sourceRoot: HTMLElement): HTMLElement | null {
+  const sticky = sourceRoot.querySelector(".charts-tab-preview-header-sticky");
+  if (sticky instanceof HTMLElement) return sticky;
+  const overview = sourceRoot.querySelector(".overview-png-export-header");
+  if (overview instanceof HTMLElement) return overview;
+  return null;
+}
+
+function extractHeaderContent(
+  header: HTMLElement,
+  sourceRoot?: HTMLElement
+): {
   kicker: string;
   title: string;
   subtitle: string;
@@ -323,6 +353,10 @@ function extractHeaderContent(header: HTMLElement): {
       const text = span.textContent?.trim();
       if (text) chips.push({ label: "", value: text, mono: true });
     });
+  }
+
+  if (!chips.length && sourceRoot) {
+    chips.push(...extractOverviewInsightChips(sourceRoot));
   }
 
   const reason = parseReasonFromNote(header.querySelector("[role='note']"));
@@ -385,7 +419,8 @@ function layoutChipRows(
   chips: ExportChip[],
   innerW: number,
   chipLabelFont: string,
-  chipValueFont: string
+  chipValueFont: string,
+  chipRowGapPx: number = CHIP_ROW_GAP
 ): { rows: ExportChip[][]; rowHeights: number[] } {
   if (!chips.length) return { rows: [], rowHeights: [] };
 
@@ -393,7 +428,8 @@ function layoutChipRows(
     measureChipWidth(ctx, c, chipLabelFont, chipValueFont)
   );
   const totalOneRow =
-    widths.reduce((a, b) => a + b, 0) + CHIP_ROW_GAP * (chips.length - 1);
+    widths.reduce((a, b) => a + b, 0) +
+    chipRowGapPx * (chips.length - 1);
 
   if (totalOneRow <= innerW) {
     return { rows: [chips], rowHeights: [CHIP_H] };
@@ -406,7 +442,7 @@ function layoutChipRows(
     const chip = chips[i]!;
     const w = widths[i]!;
     const currentRow = rows[rows.length - 1]!;
-    const gap = currentRow.length > 0 ? CHIP_ROW_GAP : 0;
+    const gap = currentRow.length > 0 ? chipRowGapPx : 0;
     if (currentRow.length > 0 && rowW + gap + w > innerW) {
       rows.push([chip]);
       rowHeights.push(CHIP_H);
@@ -419,6 +455,21 @@ function layoutChipRows(
   return { rows, rowHeights };
 }
 
+function shouldUseOverviewSummaryChipSpacing(
+  content: ReturnType<typeof extractHeaderContent>
+): boolean {
+  const chips = content.chips;
+  if (chips.length !== 3) return false;
+  if (!chips.every((c) => c.mono)) return false;
+
+  // Overview mini PNG uses values like:
+  // "Top: <name> (<value>)", "Lowest: ...", "Gap: ..."
+  return chips.every((c) => {
+    const v = String(c.value ?? "").trim().toLowerCase();
+    return v.startsWith("top:") || v.startsWith("lowest:") || v.startsWith("gap:");
+  });
+}
+
 type HeaderLayout = {
   exportWidth: number;
   contentH: number;
@@ -427,6 +478,7 @@ type HeaderLayout = {
   reasonBodyLines: string[];
   chipRows: ExportChip[][];
   chipRowHeights: number[];
+  chipRowGapPx: number;
 };
 
 function layoutHeaderExport(
@@ -436,6 +488,9 @@ function layoutHeaderExport(
 ): HeaderLayout {
   const exportWidth = Math.max(Math.round(sourceWidth), EXPORT_MIN_WIDTH);
   const innerW = exportWidth - COMPOSITE_PAD_X * 2;
+  const chipRowGapPx = shouldUseOverviewSummaryChipSpacing(content)
+    ? OVERVIEW_SUMMARY_CHIP_ROW_GAP
+    : CHIP_ROW_GAP;
 
   const fontFamily =
     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
@@ -451,7 +506,8 @@ function layoutHeaderExport(
     content.chips,
     innerW,
     chipLabelFont,
-    chipValueFont
+    chipValueFont,
+    chipRowGapPx
   );
 
   const reasonLabel = content.reason?.label ?? "";
@@ -466,7 +522,7 @@ function layoutHeaderExport(
 
   if (chipRows.length) {
     contentH += rowHeights.reduce((a, h) => a + h, 0);
-    contentH += CHIP_ROW_GAP * Math.max(0, chipRows.length - 1);
+    contentH += chipRowGapPx * Math.max(0, chipRows.length - 1);
     contentH += GAP_AFTER_CHIPS;
   }
 
@@ -488,6 +544,7 @@ function layoutHeaderExport(
     reasonBodyLines,
     chipRows,
     chipRowHeights: rowHeights,
+    chipRowGapPx,
   };
 }
 
@@ -496,10 +553,10 @@ function renderHeaderChromeToPng(
   scale: number,
   palette: ExportPalette
 ): { dataUrl: string; width: number; height: number } | null {
-  const header = sourceRoot.querySelector(".charts-tab-preview-header-sticky");
-  if (!(header instanceof HTMLElement)) return null;
+  const header = findExportHeaderZone(sourceRoot);
+  if (!header) return null;
 
-  const content = extractHeaderContent(header);
+  const content = extractHeaderContent(header, sourceRoot);
   if (!content.title && !content.chips.length && !content.reason) return null;
 
   const fontFamily =
@@ -568,7 +625,8 @@ function renderHeaderChromeToPng(
       measureChipWidth(ctx, chip, chipLabelFont, chipValueFont)
     );
     const totalW =
-      chipWidths.reduce((a, b) => a + b, 0) + CHIP_ROW_GAP * (row.length - 1);
+      chipWidths.reduce((a, b) => a + b, 0) +
+      layout.chipRowGapPx * (row.length - 1);
     let x = centerX - totalW / 2;
     for (let i = 0; i < row.length; i++) {
       const chip = row[i]!;
@@ -592,12 +650,15 @@ function renderHeaderChromeToPng(
       }
       ctx.font = chipValueFont;
       ctx.fillStyle = palette.chipValue;
+      // Ensure mono chips (Overview Top/Lowest/Gap) render inside pill bounds.
+      // Without this, title-phase center alignment can leak into chip text draw.
+      ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(chip.value, tx, ty);
-      x += w + CHIP_ROW_GAP;
+      x += w + layout.chipRowGapPx;
     }
     y += layout.chipRowHeights[ri] ?? CHIP_H;
-    if (ri < layout.chipRows.length - 1) y += CHIP_ROW_GAP;
+    if (ri < layout.chipRows.length - 1) y += layout.chipRowGapPx;
   }
 
   if (layout.chipRows.length) y += GAP_AFTER_CHIPS;

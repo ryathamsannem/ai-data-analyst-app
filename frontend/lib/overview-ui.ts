@@ -212,6 +212,13 @@ export const ovDashInsightChips = "overview-dash-insight-chips";
 
 export const ovDashInsightChip = "overview-dash-insight-chip";
 
+/** PNG capture root — title, insight chips, plot (excludes action buttons). */
+export const overviewPngExportRoot =
+  "overview-png-export-root charts-tab-png-export-root";
+
+/** Marker for chart-png-capture header extraction (no layout styles). */
+export const overviewPngExportHeader = "overview-png-export-header";
+
 export const ovBtnChip =
   "saas-btn-premium saas-btn-premium--sm !px-2 !py-1 text-[11px]";
 
