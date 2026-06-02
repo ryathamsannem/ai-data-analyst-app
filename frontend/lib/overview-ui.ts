@@ -57,6 +57,35 @@ export const ovInteractiveFiltersShell = "overview-interactive-filters";
 /** Dashboard filter controls (height in globals.css). */
 export const ovDashboardControlH = "overview-filter-control";
 
+/** Filter date field + premium calendar popup (Overview + AI Insights). */
+export const ovFilterDateField = "filter-date-field";
+
+export const ovFilterDateFieldValue = "filter-date-field__value";
+
+export const ovFilterDateFieldValuePlaceholder =
+  "filter-date-field__value filter-date-field__value--placeholder";
+
+export const ovFilterDatePickerPopup = "filter-date-picker-popup";
+
+export const ovFilterDatePickerHeader = "filter-date-picker-popup__header";
+
+export const ovFilterDatePickerMonth = "filter-date-picker-popup__month";
+
+export const ovFilterDatePickerNavBtn = "filter-date-picker-popup__nav";
+
+export const ovFilterDatePickerWeekdays = "filter-date-picker-popup__weekdays";
+
+export const ovFilterDatePickerWeekday = "filter-date-picker-popup__weekday";
+
+export const ovFilterDatePickerGrid = "filter-date-picker-popup__grid";
+
+export const ovFilterDatePickerDay = "filter-date-picker-popup__day";
+
+export const ovFilterDatePickerDayMuted = "filter-date-picker-popup__day filter-date-picker-popup__day--muted";
+
+export const ovFilterDatePickerDaySelected =
+  "filter-date-picker-popup__day filter-date-picker-popup__day--selected";
+
 /** Clear filters — height/typography in globals.css per shell class. */
 export const ovDashboardFilterBtn =
   "overview-filter-clear-btn saas-btn-premium inline-flex shrink-0 items-center justify-center leading-none";
@@ -182,6 +211,13 @@ export const ovDashChartPlotInner = "overview-chart-plot-inner";
 export const ovDashInsightChips = "overview-dash-insight-chips";
 
 export const ovDashInsightChip = "overview-dash-insight-chip";
+
+/** PNG capture root — title, insight chips, plot (excludes action buttons). */
+export const overviewPngExportRoot =
+  "overview-png-export-root charts-tab-png-export-root";
+
+/** Marker for chart-png-capture header extraction (no layout styles). */
+export const overviewPngExportHeader = "overview-png-export-header";
 
 export const ovBtnChip =
   "saas-btn-premium saas-btn-premium--sm !px-2 !py-1 text-[11px]";

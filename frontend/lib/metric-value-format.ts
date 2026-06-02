@@ -19,6 +19,8 @@ export type MetricFormatContext = {
   roundingHint?: string | null;
   /** Metric column key or display label */
   metricLabel?: string | null;
+  /** Chart recommendation metric type when available (`numeric`, `currency`, …). */
+  metricType?: string | null;
   /** Explicit format from metadata when available */
   valueFormat?: MetricValueFormatKind | null;
   /** Pie/donut share-of-total questions (not min/max ranking). */
@@ -33,7 +35,11 @@ const PERCENT_METRIC_RE =
 const DURATION_METRIC_RE =
   /\b(duration|elapsed|latency|runtime|uptime|downtime|cycle_?time|lead_?time|wait_?time)\b|(?:^|_)(?:hours?|mins?|minutes?|seconds?|secs?|ms)(?:$|_)/i;
 
-const CURRENCY_HINT_RE = /(?:^|[_\s])(?:revenue|salary|wage|pay|cost|price|amount|fee|budget|spend|payment)(?:$|[_\s])|money_0/i;
+const OPERATIONAL_METRIC_RE =
+  /\b(downtime|production\s+loss|incident|outage|failure|defect|occurrence|work\s+order|ticket)\b|(?:^|[_\s])(?:count|units?|qty|quantity|records?)(?:$|[_\s])/i;
+
+const CURRENCY_LABEL_RE =
+  /\b(revenue|salary|wages?|pay(?:roll)?|sales|price|pricing|fee|budget|spend|payment|income|profit|invoice|loan|premium|deposit|cash|capital|compensation|earning|bonus)\b/i;
 
 /** Numeric magnitude used for sorting and comparisons — never axis-formatted strings. */
 export function readChartRowRawValue(row: ChartRow): number {
@@ -57,19 +63,89 @@ export function metricLabelImpliesPercent(metricLabel: string | null | undefined
   return PERCENT_METRIC_RE.test(n) || /\bpercent\b/i.test(t);
 }
 
+/** Downtime, counts, units, incidents — never currency even when API sends `money_0`. */
+export function metricLabelImpliesOperationalMetric(
+  metricLabel: string | null | undefined
+): boolean {
+  const t = (metricLabel ?? "").trim();
+  if (!t) return false;
+  if (metricLabelImpliesPercent(t)) return false;
+  if (OPERATIONAL_METRIC_RE.test(t)) return true;
+  if (/\b(minutes?|mins?|hours?|hrs?|seconds?|secs?)\b/i.test(t)) return true;
+  if (/\b(loss\s+units?|production\s+loss|downtime)\b/i.test(t)) return true;
+  if (
+    /\b(count|counts|incidents?|cases?|events?|records?|occurrences?|number\s+of)\b/i.test(
+      t
+    ) &&
+    !CURRENCY_LABEL_RE.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function metricLabelImpliesCurrency(
+  metricLabel: string | null | undefined
+): boolean {
+  const t = (metricLabel ?? "").trim();
+  if (!t) return false;
+  if (metricLabelImpliesOperationalMetric(t)) return false;
+  if (CURRENCY_LABEL_RE.test(t)) return true;
+  if (
+    /\b(cost|amount)\b/i.test(t) &&
+    !/\b(loss|unit|count|minute|record|incident|downtime)\b/i.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function resolveMetricValueFormat(ctx: MetricFormatContext): MetricValueFormatKind {
   if (ctx.valueFormat) return ctx.valueFormat;
 
-  const hint = (ctx.roundingHint ?? "").trim();
-  if (hint === "pct_1") return "percent";
-  if (hint === "money_0") return "currency";
-
   const label = (ctx.metricLabel ?? "").trim();
-  if (DURATION_METRIC_RE.test(label)) return "duration";
-  if (CURRENCY_HINT_RE.test(label) || /\b(salary|revenue|cost|price|amount)\b/i.test(label)) {
-    return "currency";
-  }
+  const hint = (ctx.roundingHint ?? "").trim();
+  const metricType = (ctx.metricType ?? "").trim().toLowerCase();
+
+  if (hint === "pct_1") return "percent";
   if (metricLabelImpliesPercent(label)) return "percent";
+
+  if (metricLabelImpliesOperationalMetric(label)) return "number";
+
+  if (metricType === "currency" || metricType === "money") {
+    return metricLabelImpliesCurrency(label) ? "currency" : "number";
+  }
+  if (
+    metricType &&
+    metricType !== "currency" &&
+    metricType !== "money" &&
+    (metricType === "numeric" ||
+      metricType === "number" ||
+      metricType === "count" ||
+      metricType === "integer" ||
+      metricType === "ratio" ||
+      metricType === "percent" ||
+      metricType === "percentage")
+  ) {
+    if (metricType === "percent" || metricType === "percentage") return "percent";
+    if (metricType === "ratio" && metricLabelImpliesPercent(label)) return "percent";
+    return "number";
+  }
+
+  if (hint === "money_0") {
+    return metricLabelImpliesCurrency(label) ? "currency" : "number";
+  }
+
+  if (hint === "int_0") return "number";
+
+  if (
+    DURATION_METRIC_RE.test(label) &&
+    !/\b(minutes?|mins?|hours?|hrs?)\b/i.test(label)
+  ) {
+    return "duration";
+  }
+
+  if (metricLabelImpliesCurrency(label)) return "currency";
 
   const kind = ctx.presentationKind ?? "";
   const share =
@@ -225,6 +301,9 @@ export function formatExecutiveMetricValue(
     if (dv?.includes("%")) return dv;
     const n = coercePercentDisplayNumber(raw, readChartRowNormalizedValue(row));
     return formatMetricNumber(n, "percent");
+  }
+  if (format !== "currency" && dv && /[$€£¥]/.test(dv)) {
+    return formatMetricNumber(raw, format);
   }
   return formatMetricNumber(raw, format);
 }

@@ -374,6 +374,11 @@ body {
   transform: translateY(0);
 }
 
+.saas-btn-accent:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 2px;
+}
+
 .dark .saas-btn-accent {
   background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
   color: #f8fafc;
@@ -1285,7 +1290,7 @@ body {
   max-height: 43px !important;
   padding: 0 0.5rem !important;
   font-size: 0.75rem !important;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.15;
   border-radius: 0.4375rem;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -1311,26 +1316,300 @@ body {
   padding-bottom: 0 !important;
 }
 
-.overview-interactive-filters .overview-filter-date-bar input[type="date"] {
+.overview-interactive-filters .overview-filter-date-bar input[type="date"],
+.overview-interactive-filters .overview-filter-date-bar .filter-date-field__trigger {
   box-sizing: border-box;
   height: 24px !important;
   min-height: 24px !important;
   max-height: 24px !important;
   padding: 0 !important;
   font-size: 0.75rem !important;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.15;
+  color: var(--foreground);
 }
 
-.overview-interactive-filters
+.overview-interactive-filters .overview-filter-date-bar .filter-date-field__value {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: var(--foreground);
+}
+
+.overview-interactive-filters .overview-filter-date-bar .filter-date-field__value--placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.dark .overview-interactive-filters .overview-filter-date-bar .filter-date-field__trigger,
+.dark .overview-interactive-filters .overview-filter-date-bar .filter-date-field__value {
+  color: var(--foreground);
+}
+
+.dark
+  .overview-interactive-filters
   .overview-filter-date-bar
-  input[type="date"]::-webkit-calendar-picker-indicator {
+  .filter-date-field__value--placeholder {
+  color: var(--text-muted);
+}
+
+.dashboard-interactive-filters .overview-filter-date-bar .filter-date-field__trigger {
+  box-sizing: border-box;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  padding: 0 !important;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--foreground);
+}
+
+.dashboard-interactive-filters .overview-filter-date-bar .filter-date-field__value {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--foreground);
+}
+
+.dashboard-interactive-filters
+  .overview-filter-date-bar
+  .filter-date-field__value--placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Secondary filter/action buttons — typography matches Replace file (font-medium) */
+.overview-filter-clear-btn.saas-btn-premium,
+.ai-insights-page .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary) {
+  font-weight: 500;
+}
+
+/* Filter date field — shared Overview + AI Insights (custom premium calendar popup) */
+.filter-date-field__trigger:focus-visible {
+  outline: none;
+}
+
+.overview-filter-date-bar .filter-date-field__trigger:focus-visible {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 0.25rem;
+}
+
+.filter-date-field__icon {
   width: 13px;
   height: 13px;
-  margin: 0 0.125rem 0 0;
-  padding: 0;
-  opacity: 0.62;
-  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.7;
+  background: center / contain no-repeat;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20fill%3D%22none%22%20viewBox%3D%220%200%2014%2014%22%3E%3Crect%20x%3D%221.75%22%20y%3D%222.75%22%20width%3D%2210.5%22%20height%3D%229.5%22%20rx%3D%221.5%22%20stroke%3D%22%236366f1%22%20stroke-width%3D%221.25%22%2F%3E%3Cpath%20d%3D%22M4.5%201.75V3.75M9.5%201.75V3.75M1.75%205.75h10.5%22%20stroke%3D%22%236366f1%22%20stroke-width%3D%221.25%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E");
+}
+
+.dark .filter-date-field__icon {
+  opacity: 0.88;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20fill%3D%22none%22%20viewBox%3D%220%200%2014%2014%22%3E%3Crect%20x%3D%221.75%22%20y%3D%222.75%22%20width%3D%2210.5%22%20height%3D%229.5%22%20rx%3D%221.5%22%20stroke%3D%22%23a5b4fc%22%20stroke-width%3D%221.25%22%2F%3E%3Cpath%20d%3D%22M4.5%201.75V3.75M9.5%201.75V3.75M1.75%205.75h10.5%22%20stroke%3D%22%23a5b4fc%22%20stroke-width%3D%221.25%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E");
+}
+
+.filter-date-picker-popup {
+  box-sizing: border-box;
+  padding: 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--card-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-elevated) 96%, #fff) 0%,
+    var(--surface-elevated) 100%
+  );
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 10px 28px -8px rgba(15, 23, 42, 0.14),
+    0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--foreground);
+}
+
+.filter-date-picker-popup__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+}
+
+.filter-date-picker-popup__month {
+  flex: 1;
+  margin: 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+
+.filter-date-picker-popup__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border-default));
+  background: color-mix(in srgb, var(--accent-wash) 55%, var(--surface-elevated));
+  font-size: 1rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--accent) 78%, var(--foreground));
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.filter-date-picker-popup__nav:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border-strong));
+  background: color-mix(in srgb, var(--accent-wash) 85%, var(--surface-elevated));
+  box-shadow: 0 2px 8px -4px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.filter-date-picker-popup__nav:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.filter-date-picker-popup__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.125rem;
+  margin-bottom: 0.25rem;
+}
+
+.filter-date-picker-popup__weekday {
+  text-align: center;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.filter-date-picker-popup__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.125rem;
+}
+
+.filter-date-picker-popup__day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 2rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--foreground);
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.filter-date-picker-popup__day:hover {
+  background: color-mix(in srgb, var(--accent-wash) 75%, var(--surface-elevated));
+  border-color: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.filter-date-picker-popup__day--muted {
+  color: var(--text-subtle);
+}
+
+.filter-date-picker-popup__day--muted:hover {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-subtle) 70%, var(--surface-elevated));
+  border-color: var(--border-default);
+}
+
+.filter-date-picker-popup__day--selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: linear-gradient(180deg, #6366f1 0%, #7c3aed 100%);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.filter-date-picker-popup__day--selected:hover {
+  filter: brightness(1.05);
+  background: linear-gradient(180deg, #6366f1 0%, #7c3aed 100%);
+  color: #fff;
+}
+
+.filter-date-picker-popup__day[data-today="true"]:not(.filter-date-picker-popup__day--selected) {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-default));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.dark .filter-date-picker-popup {
+  border-color: var(--card-border);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--surface-elevated-card) 88%, var(--accent-wash)) 0%,
+    var(--card) 58%
+  );
+  box-shadow:
+    0 4px 24px -8px rgba(0, 0, 0, 0.45),
+    0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--foreground);
+}
+
+.dark .filter-date-picker-popup__month {
+  color: var(--foreground);
+}
+
+.dark .filter-date-picker-popup__weekday {
+  color: color-mix(in srgb, var(--text-muted) 92%, #cbd5e1);
+}
+
+.dark .filter-date-picker-popup__nav {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--insights-border-soft));
+  background: color-mix(in srgb, var(--accent-wash) 40%, var(--insights-layer-inset));
+  color: color-mix(in srgb, #c4b5fd 85%, var(--foreground));
+}
+
+.dark .filter-date-picker-popup__nav:hover {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--insights-border-medium));
+  background: color-mix(in srgb, var(--accent-wash) 55%, var(--insights-layer-nested));
+  box-shadow: 0 2px 12px -6px color-mix(in srgb, var(--accent-glow) 45%, transparent);
+}
+
+.dark .filter-date-picker-popup__day {
+  color: color-mix(in srgb, var(--foreground) 96%, #e2e8f0);
+}
+
+.dark .filter-date-picker-popup__day:hover {
+  background: color-mix(in srgb, var(--accent-wash) 50%, var(--insights-layer-inset));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--insights-border-soft));
+}
+
+.dark .filter-date-picker-popup__day--muted {
+  color: var(--text-subtle);
+}
+
+.dark .filter-date-picker-popup__day--selected {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
+  color: #f8fafc;
+  box-shadow: 0 2px 14px -6px color-mix(in srgb, var(--accent-glow) 65%, transparent);
 }
 
 .overview-interactive-filters .overview-filter-clear-btn.saas-btn-premium {
@@ -1686,6 +1965,52 @@ body {
   transform: translateY(-1px);
   border-color: var(--border-strong);
   box-shadow: var(--shadow-md);
+}
+
+/* AI Insights visualization card — Overview chart-card design language (full-size plot unchanged) */
+.ai-insights-page .ai-insights-viz-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  border-radius: 1rem;
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  padding: 1.25rem 1.5rem 1rem;
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+:root .ai-insights-page .ai-insights-viz-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-color: #cbd5e1;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 4px 12px -4px rgba(15, 23, 42, 0.08),
+    0 14px 32px -16px rgba(15, 23, 42, 0.12);
+}
+
+.dark .ai-insights-page .ai-insights-viz-card {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--surface-elevated-card) 90%, var(--accent-wash)) 0%,
+    var(--card) 60%
+  );
+  border-color: var(--card-border);
+  box-shadow: var(--shadow-card);
+}
+
+.ai-insights-page .ai-insights-viz-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.ai-insights-page .ai-insights-viz-card .ai-insights-viz-header {
+  margin-bottom: 0.5rem;
 }
 
 .overview-dash-chart-card__head {
@@ -2195,38 +2520,97 @@ body {
   box-shadow: 0 0 0 1px color-mix(in srgb, #818cf8 16%, transparent);
 }
 
-/* Ask AI submit — premium hover lift (size unchanged) */
-.ai-insights-page .ai-insights-ask-submit:not(:disabled) {
-  transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.ai-insights-page .ai-insights-ask-submit:not(:disabled):hover {
-  transform: translateY(-2px);
-  filter: brightness(1.03);
+/* AI Insights — secondary premium actions (Reset, Export): purple/indigo accent */
+.ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--border-default));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-wash) 78%, var(--surface-elevated)) 0%,
+    var(--surface-elevated) 100%
+  );
   box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.08),
-    0 8px 18px -6px color-mix(in srgb, var(--accent) 42%, transparent);
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-.ai-insights-page .ai-insights-ask-submit:not(:disabled):active {
-  transform: translateY(0);
-  filter: brightness(0.98);
-  transition-duration: 0.14s;
-}
-
-.dark .ai-insights-page .ai-insights-ask-submit:not(:disabled) {
+.ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border-strong));
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.2),
-    0 4px 14px -4px rgba(99, 102, 241, 0.45);
+    0 4px 14px -4px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.dark .ai-insights-page .ai-insights-ask-submit:not(:disabled):hover {
+/* Dark — secondary actions: match Overview saas-btn-premium (Replace file / Review mapping) */
+.dark
+  .ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-default));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-wash) 88%, var(--surface-elevated)) 0%,
+    color-mix(in srgb, var(--accent) 10%, var(--surface-elevated)) 100%
+  );
+  color: var(--foreground);
   box-shadow:
-    0 3px 6px rgba(0, 0, 0, 0.24),
-    0 10px 22px -8px rgba(99, 102, 241, 0.52);
+    0 1px 2px rgba(0, 0, 0, 0.22),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 2px 14px -6px color-mix(in srgb, var(--accent-glow) 50%, transparent);
+}
+
+.dark
+  .ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--border-strong));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-wash) 100%, var(--surface-elevated)) 0%,
+    color-mix(in srgb, var(--accent) 16%, var(--surface-elevated)) 100%
+  );
+  color: var(--foreground);
+  box-shadow:
+    0 4px 16px -4px color-mix(in srgb, var(--accent-glow) 58%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.dark
+  .ai-insights-page
+  .ai-insights-action-btn.saas-btn-premium:not(.ai-insights-action-btn--primary):not(:disabled):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  outline-offset: 2px;
+}
+
+/* AI Insights — Ask AI disabled (clearly inactive) */
+.ai-insights-page .ai-insights-ask-submit:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--border-default) 88%, transparent) !important;
+  background: color-mix(
+    in srgb,
+    var(--surface-subtle) 65%,
+    var(--surface-elevated)
+  ) !important;
+  color: color-mix(in srgb, var(--text-muted) 90%, var(--foreground)) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+
+.ai-insights-page .ai-insights-ask-submit:disabled:hover {
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+.dark .ai-insights-page .ai-insights-ask-submit:disabled {
+  border-color: var(--insights-border-soft) !important;
+  background: color-mix(
+    in srgb,
+    var(--insights-layer-inset) 82%,
+    var(--insights-layer-panel)
+  ) !important;
+  color: var(--insights-text-muted) !important;
 }
 
 .dark .ai-insights-page .ai-insights-executive {
@@ -2359,12 +2743,15 @@ body {
 /* Light mode only — dark uses solid layer tokens above */
 
 /* Shared chart viz — visualization stage (light + dark) */
+.ai-insights-page .ai-insights-viz-card .ai-insights-viz-chart-frame,
 .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame,
 .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame {
-  background: color-mix(in srgb, var(--surface-inset) 28%, var(--surface-elevated));
+  border-radius: 0.75rem;
+  border-color: color-mix(in srgb, var(--border-default) 72%, var(--card-border));
+  background: color-mix(in srgb, var(--surface-inset) 32%, var(--surface-elevated));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
-    0 1px 2px rgba(15, 23, 42, 0.04);
+    0 1px 2px rgba(15, 23, 42, 0.05);
   height: auto;
 }
 
@@ -2397,11 +2784,12 @@ body {
   margin-inline: auto;
 }
 
+.dark .ai-insights-page .ai-insights-viz-card .ai-insights-viz-chart-frame,
 .dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame,
 .dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame {
   background: color-mix(in srgb, var(--insights-layer-card) 72%, var(--insights-layer-inset));
   border-color: var(--insights-border-soft);
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-text,
@@ -2462,14 +2850,19 @@ body {
 /* Charts tab — responsive preview plot slot (less dead space at 80–125% zoom) */
 .charts-tab-viz-plot-slot {
   height: clamp(
-    196px,
+    242px,
     var(--charts-tab-plot-h, 280px),
-    min(42vh, 440px)
+    min(51vh, 550px)
   );
 }
 
 .chart-viz-theme.charts-tab-viz-preview .charts-tab-viz-plot-stage {
-  margin-top: 0.125rem;
+  margin-top: 0;
+}
+
+.charts-tab-png-export-root {
+  width: 100%;
+  min-width: 0;
 }
 
 .chart-viz-theme.charts-tab-viz-preview .charts-session-viz-frame {
