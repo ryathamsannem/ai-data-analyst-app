@@ -2850,9 +2850,9 @@ body {
 /* Charts tab — responsive preview plot slot (less dead space at 80–125% zoom) */
 .charts-tab-viz-plot-slot {
   height: clamp(
-    220px,
+    242px,
     var(--charts-tab-plot-h, 280px),
-    min(46vh, 500px)
+    min(51vh, 550px)
   );
 }
 

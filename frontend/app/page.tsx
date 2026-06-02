@@ -9830,6 +9830,7 @@ function HomeInner() {
               alignedMetric: pdfMetricColumn,
               alignedMetricDisplay: pdfAlignedMetricDisplay,
               aggregation: pdfAggregation,
+              metricType: pdfViz?.chartRecommendation?.metricType ?? null,
               roundingHint: pdfViz?.roundingHint ?? null,
               chartAttribution: chartExportAttribution,
             }

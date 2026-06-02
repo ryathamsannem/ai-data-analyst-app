@@ -896,6 +896,8 @@ export type ExecutivePdfExportInput = {
     alignedMetric?: string | null;
     alignedMetricDisplay?: string | null;
     aggregation?: string | null;
+    /** Chart recommendation metric type (`numeric`, `currency`, …). */
+    metricType?: string | null;
     /** API rounding hint (`pct_1`, `money_0`, …) for metric formatting. */
     roundingHint?: string | null;
     /** e.g. auto-dashboard vs AI no-chart placeholder */
@@ -1835,6 +1837,7 @@ function pdfChartMetricFormatContext(
     presentationKind: chart.presentationKind,
     roundingHint: chart.roundingHint ?? null,
     metricLabel: chart.alignedMetricDisplay?.trim() || chart.alignedMetric?.trim() || null,
+    metricType: chart.metricType ?? null,
     chartTitle: chart.title,
     question,
   };
@@ -2090,11 +2093,13 @@ function buildPdfVizExecutiveFacts(
   if (!scored.length) return [];
 
   const preferLow = ascending === true;
-  scored.sort((a, b) => (preferLow ? a.n - b.n : b.n - a.n));
-  const lo = scored[0]!;
-  const mid = scored[1];
-  const hi = scored[scored.length - 1]!;
-  const spread = Math.round(hi.n - lo.n);
+  let minEntry = scored[0]!;
+  let maxEntry = scored[0]!;
+  for (const x of scored) {
+    if (x.n < minEntry.n) minEntry = x;
+    if (x.n > maxEntry.n) maxEntry = x;
+  }
+  const spread = Math.max(0, Math.round(maxEntry.n - minEntry.n));
   const spreadLabel = metricFormatUsesPercent(metricCtx)
     ? `${spread} percentage points`
     : formatPdfBusinessNumber(spread);
@@ -2104,22 +2109,27 @@ function buildPdfVizExecutiveFacts(
   );
   const met = normalizePdfMetricPhrase(metricLabel);
 
+  const sortedDesc = [...scored].sort((a, b) => b.n - a.n);
+  const sortedAsc = [...scored].sort((a, b) => a.n - b.n);
+  const nextHighest = sortedDesc[1];
+  const nextLowest = sortedAsc[1];
+
   if (preferLow) {
     return [
       {
         title: `Lowest ${cat}`,
-        value: formatPdfCategoryLabel(String(lo.row.name ?? "—")),
+        value: formatPdfCategoryLabel(String(minEntry.row.name ?? "—")),
       },
-      { title: `Lowest ${met}`, value: fmt(lo.row) },
-      ...(mid
+      { title: `Lowest ${met}`, value: fmt(minEntry.row) },
+      ...(nextLowest
         ? [
             {
               title: "Next lowest category",
-              value: formatPdfCategoryLabel(String(mid.row.name ?? "")),
+              value: formatPdfCategoryLabel(String(nextLowest.row.name ?? "")),
             },
             {
               title: `Next lowest ${met}`,
-              value: fmt(mid.row),
+              value: fmt(nextLowest.row),
             },
           ]
         : [
@@ -2138,18 +2148,18 @@ function buildPdfVizExecutiveFacts(
   return [
     {
       title: `Highest ${cat}`,
-      value: formatPdfCategoryLabel(String(hi.row.name ?? "—")),
+      value: formatPdfCategoryLabel(String(maxEntry.row.name ?? "—")),
     },
-    { title: `Highest ${met}`, value: fmt(hi.row) },
-    ...(mid
+    { title: `Highest ${met}`, value: fmt(maxEntry.row) },
+    ...(nextHighest
       ? [
           {
             title: "Next highest category",
-            value: formatPdfCategoryLabel(String(mid.row.name ?? "")),
+            value: formatPdfCategoryLabel(String(nextHighest.row.name ?? "")),
           },
           {
             title: `Next highest ${met}`,
-            value: fmt(mid.row),
+            value: fmt(nextHighest.row),
           },
         ]
       : [

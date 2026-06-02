@@ -30,8 +30,8 @@ export type InsightChartLayoutMetrics = {
 /**
  * Charts tab session preview — responsive height with less vertical dead space than legacy 300–500px floor.
  */
-/** ~12% taller plot after Charts tab duplicate metadata row removal. */
-const CHARTS_TAB_PLOT_HEIGHT_BOOST = 1.12;
+/** Taller Charts tab plot after duplicate metadata row removal (+ cleanup pass). */
+const CHARTS_TAB_PLOT_HEIGHT_BOOST = 1.23;
 
 export function resolveChartsTabPreviewPlotHeight(
   pointCount: number,
