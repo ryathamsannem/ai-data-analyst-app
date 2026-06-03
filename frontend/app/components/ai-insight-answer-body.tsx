@@ -2,6 +2,14 @@
 
 import { Fragment, memo, useMemo } from "react";
 import {
+  polishInsightNarrativeText,
+  type DualMetricRoasLead,
+} from "@/lib/narrative-number-format";
+
+export type InsightNarrativePolishOpts = {
+  dualMetricRoasLead?: DualMetricRoasLead | null;
+};
+import {
   aiInsightsAnswerBodyEmphasis,
   aiInsightsAnswerBodyListItem,
   aiInsightsAnswerBodyMetric,
@@ -35,9 +43,13 @@ function highlightMetricsOnly(text: string) {
 }
 
 /** Inline emphasis: markdown bold + metric highlighting (presentation only). */
-export function formatInsightInline(text: string) {
-  const boldParts = text.split(BOLD_RE);
-  if (boldParts.length <= 1) return highlightMetricsOnly(text);
+export function formatInsightInline(
+  text: string,
+  polishOpts?: InsightNarrativePolishOpts
+) {
+  const normalized = polishInsightNarrativeText(text, polishOpts);
+  const boldParts = normalized.split(BOLD_RE);
+  if (boldParts.length <= 1) return highlightMetricsOnly(normalized);
 
   return boldParts.map((part, i) => {
     const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
@@ -78,8 +90,13 @@ function stripSummaryLead(lines: string[]): string[] {
 }
 
 /** Multi-line summary with label lines emphasized (presentation only). */
-export function formatInsightSummary(text: string) {
-  const lines = stripSummaryLead(text.split(/\r?\n/));
+export function formatInsightSummary(
+  text: string,
+  polishOpts?: InsightNarrativePolishOpts
+) {
+  const lines = stripSummaryLead(
+    polishInsightNarrativeText(text, polishOpts).split(/\r?\n/)
+  );
   let hasPriorContent = false;
 
   return lines.map((line, i) => {
@@ -164,9 +181,11 @@ function parseBodyBlocks(text: string): BodyBlock[] {
 export const AiInsightAnswerBody = memo(function AiInsightAnswerBody({
   text,
   variant = "default",
+  polishOpts,
 }: {
   text: string;
   variant?: "default" | "findings";
+  polishOpts?: InsightNarrativePolishOpts;
 }) {
   const blocks = useMemo(() => parseBodyBlocks(text), [text]);
   const asFindings = variant === "findings";
@@ -191,7 +210,7 @@ export const AiInsightAnswerBody = memo(function AiInsightAnswerBody({
             >
               {block.items.map((item, ii) => (
                 <li key={`${bi}-${ii}`} className={itemCls}>
-                  {formatInsightInline(item)}
+                  {formatInsightInline(item, polishOpts)}
                 </li>
               ))}
             </ul>
@@ -199,7 +218,7 @@ export const AiInsightAnswerBody = memo(function AiInsightAnswerBody({
         }
         return (
           <p key={`para-${bi}`} className={aiInsightsAnswerBodyPara}>
-            {formatInsightInline(block.text)}
+            {formatInsightInline(block.text, polishOpts)}
           </p>
         );
       })}

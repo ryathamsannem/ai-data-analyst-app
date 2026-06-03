@@ -157,6 +157,14 @@ import {
   AiInsightAnswerBody,
   formatInsightSummary,
 } from "./components/ai-insight-answer-body";
+import {
+  polishInsightNarrativeText,
+  type DualMetricRoasLead,
+} from "@/lib/narrative-number-format";
+import {
+  buildNumberedExecutiveBrief,
+  isExecutiveTakeawaysQuestion,
+} from "@/lib/executive-insights-brief";
 import { WrappedCategoryYAxisTick } from "./components/chart-category-axis-tick";
 import {
   aiInsightsAnswerCard,
@@ -1735,7 +1743,9 @@ function buildChartAxisPresentationBundle(args: {
   }
   const ms = vizClean?.multiSeries;
   if (ms?.layout === "grouped_bar" && ms.seriesKeys?.length) {
-    const full = ms.stackAxisTitle?.trim() || base.valueAxis;
+    const full = groupedBarMeasureChipLabel(
+      ms as NonNullable<StoredVisualization["multiSeries"]>
+    );
     const refined: ChartAxes = {
       categoryAxis: ms.categoryAxisTitle?.trim() || base.categoryAxis,
       valueAxis: full,
@@ -2751,6 +2761,23 @@ function isMultiMetricBarLayout(
   return layout === "stacked_bar" || layout === "grouped_bar";
 }
 
+/** MEASURE chip + axis label for grouped dual-metric charts (not generic stack axis). */
+function groupedBarMeasureChipLabel(
+  ms: Pick<
+    NonNullable<StoredVisualization["multiSeries"]>,
+    "seriesKeys" | "seriesLabels" | "stackAxisTitle"
+  >
+): string {
+  const parts = (ms.seriesKeys ?? [])
+    .map((k) => ms.seriesLabels?.[k]?.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) return parts.join(" & ");
+  if (parts.length === 1) return parts[0]!;
+  const stack = ms.stackAxisTitle?.trim();
+  if (stack && stack.toLowerCase() !== "amount") return stack;
+  return "Revenue & Ad Spend";
+}
+
 /** Executive signal cards for grouped revenue vs spend (etc.) by category. */
 function buildGroupedMetricExecutiveInsights(
   chartData: ChartRow[],
@@ -2793,22 +2820,33 @@ function buildGroupedMetricExecutiveInsights(
 
   if (keys.length >= 2) {
     const [ka, kb] = keys;
-    let iLead = 0;
+    const spendKey =
+      /spend|cost|budget|expense/i.test(kb) ||
+      (!/spend|cost|budget|expense/i.test(ka) && /revenue|sales/i.test(ka))
+        ? kb
+        : ka;
+    const revKey = spendKey === ka ? kb : ka;
+
+    let iBest = 0;
+    let bestRoas = -1;
     chartData.forEach((r, i) => {
-      const sumA = Number(r[ka!]) + Number(r[kb!]);
-      const sumB = Number(chartData[iLead]![ka!]) + Number(chartData[iLead]![kb!]);
-      if (Number.isFinite(sumA) && Number.isFinite(sumB) && sumA > sumB) iLead = i;
+      const spend = Number(r[spendKey]);
+      const rev = Number(r[revKey]);
+      if (Number.isFinite(spend) && spend > 1e-9 && Number.isFinite(rev)) {
+        const roas = rev / spend;
+        if (roas > bestRoas) {
+          bestRoas = roas;
+          iBest = i;
+        }
+      }
     });
-    const lead = chartData[iLead]!;
-    const va = Number(lead[ka!]);
-    const vb = Number(lead[kb!]);
-    if (Number.isFinite(va) && Number.isFinite(vb) && vb > 1e-9) {
-      const ratio = va / vb;
+    if (bestRoas >= 0) {
+      const best = chartData[iBest]!;
       out.push({
-        key: "dual-ratio-lead",
-        title: `${ms.seriesLabels[ka!] ?? ka} / ${ms.seriesLabels[kb!] ?? kb}`,
-        value: formatDerivedInsightNumber(ratio, "ratio_1", false),
-        hint: `On ${shortenLabel(String(lead.name ?? ""), 32)} (${dim})`,
+        key: "dual-roas",
+        title: "Best ROAS",
+        value: shortenLabel(String(best.name ?? ""), 44),
+        hint: formatDerivedInsightNumber(bestRoas, "ratio_1", false),
         dotClass: "bg-violet-500",
       });
     }
@@ -3086,10 +3124,20 @@ function buildExecutiveVizInsights(
   ];
 
   if (rows.length > 1) {
+    const spreadDisp = formatDerivedInsightNumber(spread, roundingHint, false);
+    const pctSuffix =
+      maxR.value > 1e-9
+        ? (() => {
+            const pct = (spread / maxR.value) * 100;
+            if (!Number.isFinite(pct)) return "";
+            const pctStr = pct >= 10 ? String(Math.round(pct)) : pct.toFixed(1);
+            return ` (${pctStr}%)`;
+          })()
+        : "";
     out.push({
       key: "cmp-gap",
       title: `${met.trim()} Gap`,
-      value: formatDerivedInsightNumber(spread, roundingHint, false),
+      value: `${spreadDisp}${pctSuffix}`,
       hint: `${shortenLabel(maxR.label, 24)} ↔ ${shortenLabel(minR.label, 24)}`,
       dotClass: nextDot(),
     });
@@ -3308,6 +3356,7 @@ type AlignedAnalysisContext = {
   mappingConfidenceLevel?: string | null;
   insightConfidenceRationale: string;
   evidenceSummaryLine: string;
+  dualMetricCompare?: boolean;
 };
 
 function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
@@ -3455,6 +3504,7 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
       typeof o.evidenceSummaryLine === "string"
         ? o.evidenceSummaryLine.trim()
         : "",
+    dualMetricCompare: Boolean(o.dualMetricCompare),
   };
 }
 
@@ -8789,6 +8839,11 @@ function HomeInner() {
       insightSemanticContext?.dimensionLabel.trim() ||
       insightChartAxisLabels.categoryAxis;
 
+    const dualMetricCompare = Boolean(
+      insightVisualization?.multiSeries?.layout === "grouped_bar" ||
+        alignedAnalysis?.dualMetricCompare
+    );
+
     const base = buildAiFollowUpQuestionChips({
       lastQuestion: lastAskedQuestion,
       chartTitle: insightDisplayChartTitle,
@@ -8801,15 +8856,19 @@ function HomeInner() {
         value: r.value,
       })),
       alternateMetricLabels: alts,
+      dualMetricCompare,
     });
 
-    const seeds = schemaAwareFollowUpSeeds(
-      datasetKind || "",
-      columns,
-      insightSemanticContext
-    );
+    const seeds = dualMetricCompare
+      ? []
+      : schemaAwareFollowUpSeeds(
+          datasetKind || "",
+          columns,
+          insightSemanticContext
+        );
 
     if (
+      !dualMetricCompare &&
       insightSemanticContext &&
       !isTrendMode(insightSnapshot?.contract) &&
       sortedInsightChartData.length >= 1
@@ -8850,6 +8909,8 @@ function HomeInner() {
     insightSemanticContext,
     datasetKind,
     sortedInsightChartData,
+    insightVisualization?.multiSeries?.layout,
+    alignedAnalysis?.dualMetricCompare,
   ]);
 
   /** Plot height inside the AI Insight shell — from chart-type layout config. */
@@ -9156,6 +9217,58 @@ function HomeInner() {
     ]
   );
 
+  const dualMetricRoasLead = useMemo((): DualMetricRoasLead | null => {
+    if (insightVisualization?.multiSeries?.layout !== "grouped_bar") return null;
+    const card = insightExecutiveVizInsights.find((c) => c.key === "dual-roas");
+    if (!card?.value?.trim() || !card.hint?.trim()) return null;
+    return { campaign: card.value.trim(), roas: card.hint.trim() };
+  }, [
+    insightVisualization?.multiSeries?.layout,
+    insightExecutiveVizInsights,
+  ]);
+
+  const insightNumberedExecutiveBrief = useMemo((): string | null => {
+    if (
+      isTrendMode(insightSnapshot?.contract) ||
+      !isExecutiveTakeawaysQuestion(lastAskedQuestion)
+    ) {
+      return null;
+    }
+    const briefRows = insightVisualization?.labels?.length
+      ? zipStoredVisualizationPairs(insightVisualization).map((r) => ({
+          label: r.label,
+          value: r.value,
+          formatted: r.formatted,
+        }))
+      : sortedInsightChartData
+          .filter((r) => Number.isFinite(Number(r.value)))
+          .map((r) => ({
+            label: String(r.name ?? "").trim() || "—",
+            value: Number(r.value),
+            formatted:
+              r.displayValue?.trim() ||
+              fallbackChartNumericDisplay(
+                insightPresentationChartKind || "bar",
+                Number(r.value)
+              ),
+          }));
+    if (briefRows.length < 2) return null;
+    return buildNumberedExecutiveBrief({
+      question: lastAskedQuestion,
+      categoryAxis: insightChartAxisLabels.categoryAxis,
+      valueAxis: insightChartAxisLabels.valueAxis,
+      rows: briefRows,
+    });
+  }, [
+    insightSnapshot?.contract,
+    lastAskedQuestion,
+    insightVisualization,
+    sortedInsightChartData,
+    insightChartAxisLabels.categoryAxis,
+    insightChartAxisLabels.valueAxis,
+    insightPresentationChartKind,
+  ]);
+
   const parsedInsightAnswer = useMemo(() => {
     const parsed = parseAnswerIntoSections(
       answer,
@@ -9163,36 +9276,55 @@ function HomeInner() {
     );
     const c = insightSnapshot?.contract;
     const tone = insightNarrativeTone;
-    const soften = (t?: string) => {
+    const softenDetail = (t?: string) => {
       const raw = t?.trim() ? t.trim() : "";
       if (!raw) return t;
       const sanitized = isTrendMode(c)
         ? sanitizeNarrativeForTrendContract(raw, c)
         : raw;
-      return softenAssertiveProse(sanitized, tone);
+      return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone));
     };
+    const softenSummary = (t?: string) => {
+      const raw = t?.trim() ? t.trim() : "";
+      if (!raw) return t;
+      const sanitized = isTrendMode(c)
+        ? sanitizeNarrativeForTrendContract(raw, c)
+        : raw;
+      return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone), {
+        dualMetricRoasLead,
+      });
+    };
+    const summaryText =
+      insightNumberedExecutiveBrief ??
+      softenSummary(parsed.summary) ??
+      "";
     return {
       ...parsed,
-      summary: soften(parsed.summary) ?? "",
-      statistical: soften(parsed.statistical),
-      hypotheses: soften(parsed.hypotheses),
-      recommendations: soften(parsed.recommendations),
-      methodology: soften(parsed.methodology),
-      moreDetail: soften(parsed.moreDetail),
+      summary: summaryText,
+      statistical: softenDetail(parsed.statistical),
+      hypotheses: softenDetail(parsed.hypotheses),
+      recommendations: softenDetail(parsed.recommendations),
+      methodology: softenDetail(parsed.methodology),
+      moreDetail: softenDetail(parsed.moreDetail),
     };
   }, [
     answer,
     alignedAnalysis?.insightSummary,
     insightSnapshot?.contract,
     insightNarrativeTone,
+    dualMetricRoasLead,
+    insightNumberedExecutiveBrief,
   ]);
 
   const insightExecutiveBrief = useMemo(() => {
+    if (insightNumberedExecutiveBrief) {
+      return polishInsightNarrativeText(insightNumberedExecutiveBrief);
+    }
     if (isTrendMode(insightSnapshot?.contract)) {
       const pinned = narrativeCopyForContract(insightSnapshot?.contract);
       if (pinned) {
-        const brief = firstSentenceForExecutiveSummary(pinned, 168);
-        return softenExecutiveTakeaway(brief, insightNarrativeTone);
+        const brief = softenExecutiveTakeaway(pinned, insightNarrativeTone);
+        return polishInsightNarrativeText(brief, { dualMetricRoasLead });
       }
     }
     const s = sanitizeNarrativeForTrendContract(
@@ -9200,14 +9332,16 @@ function HomeInner() {
       insightSnapshot?.contract
     );
     if (!s) return "";
-    return softenExecutiveTakeaway(
-      firstSentenceForExecutiveSummary(s, 168),
-      insightNarrativeTone
+    return polishInsightNarrativeText(
+      softenExecutiveTakeaway(s, insightNarrativeTone),
+      { dualMetricRoasLead }
     );
   }, [
+    insightNumberedExecutiveBrief,
     parsedInsightAnswer.summary,
     insightSnapshot?.contract,
     insightNarrativeTone,
+    dualMetricRoasLead,
   ]);
 
   const exportExecutiveInsightsPreview = useMemo(() => {
@@ -9756,6 +9890,51 @@ function HomeInner() {
               };
             }
             const ms = pdfVizForSemantics?.multiSeries;
+            if (ms?.layout === "grouped_bar" && ms.seriesKeys?.length) {
+              const full = groupedBarMeasureChipLabel(
+                ms as NonNullable<StoredVisualization["multiSeries"]>
+              );
+              const refinedGrouped: ChartAxes = {
+                categoryAxis: ms.categoryAxisTitle?.trim() || base.categoryAxis,
+                valueAxis: full,
+                valueAxisCompact: compactAxisLabelFromFullPhrase(full),
+              };
+              const categoryGrouped = resolveSemanticCategoryAxisForCharts({
+                presentationKind: pdfPresentationKind,
+                chartTitle: pdfChartTitle,
+                grainTitleHint: pdfNormMeta.grainHintTitle,
+                viz: pdfVizForSemantics,
+                analysis: pdfSemanticsAnalysis,
+                preferAnalysisForCategory:
+                  chartScope === "insight" &&
+                  pdfSnap?.source !== "auto_dashboard",
+                refinedCategoryFallback: refinedGrouped.categoryAxis,
+              });
+              const axesGrouped: ChartAxes = {
+                categoryAxis: categoryGrouped,
+                valueAxis: refinedGrouped.valueAxis,
+                valueAxisCompact: refinedGrouped.valueAxisCompact,
+              };
+              const mergedGrouped = mergeInsightAxesWithAlignedAnalysis({
+                axes: axesGrouped,
+                presentationKind: pdfPresentationKind,
+                viz: pdfVizForSemantics,
+                analysis: pdfMergeAnalysis,
+                preferAligned: pdfMergePrefer,
+                grainHintTitle: pdfNormMeta.grainHintTitle,
+                rawChartTitle: pdfChartTitle,
+                mode: "category_only",
+              });
+              const outGrouped = {
+                ...mergedGrouped,
+                valueAxis: refinedGrouped.valueAxis,
+                valueAxisCompact: refinedGrouped.valueAxisCompact,
+              };
+              return {
+                category: outGrouped.categoryAxis,
+                value: outGrouped.valueAxis,
+              };
+            }
             if (ms?.layout === "stacked_bar" && ms.seriesKeys?.length) {
               const full = ms.stackAxisTitle
                 ? `Total (${ms.stackAxisTitle} stacked)`
@@ -11583,7 +11762,9 @@ function HomeInner() {
                             </span>
                           </summary>
                           <div className={aiInsightsAnswerDetailBody}>
-                            <AiInsightAnswerBody text={parsedInsightAnswer.methodology} />
+                            <AiInsightAnswerBody
+                              text={parsedInsightAnswer.methodology}
+                            />
                           </div>
                         </details>
                       ) : null}

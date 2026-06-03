@@ -18,7 +18,38 @@ export type AiFollowUpChipContext = {
   seriesRows: { name: string; value: number }[];
   /** Human-readable alternate numeric measures for “compare A with B”. */
   alternateMetricLabels: string[];
+  /** Side-by-side revenue/spend (or similar) comparison chart. */
+  dualMetricCompare?: boolean;
 };
+
+/** Noun used in follow-up phrasing (e.g. campaign, product). */
+function followUpDimensionToken(categoryAxisLabel: string): string {
+  const d = categoryAxisLabel.trim().toLowerCase();
+  if (/\bcampaign\b/.test(d)) return "campaign";
+  if (/\bproduct\b/.test(d)) return "product";
+  if (/\bregion\b/.test(d)) return "region";
+  if (/\bchannel\b/.test(d)) return "channel";
+  if (/\bdepartment\b/.test(d)) return "department";
+  const stripped = d.replace(/\s+name$/, "").trim();
+  return stripped || "category";
+}
+
+/**
+ * Business-oriented follow-ups after a dual-metric compare chart (revenue vs spend, etc.).
+ */
+export function buildDualMetricCompareFollowUpChips(
+  categoryAxisLabel: string
+): string[] {
+  const dim = followUpDimensionToken(categoryAxisLabel);
+  const plural = dim.endsWith("s") ? dim : `${dim}s`;
+  return [
+    `Which ${dim} has the best ROAS?`,
+    `Which ${dim} spends most efficiently?`,
+    `Show ROAS by ${dim}`,
+    `Which ${dim} should receive more budget?`,
+    `Compare ROAS across ${plural}`,
+  ];
+}
 
 function norm(s: string): string {
   return s.replace(/\s+/g, " ").trim().toLowerCase();
@@ -59,6 +90,10 @@ function truncatePhrase(s: string, max: number): string {
  * Build 3–5 short follow-up questions from the latest ask + chart context.
  */
 export function buildAiFollowUpQuestionChips(ctx: AiFollowUpChipContext): string[] {
+  if (ctx.dualMetricCompare) {
+    return buildDualMetricCompareFollowUpChips(ctx.categoryAxisLabel).slice(0, 5);
+  }
+
   const chips: string[] = [];
   const met = ctx.valueAxisLabel.trim() || "this metric";
   const dim = ctx.categoryAxisLabel.trim() || "category";

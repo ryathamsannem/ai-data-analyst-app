@@ -53,7 +53,10 @@ export function SmartChartInsightPanel(props: {
         {intel.whyThisChart}
       </p>
 
-      <p className={aiInsightsSmartReadBlurb}>{intel.recommendationBlurb}</p>
+      {intel.recommendationBlurb?.trim() &&
+      intel.recommendationBlurb.trim() !== intel.whyThisChart.trim() ? (
+        <p className={aiInsightsSmartReadBlurb}>{intel.recommendationBlurb}</p>
+      ) : null}
 
       {strip.length > 0 ? (
         <div className="mt-3">

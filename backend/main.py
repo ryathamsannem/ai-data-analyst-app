@@ -9094,11 +9094,26 @@ def _resolve_two_metric_compare_spec(
         "metric_b": str(metric_b),
         "agg_label": agg_label,
         "agg_key": agg_key,
-        "metric_display": (
-            f"{_pretty_label_text(metric_a)} vs {_pretty_label_text(metric_b)}"
+        "metric_display": _dual_metric_chart_display_title(
+            str(group_col), str(metric_a), str(metric_b)
         ),
         "dual_metric_compare": True,
     }
+
+
+def _dual_metric_chart_display_title(
+    group_col: str, metric_a: str, metric_b: str
+) -> str:
+    """Executive-style title for revenue/spend style dual-metric compares."""
+    def _title_words(phrase: str) -> str:
+        t = _pretty_label_text(phrase).strip()
+        return " ".join(w.capitalize() for w in t.split()) if t else ""
+
+    dim = _title_words(group_col)
+    dim = re.sub(r"\s+Name$", "", dim, flags=re.I).strip() or dim
+    la = _title_words(metric_a)
+    lb = _title_words(metric_b)
+    return f"{la} and {lb} by {dim}"
 
 
 def _try_build_grouped_two_metric_chart(
@@ -9182,14 +9197,15 @@ def _try_build_grouped_two_metric_chart(
             "_sort",
         ]
         exact = tbl.drop(columns=["_sort"], errors="ignore").to_string(index=False)
-        dim = _pretty_label_text(group_col).lower()
-        title = f"{label_a} vs {label_b} by {dim}"
+        title = _dual_metric_chart_display_title(group_col, metric_a, metric_b)
+        disp_a = " ".join(w.capitalize() for w in label_a.split())
+        disp_b = " ".join(w.capitalize() for w in label_b.split())
         meta = {
             "layout": "grouped_bar",
             "categoryAxisTitle": _pretty_label_text(group_col),
-            "stackAxisTitle": f"{label_a} & {label_b}",
+            "stackAxisTitle": "Amount",
             "seriesKeys": [key_a, key_b],
-            "seriesLabels": {key_a: label_a, key_b: label_b},
+            "seriesLabels": {key_a: disp_a, key_b: disp_b},
             "rows": rows_out,
         }
         return exact, rows_out, title, meta

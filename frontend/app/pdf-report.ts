@@ -6,6 +6,7 @@
 import { Canvg } from "canvg";
 import type { ChartKind, ChartRow } from "./chart-types";
 import { pdfXAxisLineTitle, pdfYAxisLineTitle } from "@/lib/chart-semantic-metadata";
+import { isNumberedExecutiveBrief } from "@/lib/executive-insights-brief";
 import {
   formatExecutiveMetricValue,
   formatRawMetricValue,
@@ -3777,6 +3778,7 @@ export async function runExecutivePdfExport(
     }
 
     const execBrief = input.executiveInsightsBrief?.trim() ?? "";
+    const execBriefNumbered = isNumberedExecutiveBrief(execBrief);
     const factSlice = (input.vizExecutiveFacts ?? []).slice(0, 6);
     const hasExecFacts = factSlice.length > 0;
     const vizInsightsFollow = Boolean(execBrief || hasExecFacts);
@@ -3786,7 +3788,10 @@ export async function runExecutivePdfExport(
       let h = 6;
       if (execBrief) {
         const wrap = doc.splitTextToSize(execBrief, contentWidth - 10);
-        h += Math.min(2, wrap.length) * PDF_SPACING.insightLineGap + 3;
+        const lineCap = execBriefNumbered
+          ? Math.min(8, wrap.length)
+          : Math.min(2, wrap.length);
+        h += lineCap * PDF_SPACING.insightLineGap + 3;
       }
       if (hasExecFacts) {
         const gridRows = Math.ceil(factSlice.length / 3);
@@ -3895,7 +3900,9 @@ export async function runExecutivePdfExport(
       const briefWrap = execBrief
         ? doc.splitTextToSize(execBrief, contentWidth - 10)
         : [];
-      const briefLines = Math.min(2, briefWrap.length);
+      const briefLines = execBriefNumbered
+        ? Math.min(8, briefWrap.length)
+        : Math.min(2, briefWrap.length);
       const factBlockH = hasExecFacts
         ? PDF_SPACING.panelPad +
           gridRows * factCardH +
@@ -3932,7 +3939,7 @@ export async function runExecutivePdfExport(
         doc.setFont("helvetica", "normal");
         doc.setFontSize(PDF_TYPE.body);
         doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
-        briefWrap.slice(0, 2).forEach((ln: string) => {
+        briefWrap.slice(0, briefLines).forEach((ln: string) => {
           doc.text(ln, margin + 5, py);
           py += PDF_SPACING.insightLineGap;
         });

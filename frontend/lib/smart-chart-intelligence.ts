@@ -352,7 +352,7 @@ function blurbForRenderedChart(params: {
   const met = params.valueAxis.trim() || "your metric";
   const dim = params.categoryAxis.trim() || "each category";
   if (params.groupedDualMetric) {
-    return `Grouped side-by-side bars compare ${met} within each ${dim} so both measures are visible per category.`;
+    return "Grouped side-by-side bars compare Revenue and Ad Spend across campaigns.";
   }
   if (params.kind === "histogram") {
     return `Bins ${met} into ranges to show spread and tail behavior across the cohort.`;
@@ -450,26 +450,27 @@ export function computeSmartChartIntel(params: {
     const stackedBlurb = groupedDual
       ? chartBlurb
       : "Each stack shows sub-parts within a category — useful for mix effects while keeping the same cohort.";
+    const whyThisChart = buildWhyThisChart({
+      currentLabel: currentLabel,
+      categoryAxis: params.categoryAxis,
+      valueAxis: params.valueAxis,
+      routing: params.routing,
+      answerSummary: params.answerSummary,
+      semanticContext: params.semanticContext,
+      chartBlurb: stackedBlurb,
+    });
     return {
       active: true,
       recommendedKind: currentKind,
       histogramStyle: false,
       recommendedLabel: currentLabel,
-      recommendationBlurb: stackedBlurb,
+      recommendationBlurb: groupedDual ? "" : stackedBlurb,
       currentKind,
       currentLabel,
       suggestedKind: currentKind,
       suggestedLabel: currentLabel,
       alignsWithRecommendation: true,
-      whyThisChart: buildWhyThisChart({
-        currentLabel: currentLabel,
-        categoryAxis: params.categoryAxis,
-        valueAxis: params.valueAxis,
-        routing: params.routing,
-        answerSummary: params.answerSummary,
-        semanticContext: params.semanticContext,
-        chartBlurb: stackedBlurb,
-      }),
+      whyThisChart,
       anomalyNote: detectNumericAnomalies(params.rows, currentKind),
     };
   }
@@ -493,7 +494,8 @@ export function computeSmartChartIntel(params: {
     recommendedKind: currentKind,
     histogramStyle,
     recommendedLabel: currentLabel,
-    recommendationBlurb: chartBlurb,
+    recommendationBlurb:
+      whyThisChart.trim() === chartBlurb.trim() ? "" : chartBlurb,
     currentKind,
     currentLabel,
     suggestedKind: currentKind,
