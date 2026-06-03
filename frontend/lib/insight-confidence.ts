@@ -21,6 +21,9 @@ export type UnifiedConfidenceSignals = {
   hasMetricColumn?: boolean;
   hasCategoryColumn?: boolean;
   aggregationKey?: string | null;
+  /** Time-series / trend charts — category comparison copy is misleading. */
+  isTrendChart?: boolean;
+  growthRequestUnsatisfied?: boolean;
 };
 
 export type UnifiedConfidenceResult = {
@@ -75,6 +78,11 @@ export function computeUnifiedInsightConfidence(
   const thinCohort = rows > 0 && rows < 100;
   const fewCategories = pts > 0 && pts <= 5;
 
+  if (signals.growthRequestUnsatisfied) {
+    level = "low";
+    score = Math.min(score, 40);
+  }
+
   if (rows <= 0) {
     level = "low";
     score = Math.min(score, 14);
@@ -126,7 +134,8 @@ export function computeUnifiedInsightConfidence(
   const eligibleHigh =
     strongEvidence &&
     (mappingLevel === "high" || signals.mappingConfirmedByUser) &&
-    !thinCohort;
+    !thinCohort &&
+    !signals.growthRequestUnsatisfied;
 
   if (eligibleHigh) {
     level = "high";
@@ -159,8 +168,9 @@ export function computeUnifiedInsightConfidence(
     rationale =
       "Moderate read: core metric and breakdown were inferred sensibly — treat rankings as directional until you confirm field mapping.";
   } else if (mappingWeak && rows >= 15) {
-    rationale =
-      "Mapping still looks inferred — validate the metric and grouping columns before acting on small gaps between categories.";
+    rationale = signals.isTrendChart
+      ? "Mapping still looks inferred — validate the date and metric columns before acting on short-term trend changes."
+      : "Mapping still looks inferred — validate the metric and grouping columns before acting on small gaps between categories.";
   } else if (fewCategories) {
     rationale =
       "Few comparison groups in the chart — treat leader vs laggard gaps as directional, not proof of structural advantage.";
@@ -173,6 +183,9 @@ export function computeUnifiedInsightConfidence(
   } else if (inferenceRisk) {
     rationale =
       "Partial alignment or visualization caveats applied — interpret peaks and rankings cautiously and reconcile with the raw cohort.";
+  } else if (signals.growthRequestUnsatisfied) {
+    rationale =
+      "The question asks about growth or fastest change, but the filtered data does not include enough time periods to compute rates of change — do not present static revenue rankings as growth rankings.";
   }
 
   return {

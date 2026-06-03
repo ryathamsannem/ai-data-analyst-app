@@ -12,6 +12,10 @@ export type NarrativeToneInputs = {
   mappingConfidence?: ConfidenceLevel | string | null;
   mappingConfirmedByUser?: boolean;
   unifiedConfidenceLevel?: ConfidenceLevel | string | null;
+  /** Time-series trend charts — avoid category ranking / breakdown copy. */
+  isTrendChart?: boolean;
+  /** Growth question without multi-period evidence. */
+  isUnsupportedGrowth?: boolean;
 };
 
 function normLevel(raw: string | null | undefined): ConfidenceLevel {
@@ -64,12 +68,16 @@ export function narrativeToneDisclaimer(
     }
     if (!inputs.mappingConfirmedByUser && normLevel(inputs.mappingConfidence) === "low") {
       parts.push(
-        "Column mapping is still inferred — confirm metric and breakdown fields before acting on rankings."
+        inputs.isUnsupportedGrowth || inputs.isTrendChart
+          ? "Column mapping is still inferred — confirm the date and metric columns before acting on short-term trend changes."
+          : "Column mapping is still inferred — confirm metric and breakdown fields before acting on rankings."
       );
     }
     if (pts > 0 && pts <= 5) {
       parts.push(
-        `Only ${pts} comparison group(s) appear in the chart — avoid over-interpreting small gaps.`
+        inputs.isTrendChart
+          ? `Only ${pts} time step(s) in this series — avoid over-interpreting short-term swings.`
+          : `Only ${pts} comparison group(s) appear in the chart — avoid over-interpreting small gaps.`
       );
     }
     if (!parts.length) {

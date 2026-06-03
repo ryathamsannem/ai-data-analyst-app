@@ -1,7 +1,11 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
 import { useDevRenderCount } from "@/lib/dev-render-count";
+import {
+  collapseNumberedExecutiveBrief,
+  isNumberedExecutiveBrief,
+} from "@/lib/executive-insights-brief";
 import {
   aiInsightsExecutiveBrief,
   aiInsightsExecutiveBriefLabel,
@@ -26,6 +30,8 @@ export type AiExecutiveInsightFact = {
   dotClass: string;
 };
 
+const BRIEF_COLLAPSE_CHARS = 280;
+
 /**
  * AI Insights — at-a-glance facts derived from the current visualization (not Overview).
  */
@@ -37,9 +43,45 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
   narrativeBrief?: string;
 }) {
   useDevRenderCount("AiExecutiveInsightsPanel");
+  const [briefExpanded, setBriefExpanded] = useState(false);
+
   if (!cards.length) return null;
 
-  const brief = narrativeBrief?.replace(/\s+/g, " ").trim();
+  const briefRaw = narrativeBrief?.trim() ?? "";
+  const briefIsNumbered = isNumberedExecutiveBrief(briefRaw);
+  const brief = briefIsNumbered
+    ? briefRaw
+    : briefRaw.replace(/\s+/g, " ").trim();
+
+  const { briefDisplay, briefCanExpand, briefPreLine } = useMemo(() => {
+    if (!brief) {
+      return { briefDisplay: "", briefCanExpand: false, briefPreLine: false };
+    }
+    if (briefIsNumbered) {
+      if (briefExpanded) {
+        return { briefDisplay: brief, briefCanExpand: true, briefPreLine: true };
+      }
+      const collapsed = collapseNumberedExecutiveBrief(brief, 2);
+      return {
+        briefDisplay: collapsed.display,
+        briefCanExpand: collapsed.canExpand,
+        briefPreLine: true,
+      };
+    }
+    if (brief.length <= BRIEF_COLLAPSE_CHARS) {
+      return { briefDisplay: brief, briefCanExpand: false, briefPreLine: false };
+    }
+    if (briefExpanded) {
+      return { briefDisplay: brief, briefCanExpand: true, briefPreLine: false };
+    }
+    const slice = brief.slice(0, BRIEF_COLLAPSE_CHARS);
+    const sp = slice.lastIndexOf(" ");
+    const clipped =
+      sp > BRIEF_COLLAPSE_CHARS - 80
+        ? `${slice.slice(0, sp).trim()}…`
+        : `${slice.trim()}…`;
+    return { briefDisplay: clipped, briefCanExpand: true, briefPreLine: false };
+  }, [brief, briefExpanded, briefIsNumbered]);
 
   return (
     <div className={aiInsightsExecutiveShell}>
@@ -53,18 +95,30 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
       </div>
 
       {brief ? (
-        <p className={aiInsightsExecutiveBrief}>
-          <span className={aiInsightsExecutiveBriefLabel}>AI context · </span>
-          {brief}
-        </p>
+        <div className="mb-3.5 min-w-0">
+          <p
+            className={`${aiInsightsExecutiveBrief} break-words ${
+              briefPreLine ? "whitespace-pre-line" : "whitespace-normal"
+            }`}
+          >
+            <span className={aiInsightsExecutiveBriefLabel}>AI context · </span>
+            {briefDisplay}
+          </p>
+          {briefCanExpand ? (
+            <button
+              type="button"
+              onClick={() => setBriefExpanded((v) => !v)}
+              className="mt-1.5 text-xs font-semibold text-[var(--accent)] hover:underline dark:text-indigo-300"
+            >
+              {briefExpanded ? "Show less" : "Show full summary"}
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       <div className={aiInsightsExecutiveGrid}>
         {cards.map((c) => (
-          <div
-            key={c.key}
-            className={aiInsightsExecutiveCard}
-          >
+          <div key={c.key} className={aiInsightsExecutiveCard}>
             <div
               className={`absolute left-0 top-0 h-full w-[3px] rounded-l-xl ${c.dotClass}`}
               aria-hidden

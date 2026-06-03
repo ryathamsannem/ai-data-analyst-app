@@ -95,6 +95,48 @@ export function grainLabelFromChartTitle(title: string): string | null {
   return titleCaseGrainPhrase(inner);
 }
 
+/** Prefer engine bucket metadata over title defaults (avoids weekly copy on monthly series). */
+export function resolveTrendBucketLabel(args: {
+  title?: string;
+  timeSeriesAnalysis?: Record<string, unknown> | null;
+  timeBucketLabelOverride?: string | null;
+  question?: string;
+  labels?: string[];
+}): string {
+  const override = args.timeBucketLabelOverride?.trim();
+  if (override && override.toLowerCase() !== "time") return override;
+
+  const fromMeta = grainLabelFromTimeMeta(args.timeSeriesAnalysis);
+  if (fromMeta) return fromMeta;
+
+  const fromTitle = grainLabelFromChartTitle(args.title ?? "");
+  if (fromTitle) return fromTitle;
+
+  const ql = (args.question ?? "").toLowerCase();
+  if (/\b(by month|monthly|month[- ]wise|each month|per month|every month)\b/.test(ql)) {
+    return "Monthly";
+  }
+  if (/\b(by week|weekly|each week|per week)\b/.test(ql)) {
+    return "Weekly";
+  }
+  if (/\b(by day|daily|each day|per day)\b/.test(ql)) {
+    return "Daily";
+  }
+
+  const labels = (args.labels ?? []).map((l) => String(l ?? "").trim());
+  if (
+    labels.length >= 2 &&
+    labels.every((l) => /^\d{4}-\d{2}(-\d{2})?/.test(l) || /^\d{4}-\d{2}$/.test(l))
+  ) {
+    return "Monthly";
+  }
+
+  if (/\bmonthly\b/i.test(args.title ?? "")) return "Monthly";
+  if (/\bweekly\b/i.test(args.title ?? "")) return "Weekly";
+
+  return "Weekly";
+}
+
 export function pickCategoryParts(
   viz: ChartSemanticVizLike,
   analysis: ChartSemanticAnalysisLike,

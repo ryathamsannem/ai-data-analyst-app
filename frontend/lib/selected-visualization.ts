@@ -9,11 +9,8 @@ import {
   computeFinalChartPresentation,
 } from "@/lib/final-chart-presentation";
 import { polishMetricDisplay } from "@/lib/analytics-metadata";
-import {
-  aggregationPrefixLabel,
-  metricStemFromRawTitle,
-  trendGrainFromTitle,
-} from "@/lib/canonical-chart-title";
+import { aggregationPrefixLabel, metricStemFromRawTitle } from "@/lib/canonical-chart-title";
+import { resolveTrendBucketLabel } from "@/lib/chart-semantic-metadata";
 import {
   buildContextCore,
   formatAggregationLabel,
@@ -112,12 +109,15 @@ function buildTrendMetricLabel(stem: string, aggregation: string): string {
   return `${agg} ${core}`;
 }
 
-function buildTrendDisplayTitle(
-  rawTitle: string,
-  metricLabel: string
-): string {
-  const grain = trendGrainFromTitle(rawTitle);
-  return `${metricLabel} trend (${grain})`;
+export function buildTrendDisplayTitle(metricLabel: string, timeBucketLabel: string): string {
+  const bucket = timeBucketLabel.trim();
+  if (/\bmonth/i.test(bucket)) return `Monthly ${metricLabel} trend`;
+  if (/\bweek/i.test(bucket)) return `Weekly ${metricLabel} trend`;
+  if (/\bday/i.test(bucket)) return `Daily ${metricLabel} trend`;
+  if (/\bquarter/i.test(bucket)) return `Quarterly ${metricLabel} trend`;
+  if (/\byear/i.test(bucket)) return `Yearly ${metricLabel} trend`;
+  if (/\bhour/i.test(bucket)) return `Hourly ${metricLabel} trend`;
+  return `${metricLabel} trend`;
 }
 
 function buildComparisonDisplayTitle(
@@ -174,6 +174,9 @@ export function freezeVisualizationContract(args: {
   aggregationKey?: string;
   datasetDomain?: string;
   aiContext?: Record<string, unknown> | null;
+  /** Engine adaptive bucket (Monthly, Weekly, …) — wins over title parsing. */
+  timeBucketLabelOverride?: string | null;
+  timeSeriesAnalysis?: Record<string, unknown> | null;
 }): VisualizationContract {
   const rawTitle = args.title.trim() || "Chart";
   const temporalLabels = labelsLookTemporal(args.labels);
@@ -222,13 +225,21 @@ export function freezeVisualizationContract(args: {
   });
 
   const timeBucketLabel =
-    mode === "trend" ? extractTimeBucketLabel(rawTitle) : "";
+    mode === "trend"
+      ? resolveTrendBucketLabel({
+          title: rawTitle,
+          timeSeriesAnalysis: args.timeSeriesAnalysis,
+          timeBucketLabelOverride: args.timeBucketLabelOverride,
+          question: args.question,
+          labels: args.labels,
+        })
+      : "";
 
   let metricLabel = polishMetricDisplay(metricStemFromRawTitle(rawTitle) || rawTitle);
   let displayTitle = rawTitle;
   if (mode === "trend") {
     metricLabel = buildTrendMetricLabel(rawTitle, aggregation);
-    displayTitle = buildTrendDisplayTitle(rawTitle, metricLabel);
+    displayTitle = buildTrendDisplayTitle(metricLabel, timeBucketLabel);
   } else if (mode === "comparison" || /\s+by\s+/i.test(rawTitle)) {
     displayTitle = buildComparisonDisplayTitle(rawTitle, aggregation);
     const byIdx = rawTitle.toLowerCase().indexOf(" by ");
