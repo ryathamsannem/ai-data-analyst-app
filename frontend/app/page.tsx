@@ -2791,7 +2791,11 @@ function groupedBarMeasureChipLabel(
   if (parts.length === 1) return parts[0]!;
   const stack = ms.stackAxisTitle?.trim();
   if (stack && stack.toLowerCase() !== "amount") return stack;
-  return "Revenue & Ad Spend";
+  const fromKeys = (ms.seriesKeys ?? [])
+    .map((k) => humanizeColumnName(k))
+    .filter(Boolean);
+  if (fromKeys.length >= 2) return fromKeys.join(" & ");
+  return "Multiple measures";
 }
 
 /** Executive signal cards for grouped revenue vs spend (etc.) by category. */
@@ -8691,6 +8695,10 @@ function HomeInner() {
           visualization?.multiSeries?.layout
         ),
         multiSeriesLayout: visualization?.multiSeries?.layout ?? null,
+        groupedBarMeta:
+          visualization?.multiSeries?.layout === "grouped_bar"
+            ? visualization.multiSeries
+            : null,
         categoryAxis: chartAxisLabels.categoryAxis,
         valueAxis: chartAxisLabels.valueAxis,
         routing: chartRoutingRecommendation,
@@ -8702,6 +8710,7 @@ function HomeInner() {
       columns,
       sortedChartData,
       visualization?.chartType,
+      visualization?.multiSeries,
       visualization?.multiSeries?.layout,
       sessionRenderedChartKind,
       chartAxisLabels.categoryAxis,
@@ -9215,6 +9224,10 @@ function HomeInner() {
           insightVisualization?.multiSeries?.layout
         ),
         multiSeriesLayout: insightVisualization?.multiSeries?.layout ?? null,
+        groupedBarMeta:
+          insightVisualization?.multiSeries?.layout === "grouped_bar"
+            ? insightVisualization.multiSeries
+            : null,
         categoryAxis: insightChartAxisLabels.categoryAxis,
         valueAxis: insightChartAxisLabels.valueAxis,
         routing: insightChartRoutingRecommendation,
@@ -9226,6 +9239,7 @@ function HomeInner() {
       columns,
       sortedInsightChartData,
       insightVisualization?.chartType,
+      insightVisualization?.multiSeries,
       insightVisualization?.multiSeries?.layout,
       insightRenderedChartKind,
       insightChartAxisLabels.categoryAxis,
@@ -10349,6 +10363,11 @@ function HomeInner() {
             stackedOrMultiSeries: isMultiMetricBarLayout(
               visualization?.multiSeries?.layout
             ),
+            groupedBar: visualization?.multiSeries?.layout === "grouped_bar",
+            groupedBarMeta:
+              visualization?.multiSeries?.layout === "grouped_bar"
+                ? visualization.multiSeries
+                : null,
             histogramStyle: sessionSmartChartIntel?.histogramStyle ?? false,
             routingExplanation:
               chartRoutingRecommendation?.selectionExplanation ?? null,

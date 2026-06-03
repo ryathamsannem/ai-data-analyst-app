@@ -2,6 +2,76 @@ import type { ChartKind, ChartRow } from "@/app/chart-types";
 import type { SemanticMetricContext } from "@/lib/semantic-metric-engine";
 import { buildChartNarrative } from "@/lib/ux-narrative";
 
+/** Grouped dual-metric bar metadata — same source as visualization `multiSeries`. */
+export type GroupedBarSeriesMeta = {
+  seriesKeys?: string[];
+  seriesLabels?: Record<string, string>;
+  categoryAxisTitle?: string | null;
+};
+
+const GROUPED_BAR_FALLBACK_BLURB =
+  "If multiple measures are compared, grouped bars show differences across categories.";
+
+function formatMeasureList(labels: string[]): string | null {
+  const parts = labels.map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  if (parts.length === 1) return parts[0]!;
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+}
+
+function pluralizeDimensionLabel(label: string): string {
+  const t = label.trim();
+  if (!t) return "categories";
+  const lc = t.toLowerCase();
+  if (/\bregions?\b/.test(lc)) return "regions";
+  if (/\bproducts?\b/.test(lc)) return "products";
+  if (/\bcampaigns?\b/.test(lc)) return "campaigns";
+  if (/\bdepartments?\b/.test(lc)) return "departments";
+  if (/\bchannels?\b/.test(lc)) return "channels";
+  if (/\bcustomers?\b/.test(lc)) return "customers";
+  if (/\bsegments?\b/.test(lc)) return "segments";
+  if (/\bcategories?\b/.test(lc)) return "categories";
+  if (/s$/i.test(t)) return lc;
+  if (/^[A-Za-z][\w\s-]*$/.test(t) && !/\s/.test(t)) return `${lc}s`;
+  return lc;
+}
+
+function measureLabelsFromMeta(
+  meta: GroupedBarSeriesMeta | null | undefined,
+  valueAxisFallback: string
+): string[] {
+  const keys = meta?.seriesKeys ?? [];
+  const fromMeta = keys
+    .map((k) => meta?.seriesLabels?.[k]?.trim() || k.trim())
+    .filter(Boolean);
+  if (fromMeta.length) return fromMeta;
+  const fromAxis = valueAxisFallback
+    .split(/\s*&\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return fromAxis;
+}
+
+/** One-line “why grouped bars” copy from visualization multi-series metadata. */
+export function buildGroupedBarChartBlurb(
+  meta: GroupedBarSeriesMeta | null | undefined,
+  axisFallback?: { valueAxis?: string; categoryAxis?: string }
+): string {
+  const measures = formatMeasureList(
+    measureLabelsFromMeta(meta, axisFallback?.valueAxis ?? "")
+  );
+  const dimRaw =
+    meta?.categoryAxisTitle?.trim() ||
+    axisFallback?.categoryAxis?.trim() ||
+    "";
+  const dim = pluralizeDimensionLabel(dimRaw);
+  if (measures && dim) {
+    return `Grouped side-by-side bars compare ${measures} across ${dim}.`;
+  }
+  return GROUPED_BAR_FALLBACK_BLURB;
+}
+
 export type ChartRoutingRec = {
   detectedIntent?: string;
   selectionExplanation?: string;
@@ -348,11 +418,15 @@ function blurbForRenderedChart(params: {
   valueAxis: string;
   categoryAxis: string;
   groupedDualMetric?: boolean;
+  groupedBarMeta?: GroupedBarSeriesMeta | null;
 }): string {
   const met = params.valueAxis.trim() || "your metric";
   const dim = params.categoryAxis.trim() || "each category";
   if (params.groupedDualMetric) {
-    return "Grouped side-by-side bars compare Revenue and Ad Spend across campaigns.";
+    return buildGroupedBarChartBlurb(params.groupedBarMeta, {
+      valueAxis: met,
+      categoryAxis: dim,
+    });
   }
   if (params.kind === "histogram") {
     return `Bins ${met} into ranges to show spread and tail behavior across the cohort.`;
@@ -430,6 +504,7 @@ export function computeSmartChartIntel(params: {
   presentationKind: ChartKind;
   stackedOrMultiSeries: boolean;
   multiSeriesLayout?: string | null;
+  groupedBarMeta?: GroupedBarSeriesMeta | null;
   categoryAxis: string;
   valueAxis: string;
   routing: ChartRoutingRec;
@@ -450,6 +525,7 @@ export function computeSmartChartIntel(params: {
     valueAxis: params.valueAxis,
     categoryAxis: params.categoryAxis,
     groupedDualMetric: groupedDual,
+    groupedBarMeta: groupedDual ? params.groupedBarMeta ?? null : null,
   });
 
   if (params.stackedOrMultiSeries) {
