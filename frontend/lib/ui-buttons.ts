@@ -2,6 +2,9 @@
  * Shared SaaS button variants — semantic theme tokens (light/dark via globals.css).
  */
 
+/** Secondary premium actions — matches Replace file / Review mapping (`font-medium`). */
+export const saasSecondaryActionFont = "font-medium";
+
 const btnBase =
   "inline-flex items-center justify-center rounded-[0.85rem] font-medium transition-all duration-200 ease-out active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-[color:var(--btn-disabled-bg)] disabled:text-[color:var(--btn-disabled-fg)] disabled:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--background)]";
 

@@ -3,7 +3,9 @@
 **Status:** Stable production snapshot (May 2026)  
 **Scope:** Application-wide UI structure with **Charts tab** documented at current baseline.
 
-**Related:** [`LATEST_STABLE_UI_SNAPSHOT.md`](LATEST_STABLE_UI_SNAPSHOT.md) · [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`AGENTS.md`](AGENTS.md)
+**Related:** [`LATEST_STABLE_UI_SNAPSHOT.md`](LATEST_STABLE_UI_SNAPSHOT.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) · [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) · [`DATA_PREVIEW_STABLE_SUMMARY.md`](DATA_PREVIEW_STABLE_SUMMARY.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`AGENTS.md`](AGENTS.md)
+
+**Export/PDF:** Not finalized — pending next phase.
 
 ---
 
@@ -66,12 +68,13 @@ AppShell
    └─ export      → PDF / report options
 ```
 
-| Tab | Primary data | Chart path |
-|-----|--------------|------------|
-| Overview | `/filtered-dashboard` | Mini charts — **separate** presentation helper |
-| AI Insights | `/ask` | Shared `ChartRenderer`, `insightMode=true` |
-| Charts | Session store | Shared `ChartRenderer`, `insightMode=false` |
-| Export | Client | Captured DOM from session or insight ref |
+| Tab | Primary data | Chart path | Dataset UI |
+|-----|--------------|------------|------------|
+| Overview | `/filtered-dashboard` | Mini charts — **separate** helper | Full `ovCard` + Replace file |
+| Data Preview | `/preview` | None | `DataPreviewDatasetContext` |
+| AI Insights | `/ask` | `ChartRenderer`, `insightMode=true` | Header badge only |
+| Charts | Session store | `ChartRenderer`, `insightMode=false` | None |
+| Export | Client PDF | Capture refs | Summary rows/columns — **pending polish** |
 
 ---
 
@@ -197,8 +200,9 @@ Off-screen capture DOM mirrors preview styling for WYSIWYG PNG/PDF charts.
 1. **Extend in place** — token modules + narrow CSS, not layout rewrites  
 2. **Preserve tab-specific shells** — Overview mini charts ≠ session preview  
 3. **Keep filter bar height** aligned across Overview and Insights  
-4. **Charts tight vertical rhythm** — see [`CHARTS_TAB_STABLE_SUMMARY.md`](CHARTS_TAB_STABLE_SUMMARY.md) §4  
-5. **Dark mode** — chart plot tokens via `chart-viz-theme`, not ad-hoc slate overrides on Recharts  
+4. **Charts tight vertical rhythm** — see [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) §4  
+5. **Dataset metadata deduplication** — see [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) §7  
+6. **Dark mode** — chart plot tokens via `chart-viz-theme`, not ad-hoc slate overrides on Recharts  
 
 ---
 
@@ -209,10 +213,12 @@ Off-screen capture DOM mirrors preview styling for WYSIWYG PNG/PDF charts.
 | `frontend/lib/charts-tab-ui.ts` | Charts tokens |
 | `frontend/lib/ai-insights-ui.ts` | Insights + shared viz |
 | `frontend/lib/overview-ui.ts` | Overview dashboard |
-| `frontend/app/globals.css` | Theme, Charts motion/scroll |
+| `frontend/lib/data-preview-ui.ts` | Data Preview tokens |
+| `frontend/app/components/home/data-preview-dataset-context.tsx` | Preview dataset strip |
+| `frontend/app/globals.css` | Theme, Charts motion/scroll, `data-preview-*` |
 | `frontend/app/page.tsx` | Tab composition |
 | `frontend/app/components/home/*.tsx` | Charts tab subcomponents |
 
 ---
 
-*Last updated: May 2026 — recovery baseline for UI work including Export/PDF.*
+*Last updated: May 2026 — recovery baseline before Export/PDF finalization.*

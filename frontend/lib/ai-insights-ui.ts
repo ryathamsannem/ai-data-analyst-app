@@ -3,6 +3,8 @@
  * Do not use on Overview, Charts, or Export tabs except where noted.
  */
 
+import { saasSecondaryActionFont } from "@/lib/ui-buttons";
+
 export const aiInsightsPage = "ai-insights-page";
 
 export const aiInsightsOuterShell =
@@ -34,8 +36,16 @@ export const aiInsightsAskHeading =
 export const aiInsightsAskHeaderRow =
   "mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2";
 
+/** Shared Insights actions — premium SaaS (`saas-btn-*` in globals.css). */
+export const aiInsightsActionBtn =
+  `ai-insights-action-btn saas-btn-premium saas-btn-premium--sm inline-flex shrink-0 items-center justify-center ${saasSecondaryActionFont}`;
+
+/** Primary Insights CTA — accent gradient, same radius/glow family as premium buttons. */
+export const aiInsightsActionBtnPrimary =
+  "ai-insights-action-btn ai-insights-action-btn--primary saas-btn-accent inline-flex shrink-0 items-center justify-center font-semibold";
+
 export const aiInsightsAskResetBtn =
-  "ai-insights-ask-reset shrink-0 !py-1.5 !px-3 !text-xs sm:!text-sm disabled:cursor-not-allowed disabled:opacity-45 disabled:pointer-events-none disabled:shadow-none disabled:hover:transform-none";
+  `${aiInsightsActionBtn} ai-insights-ask-reset !py-1.5 !px-3 !text-xs sm:!text-sm disabled:cursor-not-allowed disabled:opacity-45 disabled:pointer-events-none disabled:shadow-none disabled:hover:transform-none`;
 
 export const aiInsightsAskMetaRow =
   "mb-2 flex flex-wrap items-center gap-1.5";
@@ -49,7 +59,7 @@ export const aiInsightsAskQuestionLabel =
 export const aiInsightsAskInputBlock = "mt-2";
 
 export const aiInsightsAskComposer =
-  "ai-insights-ask-composer flex flex-col gap-1";
+  "ai-insights-ask-composer flex flex-col gap-4";
 
 export const aiInsightsAskTextarea =
   "ai-insights-ask-textarea w-full min-h-[5.75rem] resize-y rounded-xl border border-[color:var(--border-default)]/70 bg-[color:var(--surface-elevated)] px-3 py-2.5 text-sm leading-snug text-[var(--foreground)] shadow-[0_1px_2px_rgba(15,23,42,0.03)] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out placeholder:text-[var(--text-muted)] focus:outline-none dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:placeholder:text-[color:var(--insights-text-muted)] sm:min-h-[6rem]";
@@ -58,7 +68,7 @@ export const aiInsightsAskActionsRow =
   "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3";
 
 export const aiInsightsAskSubmitBtn =
-  "ai-insights-ask-submit shrink-0 px-5 py-2.5 text-sm font-semibold disabled:shadow-none";
+  `${aiInsightsActionBtnPrimary} ai-insights-ask-submit !px-5 !py-2.5 !text-sm disabled:cursor-not-allowed disabled:pointer-events-none`;
 
 /** AI Answer — executive analysis panel (presentation only). */
 export const aiInsightsAnswerCard =
@@ -266,15 +276,15 @@ export const chartsTabVizPreviewCard =
 export const chartsTabVizSessionFrame =
   "ai-insights-viz-chart-frame charts-session-viz-frame h-full w-full min-w-0 rounded-[1.1rem] border border-[color:var(--border-default)]/50 p-1 sm:p-1.5";
 
-/** Visualization card — AI Insights tab only. */
+/** Visualization card — AI Insights tab only (shell styled in globals `.ai-insights-viz-card`). */
 export const aiInsightsVizCard =
-  `${chartVizThemeScope} ai-insights-viz group/chart mt-3 w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-[color:var(--border-default)]/75 bg-gradient-to-b from-[color:var(--surface-elevated)] via-[color:var(--surface-elevated)] to-[color:color-mix(in_srgb,var(--accent-wash)_55%,var(--surface-elevated))] p-4 shadow-[var(--shadow-sm)] ring-1 ring-slate-900/[0.025] transition-[border-color] duration-300 ease-out hover:border-[color:color-mix(in_srgb,var(--accent)_18%,var(--border-default))] sm:p-5 lg:px-6 lg:pb-5 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-none dark:ring-white/[0.03] dark:hover:border-[color:var(--insights-border-medium)]`;
+  `${chartVizThemeScope} ai-insights-viz ai-insights-viz-card group/chart mt-3 w-full min-w-0 overflow-hidden`;
 
 export const aiInsightsVizKicker =
   "text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)] dark:text-[color:var(--insights-text-muted)]";
 
 export const aiInsightsVizHeaderZone =
-  "w-full min-w-0 space-y-2.5 sm:space-y-3";
+  "ai-insights-viz-header w-full min-w-0 space-y-2 border-b border-[color:var(--border-default)] pb-2.5 sm:space-y-2.5 sm:pb-3 dark:border-[color:var(--insights-border-soft)]";
 
 export const aiInsightsVizChipsWrap =
   "ai-insights-viz-chips-wrap w-full min-w-0 px-0.5 sm:px-1";
@@ -317,10 +327,10 @@ export const aiInsightsVizMetaChipLeadSize =
   "max-w-[min(100%,20rem)] px-2.5 py-1 text-[10px]";
 
 export const aiInsightsVizChartStage =
-  "relative mt-2.5 w-full min-w-0 sm:mt-3 lg:mt-3.5";
+  "relative mt-2 w-full min-w-0 sm:mt-2.5";
 
 export const aiInsightsVizPlotSurface =
-  "ai-insights-viz-plot animate-chart-surface-in motion-reduce:animate-none w-full min-w-0 overflow-visible rounded-[0.9rem] border border-[color:var(--border-default)]/40 bg-[color:var(--surface-elevated)] px-2 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition-[border-color] duration-300 ease-out dark:border-[color:var(--insights-border-soft)] dark:bg-transparent dark:shadow-none";
+  "ai-insights-viz-plot animate-chart-surface-in motion-reduce:animate-none w-full min-w-0 overflow-visible rounded-xl border border-[color:var(--border-default)]/55 bg-[color:var(--surface-elevated)] px-2 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition-[border-color] duration-300 ease-out dark:border-[color:var(--insights-border-soft)] dark:bg-transparent dark:shadow-none";
 
 export const aiInsightsVizHeadingWrap =
   "text-center px-3 sm:px-4";
@@ -375,7 +385,7 @@ export const aiInsightsSmartReadSignalHint =
   "mt-0.5 text-[11px] leading-snug text-[var(--text-muted)] dark:text-[color:var(--insights-text-muted)]";
 
 export const aiInsightsBtnExport =
-  "ai-insights-btn-export saas-btn-premium saas-btn-premium--sm !rounded-xl !font-medium dark:!border-[color:var(--insights-border-soft)] dark:!bg-[color:var(--insights-layer-inset)] dark:!text-[color:var(--insights-text-secondary)] dark:hover:!border-[color:var(--insights-border-medium)] dark:hover:!bg-[color:var(--insights-layer-nested)] dark:!shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
+  `${aiInsightsActionBtn} ai-insights-btn-export`;
 
 export const aiInsightsMutedLabel =
   "ai-insights-muted-label text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)] dark:text-[color:var(--insights-text-muted)]";

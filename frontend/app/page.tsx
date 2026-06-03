@@ -81,12 +81,13 @@ import {
   chartsTabTitle,
   chartsTabTimelineColumn,
   chartsTabPreviewHeaderSticky,
+  chartsTabPngExportRoot,
   chartsTabSessionPlotSurface,
+  chartsTabVizPlotStage,
   chartsTabVizHeaderZone,
   chartsTabVizKicker,
 } from "@/lib/charts-tab-ui";
 import { ChartsTabChartReason } from "@/app/components/home/charts-tab-chart-reason";
-import { ChartsTabIntelligenceStrip } from "@/app/components/home/charts-tab-intelligence-strip";
 import { ChartsTabPlotTransition } from "@/app/components/home/charts-tab-plot-transition";
 import { generateChartReason } from "@/lib/generate-chart-reason";
 import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
@@ -253,22 +254,84 @@ import {
   aiInsightsVizTitle,
 } from "@/lib/ai-insights-ui";
 import {
-  btnExport,
-  btnPrimary,
-  btnPrimarySm,
-  btnSecondary,
-} from "@/lib/ui-buttons";
+  exportTabAdvancedDivider,
+  exportTabAdvancedStack,
+  exportTabCheckboxInput,
+  exportTabCheckboxLabel,
+  exportTabCheckboxRow,
+  exportTabCheckboxRowWide,
+  exportTabColorField,
+  exportTabColorHex,
+  exportTabColorInput,
+  exportTabColorSwatchWrap,
+  exportTabDesc,
+  exportTabDownloadBtn,
+  exportTabExecutivePreview,
+  exportTabExecutivePreviewBody,
+  exportTabExecutivePreviewList,
+  exportTabExecutivePreviewScope,
+  exportTabExecutivePreviewTitle,
+  exportTabFieldLabel,
+  exportTabFooter,
+  exportTabFooterHint,
+  exportTabFormGrid,
+  exportTabFormRow,
+  exportTabHeaderRow,
+  exportTabOptionsGrid,
+  exportTabPage,
+  exportTabSectionCard,
+  exportTabSectionDesc,
+  exportTabSectionKicker,
+  exportTabSectionTitle,
+  exportTabStack,
+  exportTabSummaryChip,
+  exportTabSummaryChipLabel,
+  exportTabSummaryChipSpan,
+  exportTabSummaryChipValue,
+  exportTabSummaryChipValueMuted,
+  exportTabSummaryGrid,
+  exportTabSummarySectionPill,
+  exportTabSummarySectionsWrap,
+  exportTabTextInput,
+  exportTabTitle,
+} from "@/lib/export-tab-ui";
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
+import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
+import { DataPreviewColumnHeader } from "./components/home/data-preview-column-header";
+import { DataPreviewCopyCell } from "./components/home/data-preview-copy-cell";
+import {
+  cycleDataPreviewSort,
+  sortDataPreviewRows,
+  type DataPreviewSortState,
+} from "@/lib/data-preview-sort";
+import {
+  DATA_PREVIEW_MISSING_LABEL,
+  isMissingValue,
+  previewCellSearchToken,
+} from "@/lib/data-preview-missing";
 import { FilterPanel } from "./components/home/filter-panel";
 import { type MainNavTabId } from "./components/home/main-nav-tabs";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
+import { OverviewUploadSelectedState } from "./components/home/overview-upload-selected-state";
 import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-summary";
 import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
 import {
   ovBtnPrimaryAccent,
+  formatOverviewFilenameMiddle,
   ovBtnSecondary,
+  ovBtnSecondarySm,
+  ovOverviewSecondaryBtn,
+  OVERVIEW_UPLOAD_ACCEPT,
+  OVERVIEW_UPLOAD_EXT_PATTERN,
+  OVERVIEW_UPLOAD_FORMAT_HINT,
+  OVERVIEW_UPLOAD_INVALID_MSG,
+  ovCapabilityChip,
+  ovDatasetEmptyInset,
+  ovUploadDropzone,
+  ovUploadDropzoneActive,
+  ovUploadDropzoneIdle,
   ovChartCell,
   ovChartGrid,
   ovChartInner,
@@ -285,6 +348,8 @@ import {
   ovDashChartTitle,
   ovDashInsightChip,
   ovDashInsightChips,
+  overviewPngExportHeader,
+  overviewPngExportRoot,
   ovDataHint,
   ovDataLabel,
   ovDataValue,
@@ -306,13 +371,13 @@ import {
   dpBadgeClean,
   dpBadgeId,
   dpBadgeMissing,
-  dpBadgeType,
   dpBadgeUnique,
   dpBtnGhost,
   dpCell,
   dpCellNull,
   dpCellSticky,
   dpControl,
+  dpPreviewHeaderIntro,
   dpEmptySearch,
   dpEmptyState,
   dpInsightsPanel,
@@ -326,10 +391,14 @@ import {
   dpTable,
   dpTableScroll,
   dpTableShell,
-  dpThBtn,
-  dpThMeta,
-  dpThName,
+  dpPaginationBar,
+  dpPaginationBtn,
+  dpPaginationInner,
+  dpPaginationMeta,
+  dpPaginationNav,
+  dpPaginationPill,
   dpSearchWrap,
+  dpToolbarMatchMeta,
   dpToolbarRow,
 } from "@/lib/data-preview-ui";
 import { SmartChartInsightPanel } from "./components/SmartChartInsightPanel";
@@ -366,7 +435,6 @@ import {
   type ChartInsightAnswerStore,
 } from "@/lib/chart-insight-answers";
 import { useDevRenderCount } from "@/lib/dev-render-count";
-import { Canvg } from "canvg";
 import {
   datasetKindLabel,
   loadReportBranding,
@@ -1389,7 +1457,9 @@ function computePdfRankedSignalsFromChartRows(
   max = 3,
   /** Original series order (e.g. unsorted snapshot) for stable ties — matches key-figure `iMax` walk. */
   orderForTieBreak?: ChartRow[],
-  trendMode = false
+  trendMode = false,
+  /** Ascending = lowest/min first; false = highest first; null = highest (default). */
+  ascending: boolean | null = null
 ): PdfRankedSignal[] | null {
   if (trendMode) {
     const trendSignals = buildTrendPdfRankedSignals(rows, kind, max);
@@ -1399,7 +1469,7 @@ function computePdfRankedSignalsFromChartRows(
 
   const dispKind: ChartKind =
     kind === "pie" || kind === "donut"
-      ? kind
+      ? "bar_horizontal"
       : kind === "bar_horizontal"
         ? "bar_horizontal"
         : "bar";
@@ -1426,18 +1496,24 @@ function computePdfRankedSignalsFromChartRows(
   const deduped = [...merged.values()];
   if (!deduped.length) return null;
 
+  const preferLow = ascending === true;
   deduped.sort((a, b) => {
-    const vb = Number(b.value) - Number(a.value);
-    if (vb !== 0) return vb;
+    const va = Number(a.value);
+    const vb = Number(b.value);
+    const delta = preferLow ? va - vb : vb - va;
+    if (delta !== 0) return delta;
     const ia = firstIndex.get(String(a.name)) ?? 0;
     const ib = firstIndex.get(String(b.name)) ?? 0;
     return ia - ib;
   });
 
-  const rankWords =
-    kind === "pie" || kind === "donut"
-      ? (["Largest", "Second", "Third"] as const)
-      : (["Highest", "Second", "Third"] as const);
+  const rankWords = preferLow
+    ? (["Lowest", "Second lowest", "Third lowest"] as const)
+    : ascending === false
+      ? (["Highest", "Second highest", "Third highest"] as const)
+      : kind === "pie" || kind === "donut"
+        ? (["Largest", "Second", "Third"] as const)
+        : (["Highest", "Second", "Third"] as const);
 
   return deduped.slice(0, max).map((row, i) => {
     const v = Number(row.value);
@@ -2927,12 +3003,6 @@ type PreviewRow = {
   [key: string]: string | number | null;
 };
 
-/** Lowercase search token for a preview cell (empty → "null"). */
-function normalizePreviewCellForSearch(v: string | number | null | undefined): string {
-  if (v === null || v === undefined || v === "") return "null";
-  return String(v).toLowerCase();
-}
-
 function previewRowMatchesSearch(
   row: PreviewRow,
   cols: string[],
@@ -2940,7 +3010,7 @@ function previewRowMatchesSearch(
 ): boolean {
   if (!qLower) return true;
   for (const c of cols) {
-    if (normalizePreviewCellForSearch(row[c]).includes(qLower)) return true;
+    if (previewCellSearchToken(row[c]).includes(qLower)) return true;
   }
   return false;
 }
@@ -2950,7 +3020,7 @@ function dataPreviewCellMatchesQuery(
   qLower: string
 ): boolean {
   if (!qLower) return false;
-  return normalizePreviewCellForSearch(value).includes(qLower);
+  return previewCellSearchToken(value).includes(qLower);
 }
 
 /** Case-insensitive highlight of every occurrence of `query` in `text`. */
@@ -3926,49 +3996,6 @@ function sanitizeChartExportFilename(title: string): string {
   return slug || "auto_dashboard_chart";
 }
 
-/** PNG export for an in-page chart container (does not use session capture ref). */
-async function exportDashboardMiniChartAsPng(
-  root: HTMLElement | null,
-  titleForFilename: string
-): Promise<void> {
-  if (!root) {
-    throw new Error("Chart area is not ready.");
-  }
-  const svg = root.querySelector("svg");
-  if (!svg) {
-    throw new Error("Chart is not available to export.");
-  }
-
-  const rect = svg.getBoundingClientRect();
-  const width = Math.max(1, Math.round(rect.width));
-  const height = Math.max(1, Math.round(rect.height));
-
-  const clone = svg.cloneNode(true) as SVGElement;
-  clone.setAttribute("width", String(width));
-  clone.setAttribute("height", String(height));
-  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-
-  const svgString = new XMLSerializer().serializeToString(clone);
-  const canvas = document.createElement("canvas");
-  const scale = 2;
-  canvas.width = width * scale;
-  canvas.height = height * scale;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Unable to create export canvas.");
-  }
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
-
-  const v = await Canvg.fromString(ctx, svgString);
-  await v.render();
-
-  const url = canvas.toDataURL("image/png");
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${sanitizeChartExportFilename(titleForFilename)}.png`;
-  a.click();
-}
-
 /** Plot band heights — keep in sync with `--overview-chart-plot-min-h` in globals.css */
 const OVERVIEW_DASH_PLOT_HEIGHT_MOBILE = 300;
 const OVERVIEW_DASH_PLOT_HEIGHT_DESKTOP = 340;
@@ -4197,7 +4224,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   /** Surface export failures (e.g. missing SVG). */
   onChartExportError?: (message: string) => void;
 }) {
-  const chartCaptureRef = useRef<HTMLDivElement | null>(null);
+  const overviewPngExportRef = useRef<HTMLDivElement | null>(null);
   const [exportingPng, setExportingPng] = useState(false);
   const dashGrid = useOverviewDashGridStyle();
   const drillPrimary = chart.interaction?.drillDimensions.find(
@@ -4767,8 +4794,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       aria-label={canonicalTitle}
       className={`${ovDashChartCard} group ${loadingPulse ? "animate-pulse opacity-[0.92]" : ""}`}
     >
-      <header className={ovDashChartHead}>
-        <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
+      <div ref={overviewPngExportRef} className={overviewPngExportRoot}>
+        <header className={`${ovDashChartHead} ${overviewPngExportHeader}`}>
+          <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
         <div className={ovDashChartActions} onClick={(e) => e.stopPropagation()}>
           {onViewInChartsTab && snapshotId ? (
             <button
@@ -4798,13 +4826,25 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             onClick={async () => {
               setExportingPng(true);
               try {
-                await exportDashboardMiniChartAsPng(
-                  chartCaptureRef.current,
-                  canonicalTitle
+                const exportRoot = overviewPngExportRef.current;
+                if (!exportRoot?.querySelector("svg")) {
+                  throw new Error("Chart is not available to export.");
+                }
+                const { captureElementToPng } = await import(
+                  "@/lib/chart-png-capture"
                 );
+                const { dataUrl } = await captureElementToPng(exportRoot, {
+                  scale: 3,
+                });
+                const a = document.createElement("a");
+                a.href = dataUrl;
+                a.download = `${sanitizeChartExportFilename(canonicalTitle)}.png`;
+                a.click();
               } catch (err) {
                 onChartExportError?.(
-                  err instanceof Error ? err.message : "Unable to export chart image."
+                  err instanceof Error
+                    ? err.message
+                    : "Unable to export chart image."
                 );
               } finally {
                 setExportingPng(false);
@@ -4817,10 +4857,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             {exportingPng ? "…" : "PNG"}
           </button>
         </div>
-      </header>
-      <div
-        ref={chartCaptureRef}
-        role={onViewInChartsTab && snapshotId ? "button" : undefined}
+        </header>
+        <div
+          role={onViewInChartsTab && snapshotId ? "button" : undefined}
         tabIndex={onViewInChartsTab && snapshotId ? 0 : undefined}
         onClick={() => {
           if (snapshotId && onViewInChartsTab) onViewInChartsTab(snapshotId);
@@ -4843,22 +4882,25 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             : undefined
         }
       >
-        <div className={ovDashChartPlotInner}>{chartBody}</div>
-      </div>
-      {overviewInsightChips.length > 0 ? (
-        <footer className={ovDashChartFooter}>
-          <div className={ovDashInsightChips}>
-            {overviewInsightChips.map((chip) => (
-              <span
-                key={chip.key}
-                className={`${ovDashInsightChip} overview-dash-insight-chip--${chip.key}`}
-              >
-                {chip.text}
-              </span>
-            ))}
+          <div className={`${ovDashChartPlotInner} ${chartsTabVizPlotStage}`}>
+            {chartBody}
           </div>
-        </footer>
-      ) : null}
+        </div>
+        {overviewInsightChips.length > 0 ? (
+          <footer className={ovDashChartFooter}>
+            <div className={ovDashInsightChips}>
+              {overviewInsightChips.map((chip) => (
+                <span
+                  key={chip.key}
+                  className={`${ovDashInsightChip} overview-dash-insight-chip--${chip.key}`}
+                >
+                  {chip.text}
+                </span>
+              ))}
+            </div>
+          </footer>
+        ) : null}
+      </div>
     </div>
   );
 });
@@ -5248,7 +5290,7 @@ function previewValuesSuggestIdentifierPattern(
   const samples: string[] = [];
   for (const row of preview) {
     const v = row[col];
-    if (isPreviewCellEmpty(v)) continue;
+    if (isMissingValue(v)) continue;
     samples.push(String(v).trim());
     if (samples.length >= maxSamples) break;
   }
@@ -5305,10 +5347,6 @@ type ColumnQualityBadge = {
   className: string;
 };
 
-function isPreviewCellEmpty(v: unknown): boolean {
-  return v === null || v === undefined || v === "";
-}
-
 function previewColumnUniqueStats(
   preview: PreviewRow[],
   col: string
@@ -5317,7 +5355,7 @@ function previewColumnUniqueStats(
   let nonNull = 0;
   for (const row of preview) {
     const v = row[col];
-    if (isPreviewCellEmpty(v)) continue;
+    if (isMissingValue(v)) continue;
     nonNull += 1;
     set.add(String(v));
   }
@@ -5327,7 +5365,7 @@ function previewColumnUniqueStats(
 function parsePreviewCellToTimestamp(
   v: string | number | null | undefined
 ): number | null {
-  if (isPreviewCellEmpty(v)) return null;
+  if (isMissingValue(v)) return null;
   if (typeof v === "number") {
     if (!Number.isFinite(v)) return null;
     if (v > 1e12 && v < 1e15) return v;
@@ -5353,7 +5391,7 @@ function computeCategoricalTopFromPreview(
   const counts = new Map<string, number>();
   for (const row of preview) {
     const cell = row[col];
-    if (isPreviewCellEmpty(cell)) continue;
+    if (isMissingValue(cell)) continue;
     const key = String(cell);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
@@ -6060,6 +6098,7 @@ function HomeInner() {
   /** Off-screen charts for PDF/PNG capture (session vs AI insight bundles). */
   const chartCaptureSessionRef = useRef<HTMLDivElement | null>(null);
   const chartCaptureInsightRef = useRef<HTMLDivElement | null>(null);
+  const chartsTabPngExportRef = useRef<HTMLDivElement | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [aiAnswerByChartId, setAiAnswerByChartId] =
@@ -6181,6 +6220,8 @@ function HomeInner() {
     useState(false);
   const [dataPreviewTableHeaderElevated, setDataPreviewTableHeaderElevated] =
     useState(false);
+  const [dataPreviewPageIndex, setDataPreviewPageIndex] = useState(0);
+  const [dataPreviewSort, setDataPreviewSort] = useState<DataPreviewSortState>(null);
   const dataPreviewTableScrollRef = useRef<HTMLDivElement | null>(null);
   const dataPreviewTableSurfaceRef = useRef<HTMLDivElement | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -6221,7 +6262,66 @@ function HomeInner() {
     };
   }, [uploadMessage]);
   const [mappingMessage, setMappingMessage] = useState("");
+  const mappingSuccessHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const dismissMappingMessage = useCallback(() => {
+    if (mappingSuccessHideRef.current) {
+      clearTimeout(mappingSuccessHideRef.current);
+      mappingSuccessHideRef.current = null;
+    }
+    setMappingMessage("");
+  }, []);
+
+  /** Mapping save toast: auto-hide after 4s (same cadence as upload success). */
+  useEffect(() => {
+    if (!mappingMessage.trim()) {
+      if (mappingSuccessHideRef.current) {
+        clearTimeout(mappingSuccessHideRef.current);
+        mappingSuccessHideRef.current = null;
+      }
+      return;
+    }
+    if (mappingSuccessHideRef.current) {
+      clearTimeout(mappingSuccessHideRef.current);
+    }
+    mappingSuccessHideRef.current = setTimeout(() => {
+      setMappingMessage("");
+      mappingSuccessHideRef.current = null;
+    }, 4000);
+    return () => {
+      if (mappingSuccessHideRef.current) {
+        clearTimeout(mappingSuccessHideRef.current);
+        mappingSuccessHideRef.current = null;
+      }
+    };
+  }, [mappingMessage]);
+
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
+
+  const mappingModalOpenRef = useRef(mappingModalOpen);
+  const mappingMessageRef = useRef(mappingMessage);
+  mappingModalOpenRef.current = mappingModalOpen;
+  mappingMessageRef.current = mappingMessage;
+
+  /** Clear mapping toast when user changes tab. */
+  useEffect(() => {
+    dismissMappingMessage();
+  }, [activeTab, dismissMappingMessage]);
+
+  /** Clear mapping toast when user edits mapping fields in the open modal. */
+  useEffect(() => {
+    if (!mappingModalOpenRef.current || !mappingMessageRef.current.trim()) return;
+    dismissMappingMessage();
+  }, [
+    productColumn,
+    salesColumn,
+    regionColumn,
+    customerColumn,
+    profitColumn,
+    dateColumn,
+    dismissMappingMessage,
+  ]);
+
   const [mappingConfirmedByUser, setMappingConfirmedByUser] = useState(false);
   const [mappingMetadata, setMappingMetadata] = useState<MappingMetadata | null>(
     null
@@ -6562,48 +6662,36 @@ function HomeInner() {
   };
 
   const downloadChartPng = useCallback(async () => {
+    const exportRoot = chartsTabPngExportRef.current;
+    if (!exportRoot) {
+      setError("Chart is not available to download.");
+      return;
+    }
+    if (!exportRoot.querySelector("svg")) {
+      setError("Chart is not available to download.");
+      return;
+    }
+
     try {
       setError("");
-      const container = chartCaptureSessionRef.current;
-      if (!container) return;
+      const { captureElementToPng } = await import("@/lib/chart-png-capture");
+      const { dataUrl } = await captureElementToPng(exportRoot, {
+        scale: 3,
+        ignoreElement: (el) =>
+          el instanceof HTMLElement &&
+          (el.classList.contains("charts-tab-preview-shimmer") ||
+            el.getAttribute("aria-hidden") === "true"),
+      });
 
-      const svg = container.querySelector("svg");
-      if (!svg) {
-        setError("Chart is not available to download.");
-        return;
-      }
-
-      const rect = svg.getBoundingClientRect();
-      const width = Math.max(1, Math.round(rect.width));
-      const height = Math.max(1, Math.round(rect.height));
-
-      const clone = svg.cloneNode(true) as SVGElement;
-      clone.setAttribute("width", String(width));
-      clone.setAttribute("height", String(height));
-      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-
-      const svgString = new XMLSerializer().serializeToString(clone);
-      const canvas = document.createElement("canvas");
-      const scale = 2;
-      canvas.width = width * scale;
-      canvas.height = height * scale;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-
-      const v = await Canvg.fromString(ctx, svgString);
-      await v.render();
-
-      const url = canvas.toDataURL("image/png");
       const a = document.createElement("a");
-      a.href = url;
-      a.download = "chart.png";
+      a.href = dataUrl;
+      a.download = `${sanitizeChartExportFilename(chartTitle || "chart")}.png`;
       a.click();
     } catch (err) {
       console.error("Chart PNG download failed:", err);
       setError("Unable to download chart image.");
     }
-  }, []);
+  }, [chartTitle]);
 
   const setQuestionAndResetInsightState = useCallback(
     (value: string) => {
@@ -6712,6 +6800,7 @@ function HomeInner() {
     }
 
     setError("");
+    dismissMappingMessage();
     setUploadMessage("");
     setAnswer("");
     setHasValidAIAnswer(false);
@@ -6753,7 +6842,29 @@ function HomeInner() {
 
       if (!response.ok) {
         const maybeJson = await response.json().catch(() => null);
-        throw new Error(maybeJson?.detail || "Upload failed");
+        const detail =
+          maybeJson &&
+          typeof maybeJson === "object" &&
+          "detail" in maybeJson
+            ? (maybeJson as { detail: unknown }).detail
+            : null;
+        const message =
+          typeof detail === "string"
+            ? detail
+            : Array.isArray(detail)
+              ? detail
+                  .map((item) =>
+                    item &&
+                    typeof item === "object" &&
+                    "msg" in item &&
+                    typeof (item as { msg: unknown }).msg === "string"
+                      ? (item as { msg: string }).msg
+                      : null
+                  )
+                  .filter(Boolean)
+                  .join(" ") || "Upload failed"
+              : "Upload failed";
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -6822,7 +6933,7 @@ function HomeInner() {
 
   const selectSheet = async (sheetName: string) => {
     setError("");
-    setMappingMessage("");
+    dismissMappingMessage();
     setAnswer("");
     setHasValidAIAnswer(false);
     setLastAskedQuestion("");
@@ -6922,23 +7033,26 @@ function HomeInner() {
   };
 
   const assignOverviewPickedFile = useCallback((next: File) => {
-    const ok = /\.(csv|xlsx|xls)$/i.test(next.name);
+    const ok = OVERVIEW_UPLOAD_EXT_PATTERN.test(next.name);
     if (!ok) {
-      setError("Please choose a CSV or Excel file (.csv, .xlsx, .xls).");
+      setError(OVERVIEW_UPLOAD_INVALID_MSG);
       return;
     }
     setError("");
+    dismissMappingMessage();
     setFile(next);
-  }, []);
+  }, [dismissMappingMessage]);
 
   const openOverviewReplaceUpload = useCallback(() => {
+    dismissMappingMessage();
+    startTabTransition(() => setActiveTab("overview"));
     setOverviewUploadExpanded(true);
     setFile(null);
     setOverviewDropActive(false);
     if (overviewFileInputRef.current) {
       overviewFileInputRef.current.value = "";
     }
-  }, []);
+  }, [dismissMappingMessage, startTabTransition]);
 
   const cancelOverviewReplaceUpload = useCallback(() => {
     setOverviewUploadExpanded(false);
@@ -6964,6 +7078,11 @@ function HomeInner() {
     setAiAnswerByChartId({});
     clearAiInsightSession();
   }, [clearAiInsightSession]);
+
+  const canAskAi = useMemo(
+    () => Boolean(question.trim()) && !loading && columns.length > 0,
+    [question, loading, columns.length]
+  );
 
   const hasActiveAiConversation = useMemo(() => {
     if (
@@ -7376,7 +7495,7 @@ function HomeInner() {
     }
 
     setError("");
-    setMappingMessage("");
+    dismissMappingMessage();
 
     try {
       const response = await fetch(
@@ -7670,9 +7789,81 @@ function HomeInner() {
     return preview.filter((row) => previewRowMatchesSearch(row, columns, q));
   }, [preview, columns, deferredDataPreviewSearch]);
 
+  const dataPreviewSortedRows = useMemo(
+    () =>
+      sortDataPreviewRows(
+        dataPreviewFilteredRows,
+        dataPreviewSort,
+        profile?.column_types
+      ),
+    [dataPreviewFilteredRows, dataPreviewSort, profile?.column_types]
+  );
+
+  const dataPreviewPaginationActive = previewRowLimit !== "all";
+
+  const dataPreviewFilteredCount = dataPreviewFilteredRows.length;
+
+  const dataPreviewPageSize = useMemo(() => {
+    if (!dataPreviewPaginationActive) {
+      return Math.max(1, dataPreviewSortedRows.length);
+    }
+    return previewRowLimit;
+  }, [
+    dataPreviewPaginationActive,
+    previewRowLimit,
+    dataPreviewSortedRows.length,
+  ]);
+
+  const dataPreviewPageCount = useMemo(() => {
+    if (!dataPreviewPaginationActive) return 1;
+    return Math.max(1, Math.ceil(dataPreviewFilteredCount / dataPreviewPageSize));
+  }, [
+    dataPreviewPaginationActive,
+    dataPreviewFilteredCount,
+    dataPreviewPageSize,
+  ]);
+
+  const dataPreviewSortKey = dataPreviewSort
+    ? `${dataPreviewSort.column}\u0000${dataPreviewSort.direction}`
+    : "";
+
+  const dataPreviewSafePageIndex = Math.min(
+    dataPreviewPageIndex,
+    Math.max(0, dataPreviewPageCount - 1)
+  );
+
+  const dataPreviewPageRows = useMemo(() => {
+    const start = dataPreviewSafePageIndex * dataPreviewPageSize;
+    return dataPreviewSortedRows.slice(start, start + dataPreviewPageSize);
+  }, [
+    dataPreviewSortedRows,
+    dataPreviewSafePageIndex,
+    dataPreviewPageSize,
+  ]);
+
+  const dataPreviewRangeStart =
+    dataPreviewFilteredCount === 0
+      ? 0
+      : dataPreviewSafePageIndex * dataPreviewPageSize + 1;
+
+  const dataPreviewRangeEnd =
+    dataPreviewFilteredCount === 0
+      ? 0
+      : Math.min(
+          (dataPreviewSafePageIndex + 1) * dataPreviewPageSize,
+          dataPreviewFilteredCount
+        );
+
+  /** Reset to page 1 when sort, search, or rows-per-page changes. */
+  useEffect(() => {
+    setDataPreviewPageIndex(0);
+  }, [deferredDataPreviewSearch, previewRowLimit, dataPreviewSortKey]);
+
   useEffect(() => {
     setDataPreviewSearchQuery("");
     setDataPreviewSuggestionsExpanded(false);
+    setDataPreviewPageIndex(0);
+    setDataPreviewSort(null);
   }, [selectedSheet, uploadMeta?.name]);
 
   useEffect(() => {
@@ -7991,17 +8182,22 @@ function HomeInner() {
     if (!chartData.length) return "";
     const fromContract = resolvePresentationKindFromContract(activeSnapshot);
     if (fromContract) return fromContract;
-    const pinnedKind = activeSnapshot?.chartKind;
-    if (pinnedKind) return pinnedKind;
-    if (chartType) return chartType;
-    const t = activeSnapshot?.timelineChartType;
-    if (t) return timelineTypeToChartKind(t);
-    return computeFinalChartPresentation({
+    const computed = computeFinalChartPresentation({
       apiChartType: visualization?.chartType ?? "bar",
       title: chartTitle,
       question: lastAskedQuestion,
       rows: chartData,
     });
+    const pinnedKind = activeSnapshot?.chartKind;
+    if (pinnedKind === "pie" || pinnedKind === "donut") {
+      if (computed !== "pie" && computed !== "donut") return computed;
+      return pinnedKind;
+    }
+    if (pinnedKind) return pinnedKind;
+    if (chartType) return chartType;
+    const t = activeSnapshot?.timelineChartType;
+    if (t) return timelineTypeToChartKind(t);
+    return computed;
   }, [
     chartData,
     chartData.length,
@@ -8285,17 +8481,22 @@ function HomeInner() {
     if (!insightChartData.length) return "";
     const fromContract = resolvePresentationKindFromContract(insightSnapshot);
     if (fromContract) return fromContract;
-    const pinnedKind = insightSnapshot?.chartKind;
-    if (pinnedKind) return pinnedKind;
-    if (insightChartType) return insightChartType;
-    const t = insightSnapshot?.timelineChartType;
-    if (t) return timelineTypeToChartKind(t);
-    return computeFinalChartPresentation({
+    const computed = computeFinalChartPresentation({
       apiChartType: insightVisualization?.chartType ?? "bar",
       title: insightChartTitle,
       question: lastAskedQuestion,
       rows: insightChartData,
     });
+    const pinnedKind = insightSnapshot?.chartKind;
+    if (pinnedKind === "pie" || pinnedKind === "donut") {
+      if (computed !== "pie" && computed !== "donut") return computed;
+      return pinnedKind;
+    }
+    if (pinnedKind) return pinnedKind;
+    if (insightChartType) return insightChartType;
+    const t = insightSnapshot?.timelineChartType;
+    if (t) return timelineTypeToChartKind(t);
+    return computed;
   }, [
     insightChartData,
     insightChartData.length,
@@ -8866,7 +9067,11 @@ function HomeInner() {
 
   const exportExecutiveInsightsPreview = useMemo(() => {
     if (!exportOptions.includeChart || !exportOptions.includeAIInsight) return null;
-    const scope = exportOptions.chartScope ?? "session";
+    const scope =
+      exportOptions.chartScope ??
+      (insightChartMatchesCurrentQuestion && insightChartData.length > 0
+        ? "insight"
+        : "session");
     const facts =
       scope === "insight" ? insightExecutiveVizInsights : executiveVizInsights;
     const brief = insightExecutiveBrief.trim();
@@ -8887,6 +9092,29 @@ function HomeInner() {
     executiveVizInsights,
     insightExecutiveBrief,
   ]);
+
+  const exportSelectedSectionLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (exportOptions.includeKPIs) labels.push("KPIs");
+    if (exportOptions.includeAIInsight) labels.push("AI Insight");
+    if (exportOptions.includeChart) labels.push("Chart");
+    if (exportOptions.includeDataPreview) labels.push("Data Preview");
+    if (exportOptions.includeDataQuality) labels.push("Data Quality");
+    if (exportOptions.includeConversationContext) labels.push("Conversation");
+    if (exportOptions.includeTechnicalAppendix) labels.push("Technical appendix");
+    return labels;
+  }, [exportOptions]);
+
+  const exportVizSummaryLabel = useMemo(() => {
+    if (!visualization || visualization.labels.length === 0) {
+      return "Not in session yet";
+    }
+    const kind = visualization.chartType?.trim() || "chart";
+    const title = visualization.title?.trim();
+    return title
+      ? `${visualization.labels.length} points · ${kind} — ${title}`
+      : `${visualization.labels.length} points · ${kind}`;
+  }, [visualization]);
 
   const chartHistoryAsideRef = useRef<HTMLDivElement | null>(null);
   const chartHistoryScrollRestore = useRef<number | null>(null);
@@ -8937,7 +9165,10 @@ function HomeInner() {
         ...options,
       };
       const chartScope: "insight" | "session" =
-        resolved.chartScope ?? "session";
+        resolved.chartScope ??
+        (insightChartMatchesCurrentQuestion && insightChartData.length > 0
+          ? "insight"
+          : "session");
       const pdfAlignedAnalysis =
         chartScope === "insight" ? insightAnalysisForExport : alignedAnalysis;
       const pdfInsightAnswer =
@@ -8947,10 +9178,37 @@ function HomeInner() {
       const pdfChartDataRaw = pdfSnap?.chartData ?? [];
       const pdfChartTitle = pdfSnap?.title ?? "";
       const pdfChartSubtitle = pdfSnap?.subtitle ?? "";
-      const pdfPresentationKind =
+      const pdfVizEarly =
+        (pdfSnap?.visualization ?? null) as StoredVisualization | null;
+      const pdfPresentationKindBase =
         chartScope === "insight"
           ? insightRenderedChartKind
           : sessionRenderedChartKind;
+      const pdfPresentationKind = (() => {
+        if (!pdfChartDataRaw.length || !pdfPresentationKindBase) {
+          return pdfPresentationKindBase;
+        }
+        const q =
+          chartScope === "insight"
+            ? lastAskedQuestion.trim() || question.trim()
+            : question.trim() || lastAskedQuestion.trim();
+        const recomputed = computeFinalChartPresentation({
+          apiChartType:
+            pdfVizEarly?.chartType ?? pdfPresentationKindBase ?? "bar",
+          title: pdfChartTitle,
+          question: q,
+          rows: pdfChartDataRaw,
+        });
+        if (
+          (pdfPresentationKindBase === "pie" ||
+            pdfPresentationKindBase === "donut") &&
+          recomputed !== "pie" &&
+          recomputed !== "donut"
+        ) {
+          return recomputed;
+        }
+        return pdfPresentationKindBase;
+      })();
       const pdfContract = pdfSnap?.contract;
       const exportContractCheck = validateExportMatchesContract({
         exportChartId: pdfSnap?.id ?? null,
@@ -8984,12 +9242,13 @@ function HomeInner() {
                 insightSnapshot?.source !== "auto_dashboard"
               ? pdfAlignedAnalysis
               : null;
+      const pdfSortAscending = pdfTrendMode
+        ? null
+        : isAscendingValueIntent(pdfAnalysisForSort, pdfViz);
       const pdfChartData = sortRowsForPresentation(
         pdfChartDataRaw,
         pdfPresentationKind,
-        pdfTrendMode
-          ? null
-          : isAscendingValueIntent(pdfAnalysisForSort, pdfViz),
+        pdfSortAscending,
         pdfTrendMode
       );
       const pdfRankedSignals =
@@ -9001,7 +9260,8 @@ function HomeInner() {
               pdfPresentationKind,
               3,
               pdfChartDataRaw,
-              pdfTrendMode
+              pdfTrendMode,
+              pdfSortAscending
             )
           : null;
       const pdfProv = pdfViz?.provenance;
@@ -9088,9 +9348,11 @@ function HomeInner() {
       });
       const pdfExportDisplayTitle =
         contractDisplayTitle(pdfContract, "") ||
-        (pdfSnap?.source === "auto_dashboard"
-          ? pdfChartTitle.trim() || pdfNormMeta.chartTitle
-          : pdfNormMeta.chartTitle);
+        (chartScope === "insight" && pdfSnap?.source !== "auto_dashboard"
+          ? insightDisplayChartTitle.trim() || pdfNormMeta.chartTitle
+          : pdfSnap?.source === "auto_dashboard"
+            ? pdfChartTitle.trim() || pdfNormMeta.chartTitle
+            : pdfNormMeta.chartTitle);
 
       const pdfChartInsightBadge =
         chartScope === "insight"
@@ -9111,7 +9373,10 @@ function HomeInner() {
           `The dataset contains ${Number(rowCount).toLocaleString()} rows and ${colCount} columns (${domainLabel} profile).`
         );
 
-        const q = question.trim();
+        const q =
+          chartScope === "insight"
+            ? lastAskedQuestion.trim() || question.trim()
+            : question.trim() || lastAskedQuestion.trim();
         if (q) {
           const qShort = q.length > 200 ? `${q.slice(0, 197)}…` : q;
           lines.push(`Question: ${qShort}`);
@@ -9131,11 +9396,17 @@ function HomeInner() {
             }
             return "";
           }
-          const fromAligned = alignedAnalysis?.insightSummary?.trim();
+          const fromAligned = pdfAlignedAnalysis?.insightSummary?.trim();
           if (fromAligned) {
             return wrap(fromAligned);
           }
-          const fromParsed = parsedInsightAnswer.summary?.trim();
+          const fromParsed =
+            chartScope === "insight"
+              ? parseAnswerIntoSections(
+                  pdfInsightAnswer,
+                  pdfAlignedAnalysis?.insightSummary ?? undefined
+                ).summary?.trim()
+              : parsedInsightAnswer.summary?.trim();
           if (fromParsed) {
             return wrap(fromParsed);
           }
@@ -9450,7 +9721,10 @@ function HomeInner() {
           ? "KPI dashboard (aligned with your question)"
           : "KPI dashboard",
         kpiCards: cardsPdf,
-        question,
+        question:
+          chartScope === "insight"
+            ? lastAskedQuestion.trim() || question.trim()
+            : question.trim() || lastAskedQuestion.trim(),
         answer:
           pdfTrendMode && pdfContract
             ? sanitizeNarrativeForTrendContract(pdfInsightAnswer, pdfContract)
@@ -9505,8 +9779,13 @@ function HomeInner() {
           hint: c.hint,
         })),
         executiveInsightsBrief:
-          resolved.includeAIInsight && insightExecutiveBrief.trim()
+          resolved.includeAIInsight &&
+          (chartScope === "insight"
             ? insightExecutiveBrief.trim()
+            : parsedInsightAnswer.summary?.trim() ?? "")
+            ? chartScope === "insight"
+              ? insightExecutiveBrief.trim()
+              : parsedInsightAnswer.summary?.trim()
             : undefined,
         provenance: provenanceSlice,
         chart: resolved.includeChart
@@ -9525,6 +9804,8 @@ function HomeInner() {
               alignedMetric: pdfMetricColumn,
               alignedMetricDisplay: pdfAlignedMetricDisplay,
               aggregation: pdfAggregation,
+              metricType: pdfViz?.chartRecommendation?.metricType ?? null,
+              roundingHint: pdfViz?.roundingHint ?? null,
               chartAttribution: chartExportAttribution,
             }
           : null,
@@ -9572,27 +9853,6 @@ function HomeInner() {
       onInsightDrill={insightChartDrill}
     />
   );
-
-  const sessionChartIntelAxisLabel = useMemo(() => {
-    const h = sessionChartSemanticHeader;
-    if (h.mode === "scatter") {
-      return `${h.xLabel} · ${h.yLabel}`;
-    }
-    return h.detailLabel?.trim() || h.roleLabel?.trim() || null;
-  }, [sessionChartSemanticHeader]);
-
-  const sessionChartIntelSourceLabel = useMemo(() => {
-    const src = activeSnapshot?.source;
-    if (src === "ai") return "AI";
-    if (src === "auto_dashboard") return "Auto Dashboard";
-    return null;
-  }, [activeSnapshot?.source]);
-
-  const sessionChartIntelNote = useMemo(() => {
-    const w = visualization?.partialVisualizationWarning?.trim();
-    if (!w) return null;
-    return w.length > 160 ? `${w.slice(0, 157)}…` : w;
-  }, [visualization?.partialVisualizationWarning]);
 
   const sessionChartReason = useMemo(
     () =>
@@ -9701,13 +9961,14 @@ function HomeInner() {
                 onDateStart={setDashDateStart}
                 onDateEnd={setDashDateEnd}
                 appearance="dashboard"
+                overviewFilterCompact
               />
             </div>
           ) : null}
           {chartData.length > 0 && (
             <div
               ref={chartCaptureSessionRef}
-              className="fixed left-[-10000px] top-0 z-0 w-[860px] min-h-[400px] overflow-hidden bg-white rounded-lg border border-slate-100 p-5 pb-6 shadow-[0_1px_2px_rgba(15,23,42,0.045)]"
+              className="pdf-chart-capture chart-viz-theme fixed left-[-10000px] top-0 z-0 w-[860px] min-h-[400px] overflow-hidden rounded-lg border border-slate-100/90 bg-white p-4 pb-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
               aria-hidden="true"
             >
               {chartHeadingBlock}
@@ -9722,7 +9983,7 @@ function HomeInner() {
           {insightChartData.length > 0 && (
             <div
               ref={chartCaptureInsightRef}
-              className="fixed left-[-10000px] top-0 z-0 w-[860px] min-h-0 overflow-hidden bg-white rounded-xl border border-slate-200/70 p-5 pb-6 shadow-[0_12px_40px_-12px_rgb(15_23_42_/_0.12)]"
+              className="pdf-chart-capture chart-viz-theme fixed left-[-10000px] top-0 z-0 w-[860px] min-h-0 overflow-hidden rounded-xl border border-slate-200/70 bg-white p-4 pb-5 shadow-[0_8px_28px_-10px_rgb(15_23_42_/_0.1)]"
               aria-hidden="true"
             >
               {insightChartHeadingBlock}
@@ -9740,7 +10001,7 @@ function HomeInner() {
           {activeTab === "overview" && (
             <>
             {columns.length === 0 ? (
-              <p className={`mb-5 max-w-2xl text-[15px] leading-relaxed ${ovMuted}`}>
+              <p className={`mb-3 max-w-2xl text-[15px] leading-relaxed ${ovMuted}`}>
                 Upload your CSV or Excel file and ask AI questions about your business data.
               </p>
             ) : null}
@@ -9758,14 +10019,21 @@ function HomeInner() {
                           Dataset ready
                         </span>
                       </div>
-                      <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="min-w-0">
+                      <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-6">
+                        <div className="min-w-0 sm:col-span-2 lg:col-span-2">
                           <dt className={ovMuted}>File</dt>
-                          <dd className="truncate font-medium text-foreground" title={uploadMeta?.name || ""}>
-                            {uploadMeta?.name || "—"}
+                          <dd
+                            className="min-w-0 font-medium text-foreground"
+                            title={uploadMeta?.name || undefined}
+                          >
+                            <span className="block min-w-0">
+                              {uploadMeta?.name
+                                ? formatOverviewFilenameMiddle(uploadMeta.name, 56)
+                                : "—"}
+                            </span>
                             {uploadMeta?.size_bytes != null ? (
-                              <span className={`ml-1 font-normal ${ovMuted}`}>
-                                ({formatBytes(uploadMeta.size_bytes)})
+                              <span className={`mt-0.5 block text-xs font-normal ${ovMuted}`}>
+                                {formatBytes(uploadMeta.size_bytes)}
                               </span>
                             ) : null}
                           </dd>
@@ -9794,7 +10062,7 @@ function HomeInner() {
                         type="button"
                         onClick={openOverviewReplaceUpload}
                         title="Upload a new CSV or Excel file (replaces the dataset in this session)"
-                        className={ovBtnSecondary}
+                        className={ovOverviewSecondaryBtn}
                       >
                         Replace file
                       </button>
@@ -9811,33 +10079,39 @@ function HomeInner() {
                         </h2>
                         {columns.length > 0 ? (
                           <p className={`mt-1 ${ovSectionDesc}`}>
-                            CSV or Excel — replaces the dataset in this session.
+                            CSV, Excel, JSON, or Parquet — replaces the dataset in this session.
                           </p>
                         ) : null}
                       </div>
-                      {file ? (
-                        <div className="text-sm text-slate-600 sm:text-right">
-                          Selected:{" "}
-                          <span className="font-medium text-slate-900">{file.name}</span>{" "}
-                          <span className="text-slate-500">({formatBytes(file.size)})</span>
-                        </div>
-                      ) : null}
                     </div>
 
                     <div className="mt-4">
                       <input
                         ref={overviewFileInputRef}
                         type="file"
-                        accept=".csv,.xlsx,.xls"
+                        accept={OVERVIEW_UPLOAD_ACCEPT}
                         className="sr-only"
-                        aria-label="Choose CSV or Excel file"
+                        aria-label="Choose dataset file (CSV, Excel, JSON, or Parquet)"
                         onChange={(e) => {
                           const next = e.target.files?.[0];
                           if (next) assignOverviewPickedFile(next);
                         }}
                       />
                       <div
-                        role="presentation"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={
+                          file
+                            ? `Selected file ${file.name}. Click to choose a different file.`
+                            : "Choose a dataset file. Drag and drop or click to browse."
+                        }
+                        onClick={() => overviewFileInputRef.current?.click()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            overviewFileInputRef.current?.click();
+                          }
+                        }}
                         onDragOver={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -9870,49 +10144,76 @@ function HomeInner() {
                           const next = e.dataTransfer.files?.[0];
                           if (next) assignOverviewPickedFile(next);
                         }}
-                        className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-8 ${
+                        className={`${ovUploadDropzone} rounded-xl border-2 border-dashed transition-colors ${
+                          file ? "p-3 sm:p-4" : "p-6 sm:p-8 text-center"
+                        } ${
                           overviewDropActive
-                            ? "border-[color:var(--accent)] bg-[color:var(--accent-wash)]"
-                            : "border-[color:var(--border-default)] bg-[color:var(--surface-inset)]"
+                            ? ovUploadDropzoneActive
+                            : ovUploadDropzoneIdle
                         }`}
                       >
-                        <p className="text-sm font-medium text-slate-800">
-                          Drag and drop a file here
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          .csv, .xlsx, or .xls
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => overviewFileInputRef.current?.click()}
-                          className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
-                        >
-                          Choose file
-                        </button>
+                        {file ? (
+                          <OverviewUploadSelectedState
+                            fileName={file.name}
+                            fileSizeLabel={formatBytes(file.size)}
+                          />
+                        ) : (
+                          <>
+                            <div className="overview-upload-dropzone__icon" aria-hidden>
+                              <svg
+                                width="17"
+                                height="17"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.75"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                              </svg>
+                            </div>
+                            <p className="text-sm font-medium text-foreground">
+                              Drag and drop a file here
+                            </p>
+                            <p className={`mt-1 text-xs ${ovMuted}`}>
+                              {OVERVIEW_UPLOAD_FORMAT_HINT}
+                            </p>
+                          </>
+                        )}
                       </div>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <div
+                        className={`overview-upload-actions flex flex-wrap items-center gap-3 ${
+                          file ? "mt-5" : "mt-3"
+                        }`}
+                      >
                         <button
                           type="button"
-                          onClick={uploadFile}
-                          disabled={loading}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl disabled:bg-gray-400"
+                          onClick={() => {
+                            if (loading || !file) return;
+                            void uploadFile();
+                          }}
+                          disabled={loading || !file}
+                          className={ovBtnPrimaryAccent}
                         >
-                          {loading ? "Uploading..." : "Upload File"}
+                          {loading ? "Uploading..." : "Upload Dataset"}
                         </button>
                         {columns.length > 0 ? (
                           <button
                             type="button"
                             onClick={cancelOverviewReplaceUpload}
                             disabled={loading}
-                            className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200/60 disabled:opacity-50"
+                            className={`${ovBtnSecondarySm} disabled:opacity-50`}
                           >
                             Cancel
                           </button>
                         ) : null}
                         {loading && (
-                          <div className="flex items-center gap-3 text-gray-600">
-                            <div className="h-5 w-5 rounded-full border-2 border-gray-300 border-t-gray-700 animate-spin" />
+                          <div className={`flex items-center gap-3 ${ovMuted}`}>
+                            <div className="h-5 w-5 rounded-full border-2 border-[color:var(--border-default)] border-t-[color:var(--foreground)] animate-spin" />
                             <span>Processing file…</span>
                           </div>
                         )}
@@ -9923,31 +10224,36 @@ function HomeInner() {
                   <section className={`min-w-0 p-5 order-1 ${ovCardElevated}`}>
                     <h2 className={ovSectionTitle}>Dataset</h2>
                     {columns.length === 0 ? (
-                      <p className={`mt-2 text-sm ${ovMuted}`}>
-                        Upload a dataset to see KPIs, preview, charts, and insights.
-                      </p>
+                      <>
+                        <p className={`mt-2 text-sm ${ovMuted}`}>
+                          Upload a dataset to see KPIs, preview, charts, and insights.
+                        </p>
+                        <div className={ovDatasetEmptyInset} aria-hidden>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className={ovCapabilityChip}>KPIs</span>
+                            <span className={ovCapabilityChip}>Charts</span>
+                            <span className={ovCapabilityChip}>AI Insights</span>
+                          </div>
+                        </div>
+                      </>
                     ) : (
-                      <div className="mt-3 space-y-2 text-sm text-slate-700">
+                      <div className="mt-3 space-y-2 text-sm text-foreground">
                         {uploadMeta?.name && (
                           <p>
-                            <span className="text-slate-500">File</span>{" "}
-                            <span className="font-medium text-slate-900">
-                              {uploadMeta.name}
-                            </span>{" "}
-                            <span className="text-slate-500">
+                            <span className={ovDataLabel}>File</span>{" "}
+                            <span className={ovDataValue}>{uploadMeta.name}</span>{" "}
+                            <span className={ovMuted}>
                               ({formatBytes(uploadMeta.size_bytes)})
                             </span>
                           </p>
                         )}
                         <p>
-                          <span className="text-slate-500">Rows</span>{" "}
-                          <span className="font-medium text-slate-900">{rows}</span>
+                          <span className={ovDataLabel}>Rows</span>{" "}
+                          <span className={ovDataValue}>{rows}</span>
                         </p>
                         <p>
-                          <span className="text-slate-500">Columns</span>{" "}
-                          <span className="font-medium text-slate-900">
-                            {columns.length}
-                          </span>
+                          <span className={ovDataLabel}>Columns</span>{" "}
+                          <span className={ovDataValue}>{columns.length}</span>
                         </p>
                         {(selectedSheet.trim() ||
                           (uploadMeta?.name ?? "").toLowerCase().endsWith(".csv")) && (
@@ -9986,7 +10292,7 @@ function HomeInner() {
                     <button
                       type="button"
                       onClick={() => setMappingModalOpen(true)}
-                      className={`shrink-0 ${ovBtnPrimaryAccent}`}
+                      className={`shrink-0 ${ovOverviewSecondaryBtn}`}
                     >
                       Review mapping
                     </button>
@@ -10277,148 +10583,11 @@ function HomeInner() {
             </>
           )}
 
-          {activeTab === "insights" && columns.length > 0 && (
-            <section className={`mb-6 p-4 sm:p-5 ${ovCard}`}>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full bg-emerald-500"
-                      aria-hidden
-                    />
-                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                      Dataset ready
-                    </span>
-                  </div>
-                  <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="min-w-0">
-                      <dt className={ovMuted}>File</dt>
-                      <dd
-                        className="truncate font-medium text-foreground"
-                        title={uploadMeta?.name || ""}
-                      >
-                        {uploadMeta?.name || "—"}
-                        {uploadMeta?.size_bytes != null ? (
-                          <span className={`ml-1 font-normal ${ovMuted}`}>
-                            ({formatBytes(uploadMeta.size_bytes)})
-                          </span>
-                        ) : null}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className={ovDataLabel}>Rows</dt>
-                      <dd className={ovDataValue}>{rows}</dd>
-                    </div>
-                    <div>
-                      <dt className={ovDataLabel}>Columns</dt>
-                      <dd className={ovDataValue}>{columns.length}</dd>
-                    </div>
-                    <div className="min-w-0">
-                      <dt className={ovDataLabel}>Sheet</dt>
-                      <dd className={`truncate ${ovDataValue}`}>
-                        {selectedSheet.trim() ||
-                          (uploadMeta?.name ?? "").toLowerCase().endsWith(".csv")
-                            ? "CSV"
-                            : "—"}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-                <div className="flex shrink-0 flex-wrap items-end gap-2">
-                  {sheets.length > 1 ? (
-                    <div className="flex min-w-[10rem] flex-col gap-1.5">
-                      <label className={ovDataLabel} htmlFor="insights-sheet-select">
-                        Sheet
-                      </label>
-                      <select
-                        id="insights-sheet-select"
-                        value={selectedSheet}
-                        onChange={(e) => selectSheet(e.target.value)}
-                        className={`${ovFilterControl} h-[52px] cursor-pointer`}
-                      >
-                        {sheets.map((sheet) => (
-                          <option key={sheet} value={sheet}>
-                            {sheet}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={openOverviewReplaceUpload}
-                    title="Upload a new CSV or Excel file (replaces the dataset in this session)"
-                    className={ovBtnSecondary}
-                  >
-                    Replace file
-                  </button>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {activeTab !== "overview" &&
-            activeTab !== "insights" &&
-            columns.length > 0 && (
-            <div className="mb-6 bg-slate-50 border rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <div className="flex flex-col gap-1 text-sm text-slate-700">
-                <div className="flex flex-wrap items-center gap-2">
-                  {uploadMeta?.name && (
-                    <span className="font-medium text-slate-900">
-                      {uploadMeta.name}
-                    </span>
-                  )}
-                  {uploadMeta?.size_bytes ? (
-                    <span className="text-slate-500">
-                      {formatBytes(uploadMeta.size_bytes)}
-                    </span>
-                  ) : null}
-                  <span className="text-slate-300">•</span>
-                  <span>
-                    <span className="text-slate-500">Rows</span>{" "}
-                    <span className="font-medium text-slate-900">{rows}</span>
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span>
-                    <span className="text-slate-500">Columns</span>{" "}
-                    <span className="font-medium text-slate-900">
-                      {columns.length}
-                    </span>
-                  </span>
-                </div>
-                {selectedSheet && (
-                  <div className="text-slate-600">
-                    Sheet: <span className="font-medium">{selectedSheet}</span>
-                  </div>
-                )}
-              </div>
-
-              {sheets.length > 1 && (
-                <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium text-slate-600">
-                    Sheet
-                  </label>
-                  <select
-                    value={selectedSheet}
-                    onChange={(e) => selectSheet(e.target.value)}
-                    className="border bg-white p-2 rounded-xl"
-                  >
-                    {sheets.map((sheet) => (
-                      <option key={sheet} value={sheet}>
-                        {sheet}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          )}
-
         {activeTab === "preview" && columns.length > 0 && (
-          <section className="mb-6 min-w-0">
-            <div className="mb-5 flex flex-col gap-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="min-w-0 max-w-3xl">
+          <section className="mb-6 min-w-0 w-full">
+            <div className="mb-5 flex min-w-0 flex-col gap-4">
+              <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className={dpPreviewHeaderIntro}>
                   <h2 className={dpSectionTitle}>Data Preview</h2>
                   <p className={dpSectionDesc}>
                     Showing first {preview.length} of {rows} rows in this window. Missing
@@ -10436,6 +10605,7 @@ function HomeInner() {
                     onChange={async (e) => {
                       const val = e.target.value === "all" ? "all" : Number(e.target.value);
                       setPreviewRowLimit(val);
+                      setDataPreviewPageIndex(0);
                       await fetchPreviewRows(val);
                     }}
                     className={dpControl}
@@ -10448,7 +10618,14 @@ function HomeInner() {
                   </select>
                 </div>
               </div>
-              <div className={dpToolbarRow}>
+              <DataPreviewDatasetContext
+                fileName={uploadMeta?.name}
+                fileSizeBytes={uploadMeta?.size_bytes}
+                rows={rows}
+                columnCount={columns.length}
+                sheetLabel={selectedSheet.trim() || null}
+              />
+              <div className={`${dpToolbarRow} min-w-0 w-full`}>
                 <div className={dpSearchWrap}>
                   <div className="relative min-w-0 flex-1">
                     <span
@@ -10491,10 +10668,7 @@ function HomeInner() {
                   ) : null}
                 </div>
                 {deferredDataPreviewSearch ? (
-                  <p
-                    className="shrink-0 text-xs font-medium tabular-nums text-[color:var(--text-muted)] sm:ml-auto"
-                    aria-live="polite"
-                  >
+                  <p className={dpToolbarMatchMeta} aria-live="polite">
                     {dataPreviewFilteredRows.length} of {preview.length} loaded row
                     {preview.length === 1 ? "" : "s"} match
                   </p>
@@ -10588,66 +10762,72 @@ function HomeInner() {
                           previewColumnHeaderSecondaryMap.get(col) ?? null;
                         const dt = profile?.column_types?.[col];
                         const elevated = dataPreviewTableHeaderElevated;
+                        const sortActive = dataPreviewSort?.column === col;
                         const thExtra = [
                           elevated ? "data-preview-th--elevated" : "",
                           colIdx === 0 ? "data-preview-th--sticky-col" : "",
+                          sortActive ? "data-preview-th--sorted" : "",
                         ]
                           .filter(Boolean)
                           .join(" ");
                         return (
-                        <th key={col} className={thExtra || undefined}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            const r = e.currentTarget.getBoundingClientRect();
-                            setDataPreviewProfileOpen((prev) =>
-                              prev?.column === col
-                                ? null
-                                : {
-                                    column: col,
-                                    anchor: {
-                                      top: r.top,
-                                      left: r.left,
-                                      right: r.right,
-                                      bottom: r.bottom,
-                                      width: r.width,
-                                      height: r.height,
-                                    },
-                                  }
-                            );
-                          }}
-                          className={dpThBtn}
-                          aria-expanded={dataPreviewProfileOpen?.column === col}
-                          title="Column profile"
-                        >
-                          <span className={dpThName}>{col}</span>
-                          <div className={dpThMeta}>
-                            <span className={dpBadgeType}>
-                              {dataPreviewHeaderTypeLabel(dt)}
-                            </span>
-                            {secondary ? (
-                              <span title={secondary.title} className={secondary.className}>
-                                {secondary.label}
-                              </span>
-                            ) : null}
-                          </div>
-                        </button>
-                      </th>
+                          <th key={col} className={thExtra || undefined}>
+                            <DataPreviewColumnHeader
+                              column={col}
+                              typeLabel={dataPreviewHeaderTypeLabel(dt)}
+                              secondary={
+                                secondary
+                                  ? {
+                                      label: secondary.label,
+                                      title: secondary.title,
+                                      className: secondary.className,
+                                    }
+                                  : null
+                              }
+                              sort={dataPreviewSort}
+                              profileOpen={dataPreviewProfileOpen?.column === col}
+                              onSort={(column) => {
+                                setDataPreviewSort((prev) =>
+                                  cycleDataPreviewSort(prev, column)
+                                );
+                                setDataPreviewPageIndex(0);
+                              }}
+                              onOpenProfile={(column, e) => {
+                                const r = e.currentTarget.getBoundingClientRect();
+                                setDataPreviewProfileOpen((prev) =>
+                                  prev?.column === column
+                                    ? null
+                                    : {
+                                        column,
+                                        anchor: {
+                                          top: r.top,
+                                          left: r.left,
+                                          right: r.right,
+                                          bottom: r.bottom,
+                                          width: r.width,
+                                          height: r.height,
+                                        },
+                                      }
+                                );
+                              }}
+                            />
+                          </th>
                         );
                       })}
                   </tr>
                 </thead>
 
                 <tbody>
-                  {dataPreviewFilteredRows.map((row, index) => {
+                  {dataPreviewPageRows.map((row, index) => {
                     const qLower = deferredDataPreviewSearch.toLowerCase();
                     return (
                       <tr key={index} className="group">
                         {columns.map((col, colIdx) => {
                           const raw = row[col];
-                          const emptyCell =
-                            raw === null || raw === undefined || raw === "";
-                          const displayText = emptyCell ? "NULL" : String(raw);
+                          const emptyCell = isMissingValue(raw);
+                          const displayText = emptyCell
+                            ? DATA_PREVIEW_MISSING_LABEL
+                            : String(raw);
                           const showHighlight =
                             qLower.length > 0 &&
                             dataPreviewCellMatchesQuery(raw, qLower);
@@ -10657,30 +10837,34 @@ function HomeInner() {
                             : isFirstCol
                               ? dpCellSticky
                               : dpCell;
-                          return (
+                          return emptyCell ? (
                             <td
                               key={col}
-                              title={emptyCell ? undefined : displayText}
                               className={cellClass}
                             >
-                              {emptyCell ? (
-                                <span className={dpNullPill}>
-                                  {showHighlight
-                                    ? highlightSearchInText(
-                                        displayText,
-                                        deferredDataPreviewSearch
-                                      )
-                                    : displayText}
-                                </span>
-                              ) : showHighlight ? (
-                                highlightSearchInText(
-                                  displayText,
-                                  deferredDataPreviewSearch
-                                )
-                              ) : (
-                                displayText
-                              )}
+                              <span className={dpNullPill}>
+                                {showHighlight
+                                  ? highlightSearchInText(
+                                      displayText,
+                                      deferredDataPreviewSearch
+                                    )
+                                  : displayText}
+                              </span>
                             </td>
+                          ) : (
+                            <DataPreviewCopyCell
+                              key={col}
+                              className={cellClass}
+                              copyValue={displayText}
+                              title={displayText}
+                            >
+                              {showHighlight
+                                ? highlightSearchInText(
+                                    displayText,
+                                    deferredDataPreviewSearch
+                                  )
+                                : displayText}
+                            </DataPreviewCopyCell>
                           );
                         })}
                       </tr>
@@ -10691,6 +10875,77 @@ function HomeInner() {
                 )}
               </div>
             </div>
+            {!previewLoading && dataPreviewFilteredCount > 0 ? (
+              <div className={dpPaginationBar}>
+                <div
+                  className={`${dpPaginationInner}${
+                    dataPreviewPaginationActive && dataPreviewPageCount > 1
+                      ? ""
+                      : " data-preview-pagination__inner--static"
+                  }`}
+                >
+                  <p className={dpPaginationMeta}>
+                    {dataPreviewPageCount === 1 ? (
+                      <>
+                        Showing all{" "}
+                        {dataPreviewFilteredCount.toLocaleString()}{" "}
+                        row{dataPreviewFilteredCount === 1 ? "" : "s"}
+                      </>
+                    ) : dataPreviewPaginationActive ? (
+                      <>
+                        Showing {dataPreviewRangeStart.toLocaleString()}–
+                        {dataPreviewRangeEnd.toLocaleString()} of{" "}
+                        {dataPreviewFilteredCount.toLocaleString()} row
+                        {dataPreviewFilteredCount === 1 ? "" : "s"} · Page{" "}
+                        {dataPreviewSafePageIndex + 1} of{" "}
+                        {dataPreviewPageCount}
+                      </>
+                    ) : (
+                      <>
+                        Showing all {dataPreviewFilteredCount.toLocaleString()}{" "}
+                        row{dataPreviewFilteredCount === 1 ? "" : "s"}
+                      </>
+                    )}
+                  </p>
+                  {dataPreviewPaginationActive && dataPreviewPageCount > 1 ? (
+                    <div className={dpPaginationNav}>
+                      <button
+                        type="button"
+                        className={dpPaginationBtn}
+                        disabled={dataPreviewSafePageIndex <= 0}
+                        onClick={() =>
+                          setDataPreviewPageIndex((p) => Math.max(0, p - 1))
+                        }
+                        aria-label="Previous page"
+                      >
+                        Previous
+                      </button>
+                      <span
+                        className={dpPaginationPill}
+                        aria-label={`Page ${dataPreviewSafePageIndex + 1} of ${dataPreviewPageCount}`}
+                      >
+                        {dataPreviewSafePageIndex + 1} / {dataPreviewPageCount}
+                      </span>
+                      <button
+                        type="button"
+                        className={dpPaginationBtn}
+                        disabled={
+                          dataPreviewSafePageIndex >= dataPreviewPageCount - 1
+                        }
+                        onClick={() =>
+                          setDataPreviewPageIndex((p) =>
+                            Math.min(dataPreviewPageCount - 1, p + 1)
+                          )
+                        }
+                        aria-label="Next page"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             {previewLoading && preview.length > 0 ? (
               <p className={`mt-2 ${dpEmptyState}`}>Refreshing preview rows…</p>
             ) : null}
@@ -10759,79 +11014,71 @@ function HomeInner() {
               >
                 {chartData.length > 0 ? (
                   <div className={chartsTabVizPreviewCard}>
-                    <div className={chartsTabPreviewHeaderSticky}>
-                      <div
-                        ref={chartsSessionHeadingRef}
-                        className="w-full min-w-0 scroll-mt-28"
-                      >
-                        <div className="mx-auto min-w-0 max-w-4xl">
-                          {chartHeadingBlock ?? (
-                            <div className={chartsTabVizHeaderZone}>
-                              <p className={chartsTabVizKicker}>Chart preview</p>
-                              <h3 className={aiInsightsVizTitle}>Visualization</h3>
-                              {chartSubtitle ? (
-                                <p className={aiInsightsVizSubtitle}>
-                                  {chartSubtitle}
-                                </p>
-                              ) : null}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div
-                        title={sessionChartMetadataLine}
-                        className={`${aiInsightsVizChipsWrap} mt-1`}
-                      >
-                        <ChartContextSummary
-                          renderedKind={sessionRenderedChartKind}
-                          metricLabel={chartAxisLabels.valueAxis}
-                          semanticHeader={sessionChartSemanticHeader}
-                          badgeCompact={sessionChartMetadataBadgeCompact}
-                          leadInsight={chartInsightBadge ?? undefined}
-                          compactChips
-                        />
-                      </div>
-                      <ChartsTabIntelligenceStrip
-                        sourceLabel={sessionChartIntelSourceLabel}
-                        chartTypeLabel={presentationKindUiLabel(
-                          sessionRenderedChartKind
-                        )}
-                        measureLabel={chartAxisLabels.valueAxis}
-                        axisLabel={sessionChartIntelAxisLabel}
-                        highlight={chartInsightBadge ?? null}
-                        note={sessionChartIntelNote}
-                      />
-                      <ChartsTabChartReason
-                        chartId={activeChartId}
-                        reason={sessionChartReason}
-                      />
-                    </div>
-                    <ChartsTabPlotTransition
-                      chartId={activeChartId}
-                      plotHeightPx={chartHeightMain}
-                    >
-                      <div
-                        className={chartsTabVizSessionFrame}
-                        style={
-                          {
-                            "--insights-viz-plot-h": `${chartHeightMain}px`,
-                          } as CSSProperties
-                        }
-                      >
-                        <ChartInsightViewportWrapper
-                          chartKind={sessionRenderedChartKind}
-                          sessionMode
+                    <div ref={chartsTabPngExportRef} className={chartsTabPngExportRoot}>
+                      <div className={chartsTabPreviewHeaderSticky}>
+                        <div
+                          ref={chartsSessionHeadingRef}
+                          className="w-full min-w-0 scroll-mt-28"
                         >
-                          <div className={chartsTabSessionPlotSurface}>
-                            {renderDatasetChart(
-                              chartHeightMain,
-                              false,
-                              false
+                          <div className="mx-auto min-w-0 max-w-4xl">
+                            {chartHeadingBlock ?? (
+                              <div className={chartsTabVizHeaderZone}>
+                                <p className={chartsTabVizKicker}>Chart preview</p>
+                                <h3 className={aiInsightsVizTitle}>Visualization</h3>
+                                {chartSubtitle ? (
+                                  <p className={aiInsightsVizSubtitle}>
+                                    {chartSubtitle}
+                                  </p>
+                                ) : null}
+                              </div>
                             )}
                           </div>
-                        </ChartInsightViewportWrapper>
+                        </div>
+                        <div
+                          title={sessionChartMetadataLine}
+                          className={`${aiInsightsVizChipsWrap} mt-1`}
+                        >
+                          <ChartContextSummary
+                            renderedKind={sessionRenderedChartKind}
+                            metricLabel={chartAxisLabels.valueAxis}
+                            semanticHeader={sessionChartSemanticHeader}
+                            badgeCompact={sessionChartMetadataBadgeCompact}
+                            leadInsight={chartInsightBadge ?? undefined}
+                            compactChips
+                          />
+                        </div>
+                        <ChartsTabChartReason
+                          chartId={activeChartId}
+                          reason={sessionChartReason}
+                        />
                       </div>
-                    </ChartsTabPlotTransition>
+                      <ChartsTabPlotTransition
+                        chartId={activeChartId}
+                        plotHeightPx={chartHeightMain}
+                      >
+                        <div
+                          className={chartsTabVizSessionFrame}
+                          style={
+                            {
+                              "--insights-viz-plot-h": `${chartHeightMain}px`,
+                            } as CSSProperties
+                          }
+                        >
+                          <ChartInsightViewportWrapper
+                            chartKind={sessionRenderedChartKind}
+                            sessionMode
+                          >
+                            <div className={chartsTabSessionPlotSurface}>
+                              {renderDatasetChart(
+                                chartHeightMain,
+                                false,
+                                false
+                              )}
+                            </div>
+                          </ChartInsightViewportWrapper>
+                        </div>
+                      </ChartsTabPlotTransition>
+                    </div>
                     <div className={chartsTabSmartReadWrap}>
                       <SmartChartInsightPanel
                         intel={sessionSmartChartIntel}
@@ -10935,7 +11182,7 @@ function HomeInner() {
                     type="button"
                     onClick={resetAiConversation}
                     disabled={!hasActiveAiConversation}
-                    className={`${btnSecondary} ${aiInsightsAskResetBtn}`}
+                    className={aiInsightsAskResetBtn}
                     title={
                       hasActiveAiConversation
                         ? "Clears the question, answer, insight cards, AI chart, follow-up chips, and thread memory. Your file, filters, auto-dashboard, and non-AI chart history stay."
@@ -10979,9 +11226,10 @@ function HomeInner() {
                     />
                     <div className={aiInsightsAskActionsRow}>
                       <button
+                        type="button"
                         onClick={() => void askAI()}
-                        disabled={loading}
-                        className={`${btnPrimary} ${aiInsightsAskSubmitBtn}`}
+                        disabled={!canAskAi}
+                        className={aiInsightsAskSubmitBtn}
                       >
                         {loading ? "Thinking..." : "Ask AI"}
                       </button>
@@ -11733,68 +11981,111 @@ function HomeInner() {
         )}
 
         {activeTab === "export" && (
-          <section className="mb-6">
-            <div className="bg-white border rounded-2xl p-4 sm:p-5 space-y-4">
-              <div>
-                <h2 className="text-xl font-semibold">Export</h2>
-                <p className="text-sm text-slate-600 mt-1">
-                  Choose what to include in the report, then download a business-ready PDF.
-                </p>
-              </div>
+          <section className={exportTabPage}>
+            <div className={exportTabHeaderRow}>
+              <h2 className={exportTabTitle}>Export</h2>
+              <p className={exportTabDesc}>
+                Choose what to include in the report, then download a business-ready PDF.
+              </p>
+            </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-slate-900">Report Preview Summary</h3>
-                <div className="mt-2 text-sm text-slate-700 space-y-1">
-                  <p>File: {uploadMeta?.name || "No file uploaded"}</p>
-                  <p>Dataset: {rows.toLocaleString()} rows • {columns.length} columns</p>
-                  <p>AI answer: {answer.trim() ? "Available" : "Not available yet"}</p>
-                  <p>
-                    Visualization:{" "}
-                    {visualization &&
-                    visualization.labels.length > 0
-                      ? `${visualization.labels.length} points (${visualization.chartType}) — ${visualization.title}`
-                      : "No visualization in this session yet"}
-                  </p>
-                  {exportExecutiveInsightsPreview ? (
-                    <div className="mt-3 rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Executive insights (PDF)
-                      </p>
-                      <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-                        {exportExecutiveInsightsPreview.scopeLabel}
-                      </p>
-                      {exportExecutiveInsightsPreview.brief ? (
-                        <p className="mt-2 text-sm leading-snug text-slate-800">
-                          <span className="font-semibold text-slate-900">AI context · </span>
-                          {exportExecutiveInsightsPreview.brief}
-                        </p>
-                      ) : null}
-                      {exportExecutiveInsightsPreview.facts.length > 0 ? (
-                        <ul className="mt-2 list-none space-y-1.5 text-xs leading-snug text-slate-700">
-                          {exportExecutiveInsightsPreview.facts.map((c) => (
-                            <li key={c.key}>
-                              <span className="font-semibold text-slate-800">{c.title}:</span>{" "}
-                              <span className="text-slate-700">{c.value}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
+            <div className={exportTabStack}>
+              <div className={exportTabSectionCard}>
+                <p className={exportTabSectionKicker}>Preview</p>
+                <h3 className={`${exportTabSectionTitle} mt-1`}>
+                  Report Preview Summary
+                </h3>
+                <div className={exportTabSummaryGrid}>
+                  <div className={exportTabSummaryChip}>
+                    <span className={exportTabSummaryChipLabel}>Dataset</span>
+                    <span className={exportTabSummaryChipValue}>
+                      {rows.toLocaleString()} rows · {columns.length} columns
+                    </span>
+                  </div>
+                  <div className={exportTabSummaryChip}>
+                    <span className={exportTabSummaryChipLabel}>AI answer</span>
+                    <span
+                      className={
+                        answer.trim()
+                          ? exportTabSummaryChipValue
+                          : exportTabSummaryChipValueMuted
+                      }
+                    >
+                      {answer.trim() ? "Available" : "Not available yet"}
+                    </span>
+                  </div>
+                  <div className={`${exportTabSummaryChip} ${exportTabSummaryChipSpan}`}>
+                    <span className={exportTabSummaryChipLabel}>Visualization</span>
+                    <span
+                      className={
+                        visualization && visualization.labels.length > 0
+                          ? exportTabSummaryChipValue
+                          : exportTabSummaryChipValueMuted
+                      }
+                      title={exportVizSummaryLabel}
+                    >
+                      {exportVizSummaryLabel}
+                    </span>
+                  </div>
+                  <div className={`${exportTabSummaryChip} ${exportTabSummaryChipSpan}`}>
+                    <span className={exportTabSummaryChipLabel}>Report sections</span>
+                    <div className={exportTabSummarySectionsWrap}>
+                      {exportSelectedSectionLabels.length > 0 ? (
+                        exportSelectedSectionLabels.map((label) => (
+                          <span key={label} className={exportTabSummarySectionPill}>
+                            {label}
+                          </span>
+                        ))
+                      ) : (
+                        <span className={exportTabSummaryChipValueMuted}>
+                          None selected
+                        </span>
+                      )}
                     </div>
-                  ) : null}
+                  </div>
                 </div>
+                {exportExecutiveInsightsPreview ? (
+                  <div className={exportTabExecutivePreview}>
+                    <p className={exportTabExecutivePreviewTitle}>
+                      Executive insights (PDF)
+                    </p>
+                    <p className={exportTabExecutivePreviewScope}>
+                      {exportExecutiveInsightsPreview.scopeLabel}
+                    </p>
+                    {exportExecutiveInsightsPreview.brief ? (
+                      <p className={exportTabExecutivePreviewBody}>
+                        <span className="font-semibold text-[var(--foreground)]">
+                          AI context ·{" "}
+                        </span>
+                        {exportExecutiveInsightsPreview.brief}
+                      </p>
+                    ) : null}
+                    {exportExecutiveInsightsPreview.facts.length > 0 ? (
+                      <ul className={exportTabExecutivePreviewList}>
+                        {exportExecutiveInsightsPreview.facts.map((c) => (
+                          <li key={c.key}>
+                            <span className="font-semibold text-[var(--foreground)]">
+                              {c.title}:
+                            </span>{" "}
+                            {c.value}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
-              <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Report branding</h3>
-                  <p className="text-xs text-slate-500">
-                    Shown on the cover page, running headers, and footers. Saved in this browser only.
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
-                    <label className="flex min-w-0 flex-1 flex-col text-sm">
-                      <span className="mb-1 text-slate-600">Company or team name</span>
+              <div className={exportTabSectionCard}>
+                <h3 className={exportTabSectionTitle}>Report branding</h3>
+                <p className={exportTabSectionDesc}>
+                  Shown on the cover page, running headers, and footers. Saved in this
+                  browser only.
+                </p>
+                <div className={exportTabFormGrid}>
+                  <div className={exportTabFormRow}>
+                    <label className="flex min-w-0 flex-1 flex-col">
+                      <span className={exportTabFieldLabel}>Company or team name</span>
                       <input
                         type="text"
                         value={reportBranding.companyName}
@@ -11812,12 +12103,12 @@ function HomeInner() {
                           });
                         }}
                         placeholder="e.g. Northwind Analytics"
-                        className="h-10 w-full rounded-lg border border-slate-200/50 bg-white px-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.045)] outline-none ring-slate-200 transition focus:border-slate-300 focus:ring-2"
+                        className={exportTabTextInput}
                       />
                     </label>
-                    <div className="flex w-full flex-col text-sm lg:w-[7.75rem] lg:flex-none">
-                      <span className="mb-1 text-slate-600">Accent color</span>
-                      <div className="flex h-10 items-center">
+                    <div className={exportTabColorField}>
+                      <span className={exportTabFieldLabel}>Accent color</span>
+                      <div className={exportTabColorSwatchWrap}>
                         <input
                           type="color"
                           value={reportBranding.accentHex}
@@ -11829,14 +12120,17 @@ function HomeInner() {
                               return next;
                             });
                           }}
-                          className="h-10 w-14 min-w-14 cursor-pointer rounded-lg border border-slate-200/50 bg-white p-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.045)] outline-none ring-slate-200 transition focus-visible:ring-2 focus-visible:ring-slate-200"
+                          className={exportTabColorInput}
                           title="Accent color"
                         />
+                        <span className={exportTabColorHex} aria-hidden>
+                          {reportBranding.accentHex}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <label className="block text-sm">
-                    <span className="text-slate-600">Tagline (optional)</span>
+                  <label className="block min-w-0">
+                    <span className={exportTabFieldLabel}>Tagline (optional)</span>
                     <input
                       type="text"
                       value={reportBranding.tagline}
@@ -11854,141 +12148,142 @@ function HomeInner() {
                         });
                       }}
                       placeholder="e.g. Q2 revenue & operations review"
-                      className="mt-1 h-10 w-full rounded-lg border border-slate-200/50 bg-white px-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.045)] outline-none ring-slate-200 transition focus:border-slate-300 focus:ring-2"
+                      className={`${exportTabTextInput} mt-1`}
                     />
                   </label>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200/90 bg-slate-50/40 p-4 sm:p-5">
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      Include in report
-                    </h3>
-                    <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2.5">
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeKPIs}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeKPIs: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include KPIs</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeAIInsight}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeAIInsight: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include AI Insight</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeChart}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeChart: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include Chart</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeDataPreview}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeDataPreview: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include Data Preview</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90 sm:col-span-2">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeDataQuality}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeDataQuality: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span>Include Data Quality</span>
-                      </label>
-                    </div>
-                  </div>
+              <div className={exportTabSectionCard}>
+                <p className={exportTabSectionKicker}>Contents</p>
+                <h3 className={`${exportTabSectionTitle} mt-1`}>Include in report</h3>
+                <div className={exportTabOptionsGrid}>
+                  <label className={exportTabCheckboxRow}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeKPIs}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeKPIs: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>KPIs</span>
+                  </label>
+                  <label className={exportTabCheckboxRow}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeAIInsight}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeAIInsight: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>AI Insight</span>
+                  </label>
+                  <label className={exportTabCheckboxRow}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeChart}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeChart: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>Chart</span>
+                  </label>
+                  <label className={exportTabCheckboxRow}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeDataPreview}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeDataPreview: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>Data Preview</span>
+                  </label>
+                  <label className={`${exportTabCheckboxRow} sm:col-span-2`}>
+                    <input
+                      type="checkbox"
+                      className={exportTabCheckboxInput}
+                      checked={exportOptions.includeDataQuality}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          includeDataQuality: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className={exportTabCheckboxLabel}>Data Quality</span>
+                  </label>
+                </div>
 
-                  <div className="border-t border-slate-200/70 pt-4">
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      Advanced options
-                    </h3>
-                    <p className="mt-1 text-[11px] leading-snug text-slate-500">
-                      Optional add-ons for audit trails and technical readers.
-                    </p>
-                    <div className="mt-2.5 space-y-2">
-                      <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeConversationContext ?? false}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeConversationContext: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span className="leading-snug">
-                          Include AI conversation thread (prior questions, follow-up
-                          chain, inherited filters)
-                        </span>
-                      </label>
-                      <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.045)] transition hover:border-slate-300/90">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
-                          checked={exportOptions.includeTechnicalAppendix === true}
-                          onChange={(e) =>
-                            setExportOptions((prev) => ({
-                              ...prev,
-                              includeTechnicalAppendix: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span className="leading-snug">
-                          Include technical appendix (chart spec, raw series sample,
-                          sparklines, engine metadata)
-                        </span>
-                      </label>
-                    </div>
+                <div className={exportTabAdvancedDivider}>
+                  <p className={exportTabSectionKicker}>Advanced</p>
+                  <h3 className={`${exportTabSectionTitle} mt-1`}>Advanced options</h3>
+                  <p className={exportTabSectionDesc}>
+                    Optional add-ons for audit trails and technical readers.
+                  </p>
+                  <div className={exportTabAdvancedStack}>
+                    <label className={exportTabCheckboxRowWide}>
+                      <input
+                        type="checkbox"
+                        className={exportTabCheckboxInput}
+                        checked={exportOptions.includeConversationContext ?? false}
+                        onChange={(e) =>
+                          setExportOptions((prev) => ({
+                            ...prev,
+                            includeConversationContext: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className={exportTabCheckboxLabel}>
+                        AI conversation thread (prior questions, follow-up chain,
+                        inherited filters)
+                      </span>
+                    </label>
+                    <label className={exportTabCheckboxRowWide}>
+                      <input
+                        type="checkbox"
+                        className={exportTabCheckboxInput}
+                        checked={exportOptions.includeTechnicalAppendix === true}
+                        onChange={(e) =>
+                          setExportOptions((prev) => ({
+                            ...prev,
+                            includeTechnicalAppendix: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className={exportTabCheckboxLabel}>
+                        Technical appendix (chart spec, raw series sample, sparklines,
+                        engine metadata)
+                      </span>
+                    </label>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-end">
-                <button type="button" onClick={() => downloadReport()} className={btnExport}>
+              <div className={exportTabFooter}>
+                <p className={exportTabFooterHint}>
+                  Generates a business-ready PDF with your selected sections and branding.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => downloadReport()}
+                  className={exportTabDownloadBtn}
+                >
                   Download Report PDF
                 </button>
               </div>
@@ -12143,14 +12438,14 @@ function HomeInner() {
                     type="button"
                     onClick={saveColumnMapping}
                     disabled={loading}
-                    className={`${btnPrimarySm} disabled:shadow-none`}
+                    className={`${ovBtnSecondarySm} disabled:opacity-50`}
                   >
                     {loading ? "Saving…" : "Save mapping"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setMappingModalOpen(false)}
-                    className={ovBtnSecondary}
+                    className={ovBtnSecondarySm}
                   >
                     Cancel
                   </button>

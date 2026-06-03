@@ -75,7 +75,7 @@ export const chartsTabIntelNote =
 
 /** Compact “Why this chart?” strip — below metadata / intel, above plot. */
 export const chartsTabChartReasonStrip =
-  "charts-tab-chart-reason charts-tab-chart-reason-enter mb-2 flex w-full min-w-0 items-start justify-center gap-2 rounded-lg border border-[color:var(--border-default)]/35 bg-[color:color-mix(in_srgb,var(--surface-subtle)_38%,transparent)] px-2.5 py-2 text-center sm:mb-2.5 sm:px-3 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:color-mix(in_srgb,var(--insights-layer-inset)_55%,transparent)]";
+  "charts-tab-chart-reason charts-tab-chart-reason-enter mb-1 flex w-full min-w-0 items-start justify-center gap-2 rounded-lg border border-[color:var(--border-default)]/35 bg-[color:color-mix(in_srgb,var(--surface-subtle)_38%,transparent)] px-2.5 py-2 text-center sm:mb-1.5 sm:px-3 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:color-mix(in_srgb,var(--insights-layer-inset)_55%,transparent)]";
 
 export const chartsTabChartReasonIcon =
   "mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:color-mix(in_srgb,var(--accent)_72%,var(--text-subtle))] dark:text-[color:color-mix(in_srgb,var(--accent)_65%,var(--insights-text-muted))]";
@@ -120,7 +120,10 @@ export const chartsTabTimelineCardIdle =
 
 /** Sticky preview header band when page scrolls (title, chips, intel strip). */
 export const chartsTabPreviewHeaderSticky =
-  "charts-tab-preview-header-sticky relative z-[2] -mx-0.5 rounded-t-[1.2rem] px-0.5 pb-1 sm:-mx-1 sm:px-1";
+  "charts-tab-preview-header-sticky relative z-[2] -mx-0.5 rounded-t-[1.2rem] px-0.5 pb-0 sm:-mx-1 sm:px-1";
+
+/** PNG export capture root — title, chips, reason, plot (excludes smart-read footer). */
+export const chartsTabPngExportRoot = "charts-tab-png-export-root";
 
 export const chartsTabTimelineCardTitle =
   "min-w-0 flex-1 line-clamp-2 text-sm font-medium leading-snug text-[var(--foreground)]";

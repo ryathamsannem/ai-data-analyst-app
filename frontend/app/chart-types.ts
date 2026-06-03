@@ -3,7 +3,12 @@
 export type ChartRow = {
   name: string;
   value: number;
+  /** Axis/tooltip formatted string — do not use for PDF appendix or raw exports. */
   displayValue?: string;
+  /** Analytical magnitude when distinct from `value` (optional). */
+  rawValue?: number;
+  /** Normalized magnitude (e.g. 0–1 share) when distinct from `value` (optional). */
+  normalizedValue?: number;
   x?: number;
   displayX?: string;
   [segmentKey: string]: string | number | undefined;

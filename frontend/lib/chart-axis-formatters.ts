@@ -1,11 +1,24 @@
 import type { ChartRow } from "@/app/chart-types";
 import { wrapCategoryLabelLines } from "@/lib/chart-axis-layout";
+import {
+  formatMetricNumber,
+  readChartRowRawValue,
+  resolveMetricValueFormat,
+  type MetricFormatContext,
+} from "@/lib/metric-value-format";
 
-export function formatAxisTickFromRows(chartData: ChartRow[], tick: number): string {
-  const row = chartData.find((r) => Math.abs(r.value - tick) < 1e-6);
+/** UI axis ticks — may use row `displayValue` (chart axis polish). Not for PDF appendix. */
+export function formatAxisTickFromRows(
+  chartData: ChartRow[],
+  tick: number,
+  ctx: MetricFormatContext = {}
+): string {
+  const row = chartData.find(
+    (r) => Math.abs(readChartRowRawValue(r) - tick) < 1e-6
+  );
   if (row?.displayValue?.trim()) return row.displayValue.trim();
-  if (Number.isInteger(tick) && Math.abs(tick) < 1e12) return tick.toLocaleString();
-  return tick.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const format = resolveMetricValueFormat(ctx);
+  return formatMetricNumber(tick, format);
 }
 
 export function formatAxisTickFromScatterX(chartData: ChartRow[], tick: number): string {
