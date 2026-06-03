@@ -33,6 +33,8 @@ export type FinalChartPresentationMeta = {
   dimension?: string;
   dateColumn?: string | null;
   aggregation?: string;
+  /** Adaptive bucket label (Monthly, Weekly, …) from engine time-series metadata. */
+  grain?: string | null;
 };
 
 export type AutoDashboardLike = {
@@ -317,6 +319,18 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           return !prevQ || !nextQ || prevQ === nextQ;
         });
         const id = dupIdx >= 0 ? prev[dupIdx].id : newId();
+        const vizProv =
+          snapBase.visualization &&
+          typeof snapBase.visualization === "object" &&
+          "provenance" in snapBase.visualization
+            ? (snapBase.visualization as { provenance?: { timeSeriesAnalysis?: unknown } })
+                .provenance
+            : null;
+        const tsMeta =
+          vizProv?.timeSeriesAnalysis &&
+          typeof vizProv.timeSeriesAnalysis === "object"
+            ? (vizProv.timeSeriesAnalysis as Record<string, unknown>)
+            : null;
         const contract = freezeVisualizationContract({
           id,
           source: "ai",
@@ -327,6 +341,8 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           values: snapBase.chartData.map((r) => Number(r.value)),
           rows: snapBase.chartData,
           question: snapBase.question,
+          timeBucketLabelOverride: args.finalPresentation?.grain ?? null,
+          timeSeriesAnalysis: tsMeta,
         });
         const snap: ChartSnapshot = {
           ...snapBase,

@@ -5678,7 +5678,7 @@ def _match_column_from_phrase(phrase: str, columns: List[str], profile: Dict[str
         score = 0
         if p == cn:
             score = 100
-        elif p in cn or cn in p:
+        elif len(p) >= 4 and (p in cn or cn in p):
             score = 75
         else:
             toks = [t for t in p.split("_") if len(t) > 1]
@@ -5860,7 +5860,10 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     by_cols_ordered: List[str] = []
     seen_b: set = set()
     for phrase in by_phrases:
-        hit = _match_column_from_phrase(phrase, cand_dims or cols, profile)
+        if _is_time_bucket_phrase(phrase):
+            hit = _pick_date_column_for_trend(df, profile)
+        else:
+            hit = _match_column_from_phrase(phrase, cand_dims or cols, profile)
         if hit and hit not in seen_b:
             by_cols_ordered.append(hit)
             seen_b.add(hit)
@@ -5951,6 +5954,12 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
 
     if not ncol or not gcol or ncol == gcol:
         return None
+
+    if _question_requests_trend_intent(ql):
+        d_trend = _pick_date_column_for_trend(df, profile)
+        if d_trend:
+            gcol = d_trend
+            secondary_col = None
 
     agg_label, agg_key = _resolve_agg_label_and_key(
         ql, value_col=ncol, incident_only=incident_only
@@ -6702,6 +6711,367 @@ def _preferred_time_bucket_from_span(span_days: float) -> str:
     return "M"
 
 
+_GROWTH_INTENT_RE = re.compile(
+    r"\b("
+    r"growing\s+fastest|fastest\s+growing|fastest\s+growth|growth\s+rate|"
+    r"increasing\s+fastest|grow(?:ing)?\s+fastest|rate\s+of\s+change|"
+    r"period[- ]over[- ]period|month[- ]over[- ]month|\bmom\b|\byoy\b|"
+    r"which\s+\w+\s+(?:is|are)\s+growing|what\s+\w+\s+(?:is|are)\s+growing|"
+    r"momentum\s+by\s+\w+|trend\s+by\s+\w+\s+over\s+time"
+    r")\b",
+    re.I,
+)
+
+
+def _question_requests_growth_intent(q: str) -> bool:
+    """Change-over-time / fastest-growth questions (may differ from simple trend charts)."""
+    ql = (q or "").lower().strip()
+    if not ql:
+        return False
+    if _GROWTH_INTENT_RE.search(ql):
+        return True
+    if re.search(r"\b(grow(?:th|ing)?)\b", ql) and re.search(
+        r"\b(fastest|highest\s+growth|most\s+growth|quickest)\b", ql
+    ):
+        return True
+    if re.search(r"\b(growth|growing)\b", ql) and re.search(
+        r"\b(region|product|department|channel|segment|category|campaign)\b", ql
+    ):
+        return True
+    return False
+
+
+def _question_asks_entity_growth_comparison(q: str) -> bool:
+    ql = (q or "").lower().strip()
+    if re.search(
+        r"\b(which|what)\s+\w+.*\b(grow(?:ing)?|growth|fastest|momentum)\b", ql
+    ):
+        return True
+    if re.search(
+        r"\b(region|product|department|channel|segment|campaign)\b", ql
+    ) and re.search(r"\b(grow(?:ing)?|growth|fastest|momentum)\b", ql):
+        return True
+    return False
+
+
+def _distinct_date_period_count(df: pd.DataFrame, date_col: str) -> int:
+    if not date_col or date_col not in df.columns:
+        return 0
+    ser = pd.to_datetime(df[date_col], errors="coerce")
+    valid = ser.dropna()
+    if valid.empty:
+        return 0
+    return int(valid.dt.normalize().nunique())
+
+
+def _unsupported_growth_payload(
+    *,
+    periods_available: int,
+    reason_code: str,
+    recommended_action: str,
+) -> Dict[str, Any]:
+    return {
+        "active": True,
+        "periodsAvailable": int(max(0, periods_available)),
+        "status": "Insufficient Time-Series Data",
+        "leadSentence": "Growth cannot be determined from the available data.",
+        "recommendedAction": recommended_action,
+        "reasonCode": reason_code,
+    }
+
+
+def _assess_unsupported_growth_analysis(
+    *,
+    question: str,
+    df: Optional[pd.DataFrame],
+    profile: Optional[Dict[str, Any]],
+    chart_type_internal: str,
+    chart_points: int,
+    intent_debug: Optional[Dict[str, Any]],
+    time_series_analysis: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """
+    When the question requires change-over-time / growth ranking but the cohort
+    cannot support rate-of-change, return diagnostic metadata for the UI.
+    """
+    if not _question_requests_growth_intent(question):
+        return None
+
+    date_col = (
+        _pick_date_column_for_trend(df, profile)
+        if df is not None and profile is not None
+        else None
+    )
+    periods = (
+        _distinct_date_period_count(df, str(date_col))
+        if date_col and df is not None
+        else 0
+    )
+
+    ts = time_series_analysis if isinstance(time_series_analysis, dict) else {}
+    ts_buckets = int(ts.get("uniqueBuckets") or 0) if ts else 0
+    effective_periods = max(periods, ts_buckets)
+
+    group_col = str(intent_debug.get("group_col") or "") if intent_debug else ""
+    group_is_date = bool(date_col and group_col and str(group_col) == str(date_col))
+
+    ct = str(chart_type_internal or "").strip().lower()
+    is_time_chart = ct in ("line", "area") and (group_is_date or ts_buckets >= 2)
+
+    entity_growth = _question_asks_entity_growth_comparison(question)
+
+    if not date_col:
+        return _unsupported_growth_payload(
+            periods_available=0,
+            reason_code="no_time_dimension",
+            recommended_action="Add a date column with multiple periods per entity",
+        )
+
+    if effective_periods < 2:
+        action = (
+            "Add multiple periods per region"
+            if re.search(r"\bregion\b", question.lower())
+            else "Add multiple order dates per entity to compare period-over-period change"
+        )
+        return _unsupported_growth_payload(
+            periods_available=max(effective_periods, 1 if periods == 1 else 0),
+            reason_code="single_period",
+            recommended_action=action,
+        )
+
+    if entity_growth and not is_time_chart:
+        return _unsupported_growth_payload(
+            periods_available=effective_periods,
+            reason_code="category_snapshot",
+            recommended_action="Add multiple periods per region",
+        )
+
+    if entity_growth and is_time_chart and group_is_date and chart_points >= 2:
+        return _unsupported_growth_payload(
+            periods_available=effective_periods,
+            reason_code="entity_growth_needs_panel",
+            recommended_action="Group by region and date (or use a multi-period panel)",
+        )
+
+    return None
+
+
+def _question_requests_trend_intent(q: str) -> bool:
+    """True when the user asks for a time-series view (not a category ranking)."""
+    ql = (q or "").lower().strip()
+    if not ql:
+        return False
+    if any(
+        k in ql
+        for k in (
+            "trend",
+            "over time",
+            "time series",
+            "timeseries",
+            "timeline",
+            "monthly",
+            "month-wise",
+            "month wise",
+            "by month",
+            "each month",
+            "every month",
+            "per month",
+            "weekly",
+            "by week",
+            "daily",
+            "by day",
+            "quarterly",
+            "by quarter",
+            "yearly",
+            "by year",
+            "show trend",
+            "incident trend",
+            "momentum",
+        )
+    ):
+        return True
+    return bool(
+        re.search(
+            r"\b(by|per)\s+(day|date|week|month|year|quarter)\b",
+            ql,
+        )
+    )
+
+
+def _forced_time_bucket_from_question(q: str) -> Optional[str]:
+    """When the question names a grain, prefer that bucket before span heuristics."""
+    ql = (q or "").lower()
+    if re.search(r"\b(by month|monthly|month[- ]wise|each month|per month|every month)\b", ql):
+        return "M"
+    if re.search(r"\b(by week|weekly|each week|per week)\b", ql):
+        return "W"
+    if re.search(r"\b(by day|daily|each day|per day|by date)\b", ql):
+        return "D"
+    if re.search(r"\b(by quarter|quarterly|each quarter)\b", ql):
+        return "Q"
+    if re.search(r"\b(by year|yearly|each year|per year)\b", ql):
+        return "Y"
+    return None
+
+
+def _is_time_bucket_phrase(phrase: str) -> bool:
+    p = (phrase or "").lower().strip().replace("-", " ")
+    if not p:
+        return False
+    if p in {
+        "month",
+        "monthly",
+        "week",
+        "weekly",
+        "day",
+        "daily",
+        "quarter",
+        "quarterly",
+        "year",
+        "yearly",
+        "date",
+        "time",
+        "period",
+        "timeline",
+    }:
+        return True
+    return bool(
+        re.search(r"\b(month[- ]wise|time series|over time)\b", p)
+    )
+
+
+def _pick_date_column_for_trend(
+    df_in: pd.DataFrame, profile: Dict[str, Any]
+) -> Optional[str]:
+    """Best date / datetime column for trend charts."""
+    if df_in is None or df_in.empty:
+        return None
+    ct = profile.get("column_types", {}) if profile else {}
+    cols = df_in.columns.tolist()
+    candidates: List[str] = []
+    mapped = get_mapped_or_detected_column(
+        "date",
+        [
+            "date",
+            "order date",
+            "order_date",
+            "transaction date",
+            "transaction_date",
+            "invoice date",
+            "invoice_date",
+            "created_at",
+            "timestamp",
+        ],
+    )
+    if mapped and mapped in cols:
+        candidates.append(str(mapped))
+    for c in cols:
+        if ct.get(c) == "date" and c not in candidates:
+            candidates.append(str(c))
+    for c in _infer_date_like_columns_from_values(df_in):
+        if c not in candidates:
+            candidates.append(str(c))
+    for c in candidates:
+        if _group_column_is_time_series_eligible(df_in, c):
+            return c
+    return candidates[0] if candidates else None
+
+
+def _trend_metric_column_for_question(
+    question: str,
+    df_in: pd.DataFrame,
+    profile: Dict[str, Any],
+    metric_spec: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    if metric_spec and not metric_spec.get("derived_roi"):
+        vc = metric_spec.get("value_col")
+        if vc and str(vc) in df_in.columns:
+            return str(vc)
+    ct = profile.get("column_types", {}) if profile else {}
+    numeric_cols = [c for c in df_in.columns if ct.get(c) == "number"]
+    hit = _numeric_col_mentioned(question.lower(), numeric_cols)
+    if hit:
+        return str(hit)
+    mapped = get_mapped_or_detected_column(
+        "sales",
+        ["sales", "revenue", "amount", "total", "value"],
+    )
+    if mapped and mapped in df_in.columns:
+        return str(mapped)
+    if len(numeric_cols) == 1:
+        return str(numeric_cols[0])
+    return _best_numeric_column_for_question(question, numeric_cols)
+
+
+def _try_build_trend_line_visualization(
+    question: str,
+    df_in: pd.DataFrame,
+    profile: Dict[str, Any],
+    metric_spec: Optional[Dict[str, Any]] = None,
+) -> Optional[
+    Tuple[
+        List[Dict[str, Any]],
+        str,
+        str,
+        Dict[str, Any],
+        Dict[str, Any],
+    ]
+]:
+    """
+    Monthly/weekly/daily revenue (etc.) trend line.
+    Returns (chart_rows, chart_type, title, intent_debug, smart_trace) or None.
+    """
+    dcol = _pick_date_column_for_trend(df_in, profile)
+    ncol = _trend_metric_column_for_question(question, df_in, profile, metric_spec)
+    if not dcol or not ncol or str(dcol) == str(ncol):
+        return None
+
+    ql = question.lower().strip()
+    force_freq = _forced_time_bucket_from_question(ql)
+    g_series, ts_meta = _adaptive_time_series_grouped(
+        df_in[[dcol, ncol]].copy(),
+        str(dcol),
+        str(ncol),
+        agg_key="sum",
+        force_freq=force_freq,
+    )
+    if g_series is None or len(g_series) < 2:
+        return None
+
+    chart_data = _time_series_rows_from_grouped(g_series)
+    tb_l = _freq_human_label(str(ts_meta.get("timeBucket") or force_freq or "M"))
+    met_lbl = _business_metric_series_label("sum", "Total", str(ncol))
+    title = f"{met_lbl} trend ({tb_l})"
+    intent_debug: Dict[str, Any] = {
+        "group_col": dcol,
+        "value_col": ncol,
+        "agg_label": "Total",
+        "agg_key": "sum",
+        "normalized_question": ql,
+        "trend_time_series": True,
+        "time_bucket": ts_meta.get("timeBucket"),
+    }
+    smart_trace: Dict[str, Any] = {
+        "routing": "trend_time_series",
+        "category_column": dcol,
+        "numeric_column": ncol,
+        "aggregation": "sum",
+        "aggregation_key": "sum",
+        "rows_analyzed": int(len(df_in)),
+        "notes": ts_meta.get("selectionReason")
+        or f"Trend chart: {met_lbl} by {tb_l} period.",
+        "timeSeriesAnalysis": {
+            **{
+                k: v
+                for k, v in ts_meta.items()
+                if k != "granularityFallbackChain"
+            },
+            "granularityFallbackChain": ts_meta.get("granularityFallbackChain", []),
+        },
+    }
+    return chart_data, "line", title, intent_debug, smart_trace
+
+
 def _bucket_labels_for_freq(dt: pd.Series, freq: str) -> pd.Series:
     """Map timestamps to stable bucket label strings for grouping."""
     d = pd.to_datetime(dt, errors="coerce")
@@ -6808,7 +7178,11 @@ def _sort_chronologically_by_bucket_labels(g: pd.Series) -> pd.Series:
 
 
 def _adaptive_time_series_grouped(
-    df_in: pd.DataFrame, date_col: str, value_col: str, agg_key: str = "sum"
+    df_in: pd.DataFrame,
+    date_col: str,
+    value_col: str,
+    agg_key: str = "sum",
+    force_freq: Optional[str] = None,
 ) -> Tuple[Optional[pd.Series], Dict[str, Any]]:
     """
     Group (date, value) into adaptive time buckets; widen/narrow buckets to avoid
@@ -6837,15 +7211,18 @@ def _adaptive_time_series_grouped(
 
     span = _time_series_span_days(tmp["_dt"])
     coverage = _time_coverage_meta(tmp["_dt"], n_in)
-    preferred = _preferred_time_bucket_from_span(span)
+    preferred = force_freq or _preferred_time_bucket_from_span(span)
     meta["spanDays"] = round(span, 4)
     meta["timeCoverage"] = coverage
 
     freqs: List[str] = []
-    cur: Optional[str] = preferred
-    while cur:
-        freqs.append(cur)
-        cur = _finer_time_bucket(cur)
+    if force_freq:
+        freqs = [force_freq]
+    else:
+        cur: Optional[str] = preferred
+        while cur:
+            freqs.append(cur)
+            cur = _finer_time_bucket(cur)
 
     chosen: Optional[str] = None
     g_out: Optional[pd.Series] = None
@@ -7323,17 +7700,19 @@ def _deterministic_viz_last_resort(
         )
     ) or bool(re.search(r"\b(by|per)\s+(day|date|week|month)\b", q))
 
-    if date_cols and trendish:
+    if date_cols and _question_requests_trend_intent(q):
         ncol = _numeric_col_mentioned(q, numeric_cols) or _pick_default_metric_column(
             q, numeric_cols, domain
         )
-        dcol = date_cols[0]
+        dcol = _pick_date_column_for_trend(df, profile) or date_cols[0]
+        force_freq = _forced_time_bucket_from_question(q)
         if ncol and str(dcol) != str(ncol):
             g_series, ts_meta = _adaptive_time_series_grouped(
                 df[[dcol, ncol]].copy(),
                 str(dcol),
                 str(ncol),
                 agg_key="sum",
+                force_freq=force_freq,
             )
             if g_series is not None and len(g_series) >= 2:
                 chart_data = _time_series_rows_from_grouped(g_series)
@@ -7703,16 +8082,21 @@ def build_smart_chart(
     )
 
     # ---- Line: date bucket + numeric (adaptive daily / weekly / monthly) ----
-    if date_cols and numeric_cols and any(k in q for k in trend_kw):
+    if date_cols and numeric_cols and _question_requests_trend_intent(q):
         ncol = _numeric_col_mentioned(q, numeric_cols)
         if ncol is None and len(numeric_cols) == 1:
             ncol = numeric_cols[0]
         if ncol is None:
             ncol = _pick_default_metric_column(q, numeric_cols, domain)
-        dcol = date_cols[0]
+        dcol = _pick_date_column_for_trend(df, profile) or date_cols[0]
+        force_freq = _forced_time_bucket_from_question(q)
         if ncol:
             g_series, ts_meta = _adaptive_time_series_grouped(
-                df, str(dcol), str(ncol), agg_key="sum"
+                df,
+                str(dcol),
+                str(ncol),
+                agg_key="sum",
+                force_freq=force_freq,
             )
             if g_series is not None and len(g_series) >= 2:
                 chart_data = _time_series_rows_from_grouped(g_series)
@@ -7741,6 +8125,8 @@ def build_smart_chart(
                         }
                     )
                 return chart_data, "line", title, subtitle
+            if _question_requests_trend_intent(q):
+                return [], "", "", subtitle
             # Sparse / degenerate time axis: fall back to category totals if possible.
             if pie_dims:
                 fb_dims = [c for c in pie_dims if c != ncol and c != dcol]
@@ -8247,6 +8633,20 @@ def analyze_data(question: str):
         q, value_col=target_for_agg
     )
     metric = agg_key_legacy if agg_key_legacy else None
+
+    if _question_requests_trend_intent(q):
+        trend_pack = _try_build_trend_line_visualization(
+            question, df, profile, metric_spec
+        )
+        if trend_pack:
+            t_rows, t_type, t_title, _t_intent, _t_trace = trend_pack
+            exact_result = _tabular_exact_from_name_value_rows(t_rows)
+            return exact_result, t_rows, t_type
+        exact_result = (
+            "Time-series visualization unavailable: need a parseable date column "
+            "(e.g. order_date) and at least two monthly (or weekly) periods with revenue."
+        )
+        return exact_result, [], ""
 
     if metric:
         cols_list = df.columns.tolist()
@@ -9639,6 +10039,8 @@ def _detect_intent_tags(question: str) -> List[str]:
         tags.append("average")
     if any(k in ql for k in ("compare", "versus", " vs ")):
         tags.append("compare")
+    if _question_requests_growth_intent(ql):
+        tags.append("growth")
     if any(
         k in ql
         for k in (
@@ -9766,6 +10168,8 @@ def _insight_confidence_meta(
     *,
     dual_metric_compare: bool = False,
     dual_metric_complete: bool = True,
+    trend_request_unsatisfied: bool = False,
+    growth_request_unsatisfied: bool = False,
 ) -> Dict[str, Any]:
     """
     Evidence / sample-size metadata for API clients and prompt contracts.
@@ -9850,6 +10254,25 @@ def _insight_confidence_meta(
     if dual_metric_compare and not dual_metric_complete:
         cautious = True
 
+    if trend_request_unsatisfied:
+        score = min(score, 28)
+        level = "low"
+        cautious = True
+        rationale = (
+            "The question requests a time trend, but a reliable monthly/weekly "
+            "line chart could not be produced — do not treat category rankings as the answer."
+        )
+
+    if growth_request_unsatisfied:
+        score = min(score, 28)
+        level = "low"
+        cautious = True
+        rationale = (
+            "The question asks about growth or fastest change, but the filtered data "
+            "does not include enough time periods to compute rates of change — do not "
+            "present static revenue rankings as growth rankings."
+        )
+
     return {
         "analysisRowCount": n,
         "chartSeriesPointCount": cp,
@@ -9874,6 +10297,7 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
     cautious = bool(conf.get("cautiousNarrativeRequired")) or small
     map_low = str(conf.get("mappingConfidenceLevel") or "").lower() == "low"
     few_cats = cp > 0 and cp <= 5
+    growth_unsupported = bool(conf.get("growthRequestUnsatisfied"))
     level = str(conf.get("insightConfidenceLevel") or "low")
     lines: List[str] = [
         "Confidence-aware reasoning (mandatory):",
@@ -9916,6 +10340,17 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
         lines.append(
             f"- **Few chart categories ({cp})** — compare groups directionally; "
             "do not over-interpret small value gaps as proof of dominance."
+        )
+    if growth_unsupported:
+        lines.extend(
+            [
+                "- **Unsupported growth analysis** — The user asked about growth or fastest change, "
+                "but this cohort lacks sufficient time-series evidence.",
+                "- In Key findings, open with exactly: Growth cannot be determined from the available data.",
+                "- Then explain why (e.g. single date snapshot or no multi-period series per entity). "
+                "You may note static totals as context only — not as a growth ranking.",
+                "- Do not imply the highest current total is the fastest growing region or product.",
+            ]
         )
     if not cautious:
         lines.append(
@@ -10098,6 +10533,9 @@ def _build_unified_analysis_payload(
     chart_recommendation: Optional[Dict[str, Any]] = None,
     analysis_validation: Optional[Dict[str, Any]] = None,
     partial_visualization_warning: Optional[str] = None,
+    trend_request_unsatisfied: bool = False,
+    growth_request_unsatisfied: bool = False,
+    unsupported_growth_analysis: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     api_t = _chart_type_for_api(chart_type_internal or "bar")
     agg_label = None
@@ -10145,6 +10583,8 @@ def _build_unified_analysis_payload(
         chart_points,
         dual_metric_compare=dual_compare,
         dual_metric_complete=dual_complete,
+        trend_request_unsatisfied=trend_request_unsatisfied,
+        growth_request_unsatisfied=growth_request_unsatisfied,
     )
 
     out: Dict[str, Any] = {
@@ -10179,6 +10619,9 @@ def _build_unified_analysis_payload(
         out["analysisValidation"] = analysis_validation
     if partial_visualization_warning:
         out["partialVisualizationWarning"] = partial_visualization_warning.strip()
+    if unsupported_growth_analysis:
+        out["unsupportedGrowthAnalysis"] = unsupported_growth_analysis
+        out["growthRequestUnsatisfied"] = True
     return out
 
 
@@ -10810,6 +11253,41 @@ def compute_visualization_for_question(
             chart_type = ""
             chart_path_handled = True
 
+    trend_request_unsatisfied = False
+
+    if not chart_path_handled and _question_requests_trend_intent(ql):
+        trend_pack = _try_build_trend_line_visualization(
+            question, df, profile_live, metric_spec_live
+        )
+        if trend_pack:
+            t_rows, t_type, t_title, t_intent, t_trace = trend_pack
+            chart_data = list(_normalize_chart_records(t_rows))
+            chart_type = t_type
+            chart_title = t_title
+            intent_debug = t_intent
+            smart_trace = t_trace
+            smart_routing_used = True
+            chart_path_handled = True
+            tab_t = _tabular_exact_from_name_value_rows(t_rows)
+            exact_result = tab_t or exact_result
+        else:
+            trend_request_unsatisfied = True
+            suppress_auto_charts = True
+            chart_suppressed_misleading = True
+            partial_visualization_warning = (
+                "Time-series visualization unavailable for this question — "
+                "could not aggregate by month/week with the available date column."
+            )
+            exact_result = (
+                (exact_result or "").strip()
+                + "\n\n"
+                + partial_visualization_warning
+            ).strip()
+            chart_data = []
+            chart_type = ""
+            chart_title = ""
+            chart_path_handled = True
+
     if not chart_path_handled:
         if _question_asks_outlier_analysis(ql) and not _question_explicitly_groups_by_dimension(
             ql
@@ -10859,8 +11337,33 @@ def compute_visualization_for_question(
     )
     print("[viz] after_analyze_chart_points=", len(chart_data), flush=True)
 
+    if (
+        chart_data
+        and _question_requests_trend_intent(ql)
+        and str(chart_type or "").strip().lower() not in ("line", "area")
+    ):
+        trend_request_unsatisfied = True
+        chart_data = []
+        chart_type = ""
+        chart_title = ""
+        suppress_auto_charts = True
+        chart_suppressed_misleading = True
+        partial_visualization_warning = (
+            "Trend question received a category chart — time-series view suppressed."
+        )
+
     if not chart_data and intent_debug and not suppress_auto_charts:
-        fb_rows, fb_type, fb_title, fb_ts = _fallback_aggregate_chart(intent_debug, question)
+        fb_rows: List[Dict[str, Any]] = []
+        fb_type = ""
+        fb_title = ""
+        fb_ts: Optional[Dict[str, Any]] = None
+        if _question_requests_trend_intent(ql):
+            suppress_auto_charts = True
+            trend_request_unsatisfied = True
+        else:
+            fb_rows, fb_type, fb_title, fb_ts = _fallback_aggregate_chart(
+                intent_debug, question
+            )
         if fb_rows:
             chart_data = list(_normalize_chart_records(fb_rows))
             chart_type = (fb_type or "bar").strip() or "bar"
@@ -11546,6 +12049,34 @@ def compute_visualization_for_question(
     ):
         visualization["contextUsed"] = conversation_sidecar["contextUsedLine"]
 
+    ts_meta = (
+        smart_trace.get("timeSeriesAnalysis")
+        if smart_trace and isinstance(smart_trace.get("timeSeriesAnalysis"), dict)
+        else None
+    )
+    unsupported_growth = _assess_unsupported_growth_analysis(
+        question=question,
+        df=df,
+        profile=profile_live,
+        chart_type_internal=str(chart_type or "bar"),
+        chart_points=ll,
+        intent_debug=intent_debug,
+        time_series_analysis=ts_meta,
+    )
+    growth_request_unsatisfied = bool(unsupported_growth)
+    if unsupported_growth and analysis_validation_block:
+        av_checks = list(analysis_validation_block.get("checks") or [])
+        av_checks.extend(
+            [
+                {"label": "Growth analysis supported", "ok": False},
+                {
+                    "label": "Time periods available for rate-of-change",
+                    "ok": int(unsupported_growth.get("periodsAvailable") or 0) >= 2,
+                },
+            ]
+        )
+        analysis_validation_block["checks"] = av_checks
+
     analysis_ctx = _build_unified_analysis_payload(
         question=question,
         intent_debug=intent_debug,
@@ -11558,6 +12089,9 @@ def compute_visualization_for_question(
         chart_recommendation=chart_rec,
         analysis_validation=analysis_validation_block,
         partial_visualization_warning=partial_visualization_warning,
+        trend_request_unsatisfied=trend_request_unsatisfied,
+        growth_request_unsatisfied=growth_request_unsatisfied,
+        unsupported_growth_analysis=unsupported_growth,
     )
     try:
         print(
@@ -11893,6 +12427,13 @@ def ask_question(data: QuestionRequest):
                 "mappingConfidenceLevel": analysis_ctx.get("mappingConfidenceLevel"),
                 "insightConfidenceLevel": str(
                     analysis_ctx.get("insightConfidenceLevel") or "low"
+                ),
+                "growthRequestUnsatisfied": bool(
+                    analysis_ctx.get("growthRequestUnsatisfied")
+                    or (
+                        isinstance(analysis_ctx.get("unsupportedGrowthAnalysis"), dict)
+                        and analysis_ctx["unsupportedGrowthAnalysis"].get("active")
+                    )
                 ),
             }
         )

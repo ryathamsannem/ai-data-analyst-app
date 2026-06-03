@@ -361,7 +361,13 @@ function blurbForRenderedChart(params: {
     return `Horizontal bars rank ${dim} by ${met} — easiest when labels are long or you are comparing many groups.`;
   }
   if (params.kind === "line") {
-    return `Line chart shows how ${met} moves across ordered ${dim} periods.`;
+    const dimLc = dim.toLowerCase();
+    const timeBuckets =
+      /\bbuckets?\b/.test(dimLc) ||
+      /\b(monthly|weekly|daily|hourly|quarterly|yearly)\b/.test(dimLc);
+    return timeBuckets
+      ? `Line chart shows how ${met} moves across ordered ${dim}.`
+      : `Line chart shows how ${met} moves across ordered ${dim} periods.`;
   }
   if (params.kind === "area") {
     return `Area chart emphasizes trend and movement of ${met} across ${dim}.`;
