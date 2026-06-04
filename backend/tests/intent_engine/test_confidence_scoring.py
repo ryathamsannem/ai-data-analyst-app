@@ -115,6 +115,42 @@ class TestConfidenceScoring(unittest.TestCase):
         self.assertIn("reasons", out)
         self.assertIsInstance(out["reasons"], list)
 
+    def test_ranking_small_cohort_directional_low_band(self) -> None:
+        meta = compute_insight_confidence_meta(
+            8,
+            4,
+            None,
+            intent_structured=True,
+            analysis_kind="ranking",
+            chart_type="bar",
+        )
+        score = int(meta["insightConfidenceScore"])
+        self.assertGreaterEqual(score, 25)
+        self.assertLessEqual(score, 45)
+        self.assertEqual(meta["insightConfidenceLevel"], "low")
+        joined = " ".join(meta.get("insightConfidenceReasons") or []).lower()
+        self.assertIn("ranking", joined)
+
+    def test_small_scatter_rationale_mentions_joint_pairs(self) -> None:
+        meta = compute_insight_confidence_meta(
+            8,
+            8,
+            "medium",
+            intent_structured=True,
+            relationship_scatter=True,
+            relationship_sample_size=7,
+            analysis_kind="relationship_scatter",
+            chart_type="scatter",
+        )
+        rationale = str(meta.get("insightConfidenceRationale") or "").lower()
+        summary = str(meta.get("evidenceSummaryLine") or "").lower()
+        self.assertTrue(
+            "joint pair" in rationale or "joint pair" in summary,
+            msg=f"expected joint-pair copy, got rationale={rationale!r} summary={summary!r}",
+        )
+        self.assertIn("directional", summary)
+        self.assertLess(meta["insightConfidenceScore"], 70)
+
 
 if __name__ == "__main__":
     unittest.main()

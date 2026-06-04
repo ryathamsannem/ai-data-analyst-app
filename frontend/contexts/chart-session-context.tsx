@@ -331,6 +331,19 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           typeof vizProv.timeSeriesAnalysis === "object"
             ? (vizProv.timeSeriesAnalysis as Record<string, unknown>)
             : null;
+        const vizRec =
+          snapBase.visualization &&
+          typeof snapBase.visualization === "object"
+            ? (snapBase.visualization as {
+                scatterXLabel?: string;
+                scatterYLabel?: string;
+                provenance?: {
+                  numericColumn?: string | null;
+                  categoryColumn?: string | null;
+                };
+              })
+            : null;
+        const provCols = vizRec?.provenance;
         const contract = freezeVisualizationContract({
           id,
           source: "ai",
@@ -341,6 +354,18 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           values: snapBase.chartData.map((r) => Number(r.value)),
           rows: snapBase.chartData,
           question: snapBase.question,
+          metricColumn:
+            provCols?.numericColumn?.trim() ||
+            vizRec?.scatterYLabel?.trim() ||
+            null,
+          categoryColumn:
+            provCols?.categoryColumn?.trim() ||
+            vizRec?.scatterXLabel?.trim() ||
+            null,
+          scatterXLabel: vizRec?.scatterXLabel ?? null,
+          scatterYLabel: vizRec?.scatterYLabel ?? null,
+          aggregationKey:
+            snapBase.chartKind === "scatter" ? "relationship" : undefined,
           timeBucketLabelOverride: args.finalPresentation?.grain ?? null,
           timeSeriesAnalysis: tsMeta,
         });

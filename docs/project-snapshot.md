@@ -377,7 +377,8 @@ npm run dev
 
 ```bash
 cd backend
-python -m unittest discover -s tests/intent_engine -v
+python run_tests.py -v
+# or: python -m unittest discover -s tests/intent_engine -v
 ```
 
 **Agent discipline:** Read [`AGENTS.md`](../AGENTS.md) before changing Insights, Charts, or shared chart shells — **incremental fixes only**.

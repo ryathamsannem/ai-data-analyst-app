@@ -59,6 +59,15 @@ def _dim_phrase(dimension_label: str) -> str:
     return resolve_executive_dimension_label(category_axis=dimension_label).lower()
 
 
+def _cohort_context_suffix(cohort_row_count: Optional[int], group_count: int) -> str:
+    n = int(cohort_row_count or 0)
+    if n <= 0:
+        return ""
+    if n < 100 or group_count <= 6:
+        return f" (filtered cohort: {n:,} row(s), {group_count} group(s))"
+    return ""
+
+
 def rank_category_executive_insights(
     rows: List[Dict[str, Any]],
     *,
@@ -66,6 +75,7 @@ def rank_category_executive_insights(
     dimension_label: str = "category",
     outlier_insights: Optional[Dict[str, Any]] = None,
     chart_kind: str = "bar",
+    cohort_row_count: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
     Return ranked insight dicts: kind, priority, title, value, hint, narrativeLine.
@@ -95,6 +105,7 @@ def rank_category_executive_insights(
     bot_name, bot_val = pairs[-1]
     share = 100.0 * top_val / total
     spread = top_val - bot_val
+    cohort_suffix = _cohort_context_suffix(cohort_row_count, len(pairs))
     measure = resolve_executive_measure_label(
         metric_column_display=metric_label,
         value_axis=metric_label,
@@ -108,7 +119,7 @@ def rank_category_executive_insights(
     if share >= 28:
         narrative = (
             f"{top_name} contributes {_fmt_pct(share)} of {met} "
-            f"and dominates performance."
+            f"and dominates performance{cohort_suffix}."
         )
         pri = 95 if share >= 40 else 82
         card_type = insight_card_type_from_ranked_kind("concentration", pri)
@@ -206,7 +217,7 @@ def rank_category_executive_insights(
     # Fallback leader line (lower priority than concentration %).
     if not any(c["kind"] == "concentration" for c in candidates):
         narrative = (
-            f"{top_name} ranks highest on {met} at {_fmt_amount(top_val)}."
+            f"{top_name} ranks highest on {met} at {_fmt_amount(top_val)}{cohort_suffix}."
         )
         if not is_weak_executive_line(narrative):
             candidates.append(
@@ -236,12 +247,22 @@ def rank_category_executive_insights(
     return out[:5]
 
 
-def executive_insight_prompt_block(ranked: List[Dict[str, Any]]) -> str:
+def executive_insight_prompt_block(
+    ranked: List[Dict[str, Any]],
+    *,
+    cohort_row_count: Optional[int] = None,
+) -> str:
     if not ranked:
         return ""
     lines = [
         "Ranked executive insights (prefer these phrasings in Key findings):",
     ]
+    n = int(cohort_row_count or 0)
+    if n > 0 and n < 100:
+        lines.append(
+            f"- Cohort size: **{n:,} filtered row(s)** — mention sample size once; "
+            "avoid generic \"performance varies\" without citing the chart leader."
+        )
     for i, item in enumerate(ranked[:4], 1):
         nl = str(item.get("narrativeLine") or "").strip()
         if nl:

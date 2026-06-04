@@ -2,6 +2,11 @@
  * Dynamic insight confidence — component model aligned with backend scoring.
  */
 
+import {
+  MIN_PEARSON_SAMPLE,
+  smallSampleCorrelationConfidenceLine,
+} from "@/lib/relationship-visualization";
+
 export type ConfidenceLevel = "high" | "medium" | "low";
 
 export type UnifiedConfidenceSignals = {
@@ -27,6 +32,7 @@ export type UnifiedConfidenceSignals = {
   multiMetricRequestUnsatisfied?: boolean;
   relationshipScatter?: boolean;
   relationshipSampleSize?: number | null;
+  relationshipPearson?: number | null;
   correlationQualitativeOnly?: boolean;
   forecastProjectionLow?: boolean;
   forecastCanForecast?: boolean | null;
@@ -47,7 +53,15 @@ export type UnifiedConfidenceResult = InsightConfidenceResult;
 
 const BAND_HIGH = 70;
 const BAND_MEDIUM = 42;
-const MIN_PEARSON_SAMPLE = 8;
+
+function filterContradictoryCorrelationReasons(reasons: string[]): string[] {
+  return reasons.filter(
+    (r) =>
+      !/could not be computed numerically|not computed numerically/i.test(
+        String(r)
+      )
+  );
+}
 
 function normLevel(raw: string | null | undefined): ConfidenceLevel {
   const s = (raw ?? "").trim().toLowerCase();
@@ -156,10 +170,18 @@ export function calculateInsightConfidence(
 
   if (signals.relationshipScatter) {
     const rs = Math.max(0, Number(signals.relationshipSampleSize ?? 0));
-    if (signals.correlationQualitativeOnly || rs < 2) {
+    const hasPearson =
+      signals.relationshipPearson != null &&
+      Number.isFinite(Number(signals.relationshipPearson));
+    const qualFail =
+      (Boolean(signals.correlationQualitativeOnly) && !hasPearson) || rs < 2;
+    if (qualFail) {
       score -= 22;
-      reasons.push("Correlation not computed numerically");
-    } else if (rs < MIN_PEARSON_SAMPLE) {
+      reasons.push("Correlation could not be computed numerically");
+    } else if (hasPearson && rs > 0 && rs <= MIN_PEARSON_SAMPLE) {
+      score -= 12;
+      reasons.push(smallSampleCorrelationConfidenceLine(rs));
+    } else if (rs <= MIN_PEARSON_SAMPLE) {
       score -= 12;
       reasons.push(`Correlation from only ${rs} joint pair(s)`);
     } else if (rs < 30) {
@@ -200,7 +222,21 @@ export function calculateInsightConfidence(
     const apiReasons = signals.insightConfidenceReasons;
     if (Array.isArray(apiReasons) && apiReasons.length > 0) {
       reasons.length = 0;
-      reasons.push(...apiReasons.filter((r) => typeof r === "string" && r.trim()));
+      let merged = apiReasons.filter((r) => typeof r === "string" && r.trim());
+      const relRs = Math.max(0, Number(signals.relationshipSampleSize ?? 0));
+      const hasPearson =
+        signals.relationshipPearson != null &&
+        Number.isFinite(Number(signals.relationshipPearson));
+      if (signals.relationshipScatter && hasPearson && relRs >= 2) {
+        merged = filterContradictoryCorrelationReasons(merged);
+        if (
+          relRs < MIN_PEARSON_SAMPLE &&
+          !merged.some((r) => /Correlation computed on \d+ paired row/i.test(r))
+        ) {
+          merged.unshift(smallSampleCorrelationConfidenceLine(relRs));
+        }
+      }
+      reasons.push(...merged);
     }
   } else {
     score = Math.min(100, Math.max(0, Math.round(score)));
@@ -213,13 +249,33 @@ export function calculateInsightConfidence(
       ? level
       : band;
 
-  const rationale =
+  let rationale =
     signals.insightConfidenceRationale?.trim() ||
     (reasons[0]
       ? reasons.length > 1
         ? `${reasons[0]} (${reasons.length} factors).`
         : reasons[0]
       : "Confidence derived from cohort and chart evidence.");
+
+  const relRs = Math.max(0, Number(signals.relationshipSampleSize ?? 0));
+  const hasPearson =
+    signals.relationshipPearson != null &&
+    Number.isFinite(Number(signals.relationshipPearson));
+  if (
+    signals.relationshipScatter &&
+    hasPearson &&
+    relRs >= 2 &&
+    relRs <= MIN_PEARSON_SAMPLE
+  ) {
+    rationale = smallSampleCorrelationConfidenceLine(relRs);
+  } else if (
+    signals.relationshipScatter &&
+    hasPearson &&
+    /could not be computed numerically|not computed numerically/i.test(rationale)
+  ) {
+    const cleaned = filterContradictoryCorrelationReasons(reasons);
+    rationale = cleaned[0] || rationale;
+  }
 
   return {
     score,

@@ -486,7 +486,7 @@ python -m unittest tests.intent_engine.test_relationship_routing tests.intent_en
 | OB-5 | Medium | Open | Intent log bucket ≠ `primaryGoal` for scatter |
 | OB-6 | Medium | Open | Frontend confidence group model diverges without API score |
 | OB-7 | Low | Open | FastAPI startup event deprecation warnings |
-| OB-8 | High | Mitigated Jun 2026 | Correlation → bar misrouting — retest if touching `compute_visualization_for_question` |
+| OB-8 | High | Mitigated Jun 2026 | Correlation → bar misrouting — `correlation_routing_locked` guard; retest if touching `compute_visualization_for_question` |
 | OB-9 | High | Mitigated Jun 2026 | Growth rate column triggers growth unsupported — correlation exempt |
 | OB-10 | Medium | Open | canvg not declared as direct frontend dependency |
 

@@ -69,7 +69,44 @@ export function sanitizeRelationshipUserFacingText(text: string): string {
   t = t.replace(/\brow\s+(\d+)\b/gi, "one observation");
   t = t.replace(/\bcategory\s*:\s*\d+\b/gi, "one category");
 
+  t = t.replace(
+    /correlation could not be computed numerically\.?/gi,
+    ""
+  );
+  t = t.replace(
+    /numeric correlation (?:could not|cannot) be calculated[^.]*\.?/gi,
+    ""
+  );
+  t = t.replace(
+    /insufficient joint pairs for numeric correlation\.?/gi,
+    ""
+  );
+  t = t.replace(
+    /qualitative discussion only\.?/gi,
+    ""
+  );
+
   return t.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** Remove confidence/narrative lines that contradict a computed Pearson r. */
+export function stripContradictoryCorrelationNarrative(
+  text: string,
+  pearson: number | null | undefined
+): string {
+  if (pearson == null || !Number.isFinite(pearson)) return text;
+  let t = text;
+  const patterns = [
+    /correlation could not be computed numerically/gi,
+    /correlation not computed numerically/gi,
+    /numeric correlation unavailable/gi,
+    /qualitative discussion only/gi,
+    /insufficient joint pairs for numeric correlation/gi,
+  ];
+  for (const pat of patterns) {
+    t = t.replace(pat, "");
+  }
+  return t.replace(/\s{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export function buildRelationshipScatterDisplayTitle(args: {

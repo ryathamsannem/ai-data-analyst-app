@@ -349,7 +349,10 @@ def compute_relationship_correlations(
 
     stats = compute_bivariate_correlations(sub["_x"], sub["_y"])
     out.update(stats)
-    out["qualitativeOnly"] = not bool(stats.get("canCompute"))
+    can = bool(stats.get("canCompute"))
+    out["qualitativeOnly"] = not can
+    if can and out.get("pearson") is not None:
+        out["qualitativeOnly"] = False
 
     xn = (x_label or col_x).strip()
     yn = (y_label or col_y).strip()

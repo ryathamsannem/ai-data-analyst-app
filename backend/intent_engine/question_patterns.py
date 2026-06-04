@@ -49,7 +49,10 @@ _BY_DIMENSION_RE = re.compile(
 )
 
 _METRIC_WORD_RE = re.compile(
-    r"\b(revenue|sales|profit|spend|cost|margin|ad\s*spend|adspend|budget)\b",
+    r"\b("
+    r"revenue|sales|profit|spend|cost|margin|customers?|customer\s+count|"
+    r"growth\s+rate|growth_rate|ad\s*spend|adspend|budget"
+    r")\b",
     re.I,
 )
 

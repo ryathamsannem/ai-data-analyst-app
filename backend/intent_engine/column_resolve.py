@@ -75,6 +75,25 @@ def find_column_for_token(
                     return str(c)
         return None
 
+    if token_l in ("region", "regions"):
+        for prefer in ("zone", "region", "territory", "area"):
+            for c in pool:
+                if prefer in _norm_col(c):
+                    return str(c)
+
+    if re.search(r"customer", token_l):
+        for c in pool:
+            if "customer" in _norm_col(c):
+                return str(c)
+
+    if re.search(r"growth\s*rate|growth_rate", token_l.replace("_", " ")):
+        for c in pool:
+            cn = _norm_col(c)
+            if "growth" in cn and "rate" in cn:
+                return str(c)
+            if cn in ("growth rate", "growth_rate"):
+                return str(c)
+
     if token == "profit":
         for c in pool:
             cn = _norm_col(c)

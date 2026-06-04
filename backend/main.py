@@ -5987,6 +5987,12 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     if ncol is None and len(numeric_cols) == 1:
         ncol = numeric_cols[0]
 
+    if ncol is None and gcol and numeric_cols:
+        domain = str(
+            profile.get("domain") or profile.get("dataset_domain") or "generic"
+        )
+        ncol = _pick_default_metric_column(question_str, numeric_cols, domain)
+
     if not ncol or not gcol or ncol == gcol:
         return None
 
@@ -6670,6 +6676,11 @@ def _looks_like_ranking_question(ql: str) -> bool:
     if _extract_top_n(ql):
         return True
     if re.search(r"\btop\s+(?:\d+|five|ten|three|four|seven|eight)", ql):
+        return True
+    if re.search(
+        r"\b(top|best|highest|lowest|leading|trailing)\s+performing\b",
+        ql,
+    ):
         return True
     if re.search(
         r"\b(highest|lowest|leading|trailing|best|worst)\b",
@@ -8092,7 +8103,10 @@ def _deterministic_viz_last_resort(
                 return chart_data, "line", title, subtitle
 
     sp = _scatter_pair_from_question(q, numeric_cols)
-    if not sp:
+    if not sp and (
+        _question_requests_correlation_routing(question)
+        or _question_triggers_numeric_relationship_chart(q)
+    ):
         try:
             from intent_engine.correlation_analysis import (
                 resolve_relationship_numeric_pair,
@@ -8101,6 +8115,13 @@ def _deterministic_viz_last_resort(
             sp = resolve_relationship_numeric_pair(question, df, profile)
         except Exception:
             sp = None
+    try:
+        from intent_engine.geographic_scope import question_geographic_scope_level
+
+        if question_geographic_scope_level(question):
+            sp = None
+    except Exception:
+        pass
     if sp:
         xc, yc = sp
         try:
@@ -8305,7 +8326,10 @@ def build_smart_chart(
         question, q, numeric_cols, columns, ct, domain
     )
     sp = _scatter_pair_from_question(q, numeric_cols)
-    if not sp:
+    if not sp and (
+        _question_requests_correlation_routing(question)
+        or _question_triggers_numeric_relationship_chart(q)
+    ):
         try:
             from intent_engine.correlation_analysis import (
                 resolve_relationship_numeric_pair,
@@ -8314,6 +8338,13 @@ def build_smart_chart(
             sp = resolve_relationship_numeric_pair(question, df, profile)
         except Exception:
             sp = None
+    try:
+        from intent_engine.geographic_scope import question_geographic_scope_level
+
+        if question_geographic_scope_level(question):
+            sp = None
+    except Exception:
+        pass
     if sp:
         xc, yc = sp
         try:
@@ -9574,7 +9605,7 @@ def _scatter_relationship_anchor_for_prompt(viz: Dict[str, Any]) -> str:
         lines.append(f"Signed strength: {ri.get('correlationLabel')}")
     if ri.get("direction"):
         lines.append(f"Direction: {ri.get('direction')}")
-    if ri.get("qualitativeOnly"):
+    if ri.get("qualitativeOnly") and ri.get("pearson") is None:
         lines.append(
             "Numeric correlation unavailable — qualitative discussion only."
         )
@@ -9875,6 +9906,14 @@ def _chart_selection_question_bucket(ql: str) -> str:
     High-level intent bucket for chart selection (deterministic, no LLM).
     """
     q = str(ql).lower()
+    try:
+        from intent_engine.correlation_routing_guard import chart_selection_bucket_override
+
+        rel_bucket = chart_selection_bucket_override(q)
+        if rel_bucket:
+            return rel_bucket
+    except Exception:
+        pass
     if _question_asks_outlier_analysis(q) and not _question_explicitly_groups_by_dimension(q):
         return "outlier"
     if re.search(r"\b(vs\.?|versus|against)\b", q):
@@ -10523,7 +10562,7 @@ def _try_build_relationship_scatter_visualization(
     smart_trace: Dict[str, Any] = {"routing": "relationship_scatter"}
     profit_c, rev_c = _find_profit_and_revenue_columns(cols, numeric_cols)
     margin_meta = None
-    if profit_c and rev_c:
+    if profit_c and rev_c and not _question_requests_correlation_routing(question):
         margin_meta = _relationship_margin_by_dimension(
             df_in, profile, str(profit_c), str(rev_c), question
         )
@@ -10918,6 +10957,9 @@ def _assemble_visualization_provenance(
     partial_alignment: bool = False,
     multi_series_rendered: bool = False,
     chart_suppressed_misleading: bool = False,
+    category_labels: Optional[List[str]] = None,
+    question: Optional[str] = None,
+    chart_title: Optional[str] = None,
 ) -> Dict[str, Any]:
     cat_col: Optional[str] = None
     num_col: Optional[str] = None
@@ -10965,6 +11007,31 @@ def _assemble_visualization_provenance(
     )
 
     api_type = _chart_type_for_api(chart_type_internal or "bar")
+    chart_sel_reason_out = (chart_selection_reason or "").strip() or None
+    viz_type_label = _humanize_chart_type_for_provenance(api_type)
+    try:
+        from intent_engine.chart_presentation_align import (
+            humanize_api_chart_type,
+            resolve_presented_bar_api_type,
+        )
+
+        labels_for_align = [
+            str(x).strip()
+            for x in (category_labels or [])
+            if str(x).strip()
+        ]
+        if labels_for_align:
+            api_type, reason_override = resolve_presented_bar_api_type(
+                question=str(question or ""),
+                title=str(chart_title or ""),
+                category_labels=labels_for_align,
+                engine_api_type=api_type,
+            )
+            viz_type_label = humanize_api_chart_type(api_type)
+            if reason_override:
+                chart_sel_reason_out = reason_override
+    except Exception:
+        pass
     confidence = _compute_provenance_confidence(
         rows_analyzed=rows_analyzed,
         chart_points=chart_points,
@@ -11014,7 +11081,11 @@ def _assemble_visualization_provenance(
         "aggregationKey": agg_key_out,
         "rowsAnalyzed": rows_analyzed,
         "chartPoints": chart_points,
-        "visualizationType": _humanize_chart_type_for_provenance(api_type),
+        "visualizationType": (
+            humanize_api_chart_type(api_type)
+            if "humanize_api_chart_type" in dir()
+            else _humanize_chart_type_for_provenance(api_type)
+        ),
         "chartTypeApi": api_type,
         "confidence": confidence,
         "flags": {
@@ -11023,7 +11094,7 @@ def _assemble_visualization_provenance(
             "intentStructured": bool(intent_structured),
         },
         "notes": smart_trace.get("notes"),
-        "chartSelectionReason": (chart_selection_reason or "").strip() or None,
+        "chartSelectionReason": chart_sel_reason_out,
         "analysisValidation": analysis_validation,
     }
     rel_ml = smart_trace.get("relationship_measure_label") if smart_trace else None
@@ -11689,9 +11760,15 @@ def _build_unified_analysis_payload(
         if intent_debug and isinstance(intent_debug.get("relationshipInsights"), dict)
         else {}
     )
-    correlation_qualitative_only = bool(
-        rel_ins_conf.get("qualitativeOnly")
-    ) if relationship_scatter else False
+    correlation_qualitative_only = False
+    if relationship_scatter:
+        correlation_qualitative_only = bool(rel_ins_conf.get("qualitativeOnly"))
+        try:
+            p_val = rel_ins_conf.get("pearson")
+            if p_val is not None and float(p_val) == float(p_val):
+                correlation_qualitative_only = False
+        except (TypeError, ValueError):
+            pass
     intent_structured = bool(
         intent_debug
         and intent_debug.get("value_col")
@@ -12288,6 +12365,8 @@ def compute_visualization_for_question(
     profile_live = dataset_profile or build_profile(df)
     ql = question.lower().strip()
 
+    correlation_routing_locked = _question_requests_correlation_routing(question)
+
     intent_debug = _describe_aggregate_intent(question, df, profile_live)
     metric_spec_live = _resolve_question_metric_spec(question, df, profile_live)
     if metric_spec_live and intent_debug:
@@ -12345,11 +12424,22 @@ def compute_visualization_for_question(
                 or "Required columns not found for this correlation question."
             )
 
+    if correlation_routing_locked:
+        suppress_auto_charts = True
+        if smart_trace is not None:
+            smart_trace = dict(smart_trace)
+            smart_trace["correlationRoutingLocked"] = True
+            smart_trace["routing"] = smart_trace.get("routing") or "correlation_pack"
+
     sec_dim = (intent_debug or {}).get("secondary_group_col")
     pri_dim = (intent_debug or {}).get("group_col")
     agg_key_here = str((intent_debug or {}).get("agg_key") or "")
 
-    dual_compare_spec = _resolve_two_metric_compare_spec(question, df, profile_live)
+    dual_compare_spec = (
+        None
+        if correlation_routing_locked
+        else _resolve_two_metric_compare_spec(question, df, profile_live)
+    )
     if dual_compare_spec:
         gt_dual = _try_build_grouped_two_metric_chart(
             df,
@@ -12394,7 +12484,8 @@ def compute_visualization_for_question(
             }
 
     if (
-        not chart_path_handled
+        not correlation_routing_locked
+        and not chart_path_handled
         and intent_debug
         and sec_dim
         and pri_dim
@@ -12506,7 +12597,7 @@ def compute_visualization_for_question(
             chart_title = ""
             chart_path_handled = True
 
-    if not chart_path_handled:
+    if not chart_path_handled and not correlation_routing_locked:
         if _question_asks_outlier_analysis(ql) and not _question_explicitly_groups_by_dimension(
             ql
         ):
@@ -12576,9 +12667,9 @@ def compute_visualization_for_question(
     )
     print(
         "[viz] intent_category_col:",
-        intent_debug["group_col"] if intent_debug else None,
+        (intent_debug or {}).get("group_col"),
         "intent_numeric_col:",
-        intent_debug["value_col"] if intent_debug else None,
+        (intent_debug or {}).get("value_col"),
         "intent_agg:",
         (intent_debug.get("agg_label"), intent_debug.get("agg_key")) if intent_debug else None,
         "secondary_dim:",
@@ -12767,7 +12858,8 @@ def compute_visualization_for_question(
                     exact_result = f"{base_er}\n\n{tab_lr}"
 
     if (
-        chart_data
+        not correlation_routing_locked
+        and chart_data
         and intent_debug
         and intent_debug.get("value_col")
         and smart_routing_used
@@ -13417,6 +13509,9 @@ def compute_visualization_for_question(
         partial_alignment=partial_alignment,
         multi_series_rendered=bool(used_two_dim_stacked),
         chart_suppressed_misleading=chart_suppressed_misleading,
+        category_labels=labels,
+        question=question,
+        chart_title=str(chart_title or ""),
     )
 
     metric_phrase_rec = None
@@ -13444,17 +13539,25 @@ def compute_visualization_for_question(
                 str(intent_debug.get("agg_label") or ""),
                 str(intent_debug.get("value_col") or ""),
             )
+    presented_api_type = (
+        str(provenance.get("chartTypeApi") or "").strip()
+        or _chart_type_for_api(chart_type or "bar")
+    )
+    chart_sel_for_rec = (
+        str(provenance.get("chartSelectionReason") or "").strip()
+        or chart_sel_reason
+    )
     chart_rec = _build_chart_recommendation_dict(
         ql,
         ll,
         ncol_guess,
-        str(chart_type or "bar"),
-        chart_sel_reason,
+        presented_api_type,
+        chart_sel_for_rec,
         metric_phrase_rec,
     )
 
     visualization: Dict[str, Any] = {
-        "chartType": _chart_type_for_api(chart_type or "bar"),
+        "chartType": presented_api_type,
         "title": chart_title.strip(),
         "subtitle": chart_subtitle,
         "labels": labels[:ll],
@@ -13580,6 +13683,7 @@ def compute_visualization_for_question(
                 dimension_label=str(d_lab or "category"),
                 outlier_insights=coi_rank if isinstance(coi_rank, dict) else None,
                 chart_kind=str(chart_type or "bar"),
+                cohort_row_count=len(df) if df is not None else None,
             )
             if ranked_exec:
                 visualization["rankedExecutiveInsights"] = _json_safe(ranked_exec)
@@ -14148,7 +14252,10 @@ def ask_question(data: QuestionRequest):
                 ranked_raw = visualization["rankedExecutiveInsights"]
             elif isinstance(analysis_ctx.get("rankedExecutiveInsights"), list):
                 ranked_raw = analysis_ctx["rankedExecutiveInsights"]
-            exec_rank_block = executive_insight_prompt_block(ranked_raw or [])
+            exec_rank_block = executive_insight_prompt_block(
+                ranked_raw or [],
+                cohort_row_count=int(analysis_ctx.get("analysisRowCount") or 0) or None,
+            )
             if exec_rank_block:
                 exec_rank_block = f"\n{exec_rank_block}\n"
         except Exception:

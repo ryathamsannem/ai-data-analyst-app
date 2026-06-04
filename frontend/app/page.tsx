@@ -79,9 +79,12 @@ import {
   createVerticalValueAxisLabel,
 } from "./components/chart-value-axis-title";
 import {
+  alignInsightProvenanceToPresentation,
   buildFinalChartPresentationMeta,
   chartKindToApiChartType,
+  chartKindToProvenanceLabel,
   computeFinalChartPresentation,
+  resolveInsightRenderedChartKind,
 } from "@/lib/final-chart-presentation";
 import {
   getInsightLayoutMetrics,
@@ -189,7 +192,9 @@ import {
 } from "@/lib/narrative-number-format";
 import {
   buildNumberedExecutiveBrief,
+  buildRankingExecutiveBrief,
   isExecutiveTakeawaysQuestion,
+  isGeographicRankingQuestion,
 } from "@/lib/executive-insights-brief";
 import { WrappedCategoryYAxisTick } from "./components/chart-category-axis-tick";
 import {
@@ -481,13 +486,21 @@ import {
   type UnsupportedTrendAnalysis,
 } from "@/lib/unsupported-trend-analysis";
 import {
+  buildRelationshipCorrelationSnapshot,
+  chartRowsToScatterPairs,
+  type RelationshipCorrelationSnapshot,
+} from "@/lib/relationship-correlation";
+import {
   buildRelationshipExecutiveCards,
+  formatPearsonCoefficient,
   parseRelationshipInsights,
+  type RelationshipInsightsPayload,
 } from "@/lib/relationship-visualization";
 import {
   buildRelationshipScatterDisplayTitle,
   isSyntheticScatterPointLabel,
   sanitizeRelationshipUserFacingText,
+  stripContradictoryCorrelationNarrative,
   titleCaseRelationshipPhrase,
 } from "@/lib/relationship-scatter-labels";
 import { buildRelationshipScatterFollowUpChips } from "@/lib/ai-follow-up-suggestions";
@@ -787,11 +800,10 @@ function computeChartInsightBadge(
     if (xs.length >= 2 && ys.length === xs.length) {
       const r = pearsonCorrelation(xs, ys);
       if (r != null && Number.isFinite(r)) {
-        const sign = r > 0 ? "+" : "";
-        return `Correlation ${sign}${r.toFixed(2)}`;
+        return `Correlation ${formatPearsonCoefficient(r)}`;
       }
     }
-    return `${rows.length} points plotted`;
+    return null;
   }
 
   if ((kind === "line" || kind === "area") && rows.length >= 2) {
@@ -1773,6 +1785,27 @@ function buildChartAxisPresentationBundle(args: {
   presentationKind: ChartKind;
   contract?: VisualizationContract | null;
 }): ChartAxisPresentationBundle {
+  if (args.contract?.mode === "relationship" && args.presentationKind === "scatter") {
+    const ctx = args.contract.semanticContext;
+    const xLabel =
+      polishMetricDisplay(ctx?.dimensionLabel?.trim() || "") ||
+      polishMetricDisplay(args.visualization?.scatterXLabel?.trim() || "") ||
+      "X";
+    const yLabel =
+      polishMetricDisplay(ctx?.metricLabel?.trim() || "") ||
+      polishMetricDisplay(args.visualization?.scatterYLabel?.trim() || "") ||
+      "Y";
+    const axes: ChartAxes = {
+      categoryAxis: xLabel,
+      valueAxis: yLabel,
+      valueAxisCompact: compactAxisLabelFromFullPhrase(yLabel),
+    };
+    return {
+      axes,
+      header: { mode: "scatter", xLabel, yLabel },
+    };
+  }
+
   if (isTrendMode(args.contract)) {
     return buildTrendAxisPresentation(args.contract!);
   }
@@ -2811,7 +2844,9 @@ function hydrateVisualizationFromApi(raw: unknown): {
     scatterYLabel: syLabel,
     scatterXValues:
       chartKind === "scatter"
-        ? chartData.map((r) => (typeof r.x === "number" ? r.x : 0))
+        ? chartData.map((r) =>
+            typeof r.x === "number" && Number.isFinite(r.x) ? r.x : Number.NaN
+          )
         : undefined,
     scatterXFormatted:
       chartKind === "scatter"
@@ -7760,6 +7795,12 @@ function HomeInner() {
       if (hydrated) {
         const titleFromApi =
           parsedAnalysis?.chartTitle?.trim() || hydrated.persisted.title;
+        const apiKindFromViz = apiChartStringToKind(
+          hydrated.persisted.chartType
+        );
+        if (apiKindFromViz === "scatter") {
+          chartKindForIntent = "scatter";
+        }
         const inferred = computeFinalChartPresentation({
           apiChartType: hydrated.persisted.chartType,
           title: titleFromApi,
@@ -7775,11 +7816,14 @@ function HomeInner() {
             ))
             ? originChartRefSnapshot
             : null;
-        chartKindForIntent = applyOriginChartPresentationLock({
-          inferred,
-          hydratedKind: hydrated.chartKind,
-          origin: lockOrigin,
-        });
+        chartKindForIntent =
+          apiKindFromViz === "scatter"
+            ? "scatter"
+            : applyOriginChartPresentationLock({
+                inferred,
+                hydratedKind: hydrated.chartKind,
+                origin: lockOrigin,
+              });
       }
 
       const semanticIntentKey =
@@ -7806,12 +7850,16 @@ function HomeInner() {
         });
         const mergedProv =
           prov && typeof prov === "object"
-            ? {
-                ...(prov as InsightProvenance),
-                ...(resolvedMetaRows != null
-                  ? { rowsAnalyzed: resolvedMetaRows }
-                  : {}),
-              }
+            ? alignInsightProvenanceToPresentation(
+                {
+                  ...(prov as InsightProvenance),
+                  ...(resolvedMetaRows != null
+                    ? { rowsAnalyzed: resolvedMetaRows }
+                    : {}),
+                },
+                chartKindForIntent,
+                qRaw
+              )
             : prov;
         const patchedPersisted = {
           ...hydrated.persisted,
@@ -8022,12 +8070,58 @@ function HomeInner() {
     mappingConfidence = resolvedCount >= 2 ? "Medium" : "Low";
   }
 
+  const insightRelationshipBundle = useMemo((): {
+    correlation: RelationshipCorrelationSnapshot;
+    enriched: RelationshipInsightsPayload;
+    scatterRows: { x?: number; value: number }[];
+  } | null => {
+    if (!insightVisualization || insightChartData.length < 2) return null;
+    const isScatter =
+      String(insightVisualization.chartType ?? "")
+        .toLowerCase()
+        .replace(/\s+/g, "") === "scatter" ||
+      insightChartData.some(
+        (r) => typeof r.x === "number" && Number.isFinite(r.x)
+      );
+    if (!isScatter) return null;
+
+    const scatterRows = chartRowsToScatterPairs(insightChartData);
+    const correlation = buildRelationshipCorrelationSnapshot({
+      chartRows: scatterRows,
+      apiPearson: (
+        insightVisualization.relationshipInsights as
+          | { pearson?: unknown }
+          | null
+          | undefined
+      )?.pearson,
+      logContext: lastAskedQuestion.trim() || undefined,
+    });
+    const meta =
+      parseRelationshipInsights(
+        insightVisualization.relationshipInsights
+      ) ?? {
+        strongestOutliers: [],
+        qualitativeOnly: true,
+      };
+    const enriched: RelationshipInsightsPayload = {
+      ...meta,
+      pearson: correlation.computed ? correlation.pearsonRounded : null,
+      qualitativeOnly: !correlation.computed,
+      sampleSize: correlation.rowCount || meta.sampleSize,
+    };
+    return { correlation, enriched, scatterRows };
+  }, [
+    insightVisualization,
+    insightChartData,
+    lastAskedQuestion,
+  ]);
+
+  const insightRelationshipEnriched = insightRelationshipBundle?.enriched ?? null;
+
   const insightUnifiedConfidence = useMemo(() => {
     if (!alignedAnalysis) return null;
     const prov = insightVisualization?.provenance;
-    const ri = insightVisualization?.relationshipInsights as
-      | { sampleSize?: number; qualitativeOnly?: boolean }
-      | undefined;
+    const ri = insightRelationshipEnriched;
     return computeUnifiedInsightConfidence({
       mappingConfidence,
       mappingConfirmedByUser,
@@ -8065,9 +8159,19 @@ function HomeInner() {
       relationshipScatter: alignedAnalysis.chartTypeInternal === "scatter",
       relationshipSampleSize: (() => {
         const n = Number(ri?.sampleSize);
-        return Number.isFinite(n) ? n : null;
+        if (Number.isFinite(n) && n > 0) return n;
+        const cp = alignedAnalysis.chartSeriesPointCount;
+        return Number.isFinite(cp) && cp > 0 ? cp : null;
       })(),
-      correlationQualitativeOnly: Boolean(ri?.qualitativeOnly),
+      relationshipPearson:
+        insightRelationshipBundle?.correlation.pearsonRounded ?? ri?.pearson ?? null,
+      correlationQualitativeOnly: Boolean(
+        ri?.qualitativeOnly &&
+          !(
+            ri?.pearson != null &&
+            Number.isFinite(Number(ri.pearson))
+          )
+      ),
       forecastProjectionLow:
         alignedAnalysis.forecastGuardrails?.canForecast === false ||
         Boolean(alignedAnalysis.forecastGuardrails?.lacksTimeSeries),
@@ -8079,7 +8183,8 @@ function HomeInner() {
             : null,
       chartTypeInternal: alignedAnalysis.chartTypeInternal,
       analysisKind:
-        alignedAnalysis.chartTypeInternal === "scatter"
+        alignedAnalysis.chartTypeInternal === "scatter" ||
+        insightVisualization?.chartType === "scatter"
           ? "relationship_scatter"
           : alignedAnalysis.dualMetricCompare
             ? "compare"
@@ -8091,7 +8196,9 @@ function HomeInner() {
     alignedAnalysis,
     insightSnapshot?.contract,
     insightVisualization?.provenance,
-    insightVisualization?.relationshipInsights,
+    insightRelationshipEnriched,
+    insightRelationshipBundle,
+    insightVisualization?.chartType,
     mappingConfidence,
     mappingConfirmedByUser,
   ]);
@@ -9557,22 +9664,40 @@ function HomeInner() {
     ]
   );
 
-  const insightRenderedChartKind = insightPresentationChartKind;
+  const insightRenderedChartKind = useMemo(
+    () =>
+      resolveInsightRenderedChartKind({
+        presentationKind: insightPresentationChartKind,
+        categoryPlan: insightCartesianPlanMain,
+      }),
+    [insightPresentationChartKind, insightCartesianPlanMain]
+  );
+
+  const insightProvenanceVisualizationLabel = useMemo(() => {
+    if (!insightVisualization?.provenance) return null;
+    if (insightRenderedChartKind === "scatter") return "Scatter Plot";
+    return chartKindToProvenanceLabel(insightRenderedChartKind);
+  }, [insightVisualization?.provenance, insightRenderedChartKind]);
 
   const insightChartInsightBadge = useMemo(
-    () =>
-      isTrendMode(insightSnapshot?.contract)
-        ? trendInsightBadgeFromRows(
-            sortedInsightChartData,
-            insightRenderedChartKind,
-            insightTrendBucketLabel || insightSnapshot?.contract?.timeBucketLabel
-          )
-        : computeChartInsightBadge(
-            sortedInsightChartData,
-            insightRenderedChartKind,
-            insightChartAxisLabels.categoryAxis,
-            insightChartSortAscending
-          ),
+    () => {
+      if (isTrendMode(insightSnapshot?.contract)) {
+        return trendInsightBadgeFromRows(
+          sortedInsightChartData,
+          insightRenderedChartKind,
+          insightTrendBucketLabel || insightSnapshot?.contract?.timeBucketLabel
+        );
+      }
+      if (insightRelationshipBundle?.correlation.badgeLabel) {
+        return insightRelationshipBundle.correlation.badgeLabel;
+      }
+      return computeChartInsightBadge(
+        sortedInsightChartData,
+        insightRenderedChartKind,
+        insightChartAxisLabels.categoryAxis,
+        insightChartSortAscending
+      );
+    },
     [
       insightSnapshot?.contract,
       insightTrendBucketLabel,
@@ -9580,6 +9705,7 @@ function HomeInner() {
       insightRenderedChartKind,
       insightChartAxisLabels.categoryAxis,
       insightChartSortAscending,
+      insightRelationshipBundle,
     ]
   );
 
@@ -9596,18 +9722,15 @@ function HomeInner() {
     if (insightUnsupportedMultiMetric) {
       return buildUnsupportedMultiMetricExecutiveCards(insightUnsupportedMultiMetric);
     }
-    if (insightVisualization?.relationshipInsights) {
-      const ri = parseRelationshipInsights(
-        insightVisualization.relationshipInsights
+    if (insightRelationshipBundle) {
+      const { enriched, scatterRows } = insightRelationshipBundle;
+      return buildRelationshipExecutiveCards(
+        enriched,
+        insightChartAxisLabels.categoryAxis,
+        insightChartAxisLabels.valueAxis,
+        scatterRows.length,
+        scatterRows
       );
-      if (ri) {
-        return buildRelationshipExecutiveCards(
-          ri,
-          insightChartAxisLabels.categoryAxis,
-          insightChartAxisLabels.valueAxis,
-          insightVisualization.labels?.length ?? 0
-        );
-      }
     }
     if (insightProfitMargin?.active && insightVisualization?.labels?.length) {
       const pairs = zipStoredVisualizationPairs(insightVisualization);
@@ -9683,6 +9806,7 @@ function HomeInner() {
     insightSnapshot,
     sortedInsightChartData,
     insightVisualization,
+    insightRelationshipBundle,
     insightRenderedChartKind,
     insightChartAxisLabels,
     insightDisplayChartTitle,
@@ -9894,10 +10018,13 @@ function HomeInner() {
     ) {
       return null;
     }
-    if (
-      isTrendMode(insightSnapshot?.contract) ||
-      !isExecutiveTakeawaysQuestion(lastAskedQuestion)
-    ) {
+    if (isTrendMode(insightSnapshot?.contract)) {
+      return null;
+    }
+    const useRankingBrief =
+      isGeographicRankingQuestion(lastAskedQuestion) ||
+      isExecutiveTakeawaysQuestion(lastAskedQuestion);
+    if (!useRankingBrief) {
       return null;
     }
     const briefRows = insightVisualization?.labels?.length
@@ -9919,6 +10046,13 @@ function HomeInner() {
               ),
           }));
     if (briefRows.length < 2) return null;
+    if (isGeographicRankingQuestion(lastAskedQuestion)) {
+      return buildRankingExecutiveBrief({
+        categoryAxis: insightChartAxisLabels.categoryAxis,
+        valueAxis: insightChartAxisLabels.valueAxis,
+        rows: briefRows,
+      });
+    }
     return buildNumberedExecutiveBrief({
       question: lastAskedQuestion,
       categoryAxis: insightChartAxisLabels.categoryAxis,
@@ -9935,6 +10069,7 @@ function HomeInner() {
     insightPresentationChartKind,
     insightUnsupportedMultiMetric,
     insightVisualization?.relationshipInsights,
+    insightRelationshipEnriched,
   ]);
 
   const parsedInsightAnswer = useMemo(() => {
@@ -9957,7 +10092,10 @@ function HomeInner() {
         ? sanitizeNarrativeForTrendContract(raw, c)
         : raw;
       if (isRelScatter) {
-        sanitized = sanitizeRelationshipUserFacingText(sanitized);
+        sanitized = stripContradictoryCorrelationNarrative(
+          sanitizeRelationshipUserFacingText(sanitized),
+          insightRelationshipEnriched?.pearson ?? null
+        );
       }
       return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone));
     };
@@ -9968,7 +10106,10 @@ function HomeInner() {
         ? sanitizeNarrativeForTrendContract(raw, c)
         : raw;
       if (isRelScatter) {
-        sanitized = sanitizeRelationshipUserFacingText(sanitized);
+        sanitized = stripContradictoryCorrelationNarrative(
+          sanitizeRelationshipUserFacingText(sanitized),
+          insightRelationshipEnriched?.pearson ?? null
+        );
       }
       return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone), {
         dualMetricRoasLead,
@@ -10024,6 +10165,9 @@ function HomeInner() {
     insightUnsupportedMultiMetric,
     insightProfitMarginLead,
     insightProfitMargin,
+    insightPresentationChartKind,
+    insightVisualization?.relationshipInsights,
+    insightRelationshipEnriched,
   ]);
 
   const insightExecutiveBrief = useMemo(() => {
@@ -10033,12 +10177,10 @@ function HomeInner() {
     if (insightNumberedExecutiveBrief) {
       return polishInsightNarrativeText(insightNumberedExecutiveBrief);
     }
-    if (isTrendMode(insightSnapshot?.contract)) {
-      const pinned = narrativeCopyForContract(insightSnapshot?.contract);
-      if (pinned) {
-        const brief = softenExecutiveTakeaway(pinned, insightNarrativeTone);
-        return polishInsightNarrativeText(brief, { dualMetricRoasLead });
-      }
+    const pinnedNarrative = narrativeCopyForContract(insightSnapshot?.contract);
+    if (pinnedNarrative) {
+      const brief = softenExecutiveTakeaway(pinnedNarrative, insightNarrativeTone);
+      return polishInsightNarrativeText(brief, { dualMetricRoasLead });
     }
     const s = sanitizeNarrativeForTrendContract(
       parsedInsightAnswer.summary?.trim() ?? "",
@@ -12702,7 +12844,10 @@ function HomeInner() {
                                 </dt>
                                 <dd className={aiInsightsProvenanceMetaValue}>
                                   {humanizeRecommendedChartApi(
-                                    insightChartRoutingRecommendation.recommendedChart
+                                    chartKindToApiChartType(
+                                      insightRenderedChartKind || "bar"
+                                    ) ||
+                                      insightChartRoutingRecommendation.recommendedChart
                                   )}
                                 </dd>
                               </div>
@@ -12861,7 +13006,10 @@ function HomeInner() {
                               Visualization
                             </dt>
                                 <dd className={aiInsightsProvenanceMetaValue}>
-                              {insightVisualization.provenance.visualizationType}
+                              {insightProvenanceVisualizationLabel ??
+                                (insightPresentationChartKind === "scatter"
+                                  ? "Scatter Plot"
+                                  : insightVisualization.provenance.visualizationType)}
                             </dd>
                           </div>
                           {insightVisualization.provenance.chartSelectionReason ? (

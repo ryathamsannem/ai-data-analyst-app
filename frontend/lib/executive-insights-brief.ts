@@ -2,6 +2,40 @@
  * Executive Insights narrative — numbered takeaways for summary-style questions.
  */
 
+/** City / region / zone ranking questions (not generic "top insights" prompts). */
+export function isGeographicRankingQuestion(question: string): boolean {
+  const q = question.replace(/\s+/g, " ").trim().toLowerCase();
+  if (!q) return false;
+  if (/\b(top|best|highest|lowest|leading|trailing)\s+performing\b/.test(q)) {
+    return true;
+  }
+  if (/\bperforming\s+(city|cities|region|regions|zone|zones)\b/.test(q)) {
+    return true;
+  }
+  if (
+    /\b(which|what)\s+.*\b(region|regions|zone|zones|city|cities)\b.*\b(highest|lowest|top|best|most|least)\b/.test(
+      q
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(highest|lowest|top|best|most|least)\b.*\b(revenue|sales|profit)\b.*\b(region|regions|zone|zones|city|cities)\b/.test(
+      q
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(region|regions|zone|zones|city|cities)\b.*\b(generates?|generate)\b.*\b(highest|lowest|most|least)\b/.test(
+      q
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function isExecutiveTakeawaysQuestion(question: string): boolean {
   const q = question.replace(/\s+/g, " ").trim().toLowerCase();
   if (!q) return false;
@@ -57,9 +91,12 @@ function formatPctForNarrative(pct: number): string {
 function humanizeMetricPhrase(valueAxis: string): string {
   const t = valueAxis.replace(/\s+/g, " ").trim();
   if (!t) return "value";
-  const lower = t.toLowerCase();
+  const lower = t.toLowerCase().replace(/\btotal\s+total\s+/g, "total ");
   if (/^total\s+/.test(lower)) return lower;
-  if (/\b(revenue|sales|spend|orders|units)\b/i.test(t)) return `total ${lower}`;
+  if (/\b(revenue|sales|spend|orders|units)\b/i.test(t)) {
+    const withTotal = `total ${lower}`;
+    return withTotal.replace(/\btotal\s+total\s+/g, "total ");
+  }
   return lower;
 }
 
@@ -74,6 +111,69 @@ export type ExecutiveBriefRow = {
   value: number;
   formatted: string;
 };
+
+function formatAggregateAmount(total: number, template?: string): string {
+  if (template?.trim()) {
+    const digits = template.replace(/[^\d.,-]/g, "");
+    if (digits) {
+      const hasDec = digits.includes(".");
+      const n = Number(digits.replace(/,/g, ""));
+      if (Number.isFinite(n) && Math.abs(n - total) < Math.max(1, total * 0.02)) {
+        return template.trim();
+      }
+    }
+  }
+  return Math.round(total).toLocaleString("en-US");
+}
+
+/**
+ * Deterministic ranking narrative from aggregated chart values (city/region bars).
+ */
+export function buildRankingExecutiveBrief(args: {
+  categoryAxis: string;
+  valueAxis: string;
+  rows: ExecutiveBriefRow[];
+}): string | null {
+  const rows = args.rows.filter((r) => Number.isFinite(r.value) && r.value >= 0);
+  if (rows.length < 2) return null;
+
+  const sorted = [...rows].sort((a, b) => b.value - a.value);
+  const total = sorted.reduce((a, r) => a + r.value, 0);
+  if (total <= 1e-9) return null;
+
+  const top = sorted[0]!;
+  const topThree = sorted.slice(0, Math.min(3, sorted.length));
+  const topThreeSum = topThree.reduce((a, r) => a + r.value, 0);
+  const topThreeShare = (100 * topThreeSum) / total;
+  const shareDisp = formatPctForNarrative(topThreeShare);
+
+  const met = humanizeMetricPhrase(args.valueAxis);
+  const dim = humanizeDimensionPhrase(args.categoryAxis);
+  const dimPlural = dim.endsWith("s") ? dim : `${dim}s`;
+
+  const sumDisp = formatAggregateAmount(topThreeSum, topThree[0]?.formatted);
+  const totalDisp = formatAggregateAmount(total, top.formatted);
+  const leaderVal = top.formatted.trim() || formatAggregateAmount(top.value);
+
+  const lines = [
+    `${top.label.trim() || "The leader"} generates the highest ${met} at ${leaderVal}.`,
+    `The top ${topThree.length} ${dimPlural} account for roughly ${shareDisp}% of total ${met} (${sumDisp} of ${totalDisp}).`,
+  ];
+
+  if (sorted.length > 1) {
+    const bottom = sorted[sorted.length - 1]!;
+    const spread = top.value - bottom.value;
+    const spreadDisp = formatAggregateAmount(spread);
+    const pct = gapPercentOfHigh(spread, top.value);
+    if (pct != null && pct >= 8) {
+      lines.push(
+        `${top.label.trim()} leads ${bottom.label.trim()} by ${spreadDisp} (${formatPctForNarrative(pct)}% gap) across ${dimPlural} in this cohort.`
+      );
+    }
+  }
+
+  return lines.join(" ");
+}
 
 /**
  * Deterministic numbered executive brief from chart series (matches KPI signals).

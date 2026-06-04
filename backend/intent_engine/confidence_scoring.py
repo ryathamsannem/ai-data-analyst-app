@@ -72,6 +72,8 @@ def _group_points(
     *,
     relationship_scatter: bool = False,
     relationship_sample_size: int = 0,
+    intent_structured: bool = False,
+    analysis_kind: Optional[str] = None,
 ) -> Tuple[float, Optional[str]]:
     if relationship_scatter:
         rs = int(relationship_sample_size or cp or 0)
@@ -86,6 +88,18 @@ def _group_points(
         return -9.0, "Only one chart group — limited comparative context"
     rpg = float(n) / float(cp) if cp else 0.0
     if rpg < 3:
+        kind = (analysis_kind or "").strip().lower()
+        if (
+            intent_structured
+            and kind in ("ranking", "aggregation", "compare")
+            and 2 <= cp <= 12
+            and n > 0
+            and n < 100
+        ):
+            return (
+                -2.0,
+                f"Compact cohort (~{rpg:.1f} rows per group across {cp} categories)",
+            )
         return -15.0, f"Sparse groups (~{rpg:.1f} rows per group)"
     if cp > 45:
         return -7.0, f"High group count ({cp}) — category signal may fragment"
@@ -94,6 +108,23 @@ def _group_points(
     if rpg >= 8:
         return 9.0, f"{cp} groups with ~{rpg:.0f} rows per group on average"
     return 3.0, f"{cp} chart group(s)"
+
+
+def _ranking_alignment_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
+    kind = (inp.analysis_kind or "").strip().lower()
+    if not inp.intent_structured or kind not in ("ranking", "aggregation", "compare"):
+        return 0.0, []
+    n = max(0, int(inp.row_count))
+    cp = max(0, int(inp.chart_point_count))
+    if n <= 0 or n >= 100 or cp < 2 or cp > 12:
+        return 0.0, []
+    ct = (inp.chart_type or "").strip().lower().replace("-", "_")
+    if ct not in ("bar", "bar_horizontal", ""):
+        return 0.0, []
+    return (
+        14.0,
+        "Ranking question with resolved metric and breakdown columns",
+    )
 
 
 def _chart_suitability_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
@@ -179,12 +210,14 @@ def _statistical_support_points(inp: InsightConfidenceInput) -> Tuple[float, Lis
     rs = int(inp.relationship_sample_size or 0)
     n = max(0, int(inp.row_count))
 
-    if inp.correlation_qualitative_only or rs < 2:
+    if rs < 2 or inp.correlation_qualitative_only:
         pts -= 22.0
         reasons.append("Correlation could not be computed numerically")
-    elif rs < MIN_PEARSON_SAMPLE:
+    elif rs <= MIN_PEARSON_SAMPLE:
         pts -= 12.0
-        reasons.append(f"Correlation based on only {rs} joint pair(s)")
+        reasons.append(
+            f"Correlation computed on {rs} paired rows; treat as directional due to small sample"
+        )
     elif rs < 30:
         pts += 4.0
         reasons.append(f"Moderate scatter sample ({rs} joint pairs)")
@@ -209,6 +242,95 @@ def _forecast_validity_points(inp: InsightConfidenceInput) -> Tuple[float, List[
         pts += 6.0
         reasons.append("Multi-period time series supports forecasting")
     return pts, reasons
+
+
+def _pick_primary_rationale(
+    reasons: List[str], inp: InsightConfidenceInput
+) -> str:
+    if not reasons:
+        return "Confidence derived from cohort and chart evidence."
+    priority = (
+        "Correlation computed on",
+        "Correlation based on only",
+        "Fewer than two joint pairs",
+        "Correlation could not be computed",
+        "Sparse groups",
+        "Only one chart group",
+        "Trend question but",
+        "Growth question without",
+        "Decline question without",
+        "Multi-metric compare blocked",
+        "Forecast invalid",
+    )
+    for needle in priority:
+        for r in reasons:
+            if needle.lower() in r.lower():
+                return r
+    if inp.relationship_scatter:
+        for r in reasons:
+            rl = r.lower()
+            if "joint pair" in rl or "scatter sample" in rl:
+                return r
+    return reasons[0]
+
+
+def _compose_evidence_summary_line(
+    score: float,
+    band: str,
+    reasons: List[str],
+    inp: InsightConfidenceInput,
+) -> str:
+    n = max(0, int(inp.row_count))
+    cp = max(0, int(inp.chart_point_count))
+    rs = int(inp.relationship_sample_size or 0)
+    rounded = int(round(score))
+
+    if inp.relationship_scatter and rs > 0:
+        if rs <= MIN_PEARSON_SAMPLE and not inp.correlation_qualitative_only:
+            return (
+                f"Correlation computed on {rs} paired row(s); treat as directional due to small sample "
+                f"(score {rounded}/100, {band} band; {n:,} filtered row(s))."
+            )
+        if rs < MIN_PEARSON_SAMPLE:
+            return (
+                f"Score {rounded}/100 ({band}): correlation uses {rs} joint pair(s) "
+                f"from {n:,} filtered row(s) — treat coefficients as directional, not definitive."
+            )
+        return (
+            f"Score {rounded}/100 ({band}): scatter correlation on {rs} joint pair(s) "
+            f"from {n:,} filtered row(s)."
+        )
+
+    if n > 0 and n < 100:
+        return (
+            f"Score {rounded}/100 ({band}): small cohort ({n:,} rows, {cp} chart group(s)) — "
+            "use hedged language and mention sample size once."
+        )
+
+    if cp > 0 and n > 0:
+        rpg = float(n) / float(cp)
+        if rpg < 3:
+            return (
+                f"Score {rounded}/100 ({band}): sparse groups (~{rpg:.1f} rows per group, "
+                f"{cp} groups, {n:,} rows total)."
+            )
+
+    return (
+        f"Score {rounded}/100 ({band}) from {len(reasons)} evidence factor(s); "
+        f"{n:,} row(s), {cp} chart group(s)."
+    )
+
+
+def _compose_insight_confidence_rationale(
+    reasons: List[str], inp: InsightConfidenceInput
+) -> str:
+    primary = _pick_primary_rationale(reasons, inp)
+    if len(reasons) <= 1:
+        return primary
+    secondary = [r for r in reasons if r != primary][:2]
+    if secondary:
+        return f"{primary} — {'; '.join(secondary)}."
+    return f"{primary} ({len(reasons)} evidence factors)."
 
 
 def _inference_quality_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
@@ -244,10 +366,16 @@ def calculate_insight_confidence(
         inp.row_count,
         relationship_scatter=inp.relationship_scatter,
         relationship_sample_size=int(inp.relationship_sample_size or 0),
+        intent_structured=inp.intent_structured,
+        analysis_kind=inp.analysis_kind,
     )
     score += g_pts
     if g_msg:
         reasons.append(g_msg)
+
+    r_pts, r_reasons = _ranking_alignment_points(inp)
+    score += r_pts
+    reasons.extend(r_reasons)
 
     for block in (
         _metric_quality_points,
@@ -262,15 +390,17 @@ def calculate_insight_confidence(
 
     score = min(100.0, max(0.0, score))
     band = _band_from_score(score)
-    primary = reasons[0] if reasons else "Confidence derived from cohort and chart evidence."
+    rounded = int(round(score))
 
     return {
-        "score": int(round(score)),
+        "score": rounded,
         "band": band,
         "reasons": reasons,
-        "insightConfidenceScore": int(round(score)),
+        "insightConfidenceScore": rounded,
         "insightConfidenceLevel": band,
-        "insightConfidenceRationale": primary if len(reasons) <= 1 else f"{primary} ({len(reasons)} factors).",
+        "insightConfidenceRationale": _compose_insight_confidence_rationale(
+            reasons, inp
+        ),
         "insightConfidenceReasons": reasons,
         "analysisRowCount": max(0, int(inp.row_count)),
         "chartSeriesPointCount": max(0, int(inp.chart_point_count)),
@@ -284,9 +414,8 @@ def calculate_insight_confidence(
         or (inp.mapping_confidence or "").lower() == "low"
         or (inp.relationship_scatter and int(inp.relationship_sample_size or 0) < MIN_PEARSON_SAMPLE),
         "mappingConfidenceLevel": (inp.mapping_confidence or "").strip().lower() or None,
-        "evidenceSummaryLine": (
-            f"Score {int(round(score))}/100 ({band}) from {len(reasons)} evidence factor(s); "
-            f"{inp.row_count:,} row(s), {inp.chart_point_count} chart point(s)."
+        "evidenceSummaryLine": _compose_evidence_summary_line(
+            score, band, reasons, inp
         ),
     }
 
