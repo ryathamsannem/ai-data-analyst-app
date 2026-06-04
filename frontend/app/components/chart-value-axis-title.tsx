@@ -92,3 +92,58 @@ export function createHorizontalBottomAxisValueLabel(
   HorizontalBottomAxisValueTitle.displayName = "HorizontalBottomAxisValueTitle";
   return HorizontalBottomAxisValueTitle;
 }
+
+function labelCoord(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/**
+ * Recharts `XAxis` `Label` `content` — bold axis title at Recharts-computed x/y
+ * (keeps original `position` / `offset`; only replaces the SVG text styling).
+ */
+export function CartesianXAxisTitleLabelContent(props: {
+  viewBox?: unknown;
+  value?: string | number;
+  x?: number | string;
+  y?: number | string;
+  textAnchor?: string;
+}): ReactElement | null {
+  const disp = String(props.value ?? "").trim();
+  if (!disp) return null;
+
+  let x = labelCoord(props.x);
+  let y = labelCoord(props.y);
+  if (x == null || y == null) {
+    const vb = asCartesianViewBox(props.viewBox);
+    if (!vb) return null;
+    if (x == null) x = vb.x + vb.width / 2;
+    if (y == null) y = vb.y + vb.height;
+  }
+
+  const anchor =
+    typeof props.textAnchor === "string" && props.textAnchor.trim()
+      ? props.textAnchor
+      : "middle";
+
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor={anchor}
+      fill="var(--chart-axis-label, #475569)"
+      fontSize={11}
+      fontWeight={600}
+      style={{ userSelect: "none" }}
+    >
+      <title>{disp}</title>
+      {disp}
+    </text>
+  );
+}
+
+CartesianXAxisTitleLabelContent.displayName = "CartesianXAxisTitleLabelContent";

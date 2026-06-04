@@ -306,7 +306,7 @@ export function buildRelationshipExecutiveCards(
       value: formatPearsonCoefficient(r),
       hint: strength
         ? `${strength} · ${xAxisLabel} vs ${yAxisLabel}`
-        : `${xAxisLabel} vs ${yAxisLabel} · Pearson r`,
+        : `${xAxisLabel} vs ${yAxisLabel}`,
       dotClass: nextDot(),
     });
   } else if (!computed) {

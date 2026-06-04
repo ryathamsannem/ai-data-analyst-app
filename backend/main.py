@@ -5483,13 +5483,44 @@ def _extract_all_by_dimension_phrases(ql: str) -> List[str]:
 
 def _which_has_focus_phrase_raw(ql: str) -> Optional[str]:
     m = re.search(
-        r"\bwhich\s+([a-z0-9][a-z0-9_\s]{0,48}?)\s+(?:has|have|shows?)\b",
+        r"\bwhich\s+([a-z0-9][a-z0-9_\s]{0,48}?)\s+(?:has|have|had|was|is|are|shows?)\b",
         ql,
         re.I,
     )
     if not m:
         return None
     return m.group(1).strip()
+
+
+def _apply_dimension_redirect_metadata(
+    intent_debug: Optional[Dict[str, Any]],
+    chart_data: List[Any],
+    partial_visualization_warning: Optional[str],
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """
+    When the question names a breakdown column that is not in the schema,
+    mark a transparent redirect and surface a partial-viz note for confidence/UI.
+    """
+    if not intent_debug or not intent_debug.get("requested_dimension_missing"):
+        return intent_debug, partial_visualization_warning
+    if not chart_data:
+        return intent_debug, partial_visualization_warning
+    gcol = intent_debug.get("group_col")
+    if not gcol:
+        return intent_debug, partial_visualization_warning
+    focus_phrase = str(intent_debug.get("question_focus_phrase") or "").strip()
+    phrase_label = _pretty_label_text(focus_phrase) if focus_phrase else "requested dimension"
+    alt = _pretty_label_text(str(gcol))
+    msg = (
+        f"This dataset has no '{phrase_label}' column to answer the question directly; "
+        f"showing the closest valid ranking by {alt} instead."
+    )
+    out_intent = dict(intent_debug)
+    out_intent["dimension_redirect_handled"] = True
+    pvw = (partial_visualization_warning or "").strip()
+    if not pvw or phrase_label.lower() not in pvw.lower():
+        pvw = f"{pvw} {msg}".strip() if pvw else msg
+    return out_intent, pvw
 
 
 def _safe_recharts_series_key(label: str, used: set) -> str:
@@ -5616,6 +5647,8 @@ def _build_analysis_validation_block(
             None,
         )
     primary_ok = bool(intent_debug and intent_debug.get("group_col"))
+    if intent_debug and intent_debug.get("requested_dimension_missing"):
+        primary_ok = False
     sec_ok = bool(multi_rendered and secondary_requested)
     if dual_compare:
         sec_label = "Both requested metrics rendered in chart"
@@ -6028,6 +6061,9 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         "question_focus_col": focus_col,
         "secondary_group_col": secondary_col,
     }
+    if focus_raw and not focus_col:
+        out_intent["question_focus_phrase"] = focus_raw
+        out_intent["requested_dimension_missing"] = True
     if secondary_col and (not focus_col) and len(by_cols_ordered) >= 2:
         out_intent["dimension_notes"] = (
             "Multiple 'by' dimensions detected; using first as primary axis "
@@ -11318,6 +11354,8 @@ def _insight_confidence_meta(
     intent_structured: bool = False,
     alignment_repaired: bool = False,
     partial_visualization_warning: bool = False,
+    dimension_redirect_handled: bool = False,
+    requested_dimension_missing: bool = False,
 ) -> Dict[str, Any]:
     """
     Evidence / sample-size metadata for API clients and prompt contracts.
@@ -11348,6 +11386,8 @@ def _insight_confidence_meta(
         intent_structured=intent_structured,
         alignment_repaired=alignment_repaired,
         partial_visualization_warning=partial_visualization_warning,
+        dimension_redirect_handled=dimension_redirect_handled,
+        requested_dimension_missing=requested_dimension_missing,
     )
 
 
@@ -11785,6 +11825,14 @@ def _build_unified_analysis_payload(
         analysis_kind = "ranking"
     else:
         analysis_kind = "aggregation"
+    from intent_engine.confidence_scoring import normalize_confidence_chart_type
+
+    dimension_redirect_handled = bool(
+        intent_debug and intent_debug.get("dimension_redirect_handled")
+    )
+    requested_dimension_missing = bool(
+        intent_debug and intent_debug.get("requested_dimension_missing")
+    )
     conf = _insight_confidence_meta(
         analysis_row_count,
         chart_points,
@@ -11800,10 +11848,12 @@ def _build_unified_analysis_payload(
         forecast_projection_low=forecast_projection_low,
         forecast_can_forecast=forecast_can_forecast,
         analysis_kind=analysis_kind,
-        chart_type=str(chart_type_internal or api_t or "bar"),
+        chart_type=normalize_confidence_chart_type(chart_type_internal or "bar"),
         intent_structured=intent_structured,
         alignment_repaired=bool(alignment_repaired),
         partial_visualization_warning=bool(partial_visualization_warning),
+        dimension_redirect_handled=dimension_redirect_handled,
+        requested_dimension_missing=requested_dimension_missing,
     )
 
     out: Dict[str, Any] = {
@@ -11838,6 +11888,10 @@ def _build_unified_analysis_payload(
         out["analysisValidation"] = analysis_validation
     if partial_visualization_warning:
         out["partialVisualizationWarning"] = partial_visualization_warning.strip()
+    if dimension_redirect_handled:
+        out["dimensionRedirectHandled"] = True
+    if requested_dimension_missing:
+        out["requestedDimensionMissing"] = True
     if unsupported_growth_analysis:
         out["unsupportedGrowthAnalysis"] = unsupported_growth_analysis
         out["growthRequestUnsatisfied"] = True
@@ -13456,6 +13510,12 @@ def compute_visualization_for_question(
         scatter_x_display = [
             format_display_numeric(round_cat, v) for v in scatter_x_rounded
         ]
+
+    intent_debug, partial_visualization_warning = _apply_dimension_redirect_metadata(
+        intent_debug,
+        chart_data,
+        partial_visualization_warning,
+    )
 
     analysis_validation_block = _build_analysis_validation_block(
         intent_debug=intent_debug,

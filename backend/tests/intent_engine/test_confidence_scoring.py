@@ -115,6 +115,68 @@ class TestConfidenceScoring(unittest.TestCase):
         self.assertIn("reasons", out)
         self.assertIsInstance(out["reasons"], list)
 
+    def test_rationale_no_dangling_single_letter_fragments(self) -> None:
+        """Ranking alignment must append one reason string, not per-character tokens."""
+        meta = compute_insight_confidence_meta(
+            8,
+            4,
+            "medium",
+            intent_structured=True,
+            analysis_kind="ranking",
+            chart_type="bar_horizontal",
+        )
+        rationale = str(meta.get("insightConfidenceRationale") or "")
+        self.assertNotRegex(rationale, r";\s*R\.\s*$")
+        self.assertNotIn("; a.", rationale)
+        reasons = meta.get("insightConfidenceReasons") or []
+        self.assertTrue(all(len(str(r)) > 1 for r in reasons), msg=reasons)
+        joined = " ".join(str(r) for r in reasons).lower()
+        self.assertIn("ranking question", joined)
+
+    def test_dimension_redirect_month_style_medium_band(self) -> None:
+        """Transparent redirect when requested breakdown column is missing."""
+        meta = compute_insight_confidence_meta(
+            13,
+            3,
+            "medium",
+            intent_structured=True,
+            analysis_kind="ranking",
+            chart_type="horizontalBar",
+            partial_visualization_warning=True,
+            dimension_redirect_handled=True,
+            requested_dimension_missing=True,
+        )
+        score = int(meta["insightConfidenceScore"])
+        self.assertGreaterEqual(score, 55)
+        self.assertLessEqual(score, 70)
+        self.assertEqual(meta["insightConfidenceLevel"], "medium")
+        joined = " ".join(meta.get("insightConfidenceReasons") or []).lower()
+        self.assertIn("closest valid ranking", joined)
+        self.assertFalse(meta.get("cautiousNarrativeRequired"))
+
+    def test_horizontal_bar_api_chart_type_scores_like_internal(self) -> None:
+        internal = calculate_insight_confidence(
+            InsightConfidenceInput(
+                row_count=13,
+                chart_point_count=3,
+                mapping_confidence="medium",
+                intent_structured=True,
+                analysis_kind="ranking",
+                chart_type="bar_horizontal",
+            )
+        )
+        api_form = calculate_insight_confidence(
+            InsightConfidenceInput(
+                row_count=13,
+                chart_point_count=3,
+                mapping_confidence="medium",
+                intent_structured=True,
+                analysis_kind="ranking",
+                chart_type="horizontalBar",
+            )
+        )
+        self.assertEqual(internal["score"], api_form["score"])
+
     def test_ranking_small_cohort_directional_low_band(self) -> None:
         meta = compute_insight_confidence_meta(
             8,

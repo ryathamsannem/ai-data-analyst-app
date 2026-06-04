@@ -2819,6 +2819,15 @@ body {
   fill: var(--chart-axis-tick);
 }
 
+/* X-axis titles must match Y-axis title weight (SVG label content uses fontWeight 600). */
+.ai-insights-page .ai-insights-viz-chart-frame .recharts-xAxis .recharts-cartesian-axis-tick + .recharts-label text,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame .recharts-xAxis .recharts-label text,
+.ai-insights-page .ai-insights-viz-chart-frame .recharts-xAxis text.recharts-label,
+.chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame .recharts-xAxis text.recharts-label {
+  font-weight: 600;
+  fill: var(--chart-axis-label);
+}
+
 .dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-cartesian-grid line,
 .dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame .recharts-cartesian-grid line {
   stroke: var(--chart-axis-line);

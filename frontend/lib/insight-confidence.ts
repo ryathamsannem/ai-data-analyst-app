@@ -38,6 +38,8 @@ export type UnifiedConfidenceSignals = {
   forecastCanForecast?: boolean | null;
   analysisKind?: string | null;
   chartTypeInternal?: string | null;
+  dimensionRedirectHandled?: boolean;
+  requestedDimensionMissing?: boolean;
 };
 
 export type InsightConfidenceResult = {
@@ -95,6 +97,13 @@ function groupPoints(cp: number, n: number): { pts: number; reason?: string } {
   return { pts: 3, reason: `${cp} chart group(s)` };
 }
 
+function normalizeConfidenceChartType(ct: string): string {
+  const c = ct.trim().toLowerCase().replace(/-/g, "_");
+  if (c === "horizontalbar" || c === "horizontal_bar") return "bar_horizontal";
+  if (c === "verticalbar") return "bar";
+  return c || "bar";
+}
+
 function mappingPoints(map: ConfidenceLevel): { pts: number; reason?: string } {
   if (map === "high") return { pts: 14, reason: "Column mapping is high confidence" };
   if (map === "medium") return { pts: 8, reason: "Column mapping is medium confidence" };
@@ -142,9 +151,19 @@ export function calculateInsightConfidence(
   }
 
   const kind = (signals.analysisKind ?? "").trim().toLowerCase();
-  const ct = (signals.chartTypeInternal ?? "").trim().toLowerCase();
+  const ct = normalizeConfidenceChartType(signals.chartTypeInternal ?? "");
+  const dimensionRedirect = Boolean(signals.dimensionRedirectHandled);
 
-  if (signals.trendRequestUnsatisfied) {
+  if (
+    dimensionRedirect &&
+    signals.trendRequestUnsatisfied &&
+    (kind === "ranking" || kind === "aggregation" || kind === "compare")
+  ) {
+    score -= 6;
+    reasons.push(
+      "Time bucket from the question is unavailable; ranking uses the next valid breakdown"
+    );
+  } else if (signals.trendRequestUnsatisfied) {
     score -= 32;
     reasons.push("Trend question without time-series support");
   }
@@ -207,13 +226,31 @@ export function calculateInsightConfidence(
     reasons.push("Categorical chart fits aggregation intent");
   }
 
-  if (signals.alignmentRepaired) {
-    score -= 10;
-    reasons.push("Chart/text alignment was repaired");
-  }
-  if (signals.partialVisualizationWarning) {
-    score -= 12;
-    reasons.push("Partial visualization warning");
+  if (dimensionRedirect) {
+    score += 18;
+    reasons.push(
+      "Requested breakdown is unavailable in the dataset; closest valid ranking is shown with explanation"
+    );
+    if (signals.requestedDimensionMissing) score += 4;
+    if (signals.partialVisualizationWarning) {
+      score -= 4;
+      reasons.push(
+        "Closest alternative breakdown shown (requested dimension unavailable)"
+      );
+    }
+    if (signals.alignmentRepaired) {
+      score -= 3;
+      reasons.push("Chart adjusted to match available columns");
+    }
+  } else {
+    if (signals.alignmentRepaired) {
+      score -= 10;
+      reasons.push("Chart/text alignment was repaired");
+    }
+    if (signals.partialVisualizationWarning) {
+      score -= 12;
+      reasons.push("Partial visualization warning");
+    }
   }
 
   const apiScore = Number(signals.insightConfidenceScore);

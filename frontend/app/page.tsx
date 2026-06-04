@@ -3171,7 +3171,7 @@ function buildExecutiveVizInsights(
         key: "sc-corr",
         title: buildInsightCardTitle(measure, "correlation"),
         value: (corr > 0 ? "+" : "") + corr.toFixed(2),
-        hint: `${xMet} vs ${yMet} · Pearson r`,
+        hint: `${xMet} vs ${yMet}`,
         dotClass: nextDot(),
       });
     }
@@ -8182,6 +8182,14 @@ function HomeInner() {
             ? false
             : null,
       chartTypeInternal: alignedAnalysis.chartTypeInternal,
+      dimensionRedirectHandled: Boolean(
+        alignedAnalysis?.intent?.dimensionRedirectHandled ??
+          alignedAnalysis?.dimensionRedirectHandled
+      ),
+      requestedDimensionMissing: Boolean(
+        alignedAnalysis?.intent?.requestedDimensionMissing ??
+          alignedAnalysis?.requestedDimensionMissing
+      ),
       analysisKind:
         alignedAnalysis.chartTypeInternal === "scatter" ||
         insightVisualization?.chartType === "scatter"

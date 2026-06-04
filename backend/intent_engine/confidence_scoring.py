@@ -38,6 +38,21 @@ class InsightConfidenceInput:
     forecast_can_forecast: Optional[bool] = None
     alignment_repaired: bool = False
     partial_visualization_warning: bool = False
+    dimension_redirect_handled: bool = False
+    requested_dimension_missing: bool = False
+
+
+def normalize_confidence_chart_type(chart_type: Optional[str]) -> str:
+    """Map API / legacy chart type strings to internal names used by scoring."""
+    c = (chart_type or "").strip().lower().replace("-", "_")
+    aliases = {
+        "horizontalbar": "bar_horizontal",
+        "horizontal_bar": "bar_horizontal",
+        "verticalbar": "bar",
+        "linechart": "line",
+        "areachart": "area",
+    }
+    return aliases.get(c, c or "bar")
 
 
 def _band_from_score(score: float) -> str:
@@ -118,12 +133,12 @@ def _ranking_alignment_points(inp: InsightConfidenceInput) -> Tuple[float, List[
     cp = max(0, int(inp.chart_point_count))
     if n <= 0 or n >= 100 or cp < 2 or cp > 12:
         return 0.0, []
-    ct = (inp.chart_type or "").strip().lower().replace("-", "_")
+    ct = normalize_confidence_chart_type(inp.chart_type)
     if ct not in ("bar", "bar_horizontal", ""):
         return 0.0, []
     return (
         14.0,
-        "Ranking question with resolved metric and breakdown columns",
+        ["Ranking question with resolved metric and breakdown columns"],
     )
 
 
@@ -131,9 +146,18 @@ def _chart_suitability_points(inp: InsightConfidenceInput) -> Tuple[float, List[
     pts = 0.0
     reasons: List[str] = []
     kind = (inp.analysis_kind or "").strip().lower()
-    ct = (inp.chart_type or "").strip().lower()
+    ct = normalize_confidence_chart_type(inp.chart_type)
 
-    if inp.trend_request_unsatisfied:
+    if (
+        inp.dimension_redirect_handled
+        and inp.trend_request_unsatisfied
+        and kind in ("ranking", "aggregation", "compare")
+    ):
+        pts -= 6.0
+        reasons.append(
+            "Time bucket from the question is unavailable; ranking uses the next valid breakdown"
+        )
+    elif inp.trend_request_unsatisfied:
         pts -= 32.0
         reasons.append("Trend question but time-series chart is not supported")
     if inp.growth_request_unsatisfied:
@@ -333,9 +357,31 @@ def _compose_insight_confidence_rationale(
     return f"{primary} ({len(reasons)} evidence factors)."
 
 
+def _dimension_redirect_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
+    if not inp.dimension_redirect_handled:
+        return 0.0, []
+    pts = 18.0
+    reasons = [
+        "Requested breakdown is unavailable in the dataset; closest valid ranking is shown with explanation"
+    ]
+    if inp.requested_dimension_missing:
+        pts += 4.0
+    return pts, reasons
+
+
 def _inference_quality_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
     pts = 0.0
     reasons: List[str] = []
+    if inp.dimension_redirect_handled:
+        if inp.partial_visualization_warning:
+            pts -= 4.0
+            reasons.append(
+                "Closest alternative breakdown shown (requested dimension unavailable)"
+            )
+        if inp.alignment_repaired:
+            pts -= 3.0
+            reasons.append("Chart adjusted to match available columns")
+        return pts, reasons
     if inp.alignment_repaired:
         pts -= 10.0
         reasons.append("Chart/text alignment was repaired")
@@ -377,6 +423,10 @@ def calculate_insight_confidence(
     score += r_pts
     reasons.extend(r_reasons)
 
+    r_dr_pts, r_dr_reasons = _dimension_redirect_points(inp)
+    score += r_dr_pts
+    reasons.extend(r_dr_reasons)
+
     for block in (
         _metric_quality_points,
         _chart_suitability_points,
@@ -405,14 +455,23 @@ def calculate_insight_confidence(
         "analysisRowCount": max(0, int(inp.row_count)),
         "chartSeriesPointCount": max(0, int(inp.chart_point_count)),
         "smallSampleCohort": inp.row_count > 0 and inp.row_count < 100,
-        "cautiousNarrativeRequired": band == "low"
+        "cautiousNarrativeRequired": (
+            band == "low"
+            and not inp.dimension_redirect_handled
+        )
         or inp.forecast_projection_low
+        or (
+            inp.trend_request_unsatisfied
+            and not inp.dimension_redirect_handled
+        )
         or inp.growth_request_unsatisfied
-        or inp.trend_request_unsatisfied
         or inp.decline_request_unsatisfied
         or inp.multi_metric_request_unsatisfied
         or (inp.mapping_confidence or "").lower() == "low"
-        or (inp.relationship_scatter and int(inp.relationship_sample_size or 0) < MIN_PEARSON_SAMPLE),
+        or (
+            inp.relationship_scatter
+            and int(inp.relationship_sample_size or 0) < MIN_PEARSON_SAMPLE
+        ),
         "mappingConfidenceLevel": (inp.mapping_confidence or "").strip().lower() or None,
         "evidenceSummaryLine": _compose_evidence_summary_line(
             score, band, reasons, inp
@@ -445,6 +504,8 @@ def compute_insight_confidence_meta(
     intent_structured: bool = False,
     alignment_repaired: bool = False,
     partial_visualization_warning: bool = False,
+    dimension_redirect_handled: bool = False,
+    requested_dimension_missing: bool = False,
 ) -> Dict[str, Any]:
     """Backward-compatible wrapper around calculate_insight_confidence."""
     return calculate_insight_confidence(
@@ -468,5 +529,7 @@ def compute_insight_confidence_meta(
             forecast_can_forecast=forecast_can_forecast,
             alignment_repaired=alignment_repaired,
             partial_visualization_warning=partial_visualization_warning,
+            dimension_redirect_handled=dimension_redirect_handled,
+            requested_dimension_missing=requested_dimension_missing,
         )
     )
