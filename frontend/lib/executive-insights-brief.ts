@@ -105,9 +105,20 @@ export function buildNumberedExecutiveBrief(args: {
 
   const bullets: string[] = [];
 
-  bullets.push(
-    `${topLabel} generates the highest ${met} at ${topVal}.`
-  );
+  const total = sorted.reduce((a, r) => a + r.value, 0);
+  const sharePct =
+    total > 1e-9 ? (100 * top.value) / total : null;
+
+  if (sharePct != null && sharePct >= 28) {
+    const shareDisp = formatPctForNarrative(sharePct);
+    bullets.push(
+      `${topLabel} contributes ${shareDisp} of ${met} and dominates performance.`
+    );
+  } else {
+    bullets.push(
+      `${topLabel} generates the highest ${met} at ${topVal}.`
+    );
+  }
 
   if (pct != null && sorted.length > 1) {
     const pctDisp = formatPctForNarrative(pct);

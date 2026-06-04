@@ -2,6 +2,11 @@
  * Unsupported growth analysis mode — growth intent without time-series evidence.
  */
 
+import {
+  pluralizeFollowUpDimension,
+  resolveFollowUpDimensionPhrase,
+} from "@/lib/ai-follow-up-suggestions";
+
 export type UnsupportedGrowthAnalysis = {
   active: boolean;
   periodsAvailable: number;
@@ -192,25 +197,23 @@ export function buildUnsupportedGrowthExecutiveCards(
 }
 
 export function buildUnsupportedGrowthFollowUpChips(
-  categoryAxisLabel: string
+  categoryAxisLabel: string,
+  opts?: {
+    categoryColumn?: string | null;
+    categoryColumnDisplay?: string | null;
+  }
 ): string[] {
-  const dim = categoryAxisLabel.trim().toLowerCase();
-  const entity =
-    /\bregion\b/.test(dim)
-      ? "region"
-      : /\bproduct\b/.test(dim)
-        ? "product"
-        : /\bdepartment\b/.test(dim)
-          ? "department"
-          : /\bchannel\b/.test(dim)
-            ? "channel"
-            : "category";
-  const plural = entity.endsWith("s") ? entity : `${entity}s`;
+  const dim = resolveFollowUpDimensionPhrase(
+    categoryAxisLabel,
+    opts?.categoryColumn,
+    opts?.categoryColumnDisplay
+  );
+  const plural = pluralizeFollowUpDimension(dim);
   return [
-    `Do multiple dates exist for each ${entity}?`,
-    `Show revenue trend by ${entity} over time`,
+    `Do multiple dates exist for each ${dim}?`,
+    `Show revenue trend by ${dim} over time`,
     `Compare ${plural} month over month`,
-    `Which ${entity} has highest total revenue?`,
+    `Which ${dim} has highest total revenue?`,
   ];
 }
 

@@ -1,0 +1,14 @@
+order_date,region,product,revenue,profit,orders
+2024-01-15,East,Widget A,12000,2400,40
+2024-01-20,West,Widget B,9000,1800,30
+2024-02-10,East,Widget C,15000,3000,50
+2024-02-14,North,Widget A,11000,2200,35
+2024-03-05,South,Widget B,8000,1600,28
+2024-03-12,West,Widget C,13000,2600,45
+2024-03-18,East,Widget B,14000,2800,48
+2024-04-01,North,Widget C,10000,2000,32
+2024-04-22,South,Widget A,7500,1500,25
+2024-05-03,West,Widget A,12500,2500,42
+2024-05-17,East,Widget A,16000,3200,55
+2024-06-08,South,Widget C,8500,1700,30
+2024-06-20,North,Widget B,9500,1900,33

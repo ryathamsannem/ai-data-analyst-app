@@ -32,7 +32,26 @@ import {
 import {
   alternateNumericMetricLabels,
   buildAiFollowUpQuestionChips,
+  filterAlternateMetricLabels,
+  filterMeaningfulFollowUpChips,
+  isInvalidMetricCompareChip,
+  isLowQualityFollowUpChip,
+  buildProfitMarginFollowUpChips,
 } from "@/lib/ai-follow-up-suggestions";
+import {
+  buildRankedCategoryExecutiveCards,
+  parseRankedExecutiveInsights,
+  rankedInsightsToExecutiveCards,
+  type ExecutiveInsightAxisContext,
+} from "@/lib/executive-insight-ranking";
+import {
+  buildInsightCardTitle,
+  buildInsightDimensionCardTitle,
+  isQuestionLikeLabel,
+  resolveExecutiveDimensionLabel,
+  resolveExecutiveMeasureLabel,
+  type ResolveExecutiveMeasureArgs,
+} from "@/lib/insight-card-titles";
 import {
   balanceHorizontalOuterMargins,
   balanceVerticalOuterMargins,
@@ -87,6 +106,13 @@ import {
   chartsTabVizHeaderZone,
   chartsTabVizKicker,
 } from "@/lib/charts-tab-ui";
+import {
+  logAnalysisIntentToConsole,
+  parseAnalysisIntent,
+  SHOW_INTENT_DEBUG,
+  type AnalysisIntentPayload,
+} from "@/lib/analysis-intent-debug";
+import { IntentEngineDebugPanel } from "@/app/components/intent-engine-debug-panel";
 import { ChartsTabChartReason } from "@/app/components/home/charts-tab-chart-reason";
 import { ChartsTabPlotTransition } from "@/app/components/home/charts-tab-plot-transition";
 import { generateChartReason } from "@/lib/generate-chart-reason";
@@ -438,6 +464,48 @@ import {
   resolveUnsupportedGrowthMode,
   type UnsupportedGrowthAnalysis,
 } from "@/lib/unsupported-growth-analysis";
+import {
+  buildUnsupportedDeclineExecutiveCards,
+  buildUnsupportedDeclineFollowUpChips,
+  parseUnsupportedDeclineAnalysis,
+  prependUnsupportedDeclineLead,
+  resolveUnsupportedDeclineMode,
+  type UnsupportedDeclineAnalysis,
+} from "@/lib/unsupported-decline-analysis";
+import {
+  buildUnsupportedTrendExecutiveCards,
+  buildUnsupportedTrendFollowUpChips,
+  parseUnsupportedTrendAnalysis,
+  prependUnsupportedTrendLead,
+  resolveUnsupportedTrendMode,
+  type UnsupportedTrendAnalysis,
+} from "@/lib/unsupported-trend-analysis";
+import {
+  buildRelationshipExecutiveCards,
+  parseRelationshipInsights,
+} from "@/lib/relationship-visualization";
+import {
+  buildRelationshipScatterDisplayTitle,
+  isSyntheticScatterPointLabel,
+  sanitizeRelationshipUserFacingText,
+  titleCaseRelationshipPhrase,
+} from "@/lib/relationship-scatter-labels";
+import { buildRelationshipScatterFollowUpChips } from "@/lib/ai-follow-up-suggestions";
+import {
+  buildUnsupportedMultiMetricExecutiveCards,
+  buildUnsupportedMultiMetricFollowUpChips,
+  buildUnsupportedMultiMetricParsedSections,
+  parseUnsupportedMultiMetricAnalysis,
+  resolveUnsupportedMultiMetricMode,
+  type UnsupportedMultiMetricAnalysis,
+} from "@/lib/unsupported-multi-metric-analysis";
+import {
+  buildProfitMarginAnswerLead,
+  buildProfitMarginExecutiveInsights,
+  prependProfitMarginLead,
+  resolveProfitMarginMode,
+  type ProfitMarginMode,
+} from "@/lib/derived-profit-margin";
 import { dashboardChartKeyFromTitle } from "@/contexts/chart-session-context";
 import {
   buildTrendAxisPresentation,
@@ -539,6 +607,18 @@ function inferChartAxesFromContext(
 ): ChartAxes {
   const titleClean = title.replace(/\s+/g, " ").trim();
 
+  const geoOutlier = titleClean.match(
+    /^(?:geographic\s+)?outliers?\s*[—\-–]\s*(.+?)\s+by\s+(.+)$/i
+  );
+  if (geoOutlier) {
+    const valuePolished = polishMetricDisplay(geoOutlier[1].trim());
+    return {
+      valueAxis: valuePolished,
+      categoryAxis: geoOutlier[2].trim(),
+      valueAxisCompact: compactAxisLabelFromFullPhrase(valuePolished),
+    };
+  }
+
   const byMatch = titleClean.match(/^(.+?)\s+by\s+(.+)$/i);
   if (byMatch) {
     const valuePolished = polishMetricDisplay(byMatch[1].trim());
@@ -600,6 +680,14 @@ function inferChartAxesFromContext(
       valueAxis: va,
       categoryAxis: "Category",
       valueAxisCompact: compactAxisLabelFromFullPhrase(va),
+    };
+  }
+
+  if (isQuestionLikeLabel(titleClean)) {
+    return {
+      categoryAxis: "Category",
+      valueAxis: "Value",
+      valueAxisCompact: "Value",
     };
   }
 
@@ -1715,29 +1803,8 @@ function buildChartAxisPresentationBundle(args: {
     vizClean?.scatterXLabel?.trim() &&
     vizClean?.scatterYLabel?.trim()
   ) {
-    let xLabel = vizClean.scatterXLabel.trim();
-    let yLabel = vizClean.scatterYLabel.trim();
-    if (args.preferAnalysisForCategory && args.analysis) {
-      const cDisp = args.analysis.categoryColumnDisplay?.trim();
-      const cCol = args.analysis.categoryColumn?.trim();
-      const mDisp = args.analysis.metricColumnDisplay?.trim();
-      const mCol = args.analysis.metricColumn?.trim();
-      if (cDisp || cCol) xLabel = cDisp || humanizeColumnName(cCol!);
-      if (mDisp || mCol) {
-        yLabel = mDisp
-          ? polishMetricDisplay(mDisp)
-          : buildAxisLabelFromAggColumn(
-              String(
-                args.analysis.aggregationKey ??
-                  args.analysis.aggregation ??
-                  ""
-              )
-                .trim()
-                .toLowerCase() || "sum",
-              mCol!
-            );
-      }
-    }
+    const xLabel = polishMetricDisplay(vizClean.scatterXLabel.trim());
+    const yLabel = polishMetricDisplay(vizClean.scatterYLabel.trim());
     const axes: ChartAxes = {
       categoryAxis: xLabel,
       valueAxis: yLabel,
@@ -2480,11 +2547,22 @@ type StoredVisualization = {
   /** Click-to-filter metadata from `/ask` (category / stacked dimensions). */
   interaction?: VizInteractionPayload;
   /** Pandas-computed scatter notes (API `visualization.relationshipInsights`). */
+  relationshipMeasureLabel?: string | null;
+  rankedExecutiveInsights?: unknown;
   relationshipInsights?: {
     pearson?: number | null;
     direction?: string | null;
+    correlationLabel?: string | null;
     summaryLine?: string | null;
-    strongestOutliers?: { point: string; note: string }[];
+    measureLabel?: string | null;
+    strongestOutliers?: {
+      point?: string;
+      note?: string;
+      x?: number | null;
+      y?: number | null;
+      xLabel?: string;
+      yLabel?: string;
+    }[];
   } | null;
 };
 
@@ -2702,16 +2780,10 @@ function hydrateVisualizationFromApi(raw: unknown): {
     const sl = String(
       (riFromApi as { summaryLine?: string }).summaryLine ?? ""
     ).trim();
-    const oo = (riFromApi as { strongestOutliers?: { point: string }[] })
-      .strongestOutliers;
-    const outlierHint =
-      Array.isArray(oo) && oo.length
-        ? `Notable points: ${oo
-            .map((x) => String(x.point ?? "").trim())
-            .filter(Boolean)
-            .slice(0, 2)
-            .join(", ")}`
-        : "";
+    const oo = (riFromApi as {
+      strongestOutliers?: { point?: string; x?: number; y?: number }[];
+    }).strongestOutliers;
+    const outlierHint = "";
     if (sl) {
       mergedSubtitle = `${mergedSubtitle}\n${sl}`;
     }
@@ -2752,12 +2824,21 @@ function hydrateVisualizationFromApi(raw: unknown): {
     multiSeries: null,
     partialVisualizationWarning: partialVizWarn,
     interaction: parseChartInteraction(o.interaction),
+    relationshipMeasureLabel:
+      typeof o.relationshipMeasureLabel === "string" &&
+      o.relationshipMeasureLabel.trim()
+        ? o.relationshipMeasureLabel.trim()
+        : typeof (riFromApi as { measureLabel?: string } | null)?.measureLabel ===
+              "string"
+          ? String((riFromApi as { measureLabel?: string }).measureLabel).trim()
+          : undefined,
     relationshipInsights:
       ctNorm === "scatter" &&
       riFromApi &&
       typeof riFromApi === "object"
         ? (riFromApi as StoredVisualization["relationshipInsights"])
         : null,
+    rankedExecutiveInsights: o.rankedExecutiveInsights,
   };
 
   return { persisted, chartData, chartKind };
@@ -2839,36 +2920,39 @@ function buildGroupedMetricExecutiveInsights(
   });
 
   if (keys.length >= 2) {
-    const [ka, kb] = keys;
-    const spendKey =
-      /spend|cost|budget|expense/i.test(kb) ||
-      (!/spend|cost|budget|expense/i.test(ka) && /revenue|sales/i.test(ka))
-        ? kb
-        : ka;
-    const revKey = spendKey === ka ? kb : ka;
-
-    let iBest = 0;
-    let bestRoas = -1;
-    chartData.forEach((r, i) => {
-      const spend = Number(r[spendKey]);
-      const rev = Number(r[revKey]);
-      if (Number.isFinite(spend) && spend > 1e-9 && Number.isFinite(rev)) {
-        const roas = rev / spend;
-        if (roas > bestRoas) {
-          bestRoas = roas;
-          iBest = i;
+    const spendKey = keys.find((k) =>
+      /spend|cost|budget|expense|ad[_\s-]?spend|cogs|opex/i.test(k)
+    );
+    const revKey = keys.find((k) => /revenue|sales|income/i.test(k));
+    if (
+      spendKey &&
+      revKey &&
+      spendKey !== revKey &&
+      /spend|cost|budget|expense|ad/i.test(spendKey)
+    ) {
+      let iBest = 0;
+      let bestRoas = -1;
+      chartData.forEach((r, i) => {
+        const spend = Number(r[spendKey]);
+        const rev = Number(r[revKey]);
+        if (Number.isFinite(spend) && spend > 1e-9 && Number.isFinite(rev)) {
+          const roas = rev / spend;
+          if (roas > bestRoas) {
+            bestRoas = roas;
+            iBest = i;
+          }
         }
-      }
-    });
-    if (bestRoas >= 0) {
-      const best = chartData[iBest]!;
-      out.push({
-        key: "dual-roas",
-        title: "Best ROAS",
-        value: shortenLabel(String(best.name ?? ""), 44),
-        hint: formatDerivedInsightNumber(bestRoas, "ratio_1", false),
-        dotClass: "bg-violet-500",
       });
+      if (bestRoas >= 0) {
+        const best = chartData[iBest]!;
+        out.push({
+          key: "dual-roas",
+          title: "Best ROAS",
+          value: shortenLabel(String(best.name ?? ""), 44),
+          hint: formatDerivedInsightNumber(bestRoas, "ratio_1", false),
+          dotClass: "bg-violet-500",
+        });
+      }
     }
   }
 
@@ -2965,17 +3049,42 @@ type ExecutiveVizInsightCard = {
   dotClass: string;
 };
 
+function executiveMeasureContextFromAligned(
+  axes: ChartAxes,
+  analysis: AlignedAnalysisContext | null | undefined,
+  chartTitle: string,
+  columns: string[]
+): ResolveExecutiveMeasureArgs {
+  return {
+    metricColumnDisplay: analysis?.metricColumnDisplay ?? null,
+    metricColumn: analysis?.metricColumn ?? null,
+    valueAxis: axes.valueAxis,
+    valueAxisCompact: axes.valueAxisCompact,
+    chartTitle,
+    datasetColumns: columns,
+  };
+}
+
 /** Compact insight tiles derived only from persisted visualization primitives. */
 function buildExecutiveVizInsights(
   rows: VizInsightDatum[],
   kind: ChartKind,
   axes: ChartAxes,
-  roundingHint?: string
+  roundingHint?: string,
+  measureCtx?: ResolveExecutiveMeasureArgs,
+  dimensionCtx?: {
+    categoryColumnDisplay?: string | null;
+    categoryColumn?: string | null;
+  }
 ): ExecutiveVizInsightCard[] {
   if (!rows.length) return [];
 
-  const dim = shortenLabel(axes.categoryAxis, 42) || "Category";
-  const met = shortenLabel(axes.valueAxis, 42) || "Value";
+  const measure = resolveExecutiveMeasureLabel(measureCtx ?? { valueAxis: axes.valueAxis });
+  const dim = resolveExecutiveDimensionLabel({
+    categoryColumnDisplay: dimensionCtx?.categoryColumnDisplay,
+    categoryColumn: dimensionCtx?.categoryColumn,
+    categoryAxis: axes.categoryAxis,
+  });
 
   const stripes = [
     "bg-emerald-500",
@@ -3002,18 +3111,21 @@ function buildExecutiveVizInsights(
       if (r.value > rows[iMaxY].value) iMaxY = i;
     });
     const maxY = rows[iMaxY];
-    const xMet = shortenLabel(axes.categoryAxis, 36) || "X";
-    const yMet = shortenLabel(axes.valueAxis, 36) || "Y";
+    const xMet = resolveExecutiveMeasureLabel({
+      ...measureCtx,
+      valueAxis: axes.categoryAxis,
+    });
+    const yMet = measure;
     const outScatter: ExecutiveVizInsightCard[] = [
       {
         key: "sc-n",
-        title: "Points",
+        title: buildInsightCardTitle(measure, "points"),
         value: String(rows.length),
         dotClass: nextDot(),
       },
       {
         key: "sc-peak-y",
-        title: `Highest ${yMet}`,
+        title: buildInsightCardTitle(yMet, "peak"),
         value: maxY.formatted,
         hint: shortenLabel(maxY.label, 40),
         dotClass: nextDot(),
@@ -3022,9 +3134,9 @@ function buildExecutiveVizInsights(
     if (corr != null && Number.isFinite(corr)) {
       outScatter.push({
         key: "sc-corr",
-        title: `${xMet} vs ${yMet}`,
+        title: buildInsightCardTitle(measure, "correlation"),
         value: (corr > 0 ? "+" : "") + corr.toFixed(2),
-        hint: "Pearson correlation",
+        hint: `${xMet} vs ${yMet} · Pearson r`,
         dotClass: nextDot(),
       });
     }
@@ -3045,27 +3157,27 @@ function buildExecutiveVizInsights(
     const out: ExecutiveVizInsightCard[] = [
       {
         key: "pie-max-label",
-        title: `Largest segment`,
+        title: buildInsightCardTitle(measure, "largest"),
         value: shortenLabel(maxR.label, 40),
         hint: maxR.formatted.trim() ? maxR.formatted : undefined,
         dotClass: nextDot(),
       },
       {
         key: "pie-min-label",
-        title: `Smallest segment`,
+        title: buildInsightCardTitle(measure, "smallest"),
         value: shortenLabel(minR.label, 40),
         hint: minR.formatted.trim() ? minR.formatted : undefined,
         dotClass: nextDot(),
       },
       {
         key: "pie-gap",
-        title: `Share gap`,
+        title: buildInsightCardTitle(measure, "gap"),
         value: `${formatDerivedInsightNumber(gap, roundingHint ?? "pct_1", true)} (spread)`,
         dotClass: nextDot(),
       },
       {
         key: "pie-n",
-        title: `Segments`,
+        title: buildInsightCardTitle(measure, "segments"),
         value: String(sliceCount),
         dotClass: nextDot(),
       },
@@ -3079,20 +3191,23 @@ function buildExecutiveVizInsights(
     return [
       {
         key: "single-dim",
-        title: `${dim}`,
+        title: buildInsightDimensionCardTitle(dim, "leader"),
         value: shortenLabel(r.label, 44),
         hint: r.formatted,
         dotClass: nextDot(),
       },
       {
         key: "single-met",
-        title: met,
+        title: buildInsightCardTitle(measure, "peak"),
         value: r.formatted,
         dotClass: nextDot(),
       },
       {
         key: "single-points",
-        title: kind === "line" || kind === "area" ? "Time steps" : "Data points",
+        title:
+          kind === "line" || kind === "area"
+            ? buildInsightCardTitle(measure, "trend")
+            : buildInsightCardTitle(measure, "points"),
         value: "1",
         dotClass: nextDot(),
       },
@@ -3114,7 +3229,7 @@ function buildExecutiveVizInsights(
   const out: ExecutiveVizInsightCard[] = [
     {
       key: "cmp-max-cat",
-      title: `Highest ${dim}`,
+      title: buildInsightDimensionCardTitle(dim, "highest"),
       value: shortenLabel(maxR.label, 44),
       hint:
         kind === "line" || kind === "area"
@@ -3124,19 +3239,16 @@ function buildExecutiveVizInsights(
     },
     {
       key: "cmp-peak-met",
-      title: met.trim()
-        ? kind === "line" || kind === "area"
-          ? `Peak ${met.trim()}`
-          : `Highest ${met.trim()}`
-        : kind === "line" || kind === "area"
-          ? "Peak value"
-          : "Highest value",
+      title: buildInsightCardTitle(
+        measure,
+        kind === "line" || kind === "area" ? "peak" : "highest"
+      ),
       value: maxR.formatted,
       dotClass: nextDot(),
     },
     {
       key: "cmp-min-cat",
-      title: `Lowest ${dim}`,
+      title: buildInsightDimensionCardTitle(dim, "lowest"),
       value: shortenLabel(minR.label, 44),
       hint: `Low: ${minR.formatted}`,
       dotClass: nextDot(),
@@ -3156,7 +3268,7 @@ function buildExecutiveVizInsights(
         : "";
     out.push({
       key: "cmp-gap",
-      title: `${met.trim()} Gap`,
+      title: buildInsightCardTitle(measure, "gap"),
       value: `${spreadDisp}${pctSuffix}`,
       hint: `${shortenLabel(maxR.label, 24)} ↔ ${shortenLabel(minR.label, 24)}`,
       dotClass: nextDot(),
@@ -3165,10 +3277,7 @@ function buildExecutiveVizInsights(
 
   out.push({
     key: "cmp-avg",
-    title:
-      /\b(mean|average)\b/i.test(met) || /\bavg\b/i.test(met.toLowerCase())
-        ? `${met}`
-        : `Average ${met}`,
+    title: buildInsightCardTitle(measure, "average"),
     value: formatDerivedInsightNumber(avg, roundingHint, false),
     dotClass: nextDot(),
   });
@@ -3177,13 +3286,22 @@ function buildExecutiveVizInsights(
     key: "cmp-points",
     title:
       kind === "line" || kind === "area"
-        ? `Time steps`
-        : kind === "bar_horizontal"
-          ? `Ranked categories`
-          : `Data points`,
+        ? buildInsightCardTitle(measure, "trend")
+        : buildInsightCardTitle(measure, "points"),
     value: String(rows.length),
     dotClass: nextDot(),
   });
+
+  if (rows.length > 1 && kind !== "line" && kind !== "area") {
+    const axisCtx: ExecutiveInsightAxisContext = {
+      categoryAxis: axes.categoryAxis,
+      valueAxis: axes.valueAxis,
+      measure: measureCtx,
+      dimension: dimensionCtx,
+    };
+    const rankedCards = buildRankedCategoryExecutiveCards(rows, axisCtx, kind);
+    if (rankedCards.length >= 2) return rankedCards;
+  }
 
   return out;
 }
@@ -3375,11 +3493,57 @@ type AlignedAnalysisContext = {
   cautiousNarrativeRequired?: boolean;
   mappingConfidenceLevel?: string | null;
   insightConfidenceRationale: string;
+  insightConfidenceReasons?: string[];
   evidenceSummaryLine: string;
   dualMetricCompare?: boolean;
   unsupportedGrowthAnalysis?: UnsupportedGrowthAnalysis | null;
   growthRequestUnsatisfied?: boolean;
+  unsupportedTrendAnalysis?: UnsupportedTrendAnalysis | null;
+  trendRequestUnsatisfied?: boolean;
+  unsupportedDeclineAnalysis?: UnsupportedDeclineAnalysis | null;
+  declineRequestUnsatisfied?: boolean;
+  unsupportedMultiMetricAnalysis?: UnsupportedMultiMetricAnalysis | null;
+  multiMetricRequestUnsatisfied?: boolean;
+  derivedProfitMargin?: boolean;
+  profitMarginUnavailable?: boolean;
+  /** Phase 2 debug — parsed from `analysis.intent`; does not drive UI behavior. */
+  analysisIntent?: AnalysisIntentPayload | null;
+  forecastGuardrails?: {
+    canForecast?: boolean;
+    outputLabel?: string;
+    directionalProjectionLabel?: string | null;
+    forecastConfidenceLevel?: string;
+    reliabilityMessage?: string | null;
+    disclaimer?: string | null;
+    lacksTimeSeries?: boolean;
+  } | null;
 };
+
+function parseForecastGuardrails(
+  raw: unknown
+): AlignedAnalysisContext["forecastGuardrails"] {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (!o.active) return null;
+  return {
+    canForecast: typeof o.canForecast === "boolean" ? o.canForecast : undefined,
+    outputLabel:
+      typeof o.outputLabel === "string" ? o.outputLabel.trim() : undefined,
+    directionalProjectionLabel:
+      typeof o.directionalProjectionLabel === "string"
+        ? o.directionalProjectionLabel.trim()
+        : null,
+    forecastConfidenceLevel:
+      typeof o.forecastConfidenceLevel === "string"
+        ? o.forecastConfidenceLevel.trim()
+        : undefined,
+    reliabilityMessage:
+      typeof o.reliabilityMessage === "string" ? o.reliabilityMessage.trim() : null,
+    disclaimer:
+      typeof o.disclaimer === "string" ? o.disclaimer.trim() : null,
+    lacksTimeSeries: Boolean(o.lacksTimeSeries),
+  };
+}
 
 function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
   if (!raw || typeof raw !== "object") return null;
@@ -3522,6 +3686,11 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
       typeof o.insightConfidenceRationale === "string"
         ? o.insightConfidenceRationale.trim()
         : "",
+    insightConfidenceReasons: Array.isArray(o.insightConfidenceReasons)
+      ? (o.insightConfidenceReasons as unknown[])
+          .map((x) => String(x).trim())
+          .filter(Boolean)
+      : undefined,
     evidenceSummaryLine:
       typeof o.evidenceSummaryLine === "string"
         ? o.evidenceSummaryLine.trim()
@@ -3536,6 +3705,37 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
           typeof o.unsupportedGrowthAnalysis === "object" &&
           (o.unsupportedGrowthAnalysis as Record<string, unknown>).active)
     ),
+    unsupportedTrendAnalysis: parseUnsupportedTrendAnalysis(
+      o.unsupportedTrendAnalysis
+    ),
+    trendRequestUnsatisfied: Boolean(
+      o.trendRequestUnsatisfied ||
+        (o.unsupportedTrendAnalysis &&
+          typeof o.unsupportedTrendAnalysis === "object" &&
+          (o.unsupportedTrendAnalysis as Record<string, unknown>).active)
+    ),
+    unsupportedDeclineAnalysis: parseUnsupportedDeclineAnalysis(
+      o.unsupportedDeclineAnalysis
+    ),
+    declineRequestUnsatisfied: Boolean(
+      o.declineRequestUnsatisfied ||
+        (o.unsupportedDeclineAnalysis &&
+          typeof o.unsupportedDeclineAnalysis === "object" &&
+          (o.unsupportedDeclineAnalysis as Record<string, unknown>).active)
+    ),
+    unsupportedMultiMetricAnalysis: parseUnsupportedMultiMetricAnalysis(
+      o.unsupportedMultiMetricAnalysis
+    ),
+    multiMetricRequestUnsatisfied: Boolean(
+      o.multiMetricRequestUnsatisfied ||
+        (o.unsupportedMultiMetricAnalysis &&
+          typeof o.unsupportedMultiMetricAnalysis === "object" &&
+          (o.unsupportedMultiMetricAnalysis as Record<string, unknown>).active)
+    ),
+    derivedProfitMargin: Boolean(o.derivedProfitMargin),
+    profitMarginUnavailable: Boolean(o.profitMarginUnavailable),
+    analysisIntent: parseAnalysisIntent(o.intent),
+    forecastGuardrails: parseForecastGuardrails(o.forecastGuardrails),
   };
 }
 
@@ -7452,6 +7652,7 @@ function HomeInner() {
 
       const hydrated = hydrateVisualizationFromApi(data.visualization);
       const parsedAnalysis = parseAlignedAnalysis(data.analysis);
+      logAnalysisIntentToConsole(qRaw, parsedAnalysis?.analysisIntent);
       const followUpDetected = Boolean(meta?.followUpDetected);
       const preservePinnedChart = Boolean(
         askPinnedSnapshot &&
@@ -7647,7 +7848,13 @@ function HomeInner() {
           analysisContextKey: chartAnalysisContextKey,
           semanticIntentKey,
         });
-      } else if (!preservePinnedChart) {
+      } else if (
+        !preservePinnedChart &&
+        !parsedAnalysis?.unsupportedTrendAnalysis?.active &&
+        !parsedAnalysis?.unsupportedGrowthAnalysis?.active &&
+        !parsedAnalysis?.unsupportedDeclineAnalysis?.active &&
+        !parsedAnalysis?.unsupportedMultiMetricAnalysis?.active
+      ) {
         pushedInsightChartId = pushAIChart({
           title: "No dedicated visualization for this answer",
           subtitle:
@@ -7818,6 +8025,9 @@ function HomeInner() {
   const insightUnifiedConfidence = useMemo(() => {
     if (!alignedAnalysis) return null;
     const prov = insightVisualization?.provenance;
+    const ri = insightVisualization?.relationshipInsights as
+      | { sampleSize?: number; qualitativeOnly?: boolean }
+      | undefined;
     return computeUnifiedInsightConfidence({
       mappingConfidence,
       mappingConfirmedByUser,
@@ -7825,6 +8035,7 @@ function HomeInner() {
       insightConfidenceLevel: alignedAnalysis.insightConfidenceLevel,
       insightConfidenceScore: alignedAnalysis.insightConfidenceScore,
       insightConfidenceRationale: alignedAnalysis.insightConfidenceRationale,
+      insightConfidenceReasons: alignedAnalysis.insightConfidenceReasons,
       analysisRowCount: alignedAnalysis.analysisRowCount,
       chartSeriesPointCount: alignedAnalysis.chartSeriesPointCount,
       alignmentRepaired: alignedAnalysis.alignmentRepaired,
@@ -7839,11 +8050,48 @@ function HomeInner() {
         alignedAnalysis?.growthRequestUnsatisfied ||
           alignedAnalysis?.unsupportedGrowthAnalysis?.active
       ),
+      trendRequestUnsatisfied: Boolean(
+        alignedAnalysis?.trendRequestUnsatisfied ||
+          alignedAnalysis?.unsupportedTrendAnalysis?.active
+      ),
+      declineRequestUnsatisfied: Boolean(
+        alignedAnalysis?.declineRequestUnsatisfied ||
+          alignedAnalysis?.unsupportedDeclineAnalysis?.active
+      ),
+      multiMetricRequestUnsatisfied: Boolean(
+        alignedAnalysis?.multiMetricRequestUnsatisfied ||
+          alignedAnalysis?.unsupportedMultiMetricAnalysis?.active
+      ),
+      relationshipScatter: alignedAnalysis.chartTypeInternal === "scatter",
+      relationshipSampleSize: (() => {
+        const n = Number(ri?.sampleSize);
+        return Number.isFinite(n) ? n : null;
+      })(),
+      correlationQualitativeOnly: Boolean(ri?.qualitativeOnly),
+      forecastProjectionLow:
+        alignedAnalysis.forecastGuardrails?.canForecast === false ||
+        Boolean(alignedAnalysis.forecastGuardrails?.lacksTimeSeries),
+      forecastCanForecast:
+        alignedAnalysis.forecastGuardrails?.canForecast === true
+          ? true
+          : alignedAnalysis.forecastGuardrails?.canForecast === false
+            ? false
+            : null,
+      chartTypeInternal: alignedAnalysis.chartTypeInternal,
+      analysisKind:
+        alignedAnalysis.chartTypeInternal === "scatter"
+          ? "relationship_scatter"
+          : alignedAnalysis.dualMetricCompare
+            ? "compare"
+            : isTrendMode(insightSnapshot?.contract)
+              ? "trend"
+              : "aggregation",
     });
   }, [
     alignedAnalysis,
     insightSnapshot?.contract,
     insightVisualization?.provenance,
+    insightVisualization?.relationshipInsights,
     mappingConfidence,
     mappingConfirmedByUser,
   ]);
@@ -7893,6 +8141,7 @@ function HomeInner() {
         alignedAnalysis?.growthRequestUnsatisfied ||
           alignedAnalysis?.unsupportedGrowthAnalysis?.active
       ),
+      forecastGuardrails: alignedAnalysis.forecastGuardrails ?? null,
     });
   }, [
     alignedAnalysis,
@@ -8287,7 +8536,82 @@ function HomeInner() {
     alignedAnalysis,
   ]);
 
+  const insightUnsupportedDecline = useMemo(
+    () =>
+      resolveUnsupportedDeclineMode({
+        question: lastAskedQuestion,
+        unsupportedDeclineAnalysis: alignedAnalysis?.unsupportedDeclineAnalysis,
+        analysisIntent: alignedAnalysis?.analysisIntent,
+      }),
+    [
+      lastAskedQuestion,
+      alignedAnalysis?.unsupportedDeclineAnalysis,
+      alignedAnalysis?.declineRequestUnsatisfied,
+      alignedAnalysis?.analysisIntent,
+    ]
+  );
+
+  const insightUnsupportedMultiMetric = useMemo(
+    () =>
+      resolveUnsupportedMultiMetricMode({
+        question: lastAskedQuestion,
+        unsupportedMultiMetricAnalysis:
+          alignedAnalysis?.unsupportedMultiMetricAnalysis,
+        analysisIntent: alignedAnalysis?.analysisIntent,
+      }),
+    [
+      lastAskedQuestion,
+      alignedAnalysis?.unsupportedMultiMetricAnalysis,
+      alignedAnalysis?.multiMetricRequestUnsatisfied,
+      alignedAnalysis?.analysisIntent,
+    ]
+  );
+
+  const insightUnsupportedTrend = useMemo(
+    () =>
+      resolveUnsupportedTrendMode({
+        question: lastAskedQuestion,
+        unsupportedTrendAnalysis: alignedAnalysis?.unsupportedTrendAnalysis,
+        trendRequestUnsatisfied: alignedAnalysis?.trendRequestUnsatisfied,
+      }),
+    [
+      lastAskedQuestion,
+      alignedAnalysis?.unsupportedTrendAnalysis,
+      alignedAnalysis?.trendRequestUnsatisfied,
+    ]
+  );
+
+  const insightUnsupportedGrowth = useMemo(
+    () =>
+      resolveUnsupportedGrowthMode({
+        question: lastAskedQuestion,
+        unsupportedGrowthAnalysis: alignedAnalysis?.unsupportedGrowthAnalysis,
+        isTrendChart: isTrendMode(insightSnapshot?.contract),
+        chartTypeInternal:
+          alignedAnalysis?.chartTypeInternal ?? insightSnapshot?.chartKind ?? "",
+        timeSeriesAnalysis:
+          insightVisualization?.provenance?.timeSeriesAnalysis ?? null,
+        partialVisualizationWarning: alignedAnalysis?.partialVisualizationWarning,
+        answerText: answer,
+      }),
+    [
+      lastAskedQuestion,
+      alignedAnalysis?.unsupportedGrowthAnalysis,
+      alignedAnalysis?.partialVisualizationWarning,
+      alignedAnalysis?.chartTypeInternal,
+      alignedAnalysis?.growthRequestUnsatisfied,
+      insightSnapshot?.contract,
+      insightSnapshot?.chartKind,
+      insightVisualization?.provenance?.timeSeriesAnalysis,
+      answer,
+    ]
+  );
+
   const insightHasRenderableVisualization = useMemo(() => {
+    if (insightUnsupportedTrend) return false;
+    if (insightUnsupportedGrowth) return false;
+    if (insightUnsupportedDecline) return false;
+    if (insightUnsupportedMultiMetric) return false;
     if (!insightSnapshot) return false;
     if (!insightChartMatchesCurrentQuestion) return false;
     if (
@@ -8304,7 +8628,14 @@ function HomeInner() {
     const title = insightSnapshot.title.trim();
     if (title.startsWith("No dedicated visualization")) return false;
     return true;
-  }, [insightSnapshot, insightChartMatchesCurrentQuestion]);
+  }, [
+    insightSnapshot,
+    insightChartMatchesCurrentQuestion,
+    insightUnsupportedTrend,
+    insightUnsupportedGrowth,
+    insightUnsupportedDecline,
+    insightUnsupportedMultiMetric,
+  ]);
 
   const insightExportNeedsAiNarrative =
     insightSnapshot?.source === "ai";
@@ -8620,19 +8951,31 @@ function HomeInner() {
     }
     if (!visualization?.labels?.length) return [];
     const pairs = zipStoredVisualizationPairs(visualization);
+    const measureCtx = executiveMeasureContextFromAligned(
+      chartAxisLabels,
+      alignedAnalysis,
+      visualization.title ?? "",
+      columns
+    );
     return buildExecutiveVizInsights(
       pairs,
       sessionRenderedChartKind,
       chartAxisLabels,
-      visualization.roundingHint
+      visualization.roundingHint,
+      measureCtx,
+      {
+        categoryColumnDisplay: alignedAnalysis?.categoryColumnDisplay,
+        categoryColumn: alignedAnalysis?.categoryColumn,
+      }
     );
   }, [
     activeSnapshot,
     sortedChartData,
     visualization,
     sessionRenderedChartKind,
-    chartAxisLabels.categoryAxis,
-    chartAxisLabels.valueAxis,
+    chartAxisLabels,
+    alignedAnalysis,
+    columns,
   ]);
 
   const chartRoutingRecommendation = useMemo(
@@ -8777,6 +9120,23 @@ function HomeInner() {
 
   const insightDisplayChartTitle = useMemo(() => {
     if (
+      insightPresentationChartKind === "scatter" &&
+      insightVisualization?.scatterXLabel?.trim() &&
+      insightVisualization?.scatterYLabel?.trim()
+    ) {
+      return buildRelationshipScatterDisplayTitle({
+        question: lastAskedQuestion,
+        xLabel: insightVisualization.scatterXLabel.trim(),
+        yLabel: insightVisualization.scatterYLabel.trim(),
+        persistedTitle: insightChartTitle,
+        relationshipMeasureLabel:
+          insightVisualization.relationshipMeasureLabel ??
+          parseRelationshipInsights(insightVisualization.relationshipInsights)
+            ?.measureLabel ??
+          null,
+      });
+    }
+    if (
       insightVisualization?.multiSeries?.layout === "grouped_bar" &&
       insightVisualization.title?.trim()
     ) {
@@ -8811,6 +9171,7 @@ function HomeInner() {
       preferAnalysisForCategory: insightSnapshot?.source !== "auto_dashboard",
     }).chartTitle;
   }, [
+    lastAskedQuestion,
     insightSnapshot?.source,
     insightSnapshot?.contract?.title,
     insightSnapshot?.contract,
@@ -8923,39 +9284,90 @@ function HomeInner() {
   const insightChartAxisLabels = insightChartAxisPresentation.axes;
   const insightChartSemanticHeader = insightChartAxisPresentation.header;
 
-  const insightUnsupportedGrowth = useMemo(
-    () =>
-      resolveUnsupportedGrowthMode({
-        question: lastAskedQuestion,
-        unsupportedGrowthAnalysis: alignedAnalysis?.unsupportedGrowthAnalysis,
-        isTrendChart: isTrendMode(insightSnapshot?.contract),
-        chartTypeInternal:
-          alignedAnalysis?.chartTypeInternal ?? insightSnapshot?.chartKind ?? "",
-        timeSeriesAnalysis:
-          insightVisualization?.provenance?.timeSeriesAnalysis ?? null,
-        partialVisualizationWarning: alignedAnalysis?.partialVisualizationWarning,
-        answerText: answer,
-      }),
-    [
-      lastAskedQuestion,
-      alignedAnalysis?.unsupportedGrowthAnalysis,
-      alignedAnalysis?.partialVisualizationWarning,
-      alignedAnalysis?.chartTypeInternal,
-      alignedAnalysis?.growthRequestUnsatisfied,
-      insightSnapshot?.contract,
-      insightSnapshot?.chartKind,
-      insightVisualization?.provenance?.timeSeriesAnalysis,
-      answer,
-    ]
-  );
+  const insightChartMeasureLabel = useMemo(() => {
+    if (insightPresentationChartKind !== "scatter") {
+      return insightChartAxisLabels.valueAxis;
+    }
+    const rel =
+      insightVisualization?.relationshipMeasureLabel?.trim() ||
+      parseRelationshipInsights(insightVisualization?.relationshipInsights)
+        ?.measureLabel?.trim();
+    if (rel) return rel;
+    if (insightChartSemanticHeader.mode === "scatter") {
+      return `${insightChartSemanticHeader.xLabel} vs ${insightChartSemanticHeader.yLabel}`;
+    }
+    return `${insightChartAxisLabels.categoryAxis} vs ${insightChartAxisLabels.valueAxis}`;
+  }, [
+    insightPresentationChartKind,
+    insightChartAxisLabels.valueAxis,
+    insightChartAxisLabels.categoryAxis,
+    insightVisualization?.relationshipMeasureLabel,
+    insightVisualization?.relationshipInsights,
+    insightChartSemanticHeader,
+  ]);
+
+  const insightProfitMargin = useMemo((): ProfitMarginMode | null => {
+    return resolveProfitMarginMode({
+      question: lastAskedQuestion,
+      derivedProfitMargin: alignedAnalysis?.derivedProfitMargin,
+      profitMarginUnavailable: alignedAnalysis?.profitMarginUnavailable,
+      metricColumnDisplay: alignedAnalysis?.metricColumnDisplay,
+      valueAxisLabel: insightChartAxisLabels.valueAxis,
+    });
+  }, [
+    lastAskedQuestion,
+    alignedAnalysis?.derivedProfitMargin,
+    alignedAnalysis?.profitMarginUnavailable,
+    alignedAnalysis?.metricColumnDisplay,
+    insightChartAxisLabels.valueAxis,
+  ]);
 
   const insightFollowUpChips = useMemo(() => {
     if (!hasValidAIAnswer || !answer.trim() || !lastAskedQuestion.trim()) {
       return [];
     }
+    const followUpDimOpts = {
+      categoryColumn: alignedAnalysis?.categoryColumn ?? null,
+      categoryColumnDisplay: alignedAnalysis?.categoryColumnDisplay ?? null,
+    };
     if (insightUnsupportedGrowth) {
       return buildUnsupportedGrowthFollowUpChips(
-        insightChartAxisLabels.categoryAxis
+        insightChartAxisLabels.categoryAxis,
+        followUpDimOpts
+      );
+    }
+    if (insightUnsupportedTrend) {
+      return buildUnsupportedTrendFollowUpChips(
+        insightChartAxisLabels.categoryAxis,
+        followUpDimOpts
+      );
+    }
+    if (insightUnsupportedDecline) {
+      return buildUnsupportedDeclineFollowUpChips(
+        insightChartAxisLabels.categoryAxis,
+        followUpDimOpts
+      );
+    }
+    if (insightUnsupportedMultiMetric) {
+      return buildUnsupportedMultiMetricFollowUpChips(
+        insightUnsupportedMultiMetric,
+        {
+          categoryAxisLabel: insightChartAxisLabels.categoryAxis,
+          ...followUpDimOpts,
+        }
+      );
+    }
+    if (insightProfitMargin?.active) {
+      const top = [...sortedInsightChartData]
+        .filter((r) => Number.isFinite(Number(r.value)))
+        .sort((a, b) => Number(b.value) - Number(a.value))[0];
+      return buildProfitMarginFollowUpChips(
+        insightChartAxisLabels.categoryAxis,
+        top?.name ?? null,
+        {
+          categoryColumn: alignedAnalysis?.categoryColumn ?? null,
+          categoryColumnDisplay: alignedAnalysis?.categoryColumnDisplay ?? null,
+        }
       );
     }
     const metricCol = alignedAnalysis?.metricColumn ?? null;
@@ -8977,6 +9389,11 @@ function HomeInner() {
         alignedAnalysis?.dualMetricCompare
     );
 
+    const followUpQuality = {
+      chartTitle: insightDisplayChartTitle,
+      valueAxisLabel: axisMet,
+    };
+
     const base = buildAiFollowUpQuestionChips({
       lastQuestion: lastAskedQuestion,
       chartTitle: insightDisplayChartTitle,
@@ -8990,6 +9407,18 @@ function HomeInner() {
       })),
       alternateMetricLabels: alts,
       dualMetricCompare,
+      dualMetricSeriesKeys: insightVisualization?.multiSeries?.seriesKeys,
+      columns,
+      metricColumn: alignedAnalysis?.metricColumn ?? null,
+      metricColumnDisplay: alignedAnalysis?.metricColumnDisplay ?? null,
+      categoryColumn: alignedAnalysis?.categoryColumn ?? null,
+      categoryColumnDisplay: alignedAnalysis?.categoryColumnDisplay ?? null,
+      breakdownDimensionLabel:
+        insightPresentationChartKind === "scatter"
+          ? alignedAnalysis?.categoryColumnDisplay ??
+            insightSemanticContext?.dimensionLabel ??
+            null
+          : null,
     });
 
     const seeds = dualMetricCompare
@@ -9004,11 +9433,12 @@ function HomeInner() {
       !dualMetricCompare &&
       insightSemanticContext &&
       !isTrendMode(insightSnapshot?.contract) &&
+      insightPresentationChartKind !== "scatter" &&
       sortedInsightChartData.length >= 1
     ) {
       const ranked = [...sortedInsightChartData].sort((a, b) => b.value - a.value);
       const top = ranked[0];
-      if (top?.name) {
+      if (top?.name && !isSyntheticScatterPointLabel(top.name)) {
         seeds.unshift(
           buildFollowupQuestion("rank_high", insightSemanticContext, {
             categoryName: top.name,
@@ -9023,16 +9453,22 @@ function HomeInner() {
       const t = c.replace(/\s+/g, " ").trim();
       const k = t.toLowerCase();
       if (t.length < 6 || seen.has(k)) continue;
+      if (isInvalidMetricCompareChip(t, axisMet)) continue;
+      if (isLowQualityFollowUpChip(t, followUpQuality)) continue;
       seen.add(k);
       merged.push(t);
       if (merged.length >= 5) break;
     }
-    return merged;
+    return filterMeaningfulFollowUpChips(merged, axisMet, followUpQuality).slice(0, 5);
   }, [
     hasValidAIAnswer,
     answer,
     lastAskedQuestion,
     insightUnsupportedGrowth,
+    insightUnsupportedTrend,
+    insightUnsupportedDecline,
+    insightUnsupportedMultiMetric,
+    insightProfitMargin,
     insightChartAxisLabels.categoryAxis,
     alignedAnalysis?.metricColumn,
     columns,
@@ -9151,6 +9587,40 @@ function HomeInner() {
     if (insightUnsupportedGrowth) {
       return buildUnsupportedGrowthExecutiveCards(insightUnsupportedGrowth);
     }
+    if (insightUnsupportedTrend) {
+      return buildUnsupportedTrendExecutiveCards(insightUnsupportedTrend);
+    }
+    if (insightUnsupportedDecline) {
+      return buildUnsupportedDeclineExecutiveCards(insightUnsupportedDecline);
+    }
+    if (insightUnsupportedMultiMetric) {
+      return buildUnsupportedMultiMetricExecutiveCards(insightUnsupportedMultiMetric);
+    }
+    if (insightVisualization?.relationshipInsights) {
+      const ri = parseRelationshipInsights(
+        insightVisualization.relationshipInsights
+      );
+      if (ri) {
+        return buildRelationshipExecutiveCards(
+          ri,
+          insightChartAxisLabels.categoryAxis,
+          insightChartAxisLabels.valueAxis,
+          insightVisualization.labels?.length ?? 0
+        );
+      }
+    }
+    if (insightProfitMargin?.active && insightVisualization?.labels?.length) {
+      const pairs = zipStoredVisualizationPairs(insightVisualization);
+      if (pairs.length >= 1) {
+        return buildProfitMarginExecutiveInsights(
+          pairs.map((r) => ({
+            label: r.label,
+            value: r.value,
+            formatted: r.formatted,
+          }))
+        );
+      }
+    }
     if (isTrendMode(insightSnapshot?.contract) && sortedInsightChartData.length) {
       const c = insightSnapshot!.contract!;
       return buildTrendExecutiveVizInsights(
@@ -9175,23 +9645,62 @@ function HomeInner() {
       );
     }
     if (!insightVisualization?.labels?.length) return [];
+    const measureCtx = executiveMeasureContextFromAligned(
+      insightChartAxisLabels,
+      alignedAnalysis,
+      insightDisplayChartTitle,
+      columns
+    );
+    const dimCtx = {
+      categoryColumnDisplay: alignedAnalysis?.categoryColumnDisplay,
+      categoryColumn: alignedAnalysis?.categoryColumn,
+    };
+    const rankedApi = parseRankedExecutiveInsights(
+      insightVisualization.rankedExecutiveInsights
+    );
+    if (rankedApi.length) {
+      return rankedInsightsToExecutiveCards(
+        rankedApi,
+        measureCtx,
+        resolveExecutiveDimensionLabel(dimCtx)
+      );
+    }
     const pairs = zipStoredVisualizationPairs(insightVisualization);
     return buildExecutiveVizInsights(
       pairs,
       insightRenderedChartKind,
       insightChartAxisLabels,
-      insightVisualization.roundingHint
+      insightVisualization.roundingHint,
+      measureCtx,
+      dimCtx
     );
   }, [
     insightUnsupportedGrowth,
+    insightUnsupportedTrend,
+    insightUnsupportedDecline,
+    insightUnsupportedMultiMetric,
+    insightProfitMargin,
     insightSnapshot,
     sortedInsightChartData,
     insightVisualization,
     insightRenderedChartKind,
-    insightChartAxisLabels.categoryAxis,
-    insightChartAxisLabels.valueAxis,
+    insightChartAxisLabels,
+    insightDisplayChartTitle,
+    alignedAnalysis,
+    columns,
     insightChartData,
   ]);
+
+  const insightProfitMarginLead = useMemo(() => {
+    if (!insightProfitMargin?.active) return null;
+    const rows = sortedInsightChartData
+      .filter((r) => Number.isFinite(Number(r.value)))
+      .map((r) => ({
+        label: String(r.name ?? "").trim() || "—",
+        value: Number(r.value),
+      }));
+    return buildProfitMarginAnswerLead(rows);
+  }, [insightProfitMargin, sortedInsightChartData]);
 
   const insightChartRoutingRecommendation = useMemo(
     () =>
@@ -9233,12 +9742,16 @@ function HomeInner() {
         routing: insightChartRoutingRecommendation,
         answerSummary: answer.trim().slice(0, 400) || undefined,
         semanticContext: insightSemanticContext,
+        relationshipInsights: insightVisualization?.relationshipInsights ?? null,
+        scatterXValues: insightVisualization?.scatterXValues,
       }),
     [
       lastAskedQuestion,
       columns,
       sortedInsightChartData,
       insightVisualization?.chartType,
+      insightVisualization?.relationshipInsights,
+      insightVisualization?.scatterXValues,
       insightVisualization?.multiSeries,
       insightVisualization?.multiSeries?.layout,
       insightRenderedChartKind,
@@ -9374,6 +9887,13 @@ function HomeInner() {
   ]);
 
   const insightNumberedExecutiveBrief = useMemo((): string | null => {
+    if (insightUnsupportedMultiMetric) return null;
+    if (
+      insightPresentationChartKind === "scatter" &&
+      insightVisualization?.relationshipInsights
+    ) {
+      return null;
+    }
     if (
       isTrendMode(insightSnapshot?.contract) ||
       !isExecutiveTakeawaysQuestion(lastAskedQuestion)
@@ -9413,29 +9933,43 @@ function HomeInner() {
     insightChartAxisLabels.categoryAxis,
     insightChartAxisLabels.valueAxis,
     insightPresentationChartKind,
+    insightUnsupportedMultiMetric,
+    insightVisualization?.relationshipInsights,
   ]);
 
   const parsedInsightAnswer = useMemo(() => {
+    if (insightUnsupportedMultiMetric) {
+      return buildUnsupportedMultiMetricParsedSections(insightUnsupportedMultiMetric);
+    }
     const parsed = parseAnswerIntoSections(
       answer,
       alignedAnalysis?.insightSummary ?? undefined
     );
     const c = insightSnapshot?.contract;
     const tone = insightNarrativeTone;
+    const isRelScatter =
+      insightPresentationChartKind === "scatter" &&
+      Boolean(insightVisualization?.relationshipInsights);
     const softenDetail = (t?: string) => {
       const raw = t?.trim() ? t.trim() : "";
       if (!raw) return t;
-      const sanitized = isTrendMode(c)
+      let sanitized = isTrendMode(c)
         ? sanitizeNarrativeForTrendContract(raw, c)
         : raw;
+      if (isRelScatter) {
+        sanitized = sanitizeRelationshipUserFacingText(sanitized);
+      }
       return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone));
     };
     const softenSummary = (t?: string) => {
       const raw = t?.trim() ? t.trim() : "";
       if (!raw) return t;
-      const sanitized = isTrendMode(c)
+      let sanitized = isTrendMode(c)
         ? sanitizeNarrativeForTrendContract(raw, c)
         : raw;
+      if (isRelScatter) {
+        sanitized = sanitizeRelationshipUserFacingText(sanitized);
+      }
       return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone), {
         dualMetricRoasLead,
       });
@@ -9444,12 +9978,30 @@ function HomeInner() {
       insightNumberedExecutiveBrief ??
       softenSummary(parsed.summary) ??
       "";
-    const summaryText = insightUnsupportedGrowth
-      ? prependUnsupportedGrowthLead(
-          summaryTextRaw,
-          insightUnsupportedGrowth.leadSentence
-        )
-      : summaryTextRaw;
+    let summaryText = summaryTextRaw;
+    if (insightUnsupportedGrowth) {
+      summaryText = prependUnsupportedGrowthLead(
+        summaryTextRaw,
+        insightUnsupportedGrowth.leadSentence
+      );
+    } else if (insightUnsupportedTrend) {
+      summaryText = prependUnsupportedTrendLead(
+        summaryTextRaw,
+        insightUnsupportedTrend.leadSentence
+      );
+    } else if (insightUnsupportedDecline) {
+      summaryText = prependUnsupportedDeclineLead(
+        summaryTextRaw,
+        insightUnsupportedDecline.leadSentence
+      );
+    } else if (insightProfitMarginLead) {
+      summaryText = prependProfitMarginLead(summaryTextRaw, insightProfitMarginLead);
+    } else if (insightProfitMargin?.unavailable && insightProfitMargin.leadSentence) {
+      summaryText = prependProfitMarginLead(
+        summaryTextRaw,
+        insightProfitMargin.leadSentence
+      );
+    }
     return {
       ...parsed,
       summary: summaryText,
@@ -9467,9 +10019,17 @@ function HomeInner() {
     dualMetricRoasLead,
     insightNumberedExecutiveBrief,
     insightUnsupportedGrowth,
+    insightUnsupportedTrend,
+    insightUnsupportedDecline,
+    insightUnsupportedMultiMetric,
+    insightProfitMarginLead,
+    insightProfitMargin,
   ]);
 
   const insightExecutiveBrief = useMemo(() => {
+    if (insightUnsupportedMultiMetric) {
+      return insightUnsupportedMultiMetric.leadSentence;
+    }
     if (insightNumberedExecutiveBrief) {
       return polishInsightNarrativeText(insightNumberedExecutiveBrief);
     }
@@ -9495,6 +10055,21 @@ function HomeInner() {
         insightUnsupportedGrowth.leadSentence
       );
     }
+    if (insightUnsupportedTrend) {
+      return prependUnsupportedTrendLead(
+        brief,
+        insightUnsupportedTrend.leadSentence
+      );
+    }
+    if (insightUnsupportedDecline) {
+      return prependUnsupportedDeclineLead(
+        brief,
+        insightUnsupportedDecline.leadSentence
+      );
+    }
+    if (insightProfitMarginLead) {
+      return prependProfitMarginLead(brief, insightProfitMarginLead);
+    }
     return brief;
   }, [
     insightNumberedExecutiveBrief,
@@ -9503,6 +10078,10 @@ function HomeInner() {
     insightNarrativeTone,
     dualMetricRoasLead,
     insightUnsupportedGrowth,
+    insightUnsupportedTrend,
+    insightUnsupportedDecline,
+    insightUnsupportedMultiMetric,
+    insightProfitMarginLead,
   ]);
 
   const exportExecutiveInsightsPreview = useMemo(() => {
@@ -11774,8 +12353,12 @@ function HomeInner() {
                 ) : null}
 
                 {hasValidAIAnswer &&
-                insightVisualization &&
-                insightExecutiveVizInsights.length > 0 ? (
+                insightExecutiveVizInsights.length > 0 &&
+                (insightVisualization ||
+                  insightUnsupportedGrowth ||
+                  insightUnsupportedTrend ||
+                  insightUnsupportedDecline ||
+                  insightUnsupportedMultiMetric) ? (
                   <AiExecutiveInsightsPanel
                     cards={insightExecutiveVizInsights}
                     narrativeBrief={insightExecutiveBrief}
@@ -12000,7 +12583,8 @@ function HomeInner() {
                 insightChartRoutingRecommendation ||
                 insightVisualization?.contextUsed ||
                 insightVisualization?.partialVisualizationWarning ||
-                alignedAnalysis?.conversationFollowUp) ? (
+                alignedAnalysis?.conversationFollowUp ||
+                SHOW_INTENT_DEBUG) ? (
                   <div className={`${aiInsightsProvenanceShell} ai-insights-provenance`}>
                     <button
                       type="button"
@@ -12190,7 +12774,9 @@ function HomeInner() {
                           </div>
                           <div className="flex flex-col gap-0.5 min-w-0">
                             <dt className={aiInsightsProvenanceMetaLabel}>
-                              Metric
+                              {insightPresentationChartKind === "scatter"
+                                ? "Y metric"
+                                : "Metric"}
                             </dt>
                             <dd className={`${aiInsightsProvenanceMetaValue} truncate`}>
                               {formatProvenanceColumn(
@@ -12217,9 +12803,31 @@ function HomeInner() {
                               Aggregation
                             </dt>
                             <dd className={`${aiInsightsProvenanceMetaValue} capitalize`}>
-                              {insightVisualization.provenance.aggregation}
+                              {insightPresentationChartKind === "scatter"
+                                ? "Relationship"
+                                : insightVisualization.provenance.aggregation}
                             </dd>
                           </div>
+                          {insightPresentationChartKind === "scatter" &&
+                          (insightVisualization.relationshipMeasureLabel ||
+                            parseRelationshipInsights(
+                              insightVisualization.relationshipInsights
+                            )?.measureLabel) ? (
+                            <div className="flex flex-col gap-0.5 sm:col-span-2 min-w-0">
+                              <dt className={aiInsightsProvenanceMetaLabel}>
+                                Relationship
+                              </dt>
+                              <dd className={`${aiInsightsProvenanceMetaValue} truncate`}>
+                                {titleCaseRelationshipPhrase(
+                                  insightVisualization.relationshipMeasureLabel?.trim() ||
+                                    parseRelationshipInsights(
+                                      insightVisualization.relationshipInsights
+                                    )?.measureLabel ||
+                                    insightChartMeasureLabel
+                                )}
+                              </dd>
+                            </div>
+                          ) : null}
                           <div className="flex flex-col gap-0.5 min-w-0">
                             <dt className={aiInsightsProvenanceMetaLabel}>
                               Rows analyzed
@@ -12402,6 +13010,15 @@ function HomeInner() {
                             {insightVisualization.provenance.notes}
                           </p>
                         ) : null}
+                        <IntentEngineDebugPanel
+                          intent={alignedAnalysis?.analysisIntent}
+                          routingConfidence={
+                            insightVisualization?.provenance?.confidence ??
+                            (insightUnifiedConfidence
+                              ? `Insight ${insightUnifiedConfidence.level} (${insightUnifiedConfidence.score}/100)`
+                              : null)
+                          }
+                        />
                       </div>
                     ) : null}
                   </div>
@@ -12420,7 +13037,7 @@ function HomeInner() {
                       >
                         <ChartContextSummary
                           renderedKind={insightRenderedChartKind}
-                          metricLabel={insightChartAxisLabels.valueAxis}
+                          metricLabel={insightChartMeasureLabel}
                           semanticHeader={insightChartSemanticHeader}
                           badgeCompact={insightChartMetadataBadgeCompact}
                           leadInsight={insightChartInsightBadge ?? undefined}
@@ -12454,6 +13071,24 @@ function HomeInner() {
                         </div>
                       ) : null}
                     </div>
+                  </div>
+                ) : hasValidAIAnswer && insightUnsupportedTrend ? (
+                  <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
+                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
+                      {insightUnsupportedTrend.title}
+                    </p>
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
+                        Reason:
+                      </span>{" "}
+                      {insightUnsupportedTrend.reason}
+                    </p>
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
+                        Required:
+                      </span>{" "}
+                      {insightUnsupportedTrend.requiredAction}
+                    </p>
                   </div>
                 ) : hasValidAIAnswer && !insightHasRenderableVisualization ? (
                   <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">

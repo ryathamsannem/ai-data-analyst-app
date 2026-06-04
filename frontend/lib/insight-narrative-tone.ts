@@ -16,6 +16,16 @@ export type NarrativeToneInputs = {
   isTrendChart?: boolean;
   /** Growth question without multi-period evidence. */
   isUnsupportedGrowth?: boolean;
+  /** Forecast asked but cohort has no date/time column — projection disclaimer. */
+  forecastGuardrails?: {
+    canForecast?: boolean;
+    outputLabel?: string;
+    directionalProjectionLabel?: string | null;
+    forecastConfidenceLevel?: string;
+    reliabilityMessage?: string | null;
+    disclaimer?: string | null;
+    lacksTimeSeries?: boolean;
+  } | null;
 };
 
 function normLevel(raw: string | null | undefined): ConfidenceLevel {
@@ -90,6 +100,21 @@ export function narrativeToneDisclaimer(
 
   if (tone === "balanced" && rows > 0 && rows < 500) {
     return "Moderate sample size — qualify strong claims and confirm field mapping when stakes are high.";
+  }
+
+  const fg = inputs.forecastGuardrails;
+  if (fg && (fg.canForecast === false || fg.lacksTimeSeries)) {
+    const label = fg.outputLabel?.trim() || "Scenario estimate";
+    const dir = fg.directionalProjectionLabel?.trim();
+    const conf = fg.forecastConfidenceLevel?.trim() || "Low";
+    const rel =
+      fg.reliabilityMessage?.trim() ||
+      "Reliable forecasting cannot be performed because historical time-series data is unavailable.";
+    const parts = [`${label}`, dir ? `(${dir})` : null, `Forecast Confidence: ${conf}.`, rel];
+    if (fg.disclaimer?.trim()) {
+      parts.push(fg.disclaimer.trim());
+    }
+    return parts.filter(Boolean).join(" ");
   }
 
   return null;

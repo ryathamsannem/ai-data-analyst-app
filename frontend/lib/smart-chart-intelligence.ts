@@ -1,4 +1,9 @@
 import type { ChartKind, ChartRow } from "@/app/chart-types";
+import {
+  humanizeColumnName,
+  polishMetricDisplay,
+  stripIntentNoiseFromMetricLabel,
+} from "@/lib/analytics-metadata";
 import type { SemanticMetricContext } from "@/lib/semantic-metric-engine";
 import { buildChartNarrative } from "@/lib/ux-narrative";
 
@@ -187,18 +192,61 @@ export function apiChartStringToKind(api: string): ChartKind {
   return "bar";
 }
 
-function presentationLabel(kind: ChartKind, histogramStyle: boolean): string {
-  if (kind === "histogram")
-    return "Histogram (value distribution)";
+const GENERIC_DIMENSION_LABEL_RE =
+  /^(category|categories|dimension|group|groups|breakdown|segment)$/i;
+
+/** Lowercase dimension noun for chart view labels (zone, product, department, …). */
+export function dimensionPhraseForComparison(
+  categoryAxis: string,
+  semanticContext?: SemanticMetricContext | null,
+  groupedCategoryTitle?: string | null
+): string {
+  const polish = (raw: string): string => {
+    let t = raw.trim();
+    if (!t || t.length > 52 || /\?/.test(t)) return "";
+    if (/^(is|are|what|which|how)\b/i.test(t)) return "";
+    t = polishMetricDisplay(stripIntentNoiseFromMetricLabel(t));
+    t = humanizeColumnName(t.replace(/_/g, " ")).trim();
+    t = t.replace(/\s+name$/i, "").trim();
+    return t.toLowerCase() || "";
+  };
+
+  const candidates = [
+    semanticContext?.dimensionLabel?.trim(),
+    groupedCategoryTitle?.trim(),
+    categoryAxis.trim(),
+  ].filter(Boolean) as string[];
+
+  for (const raw of candidates) {
+    const phrase = polish(raw);
+    if (phrase && !GENERIC_DIMENSION_LABEL_RE.test(phrase)) {
+      return phrase;
+    }
+  }
+  for (const raw of candidates) {
+    const phrase = polish(raw);
+    if (phrase) return phrase;
+  }
+  return "category";
+}
+
+function presentationLabel(
+  kind: ChartKind,
+  histogramStyle: boolean,
+  dimensionPhrase: string
+): string {
+  const dim = dimensionPhrase.trim().toLowerCase() || "category";
+  if (kind === "histogram") return `Histogram (${dim} distribution)`;
   if (histogramStyle && kind === "bar")
-    return "Vertical bar chart (distribution view)";
-  if (kind === "line") return "Line chart (trend)";
-  if (kind === "area") return "Area chart (trend)";
-  if (kind === "pie") return "Pie chart (share)";
-  if (kind === "donut") return "Donut chart (share)";
+    return `Vertical bar chart (${dim} distribution)`;
+  if (kind === "line") return `Line chart (${dim} trend)`;
+  if (kind === "area") return `Area chart (${dim} trend)`;
+  if (kind === "pie") return `Pie chart (${dim} share)`;
+  if (kind === "donut") return `Donut chart (${dim} share)`;
   if (kind === "scatter") return "Scatter plot (numeric relationship)";
-  if (kind === "bar_horizontal") return "Horizontal bar chart (ranking / long labels)";
-  return "Vertical bar chart (category comparison)";
+  if (kind === "bar_horizontal")
+    return `Horizontal bar chart (${dim} comparison)`;
+  return `Vertical bar chart (${dim} comparison)`;
 }
 
 function kindsStrictPresentationMatch(recK: ChartKind, curK: ChartKind): boolean {
@@ -223,10 +271,43 @@ function stdDev(values: number[]): number {
   return Math.sqrt(s / (n - 1));
 }
 
+export function detectScatterRelationshipAnomaly(args: {
+  rows: ChartRow[];
+  xLabel: string;
+  yLabel: string;
+  scatterX?: number[];
+  strongestOutliers?: {
+    x?: number | null;
+    y?: number | null;
+    xLabel?: string;
+    yLabel?: string;
+  }[];
+}): string | null {
+  const { rows, xLabel, yLabel, scatterX, strongestOutliers } = args;
+  if (!rows.length) return null;
+  const apiOut = strongestOutliers?.[0];
+  if (apiOut && Number.isFinite(Number(apiOut.x)) && Number.isFinite(Number(apiOut.y))) {
+    const xn = (apiOut.xLabel ?? xLabel).trim() || "X";
+    const yn = (apiOut.yLabel ?? yLabel).trim() || "Y";
+    const xv = Number(apiOut.x);
+    const yv = Number(apiOut.y);
+    const fmt = (n: number) =>
+      Math.abs(n) >= 1000
+        ? n.toLocaleString(undefined, { maximumFractionDigits: 0 })
+        : n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return `Potential outlier detected near ${xn}=${fmt(xv)}, ${yn}=${fmt(yv)}.`;
+  }
+  if (rows.length >= 3) {
+    return "One observation appears outside the normal cluster.";
+  }
+  return null;
+}
+
 export function detectNumericAnomalies(
   rows: ChartRow[],
   kind: ChartKind
 ): string | null {
+  if (kind === "scatter") return null;
   if (!rows.length || kind === "pie" || kind === "donut") return null;
   const vals = rows
     .map((r) => Number(r.value))
@@ -510,6 +591,15 @@ export function computeSmartChartIntel(params: {
   routing: ChartRoutingRec;
   answerSummary?: string;
   semanticContext?: SemanticMetricContext | null;
+  relationshipInsights?: {
+    strongestOutliers?: {
+      x?: number | null;
+      y?: number | null;
+      xLabel?: string;
+      yLabel?: string;
+    }[];
+  } | null;
+  scatterXValues?: number[];
 }): SmartChartIntel | null {
   if (!params.rows.length) {
     return null;
@@ -517,7 +607,16 @@ export function computeSmartChartIntel(params: {
 
   const currentKind = params.presentationKind || "bar";
   const histogramStyle = false;
-  const currentLabel = presentationLabel(currentKind, histogramStyle);
+  const dimensionPhrase = dimensionPhraseForComparison(
+    params.categoryAxis,
+    params.semanticContext,
+    params.groupedBarMeta?.categoryAxisTitle
+  );
+  const currentLabel = presentationLabel(
+    currentKind,
+    histogramStyle,
+    dimensionPhrase
+  );
   const groupedDual = params.multiSeriesLayout === "grouped_bar";
   const chartBlurb = blurbForRenderedChart({
     kind: currentKind,
@@ -584,6 +683,15 @@ export function computeSmartChartIntel(params: {
     suggestedLabel: currentLabel,
     alignsWithRecommendation: true,
     whyThisChart,
-    anomalyNote: detectNumericAnomalies(params.rows, currentKind),
+    anomalyNote:
+      currentKind === "scatter"
+        ? detectScatterRelationshipAnomaly({
+            rows: params.rows,
+            xLabel: params.categoryAxis,
+            yLabel: params.valueAxis,
+            scatterX: params.scatterXValues,
+            strongestOutliers: params.relationshipInsights?.strongestOutliers,
+          })
+        : detectNumericAnomalies(params.rows, currentKind),
   };
 }

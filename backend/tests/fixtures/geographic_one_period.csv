@@ -1,0 +1,9 @@
+city,state,zone,revenue,profit,customers,order_date
+Hyderabad,Telangana,South,182000,24500,310,2024-06-01
+Bengaluru,Karnataka,South,210000,30200,350,2024-06-01
+Mumbai,Maharashtra,West,260000,40100,410,2024-06-01
+Pune,Maharashtra,West,132000,19800,205,2024-06-01
+Delhi,Delhi,North,248000,32200,390,2024-06-01
+Jaipur,Rajasthan,North,90000,10500,140,2024-06-01
+Kolkata,West Bengal,East,116000,16800,190,2024-06-01
+Chennai,Tamil Nadu,South,156000,21400,250,2024-06-01

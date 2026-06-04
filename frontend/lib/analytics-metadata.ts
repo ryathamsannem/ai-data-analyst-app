@@ -168,6 +168,8 @@ export function buildMetricLabel(ctx: MetricLabelContext): string {
   if (ak === "max" || al.startsWith("max"))
     return rawPretty ? `Maximum ${rawPretty}` : "Maximum";
 
+  if (ak === "scatter" || al === "scatter") return rawPretty;
+
   const lab = (ctx.aggregationLabel ?? "").trim();
   if (lab && valueCol) return `${lab} ${rawPretty}`.trim();
   return rawPretty || lab || "Value";
