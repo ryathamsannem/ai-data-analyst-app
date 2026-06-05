@@ -47,6 +47,7 @@ _CITY_EXPLICIT_RE = re.compile(
     r"highest[- ]performing|lowest[- ]performing)\s+(?:\w+\s+){0,4}city\b|"
     r"\bcity\s+ranking\b|"
     r"\branking\s+(?:of\s+)?cities\b|"
+    r"\brank(?:ing)?\s+(?:\w+\s+){0,4}cit(?:y|ies)\b|"
     r"\b(?:top|best|highest|lowest)\s+cit(?:y|ies)\b|"
     r"\b(?:highest|lowest|best|top)\s+(?:revenue|profit|sales|performance)\s+city\b",
     re.I,

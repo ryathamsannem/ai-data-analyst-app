@@ -107,6 +107,23 @@ def _to_numeric_series(df: pd.DataFrame, col: str) -> pd.Series:
     return pd.to_numeric(df[col], errors="coerce")
 
 
+def _spearman_correlation(x: pd.Series, y: pd.Series) -> float:
+    """
+    Spearman ρ without requiring scipy (pandas ``method='spearman'`` imports scipy).
+    Equivalent to Pearson correlation on average ranks.
+    """
+    try:
+        raw = x.corr(y, method="spearman")
+        if raw == raw:
+            return float(raw)
+    except (ImportError, ModuleNotFoundError, ValueError, TypeError):
+        pass
+    rx = x.rank(method="average")
+    ry = y.rank(method="average")
+    raw = rx.corr(ry)
+    return float(raw) if raw == raw else float("nan")
+
+
 def _joint_non_null_count(df: pd.DataFrame, col_x: str, col_y: str) -> int:
     if df is None or df.empty:
         return 0
@@ -140,7 +157,7 @@ def compute_bivariate_correlations(
         return out
 
     pearson_raw = frame["_x"].corr(frame["_y"])
-    spearman_raw = frame["_x"].corr(frame["_y"], method="spearman")
+    spearman_raw = _spearman_correlation(frame["_x"], frame["_y"])
 
     pearson = float(pearson_raw) if pearson_raw == pearson_raw else float("nan")
     spearman = float(spearman_raw) if spearman_raw == spearman_raw else float("nan")
@@ -283,6 +300,196 @@ def _best_pair_by_joint_observations(
     return None
 
 
+_EXPLANATORY_SUBSTRINGS = (
+    "customer",
+    "transaction",
+    "order",
+    "quantity",
+    "unit",
+    "visit",
+    "traffic",
+    "conversion",
+    "impression",
+    "click",
+    "session",
+    "headcount",
+    "employee",
+    "footfall",
+    "basket",
+    "invoice",
+    "ticket",
+    "shipment",
+    "volume",
+    "units",
+    "growth_rate",
+    "growth rate",
+)
+
+_CO_OUTCOME_WHEN_REVENUE_QUESTION = (
+    "profit",
+    "margin",
+    "earnings",
+    "income",
+    "net income",
+)
+
+
+def _is_explanatory_numeric_column(
+    col: str,
+    *,
+    outcome_col: str,
+    question: str,
+) -> bool:
+    if not col or col == outcome_col:
+        return False
+    norm = _norm_phrase(str(col))
+    if any(sub in norm for sub in _EXPLANATORY_SUBSTRINGS):
+        return True
+    if "growth" in norm and "rate" in norm:
+        return True
+    ql = _norm_phrase(question)
+    if "growth" in ql and "growth" in norm:
+        return True
+    return False
+
+
+def resolve_driver_outcome_column(
+    question: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+) -> Optional[str]:
+    """Outcome metric named in a driver question (e.g. revenue)."""
+    if df is None or df.empty:
+        return None
+    nums = numeric_columns(df.columns.tolist(), profile)
+    if not nums:
+        return None
+    ql = _norm_phrase(question)
+    for token in ("revenue", "sales", "profit", "margin", "spend", "cost"):
+        if token not in ql:
+            continue
+        hit = find_column_for_token(
+            token, nums, numeric_only=True, profile=profile
+        )
+        if hit:
+            return str(hit)
+    for token in ("revenue", "sales", "profit"):
+        hit = find_column_for_token(
+            token, nums, numeric_only=True, profile=profile
+        )
+        if hit:
+            return str(hit)
+    return None
+
+
+def list_driver_explanatory_columns(
+    question: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    outcome_col: str,
+) -> List[str]:
+    """Numeric columns that can explain an outcome (not co-outcome totals)."""
+    if df is None or df.empty or not outcome_col:
+        return []
+    nums = numeric_columns(df.columns.tolist(), profile)
+    ql = _norm_phrase(question)
+    revenue_focus = bool(re.search(r"\b(revenue|sales)\b", ql))
+    out: List[str] = []
+    for c in nums:
+        if str(c) == str(outcome_col):
+            continue
+        cn = _norm_phrase(str(c))
+        if revenue_focus and any(tok in cn for tok in _CO_OUTCOME_WHEN_REVENUE_QUESTION):
+            continue
+        if _is_explanatory_numeric_column(str(c), outcome_col=outcome_col, question=question):
+            out.append(str(c))
+    return out
+
+
+def resolve_driver_numeric_pair(
+    question: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+) -> Optional[Tuple[str, str]]:
+    """
+    Driver/root-cause questions: (explanatory_col, outcome_col) with strongest |r|.
+    Returns None when no explanatory numeric variables exist.
+    """
+    from intent_engine.question_patterns import question_requests_driver_intent
+
+    if not question_requests_driver_intent(question):
+        return None
+    if df is None or df.empty:
+        return None
+
+    outcome = resolve_driver_outcome_column(question, df, profile)
+    if not outcome:
+        return None
+
+    explanatory = list_driver_explanatory_columns(question, df, profile, outcome)
+    if not explanatory:
+        return None
+
+    best_exp: Optional[str] = None
+    best_abs_r = -1.0
+    for exp in explanatory:
+        ins = compute_relationship_correlations(
+            df,
+            exp,
+            outcome,
+            x_label=exp,
+            y_label=outcome,
+            include_outliers=False,
+        )
+        p = ins.get("pearson")
+        if p is None:
+            continue
+        try:
+            ar = abs(float(p))
+        except (TypeError, ValueError):
+            continue
+        if ar > best_abs_r:
+            best_abs_r = ar
+            best_exp = exp
+
+    if best_exp:
+        return best_exp, outcome
+    if len(explanatory) == 1:
+        return explanatory[0], outcome
+    return None
+
+
+def build_unsupported_driver_analysis(
+    question: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Payload when a driver question has no explanatory numeric columns."""
+    outcome = resolve_driver_outcome_column(question, df, profile)
+    outcome_label = _norm_phrase(str(outcome or "revenue")).title() or "Revenue"
+    if re.search(r"\b(revenue|sales)\b", _norm_phrase(question)):
+        lead = "Revenue drivers cannot be determined from this dataset."
+    else:
+        lead = f"{outcome_label} drivers cannot be determined from this dataset."
+    nums = numeric_columns(df.columns.tolist(), profile) if df is not None else []
+    available = ", ".join(_norm_phrase(str(c)) for c in nums[:12])
+    return {
+        "active": True,
+        "reasonCode": "driver_columns_missing",
+        "leadSentence": lead,
+        "detailLines": [
+            "Driver analysis needs explanatory numeric columns (e.g. customers, "
+            "orders, transactions, quantity) — not category rankings.",
+            f"Outcome metric: {outcome_label}.",
+            f"Numeric columns available: {available or 'none'}.",
+        ],
+        "recommendedAction": (
+            "Add operational or volume fields (customers, orders, transactions, "
+            "quantity) to evaluate what drives the outcome metric."
+        ),
+    }
+
+
 def resolve_relationship_numeric_pair(
     question: str,
     df: pd.DataFrame,
@@ -296,6 +503,11 @@ def resolve_relationship_numeric_pair(
     nums = numeric_columns(df.columns.tolist(), profile)
     if len(nums) < 2:
         return None
+
+    from intent_engine.question_patterns import question_requests_driver_intent
+
+    if question_requests_driver_intent(question):
+        return resolve_driver_numeric_pair(question, df, profile)
 
     from_pat = _pair_from_between_patterns(question, nums, profile)
     if from_pat:

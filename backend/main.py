@@ -766,10 +766,16 @@ _ADDITIVE_METRIC_SUBSTRINGS = (
     "units",
     "quantity",
     "volume",
+    "customer",
+    "employee",
+    "headcount",
+    "salary",
     "margin",
     "subtotal",
     "gross",
     "net_revenue",
+    "orders",
+    "order",
 )
 
 _GEOGRAPHY_NAME_KEYWORDS = (
@@ -904,6 +910,13 @@ def _column_looks_additive_metric(col_name: Optional[str]) -> bool:
 
 def _ranking_or_leaderboard_intent(ql: str) -> bool:
     q = (ql or "").lower()
+    try:
+        from intent_engine.question_patterns import question_requests_driver_intent
+
+        if question_requests_driver_intent(q):
+            return False
+    except Exception:
+        pass
     if re.search(r"\btop\s+(?:\d+|five|ten|three|four|seven|eight)\b", q):
         return True
     if any(k in q for k in ("ranking", "rank ", "rank,", "ranked")):
@@ -948,6 +961,7 @@ def _resolve_agg_label_and_key(
     *,
     value_col: Optional[str] = None,
     incident_only: bool = False,
+    explicit_metric_resolved: bool = False,
 ) -> Tuple[str, str]:
     """Map question wording + metric column to (agg_label, agg_key) for grouped charts."""
     q = (ql or "").lower()
@@ -955,13 +969,22 @@ def _resolve_agg_label_and_key(
         return "Count", "count"
     if any(k in q for k in ["average", "avg", "mean"]):
         return "Average", "mean"
-    if (
-        "count" in q
-        or "how many" in q
-        or "number of" in q
-        or "headcount" in q
-    ):
-        return "Count", "count"
+    try:
+        from intent_engine.resolve_explicit_metric import question_requests_record_count
+
+        if question_requests_record_count(
+            q,
+            resolved_metric_col=value_col if explicit_metric_resolved else None,
+        ):
+            return "Count", "count"
+    except Exception:
+        if (
+            "count" in q
+            or "how many" in q
+            or "number of" in q
+            or "headcount" in q
+        ):
+            return "Count", "count"
     if re.search(r"\b(sum|total)\b", q) and (
         "average" not in q and "mean" not in q and "avg" not in q
     ):
@@ -5638,8 +5661,10 @@ def _build_analysis_validation_block(
         metric_ok = len(compare_metrics) >= 2 and bool(
             intent_debug.get("secondary_metric_col")
         )
-    elif intent_debug and _question_requests_roi(
-        str(intent_debug.get("normalized_question") or "")
+    elif intent_debug and (
+        intent_debug.get("explicit_metric")
+        or _question_requests_roi(str(intent_debug.get("normalized_question") or ""))
+        or _question_requests_profit_margin(str(intent_debug.get("normalized_question") or ""))
     ):
         metric_ok = _rendered_metric_matches_question(
             str(intent_debug.get("normalized_question") or ""),
@@ -5880,10 +5905,65 @@ def _infer_dimension_column_from_question(
 
     if scored:
         return max(scored, key=lambda t: t[0])[1]
+
+    try:
+        from intent_engine.geographic_scope import resolve_geographic_group_column
+
+        geo_col = resolve_geographic_group_column(question_str, df, profile)
+        if geo_col:
+            return geo_col
+    except Exception:
+        pass
+
+    rank_city = re.search(
+        r"\b(?:rank(?:ing)?|top|best|highest|lowest|leading)\s+(?:\w+\s+){0,4}cit(?:y|ies)\b",
+        ql,
+        re.I,
+    )
+    if rank_city:
+        for c in cand_dims:
+            if str(c).lower() in ("city", "cities", "metro", "location"):
+                return str(c)
+
     ranked_fb = _rank_category_dimensions(df, cand_dims, profile)
     if ranked_fb:
         return ranked_fb[0][0]
     return None
+
+
+def _pick_executive_summary_dimension(
+    df,
+    profile: Dict[str, Any],
+) -> Optional[str]:
+    """Prefer geographic or business rollup dimensions for executive-style questions."""
+    if df is None or df.empty:
+        return None
+    try:
+        from intent_engine.geographic_scope import resolve_geographic_group_column
+
+        for hint in (
+            "compare region performance",
+            "by region",
+            "across regions",
+            "compare cities",
+            "by city",
+        ):
+            col = resolve_geographic_group_column(hint, df, profile)
+            if col and col in df.columns:
+                return str(col)
+    except Exception:
+        pass
+
+    cand_dims = _dimension_pool_columns(df, profile)
+    ranked = _rank_category_dimensions(df, cand_dims, profile)
+    if not ranked:
+        return None
+    prefer_tokens = ("region", "zone", "city", "category", "segment", "channel")
+    for token in prefer_tokens:
+        for col, _sc in ranked:
+            if token in str(col).lower().replace("_", " "):
+                return str(col)
+    return str(ranked[0][0])
 
 
 def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[str, Any]]:
@@ -5931,6 +6011,22 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         else None
     )
 
+    try:
+        from intent_engine.dimension_request import (
+            extract_dimension_request_phrases,
+            phrase_is_time_bucket,
+            question_requests_executive_summary,
+            resolve_phrase_to_column,
+            _phrase_refers_to_metric_column,
+        )
+
+        dim_request_phrases = extract_dimension_request_phrases(ql)
+    except Exception:
+        dim_request_phrases = []
+        phrase_is_time_bucket = lambda _p: False  # type: ignore
+        question_requests_executive_summary = lambda _q: False  # type: ignore
+        resolve_phrase_to_column = lambda *_a, **_k: None  # type: ignore
+
     secondary_col: Optional[str] = None
     gcol: Optional[str] = None
 
@@ -5949,6 +6045,27 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
             gcol = by_cols_ordered[0]
         if not gcol:
             gcol = _infer_dimension_column_from_question(question_str, df, profile)
+
+    for phrase in dim_request_phrases:
+        resolved = resolve_phrase_to_column(
+            phrase,
+            df,
+            profile,
+            match_column=_match_column_from_phrase,
+            pick_date_column=_pick_date_column_for_trend,
+            dimension_pool=_dimension_pool_columns,
+        )
+        if resolved and not gcol:
+            gcol = resolved
+        if phrase_is_time_bucket(phrase):
+            dcol = _pick_date_column_for_trend(df, profile)
+            if dcol:
+                gcol = dcol
+
+    if question_requests_executive_summary(question_str):
+        exec_dim = _pick_executive_summary_dimension(df, profile)
+        if exec_dim:
+            gcol = exec_dim
 
     try:
         from intent_engine.geographic_scope import (
@@ -5994,7 +6111,9 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
             )
             if iid and str(iid) != str(gcol) and iid in cols:
                 ncol = str(iid)
-    metric_spec = _resolve_question_metric_spec(question_str, df, profile)
+    metric_spec = _resolve_question_metric_spec(
+        question_str, df, profile, group_col=gcol
+    )
     if metric_spec:
         ncol = metric_spec["value_col"]
     elif ncol is None:
@@ -6006,11 +6125,19 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     if ncol is None and incident_only and gcol:
         return None
 
-    if ncol is None and (
-        re.search(r"\b(count|how many|number of)\b", ql)
-        or "employee" in ql
-        or "headcount" in ql
-    ):
+    record_count_requested = False
+    try:
+        from intent_engine.resolve_explicit_metric import question_requests_record_count
+
+        record_count_requested = question_requests_record_count(
+            ql, resolved_metric_col=str(ncol) if ncol else None
+        )
+    except Exception:
+        record_count_requested = bool(
+            re.search(r"\b(count|how many|number of)\b", ql) or "headcount" in ql
+        )
+
+    if ncol is None and record_count_requested:
         idc = _find_first_column(
             cols,
             ["employee_id", "emp_id", "staff_id", "employee id", "emp id", "staff id"],
@@ -6039,9 +6166,18 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         agg_label, agg_key = "Profit margin", "mean"
     elif metric_spec and metric_spec.get("derived_roi"):
         agg_label, agg_key = "ROI", "mean"
+    elif metric_spec and metric_spec.get("entity_record_count"):
+        agg_label, agg_key = "Count", "count"
     else:
         agg_label, agg_key = _resolve_agg_label_and_key(
-            ql, value_col=ncol, incident_only=incident_only
+            ql,
+            value_col=ncol,
+            incident_only=incident_only,
+            explicit_metric_resolved=bool(
+                metric_spec
+                and metric_spec.get("explicit_metric")
+                and not metric_spec.get("entity_record_count")
+            ),
         )
 
     derived_metric_keys = (_DERIVED_ROI_METRIC_KEY, _DERIVED_PROFIT_MARGIN_METRIC_KEY)
@@ -6062,7 +6198,41 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         "secondary_group_col": secondary_col,
     }
     if focus_raw and not focus_col:
-        out_intent["question_focus_phrase"] = focus_raw
+        if not _phrase_refers_to_metric_column(
+            focus_raw,
+            df,
+            profile,
+            match_column=_match_column_from_phrase,
+        ):
+            out_intent["question_focus_phrase"] = focus_raw
+            out_intent["requested_dimension_missing"] = True
+
+    missing_phrase: Optional[str] = None
+    for phrase in dim_request_phrases:
+        if _phrase_refers_to_metric_column(
+            phrase, df, profile, match_column=_match_column_from_phrase
+        ):
+            continue
+        if phrase_is_time_bucket(phrase):
+            if _pick_date_column_for_trend(df, profile):
+                missing_phrase = phrase
+            else:
+                missing_phrase = phrase
+            continue
+        resolved = resolve_phrase_to_column(
+            phrase,
+            df,
+            profile,
+            match_column=_match_column_from_phrase,
+            pick_date_column=_pick_date_column_for_trend,
+            dimension_pool=_dimension_pool_columns,
+        )
+        if not resolved:
+            missing_phrase = phrase
+            break
+
+    if missing_phrase:
+        out_intent["question_focus_phrase"] = missing_phrase
         out_intent["requested_dimension_missing"] = True
     if secondary_col and (not focus_col) and len(by_cols_ordered) >= 2:
         out_intent["dimension_notes"] = (
@@ -6413,7 +6583,11 @@ def _find_profit_and_revenue_columns(
 
 
 def _resolve_question_metric_spec(
-    question: str, df_in: pd.DataFrame, profile: Dict[str, Any]
+    question: str,
+    df_in: pd.DataFrame,
+    profile: Dict[str, Any],
+    *,
+    group_col: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Resolve derived measures (profit margin %, ROI) when the question names them
@@ -6443,6 +6617,17 @@ def _resolve_question_metric_spec(
                 "revenue_col": rev_col,
             }
         return None
+
+    try:
+        from intent_engine.resolve_explicit_metric import resolve_explicit_metric_spec
+
+        explicit = resolve_explicit_metric_spec(
+            question, df_in, profile, group_col=group_col
+        )
+        if explicit:
+            return explicit
+    except Exception:
+        pass
 
     if not _question_requests_roi(question):
         return None
@@ -6475,6 +6660,10 @@ def _apply_metric_spec_to_intent(
     intent["value_col"] = spec["value_col"]
     intent["metricColumnDisplay"] = spec.get("metric_display") or "ROI"
     intent["requested_metric_token"] = spec.get("requested_metric_token")
+    if spec.get("explicit_metric"):
+        intent["explicit_metric"] = True
+    if spec.get("entity_record_count"):
+        intent["entity_record_count"] = True
     if spec.get("derived_roi"):
         intent["derived_roi"] = True
         intent["revenue_col"] = spec.get("revenue_col")
@@ -6559,6 +6748,37 @@ def _rendered_metric_matches_question(
     intent_debug: Optional[Dict[str, Any]],
     smart_trace: Optional[Dict[str, Any]],
 ) -> bool:
+    if intent_debug and intent_debug.get("explicit_metric"):
+        expected = str(intent_debug.get("value_col") or "").strip()
+        if not expected:
+            return False
+        rendered = str((smart_trace or {}).get("numeric_column") or "").strip()
+        if rendered and rendered == expected:
+            return True
+        if not rendered:
+            return True
+        try:
+            from intent_engine.column_resolve import column_matches_token
+
+            return column_matches_token(rendered, expected) or column_matches_token(
+                expected, rendered
+            )
+        except Exception:
+            return rendered == expected
+    try:
+        from intent_engine.resolve_explicit_metric import resolve_explicit_metric_column
+
+        expected_col = resolve_explicit_metric_column(
+            question,
+            df if df is not None else pd.DataFrame(),
+            dataset_profile or {},
+        )
+        if expected_col and intent_debug:
+            actual = str(intent_debug.get("value_col") or "").strip()
+            if actual and actual != str(expected_col):
+                return False
+    except Exception:
+        pass
     if _question_requests_profit_margin(question):
         if not intent_debug:
             return False
@@ -6667,6 +6887,17 @@ def _best_numeric_column_for_question(q: str, numeric_cols: List[str]) -> Option
                 score += 340
             if "downtime" in cn and "incident" not in cn:
                 score -= 260
+        try:
+            from intent_engine.resolve_explicit_metric import (
+                extract_explicit_metric_phrases,
+                _score_column_for_phrase,
+            )
+
+            for phrase in extract_explicit_metric_phrases(q):
+                if _score_column_for_phrase(str(c), phrase) >= 120:
+                    score += 620
+        except Exception:
+            pass
         if _question_requests_roi(q):
             if cn == "roi" or re.search(r"\broi\b", cn):
                 score += 520
@@ -6726,6 +6957,207 @@ def _looks_like_ranking_question(ql: str) -> bool:
     return any(k in ql for k in ("ranking", "rank ", "rank,", "ranked"))
 
 
+def _column_value_label_set(df: pd.DataFrame, col: str) -> set[str]:
+    """Normalized + raw labels present in a grouping column."""
+    out: set[str] = set()
+    if df is None or col not in df.columns:
+        return out
+    for v in df[col].dropna().unique():
+        raw = str(v).strip()
+        if not raw:
+            continue
+        out.add(raw)
+        out.add(_pretty_label_text(raw))
+    return out
+
+
+def _detect_chart_label_dimension(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    labels: List[str],
+    *,
+    exclude_col: Optional[str] = None,
+) -> Optional[str]:
+    """Best-effort column whose values match chart category labels."""
+    if df is None or df.empty or not labels:
+        return None
+    clean = [str(l).strip() for l in labels if str(l).strip()]
+    if not clean:
+        return None
+    best_col: Optional[str] = None
+    best_hits = 0
+    for col in _dimension_pool_columns(df, profile):
+        if exclude_col and str(col) == str(exclude_col):
+            continue
+        vals = _column_value_label_set(df, str(col))
+        if not vals:
+            continue
+        hits = sum(
+            1
+            for lab in clean
+            if lab in vals or _pretty_label_text(lab) in vals
+        )
+        if hits > best_hits:
+            best_hits = hits
+            best_col = str(col)
+    if best_col and best_hits >= max(2, int(len(clean) * 0.75)):
+        return best_col
+    return None
+
+
+def _validate_chart_dimension_alignment(
+    *,
+    intent_debug: Optional[Dict[str, Any]],
+    chart_data: List[Dict[str, Any]],
+    df: Optional[pd.DataFrame],
+    profile: Optional[Dict[str, Any]],
+    question: str,
+    chart_type: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Return a warning when chart labels do not match the resolved breakdown column.
+    """
+    if not intent_debug or not chart_data or df is None or df.empty:
+        return None
+    if str(intent_debug.get("agg_key") or "").lower() == "scatter":
+        return None
+    if str(chart_type or "").strip().lower() in ("scatter",):
+        return None
+    if intent_debug.get("trend_time_series"):
+        return None
+    if _question_requests_correlation_routing(question):
+        return None
+    if not _chart_rows_are_simple_categorical(chart_data):
+        return None
+    group_col = str(intent_debug.get("group_col") or "").strip()
+    if not group_col or group_col not in df.columns:
+        return None
+    if (profile or {}).get("column_types", {}).get(group_col) == "date":
+        return None
+
+    labels = [
+        str(r.get("name") or "").strip()
+        for r in chart_data
+        if isinstance(r, dict) and str(r.get("name") or "").strip()
+    ]
+    if len(labels) < 2:
+        return None
+
+    if all(re.match(r"^point\s*\d+$", lab, re.I) for lab in labels[: min(3, len(labels))]):
+        return None
+
+    expected_vals = _column_value_label_set(df, group_col)
+    hits = sum(
+        1
+        for lab in labels
+        if lab in expected_vals or _pretty_label_text(lab) in expected_vals
+    )
+    if hits >= max(2, int(len(labels) * 0.75)):
+        return None
+
+    actual_col = _detect_chart_label_dimension(
+        df, profile or build_profile(df), labels, exclude_col=group_col
+    )
+    dim_disp = _pretty_label_text(group_col)
+    actual_disp = _pretty_label_text(actual_col) if actual_col else "another breakdown"
+    return (
+        f"Chart dimension mismatch: metadata uses '{dim_disp}' ({group_col}) but "
+        f"chart labels match '{actual_disp}' ({actual_col or 'unknown'}) — "
+        f"{len(labels)} categories shown for question: {question.strip()!r}."
+    )
+
+
+def _validate_chart_metric_alignment(
+    *,
+    question: str,
+    intent_debug: Optional[Dict[str, Any]],
+    chart_data: List[Dict[str, Any]],
+    chart_title: str,
+    smart_trace: Optional[Dict[str, Any]],
+) -> Optional[str]:
+    """Warn when chart metric/title disagrees with the question's explicit metric."""
+    if not intent_debug or not chart_data:
+        return None
+    if str(intent_debug.get("agg_key") or "").lower() == "scatter":
+        return None
+    if _question_requests_correlation_routing(question):
+        return None
+
+    expected_col = str(intent_debug.get("value_col") or "").strip()
+    if not expected_col:
+        return None
+
+    rendered_col = str((smart_trace or {}).get("numeric_column") or expected_col).strip()
+    if not _rendered_metric_matches_question(question, intent_debug, smart_trace):
+        expected_disp = _metric_display_from_intent(intent_debug)
+        rendered_disp = _pretty_label_text(rendered_col) if rendered_col else "—"
+        return (
+            f"Chart metric mismatch: question expects '{expected_disp}' ({expected_col}) "
+            f"but chart used '{rendered_disp}' ({rendered_col})."
+        )
+
+    title_l = str(chart_title or "").lower()
+    expected_disp_l = _metric_display_from_intent(intent_debug).lower()
+    if expected_disp_l and expected_disp_l not in ("—", "value"):
+        key_token = expected_disp_l.split()[-1]
+        if key_token and len(key_token) >= 4 and key_token not in title_l:
+            try:
+                from intent_engine.resolve_explicit_metric import (
+                    resolve_explicit_metric_column,
+                )
+
+                if resolve_explicit_metric_column(question, df, dataset_profile or {}):
+                    return (
+                        f"Chart title mismatch: expected metric '{expected_disp_l}' "
+                        f"but title is '{chart_title}'."
+                    )
+            except Exception:
+                pass
+
+    if str(intent_debug.get("agg_key") or "").lower() == "count":
+        try:
+            from intent_engine.resolve_explicit_metric import (
+                question_names_metric_quantity,
+            )
+
+            if question_names_metric_quantity(question, expected_col):
+                vals = [
+                    float(r.get("value"))
+                    for r in chart_data
+                    if isinstance(r, dict) and r.get("value") is not None
+                ]
+                if vals and len(set(vals)) == 1 and vals[0] == 1.0:
+                    return (
+                        f"Chart metric mismatch: '{expected_col}' is a quantity metric but "
+                        "chart shows count=1 per group — use sum/mean on the metric column."
+                    )
+        except Exception:
+            pass
+
+    return None
+
+
+def _build_aggregate_chart_from_intent(
+    intent: Dict[str, Any],
+    question: str,
+) -> Tuple[str, List[Dict[str, Any]], str, str, Optional[Dict[str, Any]]]:
+    """Build chart rows from resolved intent (group_col, value_col, agg)."""
+    fb_rows, fb_type, fb_title, fb_ts = _fallback_aggregate_chart(intent, question)
+    if not fb_rows:
+        return "", [], "", "", None
+    chart_data = list(_normalize_chart_records(fb_rows))
+    tab = _tabular_exact_from_name_value_rows(
+        [{"name": r.get("name"), "value": r.get("value")} for r in chart_data]
+    )
+    return (
+        tab,
+        chart_data,
+        (fb_type or "bar").strip() or "bar",
+        (fb_title or "").strip(),
+        fb_ts if isinstance(fb_ts, dict) else None,
+    )
+
+
 def _question_explicitly_requests_dimension(question_lower: str, col: str) -> bool:
     """True when the user clearly named this column (including *_id)."""
     if not col:
@@ -6757,6 +7189,18 @@ def _prefer_lower_cardinality_dimension(
     """
     if df is None or df.empty or not current:
         return current
+    try:
+        from intent_engine.geographic_scope import (
+            question_geographic_scope_level,
+            resolve_geographic_group_column,
+        )
+
+        if question_geographic_scope_level(question_lower):
+            geo_col = resolve_geographic_group_column(question_lower, df, profile)
+            if geo_col and str(geo_col) in df.columns:
+                return str(geo_col)
+    except Exception:
+        pass
     if _question_explicitly_requests_dimension(question_lower, current):
         return current
     try:
@@ -7050,7 +7494,10 @@ def _unsupported_growth_payload(
         "active": True,
         "periodsAvailable": int(max(0, periods_available)),
         "status": "Insufficient Time-Series Data",
-        "leadSentence": "Growth cannot be determined from the available data.",
+        "leadSentence": (
+            "Growth metric detected, but period/methodology is unknown — "
+            "growth comparison is directional only because no date/baseline period exists."
+        ),
         "recommendedAction": recommended_action,
         "reasonCode": reason_code,
     }
@@ -7406,6 +7853,10 @@ def _bucket_labels_for_freq(dt: pd.Series, freq: str) -> pd.Series:
     d = pd.to_datetime(dt, errors="coerce")
     if freq == "M":
         return d.dt.to_period("M").astype(str)
+    if freq == "Q":
+        return d.dt.to_period("Q").astype(str)
+    if freq == "Y":
+        return d.dt.to_period("Y").astype(str)
     if freq == "W":
         return d.dt.to_period("W-MON").astype(str)
     if freq == "D":
@@ -7424,6 +7875,8 @@ def _finer_time_bucket(freq: str) -> Optional[str]:
 def _freq_human_label(freq: str) -> str:
     return {
         "M": "monthly",
+        "Q": "quarterly",
+        "Y": "yearly",
         "W": "weekly",
         "D": "daily",
         "H": "hourly",
@@ -7742,6 +8195,10 @@ def _question_asks_outlier_analysis(ql: str) -> bool:
         r"\b(outliers?|anomal(?:y|ies)|unusually\s+(?:high|low)|extreme\s+values?)\b",
         s,
     ):
+        return True
+    if re.search(r"\bunusual(?:ly)?\b.*\bpatterns?\b", s):
+        return True
+    if re.search(r"\bidentify\s+unusual\b", s):
         return True
     if re.search(
         r"\b(?:above|below)\s+(?:the\s+)?\d+(?:st|nd|rd|th)?\s+percentile\b",
@@ -9954,6 +10411,8 @@ def _chart_selection_question_bucket(ql: str) -> str:
         return "outlier"
     if re.search(r"\b(vs\.?|versus|against)\b", q):
         return "relationship"
+    if _looks_like_ranking_question(q) or _extract_top_n(q) is not None:
+        return "ranking"
     if any(
         k in q
         for k in (
@@ -9962,19 +10421,16 @@ def _chart_selection_question_bucket(ql: str) -> str:
             "time series",
             "monthly",
             "by month",
-            "quarter",
             "weekly",
             "each month",
             "momentum",
         )
-    ):
+    ) or re.search(r"\b(by|per)\s+(day|date|week|month|year|quarter)\b", q):
         return "trend"
     if _question_asks_share_or_composition_pie(q) or (
         "distribution" in q and " by " in q and "average" not in q and "mean" not in q
     ):
         return "distribution"
-    if _looks_like_ranking_question(q) or _extract_top_n(q) is not None:
-        return "ranking"
     if re.search(
         r"\b(compare|comparison|across departments|across regions|across each|by department|by region|by product)\b",
         q,
@@ -10458,12 +10914,17 @@ def _try_correlation_routing_pack(
         return rel_pack
     try:
         from intent_engine.correlation_analysis import (
+            build_unsupported_driver_analysis,
             build_unsupported_relationship_missing_columns,
         )
+        from intent_engine.question_patterns import question_requests_driver_intent
 
-        missing = build_unsupported_relationship_missing_columns(
-            question, df_in, profile
-        )
+        if question_requests_driver_intent(question):
+            missing = build_unsupported_driver_analysis(question, df_in, profile)
+        else:
+            missing = build_unsupported_relationship_missing_columns(
+                question, df_in, profile
+            )
     except Exception:
         missing = {
             "active": True,
@@ -11356,6 +11817,7 @@ def _insight_confidence_meta(
     partial_visualization_warning: bool = False,
     dimension_redirect_handled: bool = False,
     requested_dimension_missing: bool = False,
+    unsupported_explained: bool = False,
 ) -> Dict[str, Any]:
     """
     Evidence / sample-size metadata for API clients and prompt contracts.
@@ -11388,6 +11850,7 @@ def _insight_confidence_meta(
         partial_visualization_warning=partial_visualization_warning,
         dimension_redirect_handled=dimension_redirect_handled,
         requested_dimension_missing=requested_dimension_missing,
+        unsupported_explained=unsupported_explained,
     )
 
 
@@ -11458,10 +11921,23 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
             [
                 "- **Unsupported growth analysis** — The user asked about growth or fastest change, "
                 "but this cohort lacks sufficient time-series evidence.",
-                "- In Key findings, open with exactly: Growth cannot be determined from the available data.",
+                "- In Key findings, open with: Growth metric detected, but period/methodology is unknown — "
+                "growth comparison is directional only because no date/baseline period exists.",
                 "- Then explain why (e.g. single date snapshot or no multi-period series per entity). "
                 "You may note static totals as context only — not as a growth ranking.",
                 "- Do not imply the highest current total is the fastest growing region or product.",
+            ]
+        )
+    if bool(conf.get("driverAnalysis")):
+        lines.extend(
+            [
+                "- **Driver / root-cause question (association only)** — Describe the strongest "
+                "**observed relationship** or **strongest available predictor** in this sample.",
+                "- Use association language (associated with, co-varies with, aligns with) — "
+                "never causal claims (drives, causes, dominant driver, proves).",
+                "- State once that correlation/association does not prove causation.",
+                "- Name the explanatory metric with the strongest |r| vs the outcome from the "
+                "exact calculated result; cite Pearson r and sample size.",
             ]
         )
     if multi_metric_unsupported:
@@ -11815,24 +12291,40 @@ def _build_unified_analysis_payload(
         and intent_debug.get("group_col")
         and str(intent_debug.get("agg_key") or "").strip()
     )
-    if relationship_scatter:
-        analysis_kind = "relationship_scatter"
-    elif dual_compare:
-        analysis_kind = "compare"
-    elif ct_l in ("line", "area"):
-        analysis_kind = "trend"
-    elif _ranking_or_leaderboard_intent(question):
-        analysis_kind = "ranking"
-    else:
-        analysis_kind = "aggregation"
-    from intent_engine.confidence_scoring import normalize_confidence_chart_type
+    driver_analysis = False
+    try:
+        from intent_engine.question_patterns import question_requests_driver_intent
 
+        driver_analysis = question_requests_driver_intent(question)
+    except Exception:
+        driver_analysis = False
+    outlier_analysis = _question_asks_outlier_analysis(question)
     dimension_redirect_handled = bool(
         intent_debug and intent_debug.get("dimension_redirect_handled")
     )
     requested_dimension_missing = bool(
         intent_debug and intent_debug.get("requested_dimension_missing")
     )
+    if relationship_scatter:
+        analysis_kind = "driver" if driver_analysis else "relationship_scatter"
+    elif outlier_analysis:
+        analysis_kind = "outlier"
+    elif dual_compare:
+        analysis_kind = "compare"
+    elif ct_l in ("line", "area"):
+        if dimension_redirect_handled and _ranking_or_leaderboard_intent(question):
+            analysis_kind = "ranking"
+        else:
+            analysis_kind = "trend"
+    elif _ranking_or_leaderboard_intent(question):
+        analysis_kind = "ranking"
+    else:
+        analysis_kind = "aggregation"
+    unsupported_explained = bool(
+        unsupported_growth_analysis and unsupported_growth_analysis.get("active")
+    )
+    from intent_engine.confidence_scoring import normalize_confidence_chart_type
+
     conf = _insight_confidence_meta(
         analysis_row_count,
         chart_points,
@@ -11854,7 +12346,10 @@ def _build_unified_analysis_payload(
         partial_visualization_warning=bool(partial_visualization_warning),
         dimension_redirect_handled=dimension_redirect_handled,
         requested_dimension_missing=requested_dimension_missing,
+        unsupported_explained=unsupported_explained,
     )
+    if driver_analysis:
+        conf["driverAnalysis"] = True
 
     out: Dict[str, Any] = {
         "metricColumn": intent_debug.get("value_col") if intent_debug else None,
@@ -12419,12 +12914,71 @@ def compute_visualization_for_question(
     profile_live = dataset_profile or build_profile(df)
     ql = question.lower().strip()
 
+    cohort_df = df
+    entity_filter_meta: Optional[Dict[str, str]] = None
+    try:
+        from intent_engine.dimension_request import (
+            find_categorical_entity_filter,
+            question_requests_entity_performance_explanation,
+        )
+
+        if question_requests_entity_performance_explanation(question):
+            entity_hit = find_categorical_entity_filter(question, df, profile_live)
+            if entity_hit:
+                fcol, fval = entity_hit
+                sub = df[df[fcol].astype(str).str.strip() == fval]
+                if not sub.empty:
+                    cohort_df = sub
+                    entity_filter_meta = {"column": str(fcol), "value": str(fval)}
+                    analysis_row_count = int(len(cohort_df))
+    except Exception:
+        pass
+
     correlation_routing_locked = _question_requests_correlation_routing(question)
 
-    intent_debug = _describe_aggregate_intent(question, df, profile_live)
-    metric_spec_live = _resolve_question_metric_spec(question, df, profile_live)
+    intent_debug = _describe_aggregate_intent(question, cohort_df, profile_live)
+    if entity_filter_meta and intent_debug:
+        intent_debug["entity_filter_column"] = entity_filter_meta["column"]
+        intent_debug["entity_filter_value"] = entity_filter_meta["value"]
+    metric_spec_live = _resolve_question_metric_spec(question, cohort_df, profile_live)
     if metric_spec_live and intent_debug:
         _apply_metric_spec_to_intent(intent_debug, metric_spec_live)
+
+    original_df = df
+    if entity_filter_meta is not None:
+        df = cohort_df
+
+    try:
+        return _compute_visualization_for_question_body(
+            question=question,
+            conversation_sidecar=conversation_sidecar,
+            follow_up_ops=follow_up_ops,
+            fin=fin,
+            profile_live=profile_live,
+            ql=ql,
+            analysis_row_count=analysis_row_count,
+            intent_debug=intent_debug,
+            metric_spec_live=metric_spec_live,
+            correlation_routing_locked=correlation_routing_locked,
+        )
+    finally:
+        df = original_df
+
+
+def _compute_visualization_for_question_body(
+    *,
+    question: str,
+    conversation_sidecar: Optional[Dict[str, Any]],
+    follow_up_ops: Optional[Dict[str, Any]],
+    fin,
+    profile_live: Dict[str, Any],
+    ql: str,
+    analysis_row_count: int,
+    intent_debug: Optional[Dict[str, Any]],
+    metric_spec_live: Optional[Dict[str, Any]],
+    correlation_routing_locked: bool,
+) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, Any]]:
+    global df
 
     partial_visualization_warning: Optional[str] = None
     suppress_auto_charts = False
@@ -12689,9 +13243,152 @@ def compute_visualization_for_question(
                 chart_type = ""
                 chart_path_handled = True
             else:
-                exact_result, chart_data, chart_type = analyze_data(question)
+                intent_chart_built = False
+                if (
+                    intent_debug
+                    and intent_debug.get("group_col")
+                    and intent_debug.get("value_col")
+                ):
+                    tab_er, intent_rows, intent_type, intent_title, intent_ts = (
+                        _build_aggregate_chart_from_intent(intent_debug, question)
+                    )
+                    if intent_rows:
+                        exact_result = tab_er
+                        chart_data = intent_rows
+                        chart_type = intent_type
+                        chart_title = intent_title
+                        chart_path_handled = True
+                        intent_chart_built = True
+                        if intent_ts:
+                            smart_trace = {
+                                "category_column": intent_debug.get("group_col"),
+                                "numeric_column": intent_debug.get("value_col"),
+                                "aggregation": str(
+                                    intent_debug.get("agg_label", "")
+                                ).lower(),
+                                "aggregation_key": intent_debug.get("agg_key"),
+                                "rows_analyzed": int(len(df)),
+                                "notes": intent_debug.get("dimension_notes")
+                                or str(intent_ts.get("selectionReason") or "").strip()
+                                or None,
+                                "timeSeriesAnalysis": intent_ts,
+                            }
+                        elif intent_debug:
+                            smart_trace = {
+                                "category_column": intent_debug.get("group_col"),
+                                "numeric_column": intent_debug.get("value_col"),
+                                "aggregation": str(
+                                    intent_debug.get("agg_label", "")
+                                ).lower(),
+                                "aggregation_key": intent_debug.get("agg_key"),
+                                "rows_analyzed": int(len(df)),
+                                "notes": intent_debug.get("dimension_notes"),
+                            }
+                if not intent_chart_built:
+                    exact_result, chart_data, chart_type = analyze_data(question)
 
     chart_data = list(_normalize_chart_records(chart_data))
+    dim_mismatch = _validate_chart_dimension_alignment(
+        intent_debug=intent_debug,
+        chart_data=chart_data,
+        df=df,
+        profile=profile_live,
+        question=question,
+        chart_type=chart_type,
+    )
+    if dim_mismatch:
+        print("[viz] dimension_mismatch:", dim_mismatch, flush=True)
+        rebuilt = False
+        if intent_debug and intent_debug.get("group_col") and intent_debug.get("value_col"):
+            tab_er, intent_rows, intent_type, intent_title, intent_ts = (
+                _build_aggregate_chart_from_intent(intent_debug, question)
+            )
+            if intent_rows:
+                rematch = _validate_chart_dimension_alignment(
+                    intent_debug=intent_debug,
+                    chart_data=intent_rows,
+                    df=df,
+                    profile=profile_live,
+                    question=question,
+                    chart_type=intent_type,
+                )
+                if not rematch:
+                    exact_result = tab_er
+                    chart_data = intent_rows
+                    chart_type = intent_type
+                    chart_title = intent_title
+                    alignment_repaired = True
+                    rebuilt = True
+                    if intent_ts:
+                        smart_trace = {
+                            "category_column": intent_debug.get("group_col"),
+                            "numeric_column": intent_debug.get("value_col"),
+                            "aggregation": str(
+                                intent_debug.get("agg_label", "")
+                            ).lower(),
+                            "aggregation_key": intent_debug.get("agg_key"),
+                            "rows_analyzed": int(len(df)),
+                            "notes": intent_debug.get("dimension_notes")
+                            or str(intent_ts.get("selectionReason") or "").strip()
+                            or None,
+                            "timeSeriesAnalysis": intent_ts,
+                        }
+        if not rebuilt:
+            chart_data = []
+            chart_type = ""
+            chart_title = ""
+            suppress_auto_charts = True
+            chart_suppressed_misleading = True
+            partial_visualization_warning = dim_mismatch
+
+    metric_mismatch = _validate_chart_metric_alignment(
+        question=question,
+        intent_debug=intent_debug,
+        chart_data=chart_data,
+        chart_title=chart_title,
+        smart_trace=smart_trace,
+    )
+    if metric_mismatch:
+        print("[viz] metric_mismatch:", metric_mismatch, flush=True)
+        metric_rebuilt = False
+        if intent_debug and intent_debug.get("group_col") and intent_debug.get("value_col"):
+            tab_er, intent_rows, intent_type, intent_title, intent_ts = (
+                _build_aggregate_chart_from_intent(intent_debug, question)
+            )
+            if intent_rows:
+                remetric = _validate_chart_metric_alignment(
+                    question=question,
+                    intent_debug=intent_debug,
+                    chart_data=intent_rows,
+                    chart_title=intent_title,
+                    smart_trace={
+                        "numeric_column": intent_debug.get("value_col"),
+                        "category_column": intent_debug.get("group_col"),
+                    },
+                )
+                if not remetric:
+                    exact_result = tab_er
+                    chart_data = intent_rows
+                    chart_type = intent_type
+                    chart_title = intent_title
+                    alignment_repaired = True
+                    metric_rebuilt = True
+                    smart_trace = {
+                        "category_column": intent_debug.get("group_col"),
+                        "numeric_column": intent_debug.get("value_col"),
+                        "aggregation": str(intent_debug.get("agg_label", "")).lower(),
+                        "aggregation_key": intent_debug.get("agg_key"),
+                        "rows_analyzed": int(len(df)),
+                        "notes": "Chart rebuilt so metric matches the question.",
+                    }
+        if not metric_rebuilt:
+            chart_data = []
+            chart_type = ""
+            chart_title = ""
+            suppress_auto_charts = True
+            chart_suppressed_misleading = True
+            partial_visualization_warning = metric_mismatch
+
     if (
         chart_data
         and smart_trace

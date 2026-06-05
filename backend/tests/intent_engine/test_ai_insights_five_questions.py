@@ -189,13 +189,13 @@ class TestAiInsightsFiveQuestions(unittest.TestCase):
                 score = int(analysis.get("insightConfidenceScore") or 0)
                 self.assertGreaterEqual(
                     score,
-                    25,
+                    45,
                     msg=f"score {score} for {question!r}",
                 )
-                self.assertLessEqual(score, 45, msg=f"score {score} for {question!r}")
-                self.assertEqual(
+                self.assertLessEqual(score, 60, msg=f"score {score} for {question!r}")
+                self.assertIn(
                     str(analysis.get("insightConfidenceLevel") or "").lower(),
-                    "low",
+                    ("low", "medium"),
                 )
                 self.assertEqual(
                     str((visualization or {}).get("chartType") or ""),

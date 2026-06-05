@@ -27,6 +27,78 @@ def _median(vals: List[float]) -> float:
     return float(statistics.median(vals))
 
 
+def _peer_phrase(dimension_label: str) -> str:
+    dim = (dimension_label or "category").strip().lower()
+    if not dim:
+        return "peers"
+    irregular = {"city": "cities", "country": "countries", "category": "categories"}
+    if dim in irregular:
+        plural = irregular[dim]
+    elif dim.endswith("s"):
+        plural = dim
+    else:
+        plural = f"{dim}s"
+    return f"peer {plural}"
+
+
+def _refine_outlier_highlights(
+    pairs: List[Tuple[str, float]],
+    high_out: List[Dict[str, str]],
+    low_out: List[Dict[str, str]],
+    *,
+    peer_phrase: str,
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+    """Prefer rank extremes (highest / lowest) for executive cards and narrative."""
+    if not pairs:
+        return high_out, low_out
+    value_by_name = {name: val for name, val in pairs}
+    sorted_pairs = sorted(pairs, key=lambda x: x[1], reverse=True)
+    top_name, _ = sorted_pairs[0]
+    bot_name, _ = sorted_pairs[-1]
+
+    def _pick_primary(
+        bucket: List[Dict[str, str]], preferred: str
+    ) -> List[Dict[str, str]]:
+        if not bucket:
+            return []
+        names = {str(item.get("name") or "") for item in bucket}
+        if preferred in names:
+            chosen = preferred
+        elif bucket:
+            if preferred == top_name:
+                chosen = max(
+                    bucket,
+                    key=lambda item: value_by_name.get(str(item.get("name") or ""), float("-inf")),
+                ).get("name", "")
+            else:
+                chosen = min(
+                    bucket,
+                    key=lambda item: value_by_name.get(str(item.get("name") or ""), float("inf")),
+                ).get("name", "")
+        else:
+            return []
+        chosen = str(chosen or "").strip()
+        if not chosen:
+            return []
+        val = value_by_name.get(chosen)
+        if val is None:
+            return [item for item in bucket if str(item.get("name") or "") == chosen][:1]
+        if chosen == top_name:
+            phrase = f"{chosen} is the positive outlier — materially above {peer_phrase}"
+        elif chosen == bot_name:
+            phrase = f"{chosen} is the negative outlier — materially below {peer_phrase}"
+        elif preferred == top_name:
+            phrase = f"{chosen} appears materially above {peer_phrase}"
+        else:
+            phrase = f"{chosen} appears materially below {peer_phrase}"
+        return [{"name": chosen, "phrase": phrase}]
+
+    return (
+        _pick_primary(high_out, top_name),
+        _pick_primary(low_out, bot_name),
+    )
+
+
 def compute_categorical_outlier_insights(
     rows: List[Dict[str, Any]],
     *,
@@ -60,12 +132,7 @@ def compute_categorical_outlier_insights(
     med_v = _median(vals)
     stdev_v = float(statistics.stdev(vals)) if len(vals) >= 2 else 0.0
 
-    dim = (dimension_label or "category").strip().lower()
-    peer_phrase = (
-        f"peer {dim}s"
-        if dim and not dim.endswith("s")
-        else f"peer {dim}" if dim else "peers"
-    )
+    peer_phrase = _peer_phrase(dimension_label)
 
     per_category: List[Dict[str, Any]] = []
     high_out: List[Dict[str, str]] = []
@@ -117,6 +184,10 @@ def compute_categorical_outlier_insights(
 
     if not high_out and not low_out:
         return None
+
+    high_out, low_out = _refine_outlier_highlights(
+        pairs, high_out, low_out, peer_phrase=peer_phrase
+    )
 
     return {
         "dimensionLabel": dimension_label,

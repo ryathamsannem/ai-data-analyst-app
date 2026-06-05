@@ -140,6 +140,7 @@ def validate_analysis_support(
         "decline",
         "multi_metric_comparison",
         "relationship",
+        "driver",
     ):
         if df is None or (df is not None and df.empty):
             supported = False

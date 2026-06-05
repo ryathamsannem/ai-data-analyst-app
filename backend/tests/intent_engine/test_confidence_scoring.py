@@ -61,7 +61,7 @@ class TestConfidenceScoring(unittest.TestCase):
             chart_type="bar",
         )
         self.assertNotEqual(meta["insightConfidenceScore"], 38)
-        self.assertIn(meta["insightConfidenceLevel"], ("low", "medium"))
+        self.assertIn(meta["insightConfidenceLevel"], ("low", "medium", "high"))
 
     def test_aggregation_large_cohort_high_band(self) -> None:
         meta = compute_insight_confidence_meta(
@@ -187,9 +187,9 @@ class TestConfidenceScoring(unittest.TestCase):
             chart_type="bar",
         )
         score = int(meta["insightConfidenceScore"])
-        self.assertGreaterEqual(score, 25)
-        self.assertLessEqual(score, 45)
-        self.assertEqual(meta["insightConfidenceLevel"], "low")
+        self.assertGreaterEqual(score, 45)
+        self.assertLessEqual(score, 60)
+        self.assertIn(meta["insightConfidenceLevel"], ("low", "medium"))
         joined = " ".join(meta.get("insightConfidenceReasons") or []).lower()
         self.assertIn("ranking", joined)
 

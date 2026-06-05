@@ -60,7 +60,17 @@ class TestCorrelationConsistencyPack(unittest.TestCase):
                     "could not be computed numerically",
                     rationale.lower(),
                 )
-                self.assertIn("Correlation computed on", reasons)
+                self.assertTrue(
+                    any(
+                        needle in reasons
+                        for needle in (
+                            "Correlation computed on",
+                            "Based on 8 paired rows",
+                            "Based on 7 paired rows",
+                        )
+                    ),
+                    msg=reasons,
+                )
 
 
 if __name__ == "__main__":

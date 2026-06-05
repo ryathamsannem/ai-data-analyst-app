@@ -59,6 +59,16 @@ def _dim_phrase(dimension_label: str) -> str:
     return resolve_executive_dimension_label(category_axis=dimension_label).lower()
 
 
+def _dim_plural_phrase(dimension_label: str) -> str:
+    dim = _dim_phrase(dimension_label)
+    irregular = {"city": "cities", "country": "countries", "category": "categories"}
+    if dim in irregular:
+        return irregular[dim]
+    if dim.endswith("s"):
+        return dim
+    return f"{dim}s"
+
+
 def _cohort_context_suffix(cohort_row_count: Optional[int], group_count: int) -> str:
     n = int(cohort_row_count or 0)
     if n <= 0:
@@ -112,7 +122,7 @@ def rank_category_executive_insights(
     )
     met = _metric_phrase(measure)
     dim = _dim_phrase(dimension_label)
-    dim_plural = dim if dim.endswith("s") else f"{dim}s"
+    dim_plural = _dim_plural_phrase(dimension_label)
 
     candidates: List[Dict[str, Any]] = []
 
@@ -150,31 +160,57 @@ def rank_category_executive_insights(
         )
 
     if outlier_insights and isinstance(outlier_insights, dict):
-        for bucket, kind in (("highOutliers", "outlier"), ("lowOutliers", "risk")):
+        outlier_cards = (
+            ("highOutliers", "outlier", top_name, 90),
+            ("lowOutliers", "risk", bot_name, 78),
+        )
+        for bucket, kind, rank_extreme, pri in outlier_cards:
             items = outlier_insights.get(bucket) or []
             if not isinstance(items, list):
                 continue
-            for item in items[:1]:
-                if not isinstance(item, dict):
-                    continue
-                phrase = str(item.get("phrase") or "").strip()
-                name = str(item.get("name") or "").strip()
-                if not phrase and not name:
-                    continue
-                narrative = phrase or f"{name} is an outlier vs peer {dim_plural}."
-                if is_weak_executive_line(narrative):
-                    continue
-                card_t = "outlier" if kind == "outlier" else "risk"
-                candidates.append(
-                    {
-                        "kind": kind,
-                        "priority": 88 if kind == "outlier" else 75,
-                        "title": build_insight_card_title(measure, card_t),
-                        "value": name or "—",
-                        "hint": narrative,
-                        "narrativeLine": narrative,
-                    }
-                )
+            item = None
+            for candidate in items:
+                if isinstance(candidate, dict) and str(candidate.get("name") or "").strip():
+                    item = candidate
+                    break
+            if item is None:
+                item = {"name": rank_extreme, "phrase": ""}
+            phrase = str(item.get("phrase") or "").strip()
+            name = str(item.get("name") or rank_extreme).strip()
+            if not phrase and not name:
+                continue
+            narrative = phrase or f"{name} is an outlier vs peer {dim_plural}."
+            if is_weak_executive_line(narrative):
+                continue
+            card_t = "outlier" if kind == "outlier" else "risk"
+            candidates.append(
+                {
+                    "kind": kind,
+                    "priority": pri,
+                    "title": build_insight_card_title(measure, card_t),
+                    "value": name or "—",
+                    "hint": narrative,
+                    "narrativeLine": narrative,
+                }
+            )
+
+    cohort_n = int(cohort_row_count or 0)
+    if cohort_n > 0 and cohort_n < 100 and outlier_insights:
+        candidates.append(
+            {
+                "kind": "sample",
+                "priority": 62,
+                "title": "Sample size",
+                "value": f"{cohort_n:,} rows",
+                "hint": (
+                    f"Filtered cohort: {cohort_n:,} row(s) across {len(pairs)} {dim_plural} — "
+                    "treat outlier labels as directional."
+                ),
+                "narrativeLine": (
+                    f"Sample size: {cohort_n:,} filtered row(s) across {len(pairs)} {dim_plural}."
+                ),
+            }
+        )
 
     gap_pct = (spread / top_val * 100.0) if top_val > 1e-9 else None
     if gap_pct is not None and gap_pct >= 15:

@@ -1,5 +1,5 @@
 """
-Dynamic insight confidence — component model (no fixed score floors).
+Dynamic insight confidence — routing vs sample components with calibrated bands.
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ class InsightConfidenceInput:
     partial_visualization_warning: bool = False
     dimension_redirect_handled: bool = False
     requested_dimension_missing: bool = False
+    unsupported_explained: bool = False
 
 
 def normalize_confidence_chart_type(chart_type: Optional[str]) -> str:
@@ -106,7 +107,7 @@ def _group_points(
         kind = (analysis_kind or "").strip().lower()
         if (
             intent_structured
-            and kind in ("ranking", "aggregation", "compare")
+            and kind in ("ranking", "aggregation", "compare", "outlier")
             and 2 <= cp <= 12
             and n > 0
             and n < 100
@@ -127,7 +128,12 @@ def _group_points(
 
 def _ranking_alignment_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
     kind = (inp.analysis_kind or "").strip().lower()
-    if not inp.intent_structured or kind not in ("ranking", "aggregation", "compare"):
+    if not inp.intent_structured or kind not in (
+        "ranking",
+        "aggregation",
+        "compare",
+        "outlier",
+    ):
         return 0.0, []
     n = max(0, int(inp.row_count))
     cp = max(0, int(inp.chart_point_count))
@@ -161,8 +167,14 @@ def _chart_suitability_points(inp: InsightConfidenceInput) -> Tuple[float, List[
         pts -= 32.0
         reasons.append("Trend question but time-series chart is not supported")
     if inp.growth_request_unsatisfied:
-        pts -= 32.0
-        reasons.append("Growth question without multi-period evidence")
+        if inp.unsupported_explained:
+            pts -= 14.0
+            reasons.append(
+                "Growth comparison is directional only — period/methodology unavailable"
+            )
+        else:
+            pts -= 32.0
+            reasons.append("Growth question without multi-period evidence")
     if inp.decline_request_unsatisfied:
         pts -= 32.0
         reasons.append("Decline question without multi-period evidence")
@@ -177,9 +189,12 @@ def _chart_suitability_points(inp: InsightConfidenceInput) -> Tuple[float, List[
         pts -= 14.0
         reasons.append("Dual-metric compare is incomplete in the chart")
 
-    if kind == "relationship_scatter" and ct in ("scatter", ""):
+    if kind in ("relationship_scatter", "driver") and ct in ("scatter", ""):
         pts += 10.0
         reasons.append("Relationship analysis matches correlation intent")
+    elif kind == "outlier" and ct in ("bar", "bar_horizontal", ""):
+        pts += 10.0
+        reasons.append("Category chart matches outlier intent")
     elif kind == "trend" and ct in ("line", "area") and not inp.trend_request_unsatisfied:
         pts += 10.0
         reasons.append("Time-series chart matches trend intent")
@@ -238,9 +253,9 @@ def _statistical_support_points(inp: InsightConfidenceInput) -> Tuple[float, Lis
         pts -= 22.0
         reasons.append("Correlation could not be computed numerically")
     elif rs <= MIN_PEARSON_SAMPLE:
-        pts -= 12.0
+        pts -= 3.0
         reasons.append(
-            f"Correlation computed on {rs} paired rows; treat as directional due to small sample"
+            f"Based on {rs} paired rows; directional due to small sample"
         )
     elif rs < 30:
         pts += 4.0
@@ -312,7 +327,7 @@ def _compose_evidence_summary_line(
     if inp.relationship_scatter and rs > 0:
         if rs <= MIN_PEARSON_SAMPLE and not inp.correlation_qualitative_only:
             return (
-                f"Correlation computed on {rs} paired row(s); treat as directional due to small sample "
+                f"Based on {rs} paired row(s); directional due to small sample "
                 f"(score {rounded}/100, {band} band; {n:,} filtered row(s))."
             )
         if rs < MIN_PEARSON_SAMPLE:
@@ -355,6 +370,121 @@ def _compose_insight_confidence_rationale(
     if secondary:
         return f"{primary} — {'; '.join(secondary)}."
     return f"{primary} ({len(reasons)} evidence factors)."
+
+
+def _routing_analysis_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
+    """Credit when intent, chart type, and columns align even if the sample is thin."""
+    pts = 0.0
+    reasons: List[str] = []
+    kind = (inp.analysis_kind or "").strip().lower()
+    ct = normalize_confidence_chart_type(inp.chart_type)
+
+    if inp.intent_structured:
+        pts += 14.0
+        reasons.append("Routing resolved metric, breakdown, and aggregation")
+
+    if inp.relationship_scatter and kind in ("relationship_scatter", "driver"):
+        if ct in ("scatter", ""):
+            pts += 12.0
+            reasons.append("Scatter pairs the requested relationship metrics")
+    elif kind == "outlier" and ct in ("bar", "bar_horizontal", ""):
+        pts += 10.0
+        reasons.append("Outlier question routed to peer category comparison")
+    elif kind in ("ranking", "compare", "aggregation") and ct in (
+        "bar",
+        "bar_horizontal",
+        "histogram",
+        "pie",
+        "donut",
+        "",
+    ):
+        pts += 8.0
+        reasons.append("Ranking/compare intent matches categorical chart")
+
+    if inp.unsupported_explained and inp.growth_request_unsatisfied:
+        pts += 16.0
+        reasons.append(
+            "Unsupported growth guard explains missing period/baseline — routing is transparent"
+        )
+
+    return pts, reasons
+
+
+def _sample_evidence_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
+    """Sample-size and statistical-support evidence (separate from routing)."""
+    pts = 0.0
+    reasons: List[str] = []
+    n = max(0, int(inp.row_count))
+    cp = max(0, int(inp.chart_point_count))
+
+    if n > 0 and n < 100:
+        pts -= 6.0
+        reasons.append(f"Small filtered cohort ({n:,} row(s))")
+    if cp > 0 and n > 0:
+        rpg = float(n) / float(cp)
+        if rpg < 3 and not inp.relationship_scatter:
+            pts -= 5.0
+            reasons.append(f"Sparse groups (~{rpg:.1f} rows per chart group)")
+
+    if inp.relationship_scatter:
+        rs = int(inp.relationship_sample_size or 0)
+        if rs >= 2 and rs <= MIN_PEARSON_SAMPLE and not inp.correlation_qualitative_only:
+            pts -= 4.0
+            reasons.append(
+                f"Based on {rs} paired rows; directional due to small sample"
+            )
+
+    return pts, reasons
+
+
+def _calibrate_confidence_score(
+    score: float,
+    inp: InsightConfidenceInput,
+    *,
+    routing_pts: float,
+    sample_pts: float,
+) -> float:
+    """Apply scenario floors so well-routed thin samples are not scored near zero."""
+    kind = (inp.analysis_kind or "").strip().lower()
+    rs = int(inp.relationship_sample_size or 0)
+    n = max(0, int(inp.row_count))
+    cp = max(0, int(inp.chart_point_count))
+
+    if (
+        inp.relationship_scatter
+        and inp.intent_structured
+        and rs >= 2
+        and not inp.correlation_qualitative_only
+    ):
+        blended = 0.58 * routing_pts + 0.42 * max(35.0, 100.0 + sample_pts)
+        if rs <= MIN_PEARSON_SAMPLE:
+            return max(45.0, min(65.0, max(score, blended)))
+        return max(score, min(72.0, blended))
+
+    if (
+        inp.dimension_redirect_handled
+        and inp.requested_dimension_missing
+        and cp >= 2
+        and inp.intent_structured
+    ):
+        blended = 0.52 * routing_pts + 0.48 * max(42.0, 100.0 + sample_pts)
+        return max(55.0, min(69.0, max(score, blended)))
+
+    if (
+        kind in ("outlier", "ranking", "compare")
+        and inp.intent_structured
+        and 2 <= cp <= 12
+        and n > 0
+        and n < 100
+    ):
+        blended = 0.55 * routing_pts + 0.45 * max(38.0, 100.0 + sample_pts)
+        return max(45.0, min(60.0, max(score, blended)))
+
+    if inp.growth_request_unsatisfied and inp.unsupported_explained:
+        blended = 0.5 * routing_pts + 0.5 * max(28.0, 100.0 + sample_pts)
+        return max(30.0, min(41.0, max(score, blended)))
+
+    return score
 
 
 def _dimension_redirect_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
@@ -427,6 +557,14 @@ def calculate_insight_confidence(
     score += r_dr_pts
     reasons.extend(r_dr_reasons)
 
+    routing_pts, routing_reasons = _routing_analysis_points(inp)
+    score += routing_pts
+    reasons.extend(routing_reasons)
+
+    sample_pts, sample_reasons = _sample_evidence_points(inp)
+    score += sample_pts
+    reasons.extend(sample_reasons)
+
     for block in (
         _metric_quality_points,
         _chart_suitability_points,
@@ -439,13 +577,24 @@ def calculate_insight_confidence(
         reasons.extend(b_reasons)
 
     score = min(100.0, max(0.0, score))
+    score = _calibrate_confidence_score(
+        score,
+        inp,
+        routing_pts=routing_pts,
+        sample_pts=sample_pts,
+    )
+    score = min(100.0, max(0.0, score))
     band = _band_from_score(score)
     rounded = int(round(score))
+    routing_score = int(round(min(100.0, max(0.0, routing_pts))))
+    sample_score = int(round(min(100.0, max(0.0, 55.0 + sample_pts))))
 
     return {
         "score": rounded,
         "band": band,
         "reasons": reasons,
+        "routingConfidenceScore": routing_score,
+        "sampleConfidenceScore": sample_score,
         "insightConfidenceScore": rounded,
         "insightConfidenceLevel": band,
         "insightConfidenceRationale": _compose_insight_confidence_rationale(
@@ -506,6 +655,7 @@ def compute_insight_confidence_meta(
     partial_visualization_warning: bool = False,
     dimension_redirect_handled: bool = False,
     requested_dimension_missing: bool = False,
+    unsupported_explained: bool = False,
 ) -> Dict[str, Any]:
     """Backward-compatible wrapper around calculate_insight_confidence."""
     return calculate_insight_confidence(
@@ -531,5 +681,6 @@ def compute_insight_confidence_meta(
             partial_visualization_warning=partial_visualization_warning,
             dimension_redirect_handled=dimension_redirect_handled,
             requested_dimension_missing=requested_dimension_missing,
+            unsupported_explained=unsupported_explained,
         )
     )

@@ -17,7 +17,7 @@ export type UnsupportedGrowthAnalysis = {
 };
 
 export const GROWTH_CANNOT_DETERMINE_LEAD =
-  "Growth cannot be determined from the available data.";
+  "Growth metric detected, but period/methodology is unknown — growth comparison is directional only because no date/baseline period exists.";
 
 const GROWTH_INTENT_RE =
   /\b(growing\s+fastest|fastest\s+growing|fastest\s+growth|growth\s+rate|increasing\s+fastest|grow(?:ing)?\s+fastest|rate\s+of\s+change|period[- ]over[- ]period|month[- ]over[- ]month|\bmom\b|\byoy\b|which\s+\w+\s+(?:is|are)\s+growing|what\s+\w+\s+(?:is|are)\s+growing|momentum\s+by\s+\w+|trend\s+by\s+\w+\s+over\s+time)\b/i;
@@ -170,8 +170,8 @@ export function buildUnsupportedGrowthExecutiveCards(
   return [
     {
       key: "ug-cannot",
-      title: "Cannot calculate growth",
-      value: "Not supported",
+      title: "Growth methodology",
+      value: "Period unknown",
       hint: meta.leadSentence,
       dotClass: stripes[0],
     },

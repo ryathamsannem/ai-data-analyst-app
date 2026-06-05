@@ -32,6 +32,7 @@ CITY_RANKING_QUESTIONS = [
     "Best performing city",
     "Top Performing City",
     "City ranking",
+    "Rank cities by revenue",
 ]
 
 from intent_engine.geographic_scope import (
@@ -98,9 +99,26 @@ class TestGeographicScope(unittest.TestCase):
                 gcol = resolve_geographic_group_column(q, self.df, self.profile)
                 self.assertEqual(gcol, "city")
 
+    def test_rank_cities_by_revenue_full_expectations(self) -> None:
+        q = "Rank cities by revenue"
+        exact, visualization, analysis = self.main.compute_visualization_for_question(q)
+        self.assertIsNotNone(visualization)
+        labels = visualization.get("labels") or []
+        self.assertEqual(len(labels), 8)
+        self.assertEqual(labels[0], "Mumbai")
+        self.assertIn("Jaipur", labels)
+        zone_labels = {"South", "West", "North", "East"}
+        for lab in labels:
+            self.assertNotIn(lab, zone_labels)
+        title = str(visualization.get("title") or analysis.get("chartTitle") or "")
+        self.assertIn("city", title.lower())
+        self.assertEqual(str(analysis.get("categoryColumn") or "").lower(), "city")
+        prov = visualization.get("provenance") or {}
+        self.assertEqual(str(prov.get("categoryColumn") or "").lower(), "city")
+
     def test_city_ranking_charts_use_city_labels(self) -> None:
         zone_labels = {"South", "West", "North", "East"}
-        for q in CITY_RANKING_QUESTIONS[:4]:
+        for q in CITY_RANKING_QUESTIONS[:5]:
             with self.subTest(question=q):
                 _exact, visualization, analysis = (
                     self.main.compute_visualization_for_question(q)

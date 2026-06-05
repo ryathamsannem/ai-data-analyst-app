@@ -14,6 +14,7 @@ from intent_engine.multi_metric_intent import build_multi_metric_comparison
 from intent_engine.question_patterns import (
     question_requests_correlation_routing,
     question_requests_decline_intent,
+    question_requests_driver_intent,
     question_requests_entity_decline,
     question_requests_multi_metric_comparison,
     question_requests_relationship_intent,
@@ -133,6 +134,8 @@ def resolve_analysis_intent(
 
     if requests_decline:
         primary_goal_seed = "decline"
+    elif question_requests_driver_intent(question):
+        primary_goal_seed = "driver"
     elif requests_relationship:
         primary_goal_seed = "relationship"
     elif multi_payload:
@@ -188,7 +191,7 @@ def resolve_analysis_intent(
         intent_routing = "compare"
     elif primary_goal == "decline":
         intent_routing = "decline"
-    elif primary_goal == "relationship":
+    elif primary_goal in ("relationship", "driver"):
         intent_routing = "relationship"
 
     flags: Dict[str, Any] = {
@@ -200,6 +203,7 @@ def resolve_analysis_intent(
         "requestsProfitMargin": legacy.question_requests_profit_margin(question),
         "requestsRoi": legacy.question_requests_roi(question),
         "requestsRelationship": requests_relationship,
+        "requestsDriver": question_requests_driver_intent(question),
     }
     if multi_payload:
         flags["requestedMetrics"] = multi_payload.get("requestedMetrics")

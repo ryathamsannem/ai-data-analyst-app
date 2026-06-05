@@ -85,7 +85,7 @@ export function formatPearsonCoefficient(r: number): string {
 
 export function smallSampleCorrelationConfidenceLine(n: number): string {
   const rows = Math.max(0, Math.round(n));
-  return `Correlation computed on ${rows} paired row${rows === 1 ? "" : "s"}; treat as directional due to small sample.`;
+  return `Based on ${rows} paired row${rows === 1 ? "" : "s"}; directional due to small sample.`;
 }
 
 export function parseNumericCoefficient(raw: unknown): number | null {

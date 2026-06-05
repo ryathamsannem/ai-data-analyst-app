@@ -56,6 +56,35 @@ _METRIC_WORD_RE = re.compile(
     re.I,
 )
 
+_DRIVER_RE = re.compile(
+    r"\b("
+    r"what\s+drives?|what\s+is\s+driving|what\s+factors?\s+drive|"
+    r"main\s+driver|primary\s+driver|key\s+driver|biggest\s+driver|"
+    r"largest\s+driver|top\s+driver|root\s+cause|what\s+causes?|"
+    r"what\s+most\s+(?:drives?|affects?|influences?)|"
+    r"what\s+(?:drives?|affects?|influences?)\s+.{0,48}?\bmost\b"
+    r")\b",
+    re.I,
+)
+
+
+def question_requests_driver_intent(question: str) -> bool:
+    """
+    Causal / driver questions (not category ranking).
+    e.g. "What drives revenue the most?"
+    """
+    q = (question or "").strip()
+    if not q:
+        return False
+    if _DRIVER_RE.search(q):
+        return True
+    ql = q.lower()
+    if re.search(r"\bdriver(?:s)?\b", ql) and _METRIC_WORD_RE.search(ql):
+        return True
+    if re.search(r"\broot\s+cause\b", ql):
+        return True
+    return False
+
 
 def question_requests_decline_intent(question: str) -> bool:
     q = (question or "").strip()
@@ -83,6 +112,8 @@ def question_requests_correlation_routing(question: str) -> bool:
     q = (question or "").strip()
     if not q:
         return False
+    if question_requests_driver_intent(q):
+        return True
     if question_requests_relationship_intent(q):
         return True
     ql = q.lower()
@@ -134,6 +165,8 @@ def question_requests_multi_metric_comparison(question: str) -> bool:
     ql = q.lower()
 
     if question_requests_relationship_intent(q):
+        return False
+    if question_requests_driver_intent(q):
         return False
     if question_requests_decline_intent(q):
         return False

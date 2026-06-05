@@ -86,6 +86,13 @@ export function sanitizeRelationshipUserFacingText(text: string): string {
     ""
   );
 
+  t = t.replace(/\btotal\s+total\b/gi, "total");
+  t = t.replace(
+    /\b(Key findings|What this may indicate|Suggested next steps|Statistical observations|How this was calculated)\b(\s*:\s*)\1\b/gi,
+    "$1$2"
+  );
+  t = t.replace(/(\b[\w\s,'"-]{20,120}[.!?])\s+\1/g, "$1");
+
   return t.replace(/\n{3,}/g, "\n\n").trim();
 }
 
