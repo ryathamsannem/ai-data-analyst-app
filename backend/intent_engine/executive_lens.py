@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 from intent_engine.insight_card_titles import build_insight_card_title
 
-ExecutiveLens = Optional[str]  # summary | opportunity | risk | driver | explain
+ExecutiveLens = Optional[str]  # summary | opportunity | risk | driver | explain | strategy | loss | standout
 
 _OPPORTUNITY_RE = re.compile(
     r"\b("
@@ -30,7 +30,7 @@ _RISK_RE = re.compile(
 _SUMMARY_RE = re.compile(
     r"\b("
     r"summarize|summary|business\s+performance|executive\s+summary|key\s+takeaways|"
-    r"overall\s+performance|headline"
+    r"overall\s+performance|headline|business\s+overview"
     r")\b",
     re.I,
 )
@@ -47,6 +47,17 @@ def detect_executive_lens(question: str) -> ExecutiveLens:
     q = (question or "").strip()
     if not q:
         return None
+    try:
+        from intent_engine.executive_ambiguous_intent import (
+            bucket_to_executive_lens,
+            classify_executive_ambiguous_bucket,
+        )
+
+        bucket = classify_executive_ambiguous_bucket(q)
+        if bucket:
+            return bucket_to_executive_lens(bucket)  # type: ignore[return-value]
+    except Exception:
+        pass
     if _DRIVER_RE.search(q) and not _OPPORTUNITY_RE.search(q) and not _RISK_RE.search(q):
         return "driver"
     risk_hit = _RISK_RE.search(q)
@@ -148,6 +159,56 @@ def _pick_breakdown_col(
     return scored[0][1]
 
 
+def _fmt_pct(pct: float) -> str:
+    if pct >= 10:
+        return f"{round(pct)}%"
+    return f"{pct:.1f}%"
+
+
+def _summary_trend_narrative(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    metric_col: str,
+    met_label: str,
+) -> Optional[str]:
+    try:
+        from intent_engine import legacy
+
+        date_col = legacy.pick_date_column_for_trend(df, profile)
+    except Exception:
+        date_col = None
+    if not date_col or date_col not in df.columns or metric_col not in df.columns:
+        return None
+    sub = df[[date_col, metric_col]].copy()
+    sub[date_col] = pd.to_datetime(sub[date_col], errors="coerce")
+    sub[metric_col] = pd.to_numeric(sub[metric_col], errors="coerce")
+    sub = sub.dropna()
+    if len(sub) < 4:
+        return None
+    try:
+        monthly = (
+            sub.groupby(sub[date_col].dt.to_period("M"))[metric_col]
+            .sum()
+            .sort_index()
+        )
+    except Exception:
+        return None
+    if len(monthly) < 2:
+        return None
+    first = float(monthly.iloc[0])
+    last = float(monthly.iloc[-1])
+    if first <= 1e-9:
+        return None
+    chg = 100.0 * (last - first) / first
+    if abs(chg) < 3:
+        return None
+    direction = "up" if chg > 0 else "down"
+    return (
+        f"In this sample, {met_label.lower()} trends {direction} from the earliest to latest "
+        f"period ({_fmt_pct(abs(chg))} change, directional)."
+    )
+
+
 def _group_totals(
     df: pd.DataFrame,
     group_col: str,
@@ -214,6 +275,14 @@ def build_lens_specific_insights(
     growth_col = _pick_growth_col(df, profile)
     profit_col = next(
         (c for c in _numeric_cols(df, profile) if "profit" in str(c).lower()),
+        None,
+    )
+    revenue_col = next(
+        (
+            c
+            for c in _numeric_cols(df, profile)
+            if any(h in str(c).lower() for h in ("revenue", "sales"))
+        ),
         None,
     )
     customer_col = next(
@@ -367,7 +436,7 @@ def build_lens_specific_insights(
                         )
                     )
 
-    elif lens in ("summary", "explain"):
+    elif lens == "explain":
         out.append(
             _card(
                 "ranking",
@@ -388,6 +457,232 @@ def build_lens_specific_insights(
                 )
             )
 
+    elif lens == "strategy":
+        risk_slice = build_lens_specific_insights(
+            df, profile, question=question, lens="risk", metric_col=metric, dimension_col=dim
+        )
+        opp_slice = build_lens_specific_insights(
+            df,
+            profile,
+            question=question,
+            lens="opportunity",
+            metric_col=metric,
+            dimension_col=dim,
+        )
+        for card in (risk_slice[:2] + opp_slice[:1]):
+            c = dict(card)
+            c["executiveLens"] = "strategy"
+            c["priority"] = int(c.get("priority") or 0) + 4
+            out.append(c)
+        if top_share >= 28:
+            out.append(
+                _card(
+                    "concentration",
+                    68,
+                    build_insight_card_title(met_label, "concentration"),
+                    f"{top_share:.0f}%",
+                    f"Priority signal: {top_name} contributes {top_share:.0f}% of total "
+                    f"{met_label.lower()} — consider diversification alongside growth bets.",
+                )
+            )
+        if not out:
+            out.append(
+                _card(
+                    "ranking",
+                    66,
+                    "Management focus",
+                    top_name,
+                    f"Lead with {top_name} performance and weakest peer {bot_name} "
+                    f"when setting near-term priorities across {dim_label.lower()}s.",
+                )
+            )
+
+    elif lens == "loss":
+        g_loss = g.sort_values(metric, ascending=True)
+        low_row = g_loss.iloc[0]
+        low_val = float(low_row[metric])
+        if low_val < 0:
+            out.append(
+                _card(
+                    "risk",
+                    90,
+                    "Loss segment",
+                    str(low_row[dim]),
+                    f"{low_row[dim]} shows negative grouped {met_label.lower()} "
+                    f"({low_val:,.0f}) in this sample.",
+                )
+            )
+        else:
+            out.append(
+                _card(
+                    "ranking",
+                    88,
+                    "No loss rows",
+                    "None",
+                    f"No loss-making groups in this cohort — lowest profit is "
+                    f"{low_row[dim]} at {low_val:,.0f} (still >= 0).",
+                )
+            )
+        if (
+            profit_col
+            and revenue_col
+            and metric == profit_col
+            and profit_col in df.columns
+            and revenue_col in df.columns
+        ):
+            g2 = _group_totals(df, dim, profit_col, extra_numeric=[revenue_col])
+            if len(g2) >= 2 and revenue_col in g2.columns:
+                g2["margin"] = g2[profit_col] / g2[revenue_col].replace(0, pd.NA)
+                weak_m = g2.sort_values("margin", ascending=True).iloc[0]
+                if pd.notna(weak_m["margin"]):
+                    out.append(
+                        _card(
+                            "risk",
+                            78,
+                            "Margin pressure",
+                            str(weak_m[dim]),
+                            f"{weak_m[dim]} has the lowest profit-to-revenue ratio "
+                            "in this sample.",
+                        )
+                    )
+
+    elif lens == "standout":
+        spread = float(g[metric].iloc[0]) - float(g[metric].iloc[-1])
+        if spread > 0 and float(g[metric].iloc[0]) > 0:
+            gap_pct = 100.0 * spread / float(g[metric].iloc[0])
+            if gap_pct >= 12:
+                out.append(
+                    _card(
+                        "outlier",
+                        86,
+                        "Largest gap",
+                        _fmt_pct(gap_pct),
+                        f"Largest standout gap: {top_name} vs {bot_name} "
+                        f"({ _fmt_pct(gap_pct) } spread on {met_label.lower()}).",
+                    )
+                )
+        if top_share >= 30:
+            out.append(
+                _card(
+                    "concentration",
+                    82,
+                    build_insight_card_title(met_label, "concentration"),
+                    f"{top_share:.0f}%",
+                    f"Unusual concentration: {top_name} accounts for {top_share:.0f}% of "
+                    f"total {met_label.lower()} in this cohort.",
+                )
+            )
+        out.append(
+            _card(
+                "outlier",
+                74,
+                "High outlier",
+                top_name,
+                f"{top_name} is the strongest standout on {met_label.lower()} "
+                f"at {float(g[metric].iloc[0]):,.0f}.",
+            )
+        )
+        out.append(
+            _card(
+                "outlier",
+                70,
+                "Low outlier",
+                bot_name,
+                f"{bot_name} is the weakest standout on {met_label.lower()} "
+                f"at {float(g[metric].iloc[-1]):,.0f}.",
+            )
+        )
+
+    elif lens == "summary":
+        out.append(
+            _card(
+                "ranking",
+                72,
+                f"Top {dim_label}",
+                top_name,
+                f"In this sample, {top_name} leads on {met_label.lower()} across {dim_label.lower()}s.",
+            )
+        )
+        if top_share >= 25:
+            out.append(
+                _card(
+                    "concentration",
+                    70,
+                    build_insight_card_title(met_label, "concentration"),
+                    f"{top_share:.0f}%",
+                    f"The data suggests {top_name} contributes {top_share:.0f}% of total {met_label.lower()}.",
+                )
+            )
+        spread = float(g[metric].iloc[0]) - float(g[metric].iloc[-1])
+        if spread > 0 and float(g[metric].iloc[0]) > 0:
+            gap_pct = 100.0 * spread / float(g[metric].iloc[0])
+            if gap_pct >= 12:
+                out.append(
+                    _card(
+                        "gap",
+                        66,
+                        build_insight_card_title(met_label, "gap"),
+                        _fmt_pct(gap_pct),
+                        f"{top_name} leads {bot_name} by {_fmt_pct(gap_pct)} on {met_label.lower()} "
+                        f"across {dim_label.lower()}s in this sample.",
+                    )
+                )
+        trend_line = _summary_trend_narrative(df, profile, metric, met_label)
+        if trend_line:
+            out.append(
+                _card(
+                    "trend",
+                    64,
+                    "Trend direction",
+                    "Directional",
+                    trend_line,
+                )
+            )
+        if profit_col and profit_col in g.columns and metric != profit_col:
+            g_m = g.copy()
+            g_m["margin"] = g_m[profit_col] / g_m[metric].replace(0, pd.NA)
+            best = g_m.sort_values("margin", ascending=False).iloc[0]
+            if pd.notna(best["margin"]):
+                margin_pct = 100.0 * float(best["margin"])
+                out.append(
+                    _card(
+                        "ranking",
+                        60,
+                        "Profitability",
+                        str(best[dim]),
+                        f"{best[dim]} shows the strongest profit-to-{met_label.lower()} ratio "
+                        f"in this sample ({_fmt_pct(margin_pct)} margin, directional).",
+                    )
+                )
+        if growth_col and growth_col in g.columns:
+            high_g = g.sort_values(growth_col, ascending=False).iloc[0]
+            low_g = g.sort_values(growth_col, ascending=True).iloc[0]
+            gro_lbl = _pretty_col(growth_col).lower()
+            if float(high_g[growth_col]) > float(g[growth_col].median()):
+                out.append(
+                    _card(
+                        "ranking",
+                        58,
+                        f"Strong { _pretty_col(growth_col) }",
+                        str(high_g[dim]),
+                        f"In this sample, {high_g[dim]} shows the strongest {gro_lbl} among "
+                        f"{dim_label.lower()}s.",
+                    )
+                )
+            if float(low_g[growth_col]) < float(g[growth_col].median()) and str(
+                low_g[dim]
+            ) != str(high_g[dim]):
+                out.append(
+                    _card(
+                        "risk",
+                        56,
+                        "Growth watch",
+                        str(low_g[dim]),
+                        f"{low_g[dim]} has the weakest {gro_lbl} among {dim_label.lower()}s — "
+                        "a possible stagnation signal in this sample.",
+                    )
+                )
+
     return out
 
 
@@ -404,10 +699,20 @@ def merge_lens_insights(
     prefer: Dict[str, int] = {
         "opportunity": {"opportunity": 18, "gap": 12, "ranking": 4, "concentration": -6, "risk": -20},
         "risk": {"risk": 18, "concentration": 14, "outlier": 10, "opportunity": -12, "gap": -8},
-        # Summary should not drift into risk/opportunity-specific wording.
-        "summary": {"concentration": 10, "ranking": 10, "opportunity": -18, "risk": -18},
+        # Summary: multi-signal synthesis; deprioritize opportunity-style cards from base ranker.
+        "summary": {
+            "concentration": 12,
+            "ranking": 10,
+            "gap": 10,
+            "trend": 9,
+            "opportunity": -18,
+            "risk": -6,
+        },
         "driver": {"ranking": -4, "concentration": -4},
         "explain": {"ranking": 6, "opportunity": 4, "concentration": 2},
+        "strategy": {"concentration": 12, "risk": 10, "opportunity": 8, "gap": 6, "ranking": -8},
+        "loss": {"risk": 14, "ranking": 8, "concentration": -10, "opportunity": -20},
+        "standout": {"outlier": 16, "gap": 12, "concentration": 10, "ranking": -6},
     }.get(lens, {})
 
     merged = list(lens_insights) + list(base)
@@ -429,8 +734,13 @@ def merge_lens_insights(
     best_by_key: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
     disallowed_kinds: set[str] = set()
     if lens == "summary":
-        # Summary should not drift into risk/opportunity-specific wording.
-        disallowed_kinds = {"opportunity", "gap", "risk"}
+        disallowed_kinds = {"opportunity"}
+    elif lens == "risk":
+        disallowed_kinds = {"opportunity"}
+    elif lens == "loss":
+        disallowed_kinds = {"opportunity", "concentration"}
+    elif lens == "standout":
+        disallowed_kinds = {"opportunity", "risk"}
 
     for item in merged:
         kind = str(item.get("kind") or "").strip().lower()
@@ -504,6 +814,22 @@ def executive_lens_prompt_block(lens: ExecutiveLens) -> str:
         "explain": (
             "Executive lens: ENTITY PERFORMANCE EXPLANATION.\n"
             "- Explain the filtered entity's performance vs peers using available breakdown columns.\n"
+            f"- {tone}"
+        ),
+        "strategy": (
+            "Executive lens: MANAGEMENT PRIORITIES.\n"
+            "- Combine concentration, risk, opportunity, and growth/margin signals — not a single ranking.\n"
+            f"- {tone}"
+        ),
+        "loss": (
+            "Executive lens: LOSS / PROFITABILITY.\n"
+            "- Use profit totals; state if no loss-making groups exist.\n"
+            "- Never describe revenue ranking as loss analysis.\n"
+            f"- {tone}"
+        ),
+        "standout": (
+            "Executive lens: STANDOUT / OUTLIER.\n"
+            "- Highlight unusual highs, lows, gaps, and concentration.\n"
             f"- {tone}"
         ),
     }

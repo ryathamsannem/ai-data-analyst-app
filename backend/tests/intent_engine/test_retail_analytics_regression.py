@@ -363,9 +363,20 @@ class TestRetailAnalyticsRegression(unittest.TestCase):
             if bucket == "executive_summary" and ranked:
                 kinds = {str(x.get("kind") or "").lower() for x in ranked if isinstance(x, dict)}
                 self.assertTrue(
-                    not (kinds & {"risk", "opportunity", "gap"}),
-                    msg=f"executive summary should avoid risk/opportunity wording, got kinds={kinds}",
+                    not (kinds & {"risk", "opportunity"}),
+                    msg=f"executive summary should avoid dedicated risk/opportunity lens cards, got kinds={kinds}",
                 )
+                self.assertTrue(
+                    len(kinds) >= 2,
+                    msg=f"executive summary should combine multiple signals, got kinds={kinds}",
+                )
+                joined = " ".join(
+                    str(x.get("narrativeLine") or x.get("hint") or "")
+                    for x in ranked
+                    if isinstance(x, dict)
+                )
+                if "contributes" in joined.lower() and "of" in joined.lower():
+                    self.assertIn("%", joined, msg="share narratives must include %")
 
         chart_type = str((viz or {}).get("chartType") or analysis.get("chartType") or "").lower()
         chart_rec = analysis.get("chartRecommendation") or {}

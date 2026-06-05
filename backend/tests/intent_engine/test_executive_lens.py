@@ -28,6 +28,11 @@ class TestExecutiveLensDetection(unittest.TestCase):
         self.assertEqual(detect_executive_lens("Summarize business performance"), "summary")
         self.assertEqual(detect_executive_lens("What drives revenue the most?"), "driver")
         self.assertEqual(detect_executive_lens("What explains Mumbai's performance?"), "explain")
+        self.assertEqual(detect_executive_lens("What should management focus on?"), "strategy")
+        self.assertEqual(detect_executive_lens("Where are we losing money?"), "loss")
+        self.assertEqual(detect_executive_lens("What should we improve?"), "opportunity")
+        self.assertEqual(detect_executive_lens("What concerns you most?"), "risk")
+        self.assertEqual(detect_executive_lens("What stands out?"), "standout")
 
     def test_risk_not_opportunity_when_both_words(self) -> None:
         self.assertEqual(
@@ -82,6 +87,27 @@ class TestExecutiveLensCards(unittest.TestCase):
                 "rank" in narratives or "among peers" in narratives,
                 msg="customer mention should be scoped, not assumed",
             )
+
+    def test_summary_lens_multi_signal_cards(self) -> None:
+        cards = build_lens_specific_insights(
+            self.df,
+            self.profile,
+            question="Summarize business performance",
+            lens="summary",
+            metric_col="revenue",
+            dimension_col="region",
+        )
+        kinds = {str(x.get("kind")) for x in cards}
+        narratives = " ".join(
+            str(x.get("narrativeLine") or x.get("hint") or "") for x in cards
+        ).lower()
+        self.assertIn("ranking", kinds)
+        self.assertTrue(
+            "concentration" in kinds or "gap" in kinds,
+            msg=f"expected share or gap signal, got {kinds}",
+        )
+        self.assertIn("%", narratives)
+        self.assertNotIn("contributes 42 of total", narratives)
 
     def test_merge_boosts_lens_relevant_cards(self) -> None:
         base = [

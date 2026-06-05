@@ -132,6 +132,19 @@ def resolve_analysis_intent(
             question, df, profile, intent_debug_eff
         )
 
+    exec_amb_bucket = None
+    try:
+        from intent_engine.executive_ambiguous_intent import (
+            classify_executive_ambiguous_bucket,
+            bucket_to_primary_goal,
+        )
+
+        exec_amb_bucket = classify_executive_ambiguous_bucket(question)
+        if exec_amb_bucket and exec_amb_bucket not in tags:
+            tags = [*tags, exec_amb_bucket]
+    except Exception:
+        exec_amb_bucket = None
+
     if requests_decline:
         primary_goal_seed = "decline"
     elif question_requests_driver_intent(question):
@@ -140,6 +153,8 @@ def resolve_analysis_intent(
         primary_goal_seed = "relationship"
     elif multi_payload:
         primary_goal_seed = "multi_metric_comparison"
+    elif exec_amb_bucket:
+        primary_goal_seed = bucket_to_primary_goal(exec_amb_bucket)
     else:
         primary_goal_seed = _infer_primary_goal(
             question,

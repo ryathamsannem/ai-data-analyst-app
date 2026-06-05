@@ -47,6 +47,7 @@ export function isExecutiveTakeawaysQuestion(question: string): boolean {
     /\b(primary|core)\s+findings?\b/.test(q) ||
     /\b(summarize|summarise)\b.*\b(business\s+)?performance\b/.test(q) ||
     /\bbusiness\s+overview\b/.test(q) ||
+    /\bwhat\s+is\s+the\s+business\s+overview\b/.test(q) ||
     /\bgive\s+(an?\s+)?executive\s+summary\b/.test(q) ||
     /\boverall\s+business\s+(performance|health)\b/.test(q)
   );
@@ -95,6 +96,19 @@ export function formatGapPercentSuffix(
 
 function formatPctForNarrative(pct: number): string {
   return pct >= 10 ? String(Math.round(pct)) : pct.toFixed(1);
+}
+
+/** Share/concentration/rate text — always includes a percent sign. */
+export function formatSharePercentText(pct: number): string {
+  return `${formatPctForNarrative(pct)}%`;
+}
+
+/** Fix share lines that omit % before "of total". */
+export function ensureSharePercentInPhrase(text: string): string {
+  return text.replace(
+    /\bcontributes\s+(\d+(?:\.\d+)?)\s+of\s+(?!%)/gi,
+    "contributes $1% of "
+  );
 }
 
 function humanizeMetricPhrase(valueAxis: string): string {
@@ -219,7 +233,7 @@ export function buildNumberedExecutiveBrief(args: {
     total > 1e-9 ? (100 * top.value) / total : null;
 
   if (sharePct != null && sharePct >= 28) {
-    const shareDisp = formatPctForNarrative(sharePct);
+    const shareDisp = formatSharePercentText(sharePct);
     bullets.push(
       `${topLabel} contributes ${shareDisp} of ${met} and dominates performance.`
     );
@@ -261,6 +275,26 @@ export function buildNumberedExecutiveBrief(args: {
 
   const headline = `TOP ${n} BUSINESS INSIGHTS`;
   const numbered = bullets
+    .slice(0, n)
+    .map((body, i) => `${i + 1}. ${body}`)
+    .join("\n\n");
+
+  return `${headline}\n\n${numbered}`;
+}
+
+/** Numbered brief from API-ranked executive insights (multi-signal summary). */
+export function buildNumberedExecutiveBriefFromRanked(args: {
+  question: string;
+  lines: string[];
+}): string | null {
+  const lines = args.lines
+    .map((l) => ensureSharePercentInPhrase(l.trim()))
+    .filter((l) => l.length >= 12);
+  if (lines.length < 2) return null;
+
+  const n = executiveInsightCount(args.question);
+  const headline = `TOP ${n} BUSINESS INSIGHTS`;
+  const numbered = lines
     .slice(0, n)
     .map((body, i) => `${i + 1}. ${body}`)
     .join("\n\n");

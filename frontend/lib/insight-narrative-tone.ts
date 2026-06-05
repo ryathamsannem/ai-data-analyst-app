@@ -143,12 +143,40 @@ const DEFINITIVE_PATTERNS: [RegExp, string][] = [
   [/\bconfirms that\b/gi, "is consistent with"],
 ];
 
+const SPECULATIVE_DRIVER_RE =
+  /\b(higher|lower|larger|smaller|stronger|weaker)\s+(customer\s+density|order\s+volumes?|product[- ]?category\s+mix|pricing(?:\s+pressure)?)\b/i;
+
+const DRIVER_DISCLAIMER =
+  "Potential drivers could include customer density, order volume, pricing, or product mix. Additional analysis is required.";
+
+/** Soften operational driver claims that are not computed in this cohort. */
+export function softenSpeculativeOperationalDrivers(text: string): string {
+  const raw = text.trim();
+  if (!raw || !SPECULATIVE_DRIVER_RE.test(raw)) return text;
+  if (/\bpotential drivers could include\b/i.test(raw)) return text;
+
+  let t = raw
+    .replace(
+      /\b(?:due to|because of|driven by|reflects?|indicates?)\s+(?:higher|larger|stronger)\s+customer\s+density\b/gi,
+      "may be consistent with factors such as customer density"
+    )
+    .replace(/\bhigher customer density\b/gi, "customer density")
+    .replace(/\blarger order volumes?\b/gi, "order volume")
+    .replace(/\bstronger product[- ]category mix\b/gi, "product mix")
+    .replace(/\bbetter pricing\b/gi, "pricing");
+
+  if (!/\b(may|might|could|potential|not measured|additional analysis)\b/i.test(t)) {
+    t = `${t.replace(/\.$/, "")}. ${DRIVER_DISCLAIMER}`;
+  }
+  return t;
+}
+
 export function softenAssertiveProse(
   text: string,
   tone: NarrativeTone
 ): string {
   if (!text.trim() || tone === "confident") return text;
-  let t = text;
+  let t = softenSpeculativeOperationalDrivers(text);
   for (const [re, repl] of DEFINITIVE_PATTERNS) {
     t = t.replace(re, repl);
   }

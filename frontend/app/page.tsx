@@ -192,6 +192,7 @@ import {
 } from "@/lib/narrative-number-format";
 import {
   buildNumberedExecutiveBrief,
+  buildNumberedExecutiveBriefFromRanked,
   buildRankingExecutiveBrief,
   isExecutiveSummaryLayoutMode,
   isExecutiveTakeawaysQuestion,
@@ -10156,6 +10157,21 @@ function HomeInner() {
         valueAxis: insightChartAxisLabels.valueAxis,
         rows: briefRows,
       });
+    }
+    if (isExecutiveSummaryLayoutMode(lastAskedQuestion)) {
+      const rankedApi = parseRankedExecutiveInsights(
+        insightVisualization?.rankedExecutiveInsights
+      );
+      const rankedLines = rankedApi
+        .map((r) => r.narrativeLine?.trim() || r.hint?.trim() || "")
+        .filter(Boolean);
+      if (rankedLines.length >= 2) {
+        const fromRanked = buildNumberedExecutiveBriefFromRanked({
+          question: lastAskedQuestion,
+          lines: rankedLines,
+        });
+        if (fromRanked) return fromRanked;
+      }
     }
     return buildNumberedExecutiveBrief({
       question: lastAskedQuestion,

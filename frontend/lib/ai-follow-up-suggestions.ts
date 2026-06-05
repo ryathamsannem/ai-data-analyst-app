@@ -35,7 +35,7 @@ export type AiFollowUpChipContext = {
   categoryColumnDisplay?: string | null;
   /** Breakdown dimension for scatter margin follow-ups (not the scatter X metric). */
   breakdownDimensionLabel?: string | null;
-  /** Backend executive lens: opportunity | risk | summary | driver | explain */
+  /** Backend executive lens: opportunity | risk | summary | driver | explain | strategy | loss | standout */
   executiveLens?: string | null;
 };
 
@@ -629,6 +629,41 @@ export function buildExecutiveLensFollowUpChips(
         hasGrowth ? `How does growth compare to peers?` : `How does ${met} compare to peers?`,
         hasCustomer ? `Is customer volume aligned with ${met}?` : `Which factor stands out most?`,
         `What are the biggest opportunities?`,
+      ],
+      4
+    );
+  }
+  if (lens === "strategy") {
+    return dedupeFollowUpChips(
+      [
+        `What should we prioritize across ${plural}?`,
+        `What are the biggest risks?`,
+        `What are the biggest opportunities?`,
+        hasProfit ? `Compare profit margin by ${dimPhrase}` : `Where should we improve?`,
+        `What concerns you most?`,
+      ],
+      4
+    );
+  }
+  if (lens === "loss") {
+    return dedupeFollowUpChips(
+      [
+        hasProfit ? `Which ${dimPhrase} has the lowest profit margin?` : `Which ${dimPhrase} is least profitable?`,
+        `Are any ${plural} loss-making in this cohort?`,
+        `What profit threshold defines a loss segment?`,
+        `Compare profit margin across ${plural}`,
+        `Which product-region pairs are least profitable?`,
+      ],
+      4
+    );
+  }
+  if (lens === "standout") {
+    return dedupeFollowUpChips(
+      [
+        `Which ${dimPhrase} is an outlier on ${met}?`,
+        `What is the largest gap across ${plural}?`,
+        `Which points look unusual on ${met}?`,
+        `What concerns you most?`,
       ],
       4
     );

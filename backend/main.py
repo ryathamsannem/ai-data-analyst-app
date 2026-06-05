@@ -8212,6 +8212,15 @@ def _question_asks_outlier_analysis(ql: str) -> bool:
     s = str(ql).lower().strip()
     if not s:
         return False
+    try:
+        from intent_engine.executive_ambiguous_intent import (
+            question_requests_standout_analysis,
+        )
+
+        if question_requests_standout_analysis(s):
+            return True
+    except Exception:
+        pass
     if re.search(
         r"\b(outliers?|anomal(?:y|ies)|unusually\s+(?:high|low)|extreme\s+values?)\b",
         s,
@@ -10428,6 +10437,16 @@ def _chart_selection_question_bucket(ql: str) -> str:
             return rel_bucket
     except Exception:
         pass
+    try:
+        from intent_engine.executive_ambiguous_intent import (
+            chart_selection_bucket_override as exec_chart_bucket,
+        )
+
+        exec_bucket = exec_chart_bucket(q)
+        if exec_bucket:
+            return exec_bucket
+    except Exception:
+        pass
     if _question_asks_outlier_analysis(q) and not _question_explicitly_groups_by_dimension(q):
         return "outlier"
     if re.search(r"\b(vs\.?|versus|against)\b", q):
@@ -11911,6 +11930,10 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
         "- Do not diagnose data quality, customer dissatisfaction, churn, loyalty, or operational failure "
         "unless the calculated result explicitly quantifies those constructs with defined columns. "
         "If unsupported, say there is insufficient evidence in this sample.",
+        "- Do not state that customer density, order volumes, pricing, or product-category mix **are** the cause "
+        "unless those columns were directly aggregated in the calculated result. Preferred wording: "
+        "\"Potential drivers could include customer density, order volume, pricing, or product mix. "
+        "Additional analysis is required.\"",
         "- Avoid words like proves, definitively, clearly indicates, obviously, must be, always when the sample is small "
         "or when no statistical test output is provided.",
     ]
@@ -11957,6 +11980,38 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
                 "You may note static totals as context only — not as a growth ranking.",
                 "- Do not imply the highest current total is the fastest growing region or product.",
             ]
+        )
+    if bool(conf.get("lossProfitabilityAnalysis")):
+        lines.extend(
+            [
+                "- **Loss / profitability question** — Use profit (or margin) totals from the "
+                "calculated result. Do NOT describe revenue ranking as loss analysis.",
+                "- If the calculated result states that no loss-making groups exist, say that "
+                "explicitly before discussing low-profit segments.",
+                "- Preferred follow-up topics: profit margin by segment, negative-profit rows, "
+                "loss thresholds, product-region profitability.",
+            ]
+        )
+    exec_amb = str(conf.get("executiveAmbiguousBucket") or "").strip()
+    if exec_amb == "executive_strategy":
+        lines.append(
+            "- **Management priority question** — Combine concentration, risk, opportunity, and "
+            "growth/margin signals; do not answer with only a product revenue ranking."
+        )
+    elif exec_amb == "executive_risk":
+        lines.append(
+            "- **Concern / risk question** — Lead with concentration, weak segments, growth or "
+            "margin risks; avoid a generic revenue leaderboard."
+        )
+    elif exec_amb == "executive_opportunity":
+        lines.append(
+            "- **Improvement question** — Focus on uplift segments (gap, growth vs revenue, margin); "
+            "not only top revenue products."
+        )
+    elif exec_amb == "executive_outlier_standout":
+        lines.append(
+            "- **Standout / outlier question** — Describe unusual highs, lows, gaps, and "
+            "concentration; avoid generic ranking copy."
         )
     if bool(conf.get("driverAnalysis")):
         lines.extend(
@@ -12439,6 +12494,13 @@ def _build_unified_analysis_payload(
             exec_lens_out = None
     if exec_lens_out:
         out["executiveLens"] = exec_lens_out
+    if intent_debug and intent_debug.get("executive_ambiguous_bucket"):
+        out["executiveAmbiguousBucket"] = str(intent_debug["executive_ambiguous_bucket"])
+        conf["executiveAmbiguousBucket"] = out["executiveAmbiguousBucket"]
+    if intent_debug and isinstance(intent_debug.get("lossProfitabilityContext"), dict):
+        lpc = intent_debug["lossProfitabilityContext"]
+        out["lossProfitabilityContext"] = lpc
+        conf["lossProfitabilityAnalysis"] = True
     if conf.get("insightConfidenceBreakdown"):
         out["insightConfidenceBreakdown"] = conf["insightConfidenceBreakdown"]
     if forecast_guardrails and forecast_guardrails.get("active"):
@@ -13024,6 +13086,18 @@ def compute_visualization_for_question(
     if metric_spec_live and intent_debug:
         _apply_metric_spec_to_intent(intent_debug, metric_spec_live)
 
+    if intent_debug:
+        try:
+            from intent_engine.executive_ambiguous_intent import (
+                apply_executive_ambiguous_routing,
+            )
+
+            apply_executive_ambiguous_routing(
+                question, cohort_df, profile_live, intent_debug
+            )
+        except Exception:
+            pass
+
     original_df = df
     if entity_filter_meta is not None and not entity_explain_peer_compare:
         df = cohort_df
@@ -13321,8 +13395,13 @@ def _compute_visualization_for_question_body(
             chart_path_handled = True
 
     if not chart_path_handled and not correlation_routing_locked:
-        if _question_asks_outlier_analysis(ql) and not _question_explicitly_groups_by_dimension(
-            ql
+        standout_category_compare = bool(
+            intent_debug and intent_debug.get("executive_standout_analysis")
+        )
+        if (
+            _question_asks_outlier_analysis(ql)
+            and not _question_explicitly_groups_by_dimension(ql)
+            and not standout_category_compare
         ):
             ol_rows, ol_type, ol_title, ol_sub = _try_outlier_visualization(
                 question, smart_trace
@@ -14678,6 +14757,14 @@ def _compute_visualization_for_question_body(
             ]
         )
         analysis_validation_block["checks"] = av_checks
+
+    if intent_debug and isinstance(intent_debug.get("lossProfitabilityContext"), dict):
+        loss_block = str(
+            intent_debug["lossProfitabilityContext"].get("exactBlock") or ""
+        ).strip()
+        if loss_block:
+            er_tail = (exact_result or "").strip()
+            exact_result = f"{loss_block}\n\n{er_tail}" if er_tail else loss_block
 
     analysis_ctx = _build_unified_analysis_payload(
         question=question,
