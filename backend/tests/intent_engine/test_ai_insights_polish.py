@@ -102,19 +102,20 @@ class TestAiInsightsPolish(unittest.TestCase):
         self.assertEqual(high_names, ["Mumbai"])
         self.assertEqual(low_names, ["Jaipur"])
 
-    def test_growth_unsupported_wording_and_confidence_floor(self) -> None:
+    def test_static_growth_metric_compare_renders_chart(self) -> None:
+        """Compare an existing growth_rate column — chart renders; growth is not suppressed."""
         q = "Compare growth rate across zones"
         exact, viz, analysis = self._run(q)
-        score = int(analysis.get("insightConfidenceScore") or 0)
-        self.assertGreaterEqual(score, 30)
-        self.assertLessEqual(score, 44)
-        self.assertEqual(analysis.get("insightConfidenceLevel"), "low")
-        self.assertTrue(analysis.get("growthRequestUnsatisfied"))
+        self.assertIsNotNone(viz, msg=q)
+        labels = (viz or {}).get("labels") or []
+        self.assertGreaterEqual(len(labels), 2, msg=q)
+        self.assertIn("growth", str(analysis.get("metricColumn") or "").lower(), msg=q)
+        self.assertFalse(bool(analysis.get("growthRequestUnsatisfied")), msg=q)
         ug = analysis.get("unsupportedGrowthAnalysis") or {}
-        lead = str(ug.get("leadSentence") or "")
-        self.assertIn("period/methodology", lead.lower())
-        self.assertNotIn("cannot be determined", lead.lower())
-        self.assertNotIn("cannot calculate growth", lead.lower())
+        self.assertFalse(bool(ug.get("active")), msg=q)
+        score = int(analysis.get("insightConfidenceScore") or 0)
+        self.assertGreaterEqual(score, 40)
+        self.assertIn(analysis.get("insightConfidenceLevel"), ("low", "medium"))
 
 
 if __name__ == "__main__":

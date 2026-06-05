@@ -7592,6 +7592,25 @@ def _assess_unsupported_growth_analysis(
     is_time_chart = ct in ("line", "area") and (group_is_date or ts_buckets >= 2)
 
     entity_growth = _question_asks_entity_growth_comparison(question)
+    ql = (question or "").lower()
+    selected_value_col = str(intent_debug.get("value_col") or "") if intent_debug else ""
+    # If the dataset already provides a "growth rate" style metric and the question is
+    # asking to compare that metric across categories (not a computed period-over-period
+    # rate-of-change), do not suppress the visualization due to missing baseline periods.
+    requests_rate_of_change = bool(
+        re.search(
+            r"\b(over\s+time|period[- ]over[- ]period|rate\s+of\s+change|mom\b|yoy\b|yoy\+|mom\+)\b",
+            ql,
+            flags=re.I,
+        )
+    )
+    selected_looks_growth_metric = "growth" in selected_value_col.lower()
+    if (
+        selected_looks_growth_metric
+        and not requests_rate_of_change
+        and int(chart_points) >= 2
+    ):
+        return None
 
     if not date_col:
         return _unsupported_growth_payload(
@@ -7613,6 +7632,8 @@ def _assess_unsupported_growth_analysis(
         )
 
     if entity_growth and not is_time_chart:
+        if selected_looks_growth_metric and not requests_rate_of_change:
+            return None
         return _unsupported_growth_payload(
             periods_available=effective_periods,
             reason_code="category_snapshot",
@@ -11527,6 +11548,15 @@ def _assemble_visualization_provenance(
             viz_type_label = humanize_api_chart_type(api_type)
             if reason_override:
                 chart_sel_reason_out = reason_override
+            from intent_engine.chart_presentation_align import (
+                selection_explanation_for_presented_type,
+            )
+
+            chart_sel_reason_out = selection_explanation_for_presented_type(
+                api_type,
+                category_axis=_pretty_label_text(str(cat_col)) if cat_col else "categories",
+                metric_axis=_pretty_label_text(str(num_col)) if num_col else "values",
+            )
     except Exception:
         pass
     confidence = _compute_provenance_confidence(
@@ -12397,6 +12427,20 @@ def _build_unified_analysis_payload(
         out["categoricalOutlierInsights"] = intent_debug["categoricalOutlierInsights"]
     if intent_debug and intent_debug.get("rankedExecutiveInsights"):
         out["rankedExecutiveInsights"] = intent_debug["rankedExecutiveInsights"]
+    exec_lens_out: Optional[str] = None
+    if intent_debug and intent_debug.get("executive_lens"):
+        exec_lens_out = str(intent_debug["executive_lens"])
+    else:
+        try:
+            from intent_engine.executive_lens import detect_executive_lens
+
+            exec_lens_out = detect_executive_lens(question)
+        except Exception:
+            exec_lens_out = None
+    if exec_lens_out:
+        out["executiveLens"] = exec_lens_out
+    if conf.get("insightConfidenceBreakdown"):
+        out["insightConfidenceBreakdown"] = conf["insightConfidenceBreakdown"]
     if forecast_guardrails and forecast_guardrails.get("active"):
         out["forecastGuardrails"] = forecast_guardrails
     if unsupported_decline_analysis:
@@ -12916,21 +12960,34 @@ def compute_visualization_for_question(
 
     cohort_df = df
     entity_filter_meta: Optional[Dict[str, str]] = None
+    entity_explain_peer_compare = False
     try:
         from intent_engine.dimension_request import (
             find_categorical_entity_filter,
             question_requests_entity_performance_explanation,
+            resolve_entity_explain_chart_plan,
         )
 
         if question_requests_entity_performance_explanation(question):
             entity_hit = find_categorical_entity_filter(question, df, profile_live)
             if entity_hit:
                 fcol, fval = entity_hit
-                sub = df[df[fcol].astype(str).str.strip() == fval]
-                if not sub.empty:
-                    cohort_df = sub
-                    entity_filter_meta = {"column": str(fcol), "value": str(fval)}
-                    analysis_row_count = int(len(cohort_df))
+                plan = resolve_entity_explain_chart_plan(
+                    str(fcol), str(fval), df, profile_live
+                )
+                entity_filter_meta = {
+                    "column": str(fcol),
+                    "value": str(fval),
+                    "mode": str(plan.get("mode") or "cohort_breakdown"),
+                }
+                if plan.get("mode") == "peer_compare" and plan.get("use_full_cohort"):
+                    entity_explain_peer_compare = True
+                    analysis_row_count = int(len(df))
+                else:
+                    sub = df[df[fcol].astype(str).str.strip() == fval]
+                    if not sub.empty:
+                        cohort_df = sub
+                        analysis_row_count = int(len(cohort_df))
     except Exception:
         pass
 
@@ -12940,16 +12997,40 @@ def compute_visualization_for_question(
     if entity_filter_meta and intent_debug:
         intent_debug["entity_filter_column"] = entity_filter_meta["column"]
         intent_debug["entity_filter_value"] = entity_filter_meta["value"]
+        intent_debug["entity_explain_mode"] = entity_filter_meta.get(
+            "mode", "cohort_breakdown"
+        )
+        try:
+            from intent_engine.dimension_request import (
+                pick_entity_cohort_breakdown_column,
+                question_requests_entity_performance_explanation,
+                resolve_entity_explain_chart_plan,
+            )
+
+            if question_requests_entity_performance_explanation(question):
+                if entity_explain_peer_compare:
+                    intent_debug["group_col"] = entity_filter_meta["column"]
+                else:
+                    breakdown = pick_entity_cohort_breakdown_column(
+                        cohort_df,
+                        profile_live,
+                        exclude_columns=[entity_filter_meta["column"]],
+                    )
+                    if breakdown:
+                        intent_debug["group_col"] = breakdown
+        except Exception:
+            pass
     metric_spec_live = _resolve_question_metric_spec(question, cohort_df, profile_live)
     if metric_spec_live and intent_debug:
         _apply_metric_spec_to_intent(intent_debug, metric_spec_live)
 
     original_df = df
-    if entity_filter_meta is not None:
+    if entity_filter_meta is not None and not entity_explain_peer_compare:
         df = cohort_df
 
     try:
-        return _compute_visualization_for_question_body(
+        exact_result, visualization, analysis_ctx = (
+            _compute_visualization_for_question_body(
             question=question,
             conversation_sidecar=conversation_sidecar,
             follow_up_ops=follow_up_ops,
@@ -12960,7 +13041,41 @@ def compute_visualization_for_question(
             intent_debug=intent_debug,
             metric_spec_live=metric_spec_live,
             correlation_routing_locked=correlation_routing_locked,
+            )
         )
+
+        # When the question references a specific categorical entity (e.g. city= Mumbai),
+        # keep chart titles aligned with that cohort context. This avoids generic
+        # "Total X by Y" titles when the chart is actually filtered to the entity.
+        if (
+            entity_filter_meta
+            and isinstance(visualization, dict)
+            and str(entity_filter_meta.get("value") or "").strip()
+            and entity_filter_meta.get("mode") != "peer_compare"
+        ):
+            entity_val = str(entity_filter_meta.get("value") or "").strip()
+            title = str(visualization.get("title") or "").strip()
+            if title and entity_val.lower() not in title.lower():
+                stripped = re.sub(
+                    r"^(total|average|avg|mean|minimum|min|max|maximum)\s+",
+                    "",
+                    title,
+                    flags=re.I,
+                ).strip()
+                if stripped:
+                    visualization["title"] = f"{entity_val} {stripped}".strip()
+
+        if isinstance(analysis_ctx, dict) and isinstance(visualization, dict):
+            viz_title = str(visualization.get("title") or "").strip()
+            if viz_title:
+                analysis_ctx["chartTitle"] = viz_title
+            if entity_filter_meta:
+                analysis_ctx["entityFilterColumn"] = entity_filter_meta.get("column")
+                analysis_ctx["entityFilterValue"] = entity_filter_meta.get("value")
+                if entity_filter_meta.get("mode"):
+                    analysis_ctx["entityExplainMode"] = entity_filter_meta.get("mode")
+
+        return exact_result, visualization, analysis_ctx
     finally:
         df = original_df
 
@@ -14434,6 +14549,18 @@ def _compute_visualization_for_question_body(
                 if smart_trace
                 else None
             )
+            exec_lens = None
+            try:
+                from intent_engine.executive_lens import (
+                    build_lens_specific_insights,
+                    detect_executive_lens,
+                    merge_lens_insights,
+                )
+
+                exec_lens = detect_executive_lens(question)
+            except Exception:
+                exec_lens = None
+
             ranked_exec = rank_category_executive_insights(
                 series_rows,
                 metric_label=str(m_lab or "value"),
@@ -14442,10 +14569,37 @@ def _compute_visualization_for_question_body(
                 chart_kind=str(chart_type or "bar"),
                 cohort_row_count=len(df) if df is not None else None,
             )
+            if exec_lens and df is not None:
+                try:
+                    lens_cards = build_lens_specific_insights(
+                        df,
+                        profile_live,
+                        question=question,
+                        lens=exec_lens,
+                        metric_col=(
+                            str(intent_debug.get("value_col"))
+                            if intent_debug and intent_debug.get("value_col")
+                            else None
+                        ),
+                        dimension_col=(
+                            str(intent_debug.get("group_col"))
+                            if intent_debug and intent_debug.get("group_col")
+                            else None
+                        ),
+                    )
+                    ranked_exec = merge_lens_insights(
+                        ranked_exec or [],
+                        lens_cards,
+                        lens=exec_lens,
+                    )
+                except Exception:
+                    pass
             if ranked_exec:
                 visualization["rankedExecutiveInsights"] = _json_safe(ranked_exec)
                 if intent_debug is not None:
                     intent_debug["rankedExecutiveInsights"] = ranked_exec
+                    if exec_lens:
+                        intent_debug["executive_lens"] = exec_lens
         except Exception:
             pass
 
@@ -14870,6 +15024,27 @@ def ask_question(data: QuestionRequest):
                         "- Dual-metric comparison: include both the primary metric and "
                         f"{_pretty_label_text(str(sec_m))} in your answer.\n"
                     )
+            entity_col = analysis_ctx.get("entityFilterColumn")
+            entity_val = analysis_ctx.get("entityFilterValue")
+            explain_mode = str(analysis_ctx.get("entityExplainMode") or "").strip().lower()
+            if entity_col and entity_val:
+                entity_col_lbl = _pretty_label_text(str(entity_col))
+                focus_line += (
+                    f"\nEntity focus (mandatory):\n"
+                    f"- Focused entity: {entity_val} ({entity_col_lbl})\n"
+                )
+                if explain_mode == "peer_compare":
+                    focus_line += (
+                        "- Compare this entity against peer "
+                        f"{entity_col_lbl.lower()}s using the chart values. "
+                        "Do not claim the entity cannot be isolated — it is highlighted in the chart.\n"
+                        "- Do not answer with a global product-only ranking across all rows.\n"
+                    )
+                else:
+                    focus_line += (
+                        "- Break down performance within this entity cohort using the chart breakdown dimension.\n"
+                        "- Do not answer with a global ranking that ignores the focused entity.\n"
+                    )
 
         conv_block = plan.get("ai_context_block") or ""
         if sidecar and isinstance(sidecar.get("contextUsedLine"), str):
@@ -15012,6 +15187,7 @@ def ask_question(data: QuestionRequest):
             exec_rank_block = executive_insight_prompt_block(
                 ranked_raw or [],
                 cohort_row_count=int(analysis_ctx.get("analysisRowCount") or 0) or None,
+                executive_lens=analysis_ctx.get("executiveLens"),
             )
             if exec_rank_block:
                 exec_rank_block = f"\n{exec_rank_block}\n"

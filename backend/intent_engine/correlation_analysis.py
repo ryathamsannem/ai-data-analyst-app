@@ -18,6 +18,33 @@ from intent_engine.column_resolve import (
 # Minimum joint pairs for a stable coefficient read in confidence scoring.
 MIN_PEARSON_SAMPLE = 8
 
+# Flag near-duplicate / derived metric pairs without penalizing confidence score.
+NEAR_PERFECT_CORRELATION_THRESHOLD = 0.98
+
+NEAR_PERFECT_CORRELATION_CAUTION = (
+    "Near-perfect relationship detected. Verify these metrics are not "
+    "mathematically derived or duplicated before treating this as an independent driver."
+)
+
+
+def is_near_perfect_correlation(value: Any) -> bool:
+    """True when |r| >= NEAR_PERFECT_CORRELATION_THRESHOLD."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return False
+    if v != v:
+        return False
+    return abs(v) >= NEAR_PERFECT_CORRELATION_THRESHOLD
+
+
+def near_perfect_correlation_detected(
+    pearson: Any, spearman: Any
+) -> bool:
+    return is_near_perfect_correlation(pearson) or is_near_perfect_correlation(
+        spearman
+    )
+
 _BETWEEN_RE = re.compile(
     r"\bbetween\s+(.+?)\s+and\s+(.+?)(?:\s*[\?\.]|$)",
     re.I,
@@ -657,6 +684,9 @@ def enrich_relationship_insights(
         out["correlationSampleWarning"] = (
             f"Only {n} joint observation(s) — treat coefficients as directional."
         )
+    if near_perfect_correlation_detected(pearson, spearman):
+        out["nearPerfectCorrelation"] = True
+        out["nearPerfectCorrelationCaution"] = NEAR_PERFECT_CORRELATION_CAUTION
     return out
 
 
@@ -738,4 +768,10 @@ def format_correlation_exact_result_lines(
     warn = rel_ins.get("correlationSampleWarning")
     if isinstance(warn, str) and warn.strip():
         lines.append(warn.strip())
+    if rel_ins.get("nearPerfectCorrelation"):
+        caution = rel_ins.get("nearPerfectCorrelationCaution")
+        if isinstance(caution, str) and caution.strip():
+            lines.append(caution.strip())
+        else:
+            lines.append(NEAR_PERFECT_CORRELATION_CAUTION)
     return lines

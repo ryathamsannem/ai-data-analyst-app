@@ -35,6 +35,8 @@ export type AiFollowUpChipContext = {
   categoryColumnDisplay?: string | null;
   /** Breakdown dimension for scatter margin follow-ups (not the scatter X metric). */
   breakdownDimensionLabel?: string | null;
+  /** Backend executive lens: opportunity | risk | summary | driver | explain */
+  executiveLens?: string | null;
 };
 
 const QUESTION_LIKE_AXIS_RE =
@@ -401,6 +403,7 @@ export function buildNaturalBusinessFollowUpChips(
 
   const profitLike = uniqueMeasures.find((m) => /\bprofit\b/.test(m));
   if (profitLike && profitLike !== metric) {
+    push(`Compare ${profitLike} across ${plural}`);
     push(`Which ${dim} is most profitable?`);
   }
 
@@ -430,15 +433,43 @@ function resolveFollowUpMetricLabel(ctx: AiFollowUpChipContext): string {
   return "this metric";
 }
 
-function dedupeChips(chips: string[], max: number): string[] {
+/** Collapse near-duplicate “why is X highest” / “why does X lead” style chips. */
+function followUpSemanticIntentKey(chip: string): string {
+  const t = norm(chip);
+  const whyLead = t.match(
+    /why\s+(?:is|does)\s+(.+?)\s+(highest|lead|leading|top|best|lowest|worst|perform)/
+  );
+  if (whyLead) {
+    const entity = whyLead[1]!.replace(/\s+/g, " ").trim().slice(0, 40);
+    return `why|${entity}`;
+  }
+  const whichContrib = t.match(
+    /which\s+(.+?)\s+(?:contributes|has|generates|leads)/
+  );
+  if (whichContrib) {
+    return `which|${whichContrib[1]!.slice(0, 40)}|contrib`;
+  }
+  const compareAcross = t.match(/compare\s+(.+?)\s+across\s+(.+)/);
+  if (compareAcross) {
+    return `compare|${compareAcross[1]!.slice(0, 24)}|${compareAcross[2]!.slice(0, 24)}`;
+  }
+  return t.slice(0, 56);
+}
+
+/** Exported for tests — semantic + exact dedupe of follow-up chip strings. */
+export function dedupeFollowUpChips(chips: string[], max: number): string[] {
   const seen = new Set<string>();
+  const intentSeen = new Set<string>();
   const out: string[] = [];
   for (const c of chips) {
     const t = c.replace(/\s+/g, " ").trim();
     if (t.length < 6 || t.length > 160) continue;
     const k = norm(t);
     if (seen.has(k)) continue;
+    const intentKey = followUpSemanticIntentKey(t);
+    if (intentSeen.has(intentKey)) continue;
     seen.add(k);
+    intentSeen.add(intentKey);
     out.push(t);
     if (out.length >= max) break;
   }
@@ -480,7 +511,7 @@ export function buildRelationshipScatterFollowUpChips(
   const marginDim = marginDimensionLabel?.trim()
     ? resolveFollowUpDimensionPhrase(marginDimensionLabel, null, marginDimensionLabel)
     : "category";
-  return dedupeChips(
+  return dedupeFollowUpChips(
     [
       "Which points look like outliers?",
       "Which observation is driving the correlation?",
@@ -518,12 +549,117 @@ export function buildProfitMarginFollowUpChips(
   ).slice(0, 5);
 }
 
+function executiveLensColumnHints(columns: string[]): {
+  hasGrowth: boolean;
+  hasProfit: boolean;
+  hasCustomer: boolean;
+} {
+  const lc = columns.map((c) => c.toLowerCase().replace(/_/g, " "));
+  return {
+    hasGrowth: lc.some((c) => /\bgrowth\b/.test(c)),
+    hasProfit: lc.some((c) => /\bprofit\b/.test(c)),
+    hasCustomer: lc.some((c) => /\bcustomer/.test(c)),
+  };
+}
+
+export function buildExecutiveLensFollowUpChips(
+  lens: string,
+  dimPhrase: string,
+  metricNoun: string,
+  columns: string[]
+): string[] {
+  const plural = pluralizeFollowUpDimension(dimPhrase);
+  const { hasGrowth, hasProfit, hasCustomer } = executiveLensColumnHints(columns);
+  const met = metricNoun.trim() || "revenue";
+
+  if (lens === "risk") {
+    return dedupeFollowUpChips(
+      [
+        `Which ${dimPhrase} has the highest concentration risk?`,
+        hasGrowth
+          ? `Which ${dimPhrase} is declining?`
+          : `Which ${dimPhrase} is underperforming?`,
+        `Is ${met} dependent on one ${dimPhrase}?`,
+        hasProfit ? `Compare profit margin by ${dimPhrase}` : `Compare ${met} across ${plural}`,
+      ],
+      4
+    );
+  }
+  if (lens === "opportunity") {
+    return dedupeFollowUpChips(
+      [
+        hasGrowth
+          ? `Which low-${met} ${dimPhrase} has high growth?`
+          : `Which ${dimPhrase} has the highest upside?`,
+        `Which ${dimPhrase} has the highest upside?`,
+        hasGrowth
+          ? `Which ${dimPhrase} is growing fastest?`
+          : `Which ${dimPhrase} leads on ${met}?`,
+        "Where should we invest next?",
+      ],
+      4
+    );
+  }
+  if (lens === "summary") {
+    return dedupeFollowUpChips(
+      [
+        `What is the headline ${met} pattern across ${plural}?`,
+        hasGrowth ? `Which ${dimPhrase} is growing fastest?` : `Which ${dimPhrase} leads on ${met}?`,
+        hasProfit ? `Compare profit margin by ${dimPhrase}` : `Compare ${met} across ${plural}`,
+        "What are the biggest risks?",
+      ],
+      4
+    );
+  }
+  if (lens === "driver") {
+    return dedupeFollowUpChips(
+      [
+        "Which points look like outliers?",
+        `Does the relationship hold by ${dimPhrase}?`,
+        hasProfit ? `Compare profit with ${met}` : `How strong is the link with ${met}?`,
+        `What explains the strongest ${dimPhrase}?`,
+      ],
+      4
+    );
+  }
+  if (lens === "explain") {
+    return dedupeFollowUpChips(
+      [
+        `What drives ${met} for this cohort?`,
+        hasGrowth ? `How does growth compare to peers?` : `How does ${met} compare to peers?`,
+        hasCustomer ? `Is customer volume aligned with ${met}?` : `Which factor stands out most?`,
+        `What are the biggest opportunities?`,
+      ],
+      4
+    );
+  }
+  return [];
+}
+
 export function buildAiFollowUpQuestionChips(ctx: AiFollowUpChipContext): string[] {
   const qualityCtx: FollowUpQualityContext = {
     chartTitle: ctx.chartTitle,
     valueAxisLabel: ctx.valueAxisLabel,
   };
   const columns = ctx.columns ?? [];
+  const dimPhrase = resolveFollowUpDimensionFromCtx(ctx);
+  const metricNoun = resolveFollowUpMetricLabel(ctx);
+  const execLens = (ctx.executiveLens || "").trim().toLowerCase();
+
+  if (execLens) {
+    const lensChips = buildExecutiveLensFollowUpChips(
+      execLens,
+      dimPhrase,
+      metricNoun,
+      columns
+    );
+    if (lensChips.length >= 3) {
+      return filterMeaningfulFollowUpChips(lensChips, metricNoun, qualityCtx).slice(
+        0,
+        5
+      );
+    }
+  }
 
   if (ctx.dualMetricCompare) {
     return filterMeaningfulFollowUpChips(
@@ -557,8 +693,6 @@ export function buildAiFollowUpQuestionChips(ctx: AiFollowUpChipContext): string
   }
 
   const chips: string[] = [];
-  const dimPhrase = resolveFollowUpDimensionFromCtx(ctx);
-  const metricNoun = resolveFollowUpMetricLabel(ctx);
   const lastQn = norm(ctx.lastQuestion);
 
   const rows = ctx.seriesRows
@@ -591,6 +725,7 @@ export function buildAiFollowUpQuestionChips(ctx: AiFollowUpChipContext): string
     rows.length >= 2
   ) {
     chips.push("Which period changed most vs the prior bucket?");
+    chips.push(`Which ${dimPhrase} is growing fastest over time?`);
   }
 
   if (isRankableBarLike(ctx.chartKind) && rows.length >= 2) {
@@ -621,7 +756,7 @@ export function buildAiFollowUpQuestionChips(ctx: AiFollowUpChipContext): string
     chips.push("What is the most important business insight?");
   }
 
-  let out = dedupeChips(chips, 12);
+  let out = dedupeFollowUpChips(chips, 12);
   return filterMeaningfulFollowUpChips(out.slice(0, 5), metricNoun, qualityCtx);
 }
 

@@ -193,6 +193,7 @@ import {
 import {
   buildNumberedExecutiveBrief,
   buildRankingExecutiveBrief,
+  isExecutiveSummaryLayoutMode,
   isExecutiveTakeawaysQuestion,
   isGeographicRankingQuestion,
 } from "@/lib/executive-insights-brief";
@@ -494,6 +495,7 @@ import {
   buildRelationshipExecutiveCards,
   formatPearsonCoefficient,
   parseRelationshipInsights,
+  resolveNearPerfectCorrelationCaution,
   type RelationshipInsightsPayload,
 } from "@/lib/relationship-visualization";
 import {
@@ -3529,6 +3531,8 @@ type AlignedAnalysisContext = {
   mappingConfidenceLevel?: string | null;
   insightConfidenceRationale: string;
   insightConfidenceReasons?: string[];
+  insightConfidenceBreakdown?: InsightConfidenceBreakdown | null;
+  executiveLens?: string | null;
   evidenceSummaryLine: string;
   dualMetricCompare?: boolean;
   unsupportedGrowthAnalysis?: UnsupportedGrowthAnalysis | null;
@@ -3553,6 +3557,55 @@ type AlignedAnalysisContext = {
     lacksTimeSeries?: boolean;
   } | null;
 };
+
+type InsightConfidenceBreakdownComponent = {
+  score: number;
+  label: string;
+  reasons?: string[];
+};
+
+type InsightConfidenceBreakdown = {
+  sampleSize: InsightConfidenceBreakdownComponent;
+  metricMatch: InsightConfidenceBreakdownComponent;
+  dimensionMatch: InsightConfidenceBreakdownComponent;
+  intentMatch: InsightConfidenceBreakdownComponent;
+  chartSuitability: InsightConfidenceBreakdownComponent;
+  dataCompleteness: InsightConfidenceBreakdownComponent;
+};
+
+function parseInsightConfidenceBreakdown(
+  raw: unknown
+): InsightConfidenceBreakdown | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const keys = [
+    "sampleSize",
+    "metricMatch",
+    "dimensionMatch",
+    "intentMatch",
+    "chartSuitability",
+    "dataCompleteness",
+  ] as const;
+  const out = {} as InsightConfidenceBreakdown;
+  for (const key of keys) {
+    const row = o[key];
+    if (!row || typeof row !== "object") return null;
+    const r = row as Record<string, unknown>;
+    const score = Number(r.score);
+    const label = typeof r.label === "string" ? r.label.trim() : "";
+    if (!label || !Number.isFinite(score)) return null;
+    out[key] = {
+      score: Math.min(100, Math.max(0, Math.round(score))),
+      label,
+      reasons: Array.isArray(r.reasons)
+        ? (r.reasons as unknown[])
+            .map((x) => String(x).trim())
+            .filter(Boolean)
+        : undefined,
+    };
+  }
+  return out;
+}
 
 function parseForecastGuardrails(
   raw: unknown
@@ -3726,6 +3779,13 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
           .map((x) => String(x).trim())
           .filter(Boolean)
       : undefined,
+    insightConfidenceBreakdown: parseInsightConfidenceBreakdown(
+      o.insightConfidenceBreakdown
+    ),
+    executiveLens:
+      typeof o.executiveLens === "string" && o.executiveLens.trim()
+        ? o.executiveLens.trim().toLowerCase()
+        : null,
     evidenceSummaryLine:
       typeof o.evidenceSummaryLine === "string"
         ? o.evidenceSummaryLine.trim()
@@ -7898,8 +7958,8 @@ function HomeInner() {
         });
       } else if (
         !preservePinnedChart &&
+        !hydrated &&
         !parsedAnalysis?.unsupportedTrendAnalysis?.active &&
-        !parsedAnalysis?.unsupportedGrowthAnalysis?.active &&
         !parsedAnalysis?.unsupportedDeclineAnalysis?.active &&
         !parsedAnalysis?.unsupportedMultiMetricAnalysis?.active
       ) {
@@ -8105,9 +8165,17 @@ function HomeInner() {
       };
     const enriched: RelationshipInsightsPayload = {
       ...meta,
-      pearson: correlation.computed ? correlation.pearsonRounded : null,
-      qualitativeOnly: !correlation.computed,
-      sampleSize: correlation.rowCount || meta.sampleSize,
+      pearson:
+        meta.pearson != null
+          ? meta.pearson
+          : correlation.computed
+            ? correlation.pearsonRounded
+            : null,
+      spearman: meta.spearman ?? null,
+      qualitativeOnly:
+        meta.qualitativeOnly ??
+        (!correlation.computed && meta.pearson == null),
+      sampleSize: meta.sampleSize ?? correlation.rowCount,
     };
     return { correlation, enriched, scatterRows };
   }, [
@@ -8117,6 +8185,16 @@ function HomeInner() {
   ]);
 
   const insightRelationshipEnriched = insightRelationshipBundle?.enriched ?? null;
+
+  const insightCorrelationCaution = useMemo(
+    () => resolveNearPerfectCorrelationCaution(insightRelationshipEnriched),
+    [insightRelationshipEnriched]
+  );
+
+  const insightExecutiveSummaryMode = useMemo(
+    () => isExecutiveSummaryLayoutMode(lastAskedQuestion),
+    [lastAskedQuestion]
+  );
 
   const insightUnifiedConfidence = useMemo(() => {
     if (!alignedAnalysis) return null;
@@ -8708,6 +8786,12 @@ function HomeInner() {
           insightVisualization?.provenance?.timeSeriesAnalysis ?? null,
         partialVisualizationWarning: alignedAnalysis?.partialVisualizationWarning,
         answerText: answer,
+        metricColumn: alignedAnalysis?.metricColumn ?? null,
+        chartSeriesPointCount:
+          alignedAnalysis?.chartSeriesPointCount ??
+          alignedAnalysis?.chartPointCount ??
+          insightSnapshot?.chartData.length ??
+          0,
       }),
     [
       lastAskedQuestion,
@@ -8715,8 +8799,12 @@ function HomeInner() {
       alignedAnalysis?.partialVisualizationWarning,
       alignedAnalysis?.chartTypeInternal,
       alignedAnalysis?.growthRequestUnsatisfied,
+      alignedAnalysis?.metricColumn,
+      alignedAnalysis?.chartSeriesPointCount,
+      alignedAnalysis?.chartPointCount,
       insightSnapshot?.contract,
       insightSnapshot?.chartKind,
+      insightSnapshot?.chartData.length,
       insightVisualization?.provenance?.timeSeriesAnalysis,
       answer,
     ]
@@ -8724,7 +8812,12 @@ function HomeInner() {
 
   const insightHasRenderableVisualization = useMemo(() => {
     if (insightUnsupportedTrend) return false;
-    if (insightUnsupportedGrowth) return false;
+    if (
+      insightUnsupportedGrowth &&
+      !(insightSnapshot && insightSnapshot.chartData.length >= 2)
+    ) {
+      return false;
+    }
     if (insightUnsupportedDecline) return false;
     if (insightUnsupportedMultiMetric) return false;
     if (!insightSnapshot) return false;
@@ -9534,6 +9627,7 @@ function HomeInner() {
             insightSemanticContext?.dimensionLabel ??
             null
           : null,
+      executiveLens: alignedAnalysis?.executiveLens ?? null,
     });
 
     const seeds = dualMetricCompare
@@ -9876,11 +9970,13 @@ function HomeInner() {
         semanticContext: insightSemanticContext,
         relationshipInsights: insightVisualization?.relationshipInsights ?? null,
         scatterXValues: insightVisualization?.scatterXValues,
+        nearPerfectCorrelationCaution: insightCorrelationCaution,
       }),
     [
       lastAskedQuestion,
       columns,
       sortedInsightChartData,
+      insightCorrelationCaution,
       insightVisualization?.chartType,
       insightVisualization?.relationshipInsights,
       insightVisualization?.scatterXValues,
@@ -10151,6 +10247,12 @@ function HomeInner() {
         insightProfitMargin.leadSentence
       );
     }
+    if (insightCorrelationCaution) {
+      const lead = insightCorrelationCaution.trim();
+      if (lead && !summaryText.toLowerCase().includes(lead.slice(0, 32).toLowerCase())) {
+        summaryText = `${lead} ${summaryText}`.trim();
+      }
+    }
     return {
       ...parsed,
       summary: summaryText,
@@ -10176,6 +10278,7 @@ function HomeInner() {
     insightPresentationChartKind,
     insightVisualization?.relationshipInsights,
     insightRelationshipEnriched,
+    insightCorrelationCaution,
   ]);
 
   const insightExecutiveBrief = useMemo(() => {
@@ -12483,7 +12586,8 @@ function HomeInner() {
                   </div>
                 ) : null}
 
-                {insightVisualization?.partialVisualizationWarning ? (
+                {insightVisualization?.partialVisualizationWarning &&
+                !insightExecutiveSummaryMode ? (
                   <p className="mt-4 text-xs text-amber-950 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-2 leading-snug dark:border-amber-500/22 dark:bg-amber-950/30 dark:text-amber-100/90">
                     <span className="font-semibold">Visualization caution:</span> full
                     statistical note is under{" "}
@@ -12515,7 +12619,9 @@ function HomeInner() {
                   />
                 ) : null}
 
-                {hasValidAIAnswer && alignedAnalysis ? (
+                {hasValidAIAnswer &&
+                alignedAnalysis &&
+                !insightExecutiveSummaryMode ? (
                   <div
                     className={`${aiInsightsConfidenceShell} ${
                       alignedAnalysis.smallSampleCohort ||
@@ -12779,6 +12885,16 @@ function HomeInner() {
                     </button>
                     {howCalculatedOpen ? (
                       <div className={aiInsightsProvenanceBody}>
+                        {insightCorrelationCaution ? (
+                          <div className={aiInsightsProvenanceDivider}>
+                            <p className={`${aiInsightsProvenanceSectionLabel} mb-2`}>
+                              Correlation caution
+                            </p>
+                            <p className={`${aiInsightsProvenanceSectionBodyEmphasis} text-amber-950/95 dark:text-amber-200/90`}>
+                              {insightCorrelationCaution}
+                            </p>
+                          </div>
+                        ) : null}
                         {insightVisualization?.partialVisualizationWarning ? (
                           <div className={aiInsightsProvenanceDivider}>
                             <p className={`${aiInsightsProvenanceSectionLabel} mb-2`}>
@@ -12811,6 +12927,48 @@ function HomeInner() {
                                 and avoid strong claims about quality or satisfaction unless
                                 the numbers explicitly support them.
                               </p>
+                            ) : null}
+                            {alignedAnalysis?.insightConfidenceBreakdown ? (
+                              <div className="mt-3 space-y-1.5">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-[color:var(--insights-text-muted)]">
+                                  Score breakdown
+                                </p>
+                                <ul className="text-xs space-y-1 text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
+                                  {(
+                                    [
+                                      "sampleSize",
+                                      "metricMatch",
+                                      "dimensionMatch",
+                                      "intentMatch",
+                                      "chartSuitability",
+                                      "dataCompleteness",
+                                    ] as const
+                                  ).map((key) => {
+                                    const row =
+                                      alignedAnalysis.insightConfidenceBreakdown![
+                                        key
+                                      ];
+                                    return (
+                                      <li
+                                        key={key}
+                                        className="flex items-baseline justify-between gap-3"
+                                      >
+                                        <span>{row.label}</span>
+                                        <span className="tabular-nums font-medium shrink-0">
+                                          {row.score}/100
+                                        </span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                                <p className="text-[11px] text-slate-500 dark:text-[color:var(--insights-text-muted)] mt-1">
+                                  Total{" "}
+                                  {insightUnifiedConfidence?.score ??
+                                    alignedAnalysis.insightConfidenceScore}
+                                  /100 — components are weighted inputs to the
+                                  final band, not a simple sum.
+                                </p>
+                              </div>
                             ) : null}
                           </div>
                         ) : null}
@@ -13218,7 +13376,8 @@ function HomeInner() {
                         </div>
                       </AiInsightChartShell>
                       {insightChartMatchesCurrentQuestion &&
-                      insightSmartChartIntel?.active ? (
+                      insightSmartChartIntel?.active &&
+                      !insightExecutiveSummaryMode ? (
                         <div className={aiInsightsSmartPanelDivider}>
                           <SmartChartInsightPanel
                             intel={insightSmartChartIntel}

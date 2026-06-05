@@ -576,6 +576,9 @@ def calculate_insight_confidence(
         score += b_pts
         reasons.extend(b_reasons)
 
+    metric_pts, metric_reasons = _metric_quality_points(inp)
+    chart_pts_suit, chart_suit_reasons = _chart_suitability_points(inp)
+
     score = min(100.0, max(0.0, score))
     score = _calibrate_confidence_score(
         score,
@@ -588,6 +591,49 @@ def calculate_insight_confidence(
     rounded = int(round(score))
     routing_score = int(round(min(100.0, max(0.0, routing_pts))))
     sample_score = int(round(min(100.0, max(0.0, 55.0 + sample_pts))))
+
+    sample_component = max(0.0, min(100.0, r_pts + g_pts + sample_pts))
+    metric_component = max(0.0, min(100.0, metric_pts))
+    dimension_component = max(0.0, min(100.0, r_pts + r_dr_pts))
+    intent_component = max(0.0, min(100.0, routing_pts))
+    chart_component = max(0.0, min(100.0, chart_pts_suit))
+    completeness_component = max(
+        0.0,
+        min(100.0, r_pts + (14.0 if (inp.mapping_confidence or "").lower() == "high" else 8.0 if (inp.mapping_confidence or "").lower() == "medium" else 0.0)),
+    )
+
+    breakdown = {
+        "sampleSize": {
+            "score": int(round(sample_component)),
+            "label": "Sample size",
+            "reasons": [x for x in [r_msg, g_msg, *sample_reasons] if x],
+        },
+        "metricMatch": {
+            "score": int(round(metric_component)),
+            "label": "Metric match",
+            "reasons": metric_reasons,
+        },
+        "dimensionMatch": {
+            "score": int(round(dimension_component)),
+            "label": "Dimension match",
+            "reasons": r_reasons + r_dr_reasons,
+        },
+        "intentMatch": {
+            "score": int(round(intent_component)),
+            "label": "Intent match",
+            "reasons": routing_reasons,
+        },
+        "chartSuitability": {
+            "score": int(round(chart_component)),
+            "label": "Chart suitability",
+            "reasons": chart_suit_reasons,
+        },
+        "dataCompleteness": {
+            "score": int(round(completeness_component)),
+            "label": "Data completeness",
+            "reasons": [x for x in [r_msg] if x],
+        },
+    }
 
     return {
         "score": rounded,
@@ -625,6 +671,7 @@ def calculate_insight_confidence(
         "evidenceSummaryLine": _compose_evidence_summary_line(
             score, band, reasons, inp
         ),
+        "insightConfidenceBreakdown": breakdown,
     }
 
 

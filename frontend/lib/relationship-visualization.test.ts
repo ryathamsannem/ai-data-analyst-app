@@ -59,6 +59,21 @@ describe("buildRelationshipExecutiveCards", () => {
     expect(ri?.qualitativeOnly).toBe(false);
   });
 
+  it("shows near-perfect correlation caution when |r| >= 0.98", () => {
+    const ri = parseRelationshipInsights({
+      pearson: 0.99,
+      spearman: 0.99,
+      qualitativeOnly: false,
+      sampleSize: 12,
+      nearPerfectCorrelation: true,
+    });
+    const cards = buildRelationshipExecutiveCards(ri!, "Metric A", "Metric B", 12, []);
+    expect(cards.some((c) => c.key === "rel-near-perfect")).toBe(true);
+    expect(
+      cards.find((c) => c.key === "rel-near-perfect")?.hint
+    ).toMatch(/near-perfect relationship/i);
+  });
+
   it("geographic profit vs revenue executive card matches API pearson +0.98", () => {
     const rows = [
       { x: 24500, value: 182000 },

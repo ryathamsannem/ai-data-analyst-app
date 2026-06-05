@@ -44,8 +44,17 @@ export function isExecutiveTakeawaysQuestion(question: string): boolean {
     /\bkey\s+takeaways?\b/.test(q) ||
     /\bexecutive\s+summary\b/.test(q) ||
     /\bmain\s+findings?\b/.test(q) ||
-    /\b(primary|core)\s+findings?\b/.test(q)
+    /\b(primary|core)\s+findings?\b/.test(q) ||
+    /\b(summarize|summarise)\b.*\b(business\s+)?performance\b/.test(q) ||
+    /\bbusiness\s+overview\b/.test(q) ||
+    /\bgive\s+(an?\s+)?executive\s+summary\b/.test(q) ||
+    /\boverall\s+business\s+(performance|health)\b/.test(q)
   );
+}
+
+/** Summary-style questions: prioritize narrative/cards over chart-debug chrome. */
+export function isExecutiveSummaryLayoutMode(question: string): boolean {
+  return isExecutiveTakeawaysQuestion(question);
 }
 
 export function isNumberedExecutiveBrief(text: string): boolean {

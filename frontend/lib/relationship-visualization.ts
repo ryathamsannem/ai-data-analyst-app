@@ -10,9 +10,16 @@ export type RelationshipExecutiveCard = {
   dotClass: string;
 };
 
+export const NEAR_PERFECT_CORRELATION_THRESHOLD = 0.98;
+
+export const NEAR_PERFECT_CORRELATION_CAUTION =
+  "Near-perfect relationship detected. Verify these metrics are not mathematically derived or duplicated before treating this as an independent driver.";
+
 export type RelationshipInsightsPayload = {
   pearson?: number | null;
   spearman?: number | null;
+  nearPerfectCorrelation?: boolean;
+  nearPerfectCorrelationCaution?: string | null;
   direction?: string | null;
   correlationClass?: string | null;
   correlationLabel?: string | null;
@@ -83,9 +90,31 @@ export function formatPearsonCoefficient(r: number): string {
   return (r > 0 ? "+" : "") + r.toFixed(2);
 }
 
+export function isNearPerfectCorrelation(value: number | null | undefined): boolean {
+  if (value == null || !Number.isFinite(value)) return false;
+  return Math.abs(value) >= NEAR_PERFECT_CORRELATION_THRESHOLD;
+}
+
+export function resolveNearPerfectCorrelationCaution(
+  ri: RelationshipInsightsPayload | null | undefined
+): string | null {
+  if (!ri) return null;
+  if (ri.nearPerfectCorrelationCaution?.trim()) {
+    return ri.nearPerfectCorrelationCaution.trim();
+  }
+  if (
+    ri.nearPerfectCorrelation ||
+    isNearPerfectCorrelation(ri.pearson) ||
+    isNearPerfectCorrelation(ri.spearman)
+  ) {
+    return NEAR_PERFECT_CORRELATION_CAUTION;
+  }
+  return null;
+}
+
 export function smallSampleCorrelationConfidenceLine(n: number): string {
   const rows = Math.max(0, Math.round(n));
-  return `Based on ${rows} paired row${rows === 1 ? "" : "s"}; directional due to small sample.`;
+  return `Correlation computed on ${rows} paired row${rows === 1 ? "" : "s"}; directional due to small sample.`;
 }
 
 export function parseNumericCoefficient(raw: unknown): number | null {
@@ -218,9 +247,20 @@ export function parseRelationshipInsights(
     ? false
     : Boolean(o.qualitativeOnly);
 
+  const nearFlag = Boolean(o.nearPerfectCorrelation);
+  const nearCaution =
+    typeof o.nearPerfectCorrelationCaution === "string"
+      ? o.nearPerfectCorrelationCaution.trim() || null
+      : null;
+
   return {
     pearson: hasPearson ? pearson : null,
     spearman: spearman != null ? spearman : null,
+    nearPerfectCorrelation:
+      nearFlag ||
+      isNearPerfectCorrelation(pearson) ||
+      isNearPerfectCorrelation(spearman),
+    nearPerfectCorrelationCaution: nearCaution,
     direction: typeof o.direction === "string" ? o.direction : null,
     correlationClass:
       typeof o.correlationClass === "string" ? o.correlationClass : null,
@@ -376,11 +416,22 @@ export function buildRelationshipExecutiveCards(
     });
   }
 
+  const nearCaution = resolveNearPerfectCorrelationCaution(riUse);
+  if (nearCaution) {
+    cards.push({
+      key: "rel-near-perfect",
+      title: "Correlation caution",
+      value: "Near-perfect",
+      hint: nearCaution,
+      dotClass: nextDot(),
+    });
+  }
+
   if (!computed) {
     return cards.slice(0, 4);
   }
 
   return cards
     .filter((c) => !/profit\s+margin/i.test(c.title))
-    .slice(0, 5);
+    .slice(0, nearCaution ? 6 : 5);
 }

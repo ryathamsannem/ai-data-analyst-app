@@ -8,11 +8,14 @@ import pandas as pd
 
 from intent_engine.correlation_analysis import (
     MIN_PEARSON_SAMPLE,
+    NEAR_PERFECT_CORRELATION_CAUTION,
     classify_pearson_r,
     compute_bivariate_correlations,
     compute_relationship_correlations,
     enrich_relationship_insights,
     interpret_correlation_magnitude,
+    is_near_perfect_correlation,
+    near_perfect_correlation_detected,
     pearson_sample_adequate,
     resolve_relationship_numeric_pair,
 )
@@ -46,6 +49,20 @@ class TestCorrelationAnalysis(unittest.TestCase):
         self.assertIsNotNone(stats["pearson"])
         self.assertIsNotNone(stats["spearman"])
         self.assertEqual(stats["sampleSize"], 5)
+
+    def test_near_perfect_correlation_flag(self) -> None:
+        self.assertTrue(is_near_perfect_correlation(0.99))
+        self.assertTrue(is_near_perfect_correlation(-0.985))
+        self.assertFalse(is_near_perfect_correlation(0.9))
+        out = enrich_relationship_insights(
+            {"pearson": 0.99, "spearman": 0.98, "canCompute": True},
+            x_label="Metric A",
+            y_label="Metric B",
+            n=20,
+        )
+        self.assertTrue(out.get("nearPerfectCorrelation"))
+        self.assertIn("near-perfect", str(out.get("nearPerfectCorrelationCaution", "")).lower())
+        self.assertTrue(near_perfect_correlation_detected(0.99, None))
 
     def test_enrich_adds_sample_warning(self) -> None:
         out = enrich_relationship_insights(

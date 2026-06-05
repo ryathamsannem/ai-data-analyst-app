@@ -93,3 +93,35 @@ def humanize_api_chart_type(api_type: str) -> str:
         "scatter": "Scatter plot",
         "histogram": "Histogram",
     }.get((api_type or "bar").strip(), api_type)
+
+
+def selection_explanation_for_presented_type(
+    api_type: str,
+    *,
+    category_axis: str = "categories",
+    metric_axis: str = "values",
+) -> str:
+    """Single source of truth for chart-selection copy matching the rendered chart."""
+    api = (api_type or "bar").strip()
+    cat = (category_axis or "categories").strip()
+    met = (metric_axis or "values").strip()
+    if api == "horizontalBar":
+        return (
+            f"Horizontal bar chart ranks {cat} by {met} — readable when labels are long "
+            "or many groups are compared."
+        )
+    if api == "bar":
+        return (
+            f"Vertical bar chart compares {met} side-by-side across {cat}."
+        )
+    if api == "line":
+        return f"Line chart shows how {met} moves across ordered {cat} periods."
+    if api == "area":
+        return f"Area chart emphasizes trend and movement of {met} across {cat}."
+    if api == "scatter":
+        return "Scatter plot pairs two numeric measures to surface relationship patterns."
+    if api == "histogram":
+        return f"Histogram bins {met} values to show spread and outlier tails."
+    if api in ("pie", "donut"):
+        return f"{'Donut' if api == 'donut' else 'Pie'} chart shows part-to-whole split of {met} across {cat}."
+    return humanize_api_chart_type(api)

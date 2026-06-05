@@ -600,6 +600,7 @@ export function computeSmartChartIntel(params: {
     }[];
   } | null;
   scatterXValues?: number[];
+  nearPerfectCorrelationCaution?: string | null;
 }): SmartChartIntel | null {
   if (!params.rows.length) {
     return null;
@@ -656,42 +657,50 @@ export function computeSmartChartIntel(params: {
     };
   }
 
-  const routingExpl = params.routing?.selectionExplanation?.trim() ?? "";
-  const whyThisChart =
-    routingExpl.length > 12
-      ? buildWhyThisChart({
-          currentLabel,
-          categoryAxis: params.categoryAxis,
-          valueAxis: params.valueAxis,
-          routing: params.routing,
-          answerSummary: params.answerSummary,
-          semanticContext: params.semanticContext,
-          chartBlurb,
-        })
-      : chartBlurb;
+  // Always describe the rendered chart kind — never contradict orientation via stale routing copy.
+  const whyThisChart = buildWhyThisChart({
+    currentLabel,
+    categoryAxis: params.categoryAxis,
+    valueAxis: params.valueAxis,
+    routing: params.routing,
+    answerSummary: params.answerSummary,
+    semanticContext: params.semanticContext,
+    chartBlurb,
+  });
 
   return {
     active: true,
     recommendedKind: currentKind,
     histogramStyle,
     recommendedLabel: currentLabel,
-    recommendationBlurb:
-      whyThisChart.trim() === chartBlurb.trim() ? "" : chartBlurb,
+    recommendationBlurb: "",
     currentKind,
     currentLabel,
     suggestedKind: currentKind,
     suggestedLabel: currentLabel,
     alignsWithRecommendation: true,
     whyThisChart,
-    anomalyNote:
-      currentKind === "scatter"
-        ? detectScatterRelationshipAnomaly({
-            rows: params.rows,
-            xLabel: params.categoryAxis,
-            yLabel: params.valueAxis,
-            scatterX: params.scatterXValues,
-            strongestOutliers: params.relationshipInsights?.strongestOutliers,
-          })
-        : detectNumericAnomalies(params.rows, currentKind),
+    anomalyNote: (() => {
+      const parts: string[] = [];
+      const near = params.nearPerfectCorrelationCaution?.trim();
+      if (near) parts.push(near);
+      const scatter =
+        currentKind === "scatter"
+          ? detectScatterRelationshipAnomaly({
+              rows: params.rows,
+              xLabel: params.categoryAxis,
+              yLabel: params.valueAxis,
+              scatterX: params.scatterXValues,
+              strongestOutliers: params.relationshipInsights?.strongestOutliers,
+            })
+          : null;
+      if (scatter) parts.push(scatter);
+      const numeric =
+        currentKind !== "scatter"
+          ? detectNumericAnomalies(params.rows, currentKind)
+          : null;
+      if (numeric) parts.push(numeric);
+      return parts.length ? parts.join(" ") : null;
+    })(),
   };
 }

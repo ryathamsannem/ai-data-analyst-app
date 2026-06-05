@@ -287,12 +287,21 @@ def executive_insight_prompt_block(
     ranked: List[Dict[str, Any]],
     *,
     cohort_row_count: Optional[int] = None,
+    executive_lens: Optional[str] = None,
 ) -> str:
     if not ranked:
         return ""
+    try:
+        from intent_engine.executive_lens import executive_lens_prompt_block
+
+        lens_block = executive_lens_prompt_block(executive_lens)
+    except Exception:
+        lens_block = ""
     lines = [
         "Ranked executive insights (prefer these phrasings in Key findings):",
     ]
+    if lens_block:
+        lines.append(lens_block)
     n = int(cohort_row_count or 0)
     if n > 0 and n < 100:
         lines.append(

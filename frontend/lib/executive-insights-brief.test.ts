@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRankingExecutiveBrief,
+  isExecutiveSummaryLayoutMode,
+  isExecutiveTakeawaysQuestion,
   isGeographicRankingQuestion,
 } from "@/lib/executive-insights-brief";
 
@@ -15,6 +17,13 @@ describe("buildRankingExecutiveBrief", () => {
     { label: "Kolkata", value: 116000, formatted: "116,000" },
     { label: "Jaipur", value: 90000, formatted: "90,000" },
   ];
+
+  it("detects executive summary layout questions", () => {
+    expect(isExecutiveTakeawaysQuestion("Summarize business performance")).toBe(true);
+    expect(isExecutiveTakeawaysQuestion("Give executive summary")).toBe(true);
+    expect(isExecutiveTakeawaysQuestion("Business overview")).toBe(true);
+    expect(isExecutiveSummaryLayoutMode("Summarize business performance")).toBe(true);
+  });
 
   it("detects Top Performing City as geographic ranking", () => {
     expect(isGeographicRankingQuestion("Top Performing City")).toBe(true);

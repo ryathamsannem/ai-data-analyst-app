@@ -155,7 +155,7 @@ def question_requests_entity_performance_explanation(question: str) -> bool:
     if not q:
         return False
     return bool(
-        re.search(r"\bexplain\b", q, re.I)
+        re.search(r"\bexplains?\b", q, re.I)
         and re.search(r"\bperformance\b", q, re.I)
     )
 
@@ -201,16 +201,95 @@ def find_categorical_entity_filter(
 
 
 def question_requests_executive_summary(question: str) -> bool:
-    ql = (question or "").lower().strip()
-    if not ql:
+    try:
+        from intent_engine.executive_lens import question_requests_executive_summary as _exec
+
+        return _exec(question)
+    except Exception:
         return False
-    patterns = (
-        r"\bsummarize\b.*\b(?:business\s+)?performance\b",
-        r"\bbusiness performance\b",
-        r"\bbiggest growth opportunities\b",
-        r"\bgrowth opportunities\b",
-        r"\bwhat risks\b",
-        r"\brisks do you see\b",
-        r"\bexecutive summary\b",
+
+
+def _column_name_is_entity_peer_level(col: str) -> bool:
+    cn = str(col).lower().replace("_", " ")
+    return any(t in cn for t in ("city", "metro", "market", "store", "branch"))
+
+
+def resolve_entity_explain_chart_plan(
+    entity_col: str,
+    entity_val: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Entity explain routing:
+    - peer_compare: benchmark entity against peers on its own column (e.g. city vs cities)
+    - cohort_breakdown: filter to entity rows, break down by another dimension
+    """
+    if df is None or df.empty or not entity_col or entity_col not in df.columns:
+        return {"mode": "cohort_breakdown", "group_col": None, "use_full_cohort": False}
+
+    try:
+        peer_n = int(df[entity_col].nunique(dropna=True))
+    except Exception:
+        peer_n = 0
+
+    if _column_name_is_entity_peer_level(entity_col) and peer_n >= 2:
+        return {
+            "mode": "peer_compare",
+            "group_col": str(entity_col),
+            "use_full_cohort": True,
+            "entity_column": str(entity_col),
+            "entity_value": str(entity_val),
+        }
+
+    breakdown = pick_entity_cohort_breakdown_column(
+        df[df[entity_col].astype(str).str.strip() == str(entity_val).strip()],
+        profile,
+        exclude_columns=[entity_col],
     )
-    return any(re.search(p, ql) for p in patterns)
+    return {
+        "mode": "cohort_breakdown",
+        "group_col": breakdown,
+        "use_full_cohort": False,
+        "entity_column": str(entity_col),
+        "entity_value": str(entity_val),
+    }
+
+
+def pick_entity_cohort_breakdown_column(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    *,
+    exclude_columns: Optional[List[str]] = None,
+    min_unique: int = 2,
+) -> Optional[str]:
+    """
+    Pick a categorical breakdown within a filtered entity cohort (e.g. products within a city).
+    """
+    if df is None or df.empty:
+        return None
+    ct = profile.get("column_types", {}) if profile else {}
+    skip = {str(c).lower() for c in (exclude_columns or [])}
+    scored: List[Tuple[int, str]] = []
+    for col in df.columns.tolist():
+        if str(col).lower() in skip:
+            continue
+        if ct.get(col) in ("number", "date"):
+            continue
+        try:
+            nu = int(df[col].nunique(dropna=True))
+        except Exception:
+            continue
+        if nu < min_unique or nu > 40:
+            continue
+        cn = str(col).lower().replace("_", " ")
+        score = min(nu, 12)
+        if any(t in cn for t in ("product", "category", "segment", "channel")):
+            score += 24
+        elif any(t in cn for t in ("region", "zone", "city")):
+            score += 12
+        scored.append((score, str(col)))
+    if not scored:
+        return None
+    scored.sort(key=lambda t: (-t[0], t[1]))
+    return scored[0][1]

@@ -71,8 +71,12 @@ export function rankedInsightsToExecutiveCards(
   const cards: ExecutiveVizInsightCard[] = [];
   ranked.slice(0, max).forEach((item, i) => {
     const cardType = insightCardTypeFromRankedKind(item.kind, item.priority);
+    const apiTitle = item.title?.trim() ?? "";
     let title: string;
-    if (cardType === "leader") {
+    if (apiTitle) {
+      // Prefer backend lens-specific titles (Growth Risk, Margin Risk, …).
+      title = apiTitle;
+    } else if (cardType === "leader") {
       title = buildInsightDimensionCardTitle(dim, "leader");
     } else if (cardType === "outlier" || cardType === "risk" || cardType === "trend") {
       title = buildInsightCardTitle(measure, cardType);
