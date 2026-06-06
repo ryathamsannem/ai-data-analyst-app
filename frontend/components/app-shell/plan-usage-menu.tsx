@@ -19,11 +19,12 @@ import { usePlanUsage } from "@/lib/use-plan-usage";
 
 export const PlanUsageMenu = memo(function PlanUsageMenu() {
   const [open, setOpen] = useState(false);
-  const [tier, setTierState] = useState<PlanTier>(() => getPlanTier());
+  const [tier, setTierState] = useState<PlanTier>("free");
   const rootRef = useRef<HTMLDivElement>(null);
   const { data, loading, error, refresh } = usePlanUsage({ enabled: open });
 
   useEffect(() => {
+    scheduleEffectUpdate(() => setTierState(getPlanTier()));
     const onChange = (event: Event) => {
       const detail = (event as CustomEvent<PlanTier>).detail;
       setTierState(detail ?? getPlanTier());

@@ -6530,7 +6530,7 @@ function HomeInner() {
   }, [mappingMessage]);
 
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
-  const [planTier, setPlanTierState] = useState<PlanTier>(() => getPlanTier());
+  const [planTier, setPlanTierState] = useState<PlanTier>("free");
   const [planUsage, setPlanUsage] = useState<PlanUsageResponse | null>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradeLimit, setUpgradeLimit] = useState<LimitKind | null>(null);
@@ -6568,6 +6568,7 @@ function HomeInner() {
         .catch(() => {});
     };
     scheduleEffectUpdate(() => {
+      setPlanTierState(getPlanTier());
       refreshUsage();
     });
     const onPlanChange = () => {
