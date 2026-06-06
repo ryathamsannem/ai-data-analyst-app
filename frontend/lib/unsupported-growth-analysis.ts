@@ -2,6 +2,11 @@
  * Unsupported growth analysis mode — growth intent without time-series evidence.
  */
 
+import {
+  pluralizeFollowUpDimension,
+  resolveFollowUpDimensionPhrase,
+} from "@/lib/ai-follow-up-suggestions";
+
 export type UnsupportedGrowthAnalysis = {
   active: boolean;
   periodsAvailable: number;
@@ -12,10 +17,28 @@ export type UnsupportedGrowthAnalysis = {
 };
 
 export const GROWTH_CANNOT_DETERMINE_LEAD =
-  "Growth cannot be determined from the available data.";
+  "Growth metric detected, but period/methodology is unknown — growth comparison is directional only because no date/baseline period exists.";
 
 const GROWTH_INTENT_RE =
   /\b(growing\s+fastest|fastest\s+growing|fastest\s+growth|growth\s+rate|increasing\s+fastest|grow(?:ing)?\s+fastest|rate\s+of\s+change|period[- ]over[- ]period|month[- ]over[- ]month|\bmom\b|\byoy\b|which\s+\w+\s+(?:is|are)\s+growing|what\s+\w+\s+(?:is|are)\s+growing|momentum\s+by\s+\w+|trend\s+by\s+\w+\s+over\s+time)\b/i;
+
+const RATE_OF_CHANGE_RE =
+  /\b(over\s+time|period[- ]over[- ]period|rate\s+of\s+change|month[- ]over[- ]month|\bmom\b|\byoy\b)\b/i;
+
+/** Compare an existing growth-rate column across categories (not computed PoP change). */
+export function isStaticGrowthMetricComparison(args: {
+  question: string;
+  metricColumn?: string | null;
+  chartSeriesPointCount?: number;
+}): boolean {
+  const q = (args.question || "").trim();
+  if (!q || !questionRequestsGrowthIntent(q)) return false;
+  if (RATE_OF_CHANGE_RE.test(q)) return false;
+  const metric = (args.metricColumn || "").toLowerCase().replace(/_/g, " ");
+  if (!metric.includes("growth")) return false;
+  const pts = Number(args.chartSeriesPointCount ?? 0);
+  return pts >= 2;
+}
 
 export function questionRequestsGrowthIntent(question: string): boolean {
   const q = question.trim();
@@ -70,8 +93,20 @@ export function inferUnsupportedGrowthClient(args: {
   timeSeriesAnalysis?: Record<string, unknown> | null;
   partialVisualizationWarning?: string | null;
   answerText?: string;
+  metricColumn?: string | null;
+  chartSeriesPointCount?: number;
 }): UnsupportedGrowthAnalysis | null {
   if (!questionRequestsGrowthIntent(args.question)) return null;
+
+  if (
+    isStaticGrowthMetricComparison({
+      question: args.question,
+      metricColumn: args.metricColumn,
+      chartSeriesPointCount: args.chartSeriesPointCount,
+    })
+  ) {
+    return null;
+  }
 
   const tsPeriods = periodsFromTimeSeriesMeta(args.timeSeriesAnalysis);
   if (args.isTrendChart && tsPeriods != null && tsPeriods >= 2) {
@@ -132,7 +167,18 @@ export function resolveUnsupportedGrowthMode(args: {
   timeSeriesAnalysis?: Record<string, unknown> | null;
   partialVisualizationWarning?: string | null;
   answerText?: string;
+  metricColumn?: string | null;
+  chartSeriesPointCount?: number;
 }): UnsupportedGrowthAnalysis | null {
+  if (
+    isStaticGrowthMetricComparison({
+      question: args.question,
+      metricColumn: args.metricColumn,
+      chartSeriesPointCount: args.chartSeriesPointCount,
+    })
+  ) {
+    return null;
+  }
   const fromApi = parseUnsupportedGrowthAnalysis(args.unsupportedGrowthAnalysis);
   if (fromApi) return fromApi;
   return inferUnsupportedGrowthClient({
@@ -142,7 +188,18 @@ export function resolveUnsupportedGrowthMode(args: {
     timeSeriesAnalysis: args.timeSeriesAnalysis,
     partialVisualizationWarning: args.partialVisualizationWarning,
     answerText: args.answerText,
+    metricColumn: args.metricColumn,
+    chartSeriesPointCount: args.chartSeriesPointCount,
   });
+}
+
+/** True when growth caution applies but a chart should still render. */
+export function growthCautionWithoutSuppressingChart(args: {
+  question: string;
+  metricColumn?: string | null;
+  chartSeriesPointCount?: number;
+}): boolean {
+  return isStaticGrowthMetricComparison(args);
 }
 
 export type UnsupportedGrowthExecutiveCard = {
@@ -165,8 +222,8 @@ export function buildUnsupportedGrowthExecutiveCards(
   return [
     {
       key: "ug-cannot",
-      title: "Cannot calculate growth",
-      value: "Not supported",
+      title: "Growth methodology",
+      value: "Period unknown",
       hint: meta.leadSentence,
       dotClass: stripes[0],
     },
@@ -192,25 +249,23 @@ export function buildUnsupportedGrowthExecutiveCards(
 }
 
 export function buildUnsupportedGrowthFollowUpChips(
-  categoryAxisLabel: string
+  categoryAxisLabel: string,
+  opts?: {
+    categoryColumn?: string | null;
+    categoryColumnDisplay?: string | null;
+  }
 ): string[] {
-  const dim = categoryAxisLabel.trim().toLowerCase();
-  const entity =
-    /\bregion\b/.test(dim)
-      ? "region"
-      : /\bproduct\b/.test(dim)
-        ? "product"
-        : /\bdepartment\b/.test(dim)
-          ? "department"
-          : /\bchannel\b/.test(dim)
-            ? "channel"
-            : "category";
-  const plural = entity.endsWith("s") ? entity : `${entity}s`;
+  const dim = resolveFollowUpDimensionPhrase(
+    categoryAxisLabel,
+    opts?.categoryColumn,
+    opts?.categoryColumnDisplay
+  );
+  const plural = pluralizeFollowUpDimension(dim);
   return [
-    `Do multiple dates exist for each ${entity}?`,
-    `Show revenue trend by ${entity} over time`,
+    `Do multiple dates exist for each ${dim}?`,
+    `Show revenue trend by ${dim} over time`,
     `Compare ${plural} month over month`,
-    `Which ${entity} has highest total revenue?`,
+    `Which ${dim} has highest total revenue?`,
   ];
 }
 

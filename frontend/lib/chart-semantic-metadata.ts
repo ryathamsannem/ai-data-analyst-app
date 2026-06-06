@@ -5,6 +5,7 @@ export type ChartSemanticVizLike = {
   chartType?: string;
   scatterXLabel?: string | null;
   scatterYLabel?: string | null;
+  relationshipMeasureLabel?: string | null;
   multiSeries?: {
     layout?: string;
     seriesKeys?: unknown[];
@@ -314,12 +315,16 @@ export function buildChartSemanticMetadata(args: {
     analysis,
     preferAnalysisForCategory
   );
-  const metricPhrase =
+  const relMeasure = viz?.relationshipMeasureLabel?.trim();
+  let metricPhrase =
     polishMetricDisplay(
       metDisp?.trim() ||
         (metCol ? humanizeColumnName(metCol) : "") ||
         args.refinedMetricLabel
     ).trim() || args.refinedMetricLabel;
+  if (presentationKind === "scatter" && relMeasure) {
+    metricPhrase = polishMetricDisplay(relMeasure);
+  }
 
   const ts = viz?.provenance?.timeSeriesAnalysis;
   const grain = isTimeSeriesKind(presentationKind)

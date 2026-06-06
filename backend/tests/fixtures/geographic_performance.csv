@@ -1,0 +1,9 @@
+city,state,zone,revenue,profit,customers,growth_rate
+Hyderabad,Telangana,South,182000,24500,310,0.23
+Bengaluru,Karnataka,South,210000,30200,350,0.26
+Mumbai,Maharashtra,West,260000,40100,410,0.28
+Pune,Maharashtra,West,132000,19800,205,0.21
+Delhi,Delhi,North,248000,32200,390,0.24
+Jaipur,Rajasthan,North,90000,10500,140,0.16
+Kolkata,West Bengal,East,116000,16800,190,0.18
+Chennai,Tamil Nadu,South,156000,21400,250,0.2

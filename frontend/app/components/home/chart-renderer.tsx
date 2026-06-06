@@ -22,6 +22,7 @@ import {
   TREND_X_AXIS_ANGLE_DEG,
 } from "@/lib/chart-time-x-axis";
 import {
+  CartesianXAxisTitleLabelContent,
   createHorizontalBottomAxisValueLabel,
   createVerticalValueAxisLabel,
 } from "@/app/components/chart-value-axis-title";
@@ -448,7 +449,7 @@ function ChartRendererInner({
               value={rAxes.categoryAxis}
               position="insideBottom"
               offset={insightVBarLabelOffset}
-              style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
+              content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
           <YAxis
@@ -536,7 +537,7 @@ function ChartRendererInner({
               value={rAxes.categoryAxis}
               position="insideBottom"
               offset={-6}
-              style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
+              content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
           <YAxis
@@ -810,7 +811,7 @@ function ChartRendererInner({
               value={rAxes.categoryAxis}
               position="insideBottom"
               offset={insightUi ? -14 : compact ? -20 : -24}
-              style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
+              content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
           <YAxis
@@ -930,7 +931,7 @@ function ChartRendererInner({
             value={rAxes.categoryAxis}
             position="insideBottom"
             offset={insightVBarLabelOffset}
-            style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
+            content={CartesianXAxisTitleLabelContent}
           />
         </XAxis>
         <YAxis

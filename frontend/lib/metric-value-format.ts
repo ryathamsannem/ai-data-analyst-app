@@ -60,6 +60,7 @@ export function metricLabelImpliesPercent(metricLabel: string | null | undefined
   const t = (metricLabel ?? "").trim();
   if (!t) return false;
   const n = t.toLowerCase().replace(/\s+/g, "_");
+  if (/\bprofit\s+margin\b/i.test(t) || /\bmargin\s*%/.test(t)) return true;
   return PERCENT_METRIC_RE.test(n) || /\bpercent\b/i.test(t);
 }
 
@@ -89,6 +90,7 @@ export function metricLabelImpliesCurrency(
 ): boolean {
   const t = (metricLabel ?? "").trim();
   if (!t) return false;
+  if (metricLabelImpliesPercent(t)) return false;
   if (metricLabelImpliesOperationalMetric(t)) return false;
   if (CURRENCY_LABEL_RE.test(t)) return true;
   if (

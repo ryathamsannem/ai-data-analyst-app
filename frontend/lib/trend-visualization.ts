@@ -98,14 +98,10 @@ export function buildTrendExecutiveVizInsights(
   }
 
   let iMax = 0;
-  let iMin = 0;
   rows.forEach((r, i) => {
     if (r.value > rows[iMax].value) iMax = i;
-    if (r.value < rows[iMin].value) iMin = i;
   });
   const maxR = rows[iMax];
-  const minR = rows[iMin];
-  const spread = maxR.value - minR.value;
   const sum = rows.reduce((a, r) => a + r.value, 0);
   const avg = sum / rows.length;
   const bucket = timeBucketLabel.trim() || "Weekly";
@@ -148,15 +144,15 @@ export function buildTrendExecutiveVizInsights(
       dotClass: nextDot(),
     },
     {
-      key: "t-low",
-      title: `Worst ${periodNoun}`,
-      value: shorten(String(minR.name ?? "—"), 44),
-      hint: fmt(minR.value, minR.displayValue),
+      key: "t-baseline",
+      title: chron.length >= 2 ? `Starting ${periodNoun}` : `Baseline ${periodNoun}`,
+      value: shorten(String(chron[0]?.name ?? "—"), 44),
+      hint: fmt(chron[0]?.value ?? 0, chron[0]?.displayValue),
       dotClass: nextDot(),
     },
     {
       key: "t-growth",
-      title: "Growth %",
+      title: "Total Growth",
       value: growthDisp,
       hint:
         chron.length >= 2

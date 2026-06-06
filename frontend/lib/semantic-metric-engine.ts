@@ -18,6 +18,11 @@ import {
   type ChartSemanticVizLike,
 } from "@/lib/chart-semantic-metadata";
 import { apiChartStringToKind } from "@/lib/smart-chart-intelligence";
+import {
+  metricsAreEquivalentForCompare,
+  resolveFollowUpDimensionPhrase,
+  sanitizeMetricPhraseForFollowUp,
+} from "@/lib/ai-follow-up-suggestions";
 
 export type AggregationKey = "sum" | "mean" | "max" | "min" | "count" | string;
 
@@ -90,6 +95,10 @@ export function formatMetricLabel(
 
   if (display) {
     const polished = polishMetricDisplay(stripIntentNoiseFromMetricLabel(display));
+    if (agg === "scatter") {
+      if (/\bvs\.?\b/i.test(polished)) return polished;
+      return polished;
+    }
     if (agg === "mean") {
       const stem = stripLeadingAggFromPhrase(polished);
       if (dimLabel && stem) return `Average ${stem.toLowerCase()} per ${dimLabel.toLowerCase()}`;
@@ -152,31 +161,54 @@ export function buildInsightTitle(ctx: SemanticMetricContext): string {
 
   if (kind === "pie" || kind === "donut") return `${met} by ${dim.toLowerCase()}`;
   if (kind === "line" || kind === "area") return `${met} over time`;
-  if (kind === "scatter") return `${met} vs ${dim.toLowerCase()}`;
+  if (kind === "scatter") {
+    if (/\bvs\.?\b/i.test(met)) return met;
+    return `${met} vs ${dim}`;
+  }
   if (kind === "histogram") return `Distribution — ${met}`;
   return `${met} by ${dim.toLowerCase()}`;
 }
 
 export type FollowupQuestionKind = "compare" | "drill" | "rank_high" | "trend";
 
+function followUpMetricPhrase(label: string): string {
+  const raw = label.trim();
+  if (!raw) return "";
+  const clean = sanitizeMetricPhraseForFollowUp(raw);
+  if (clean) return clean;
+  const polished = polishMetricDisplay(stripIntentNoiseFromMetricLabel(raw));
+  return polished.trim() || raw;
+}
+
 export function buildFollowupQuestion(
   kind: FollowupQuestionKind,
   ctx: SemanticMetricContext,
   opts?: { otherMetricLabel?: string; categoryName?: string }
 ): string {
-  const met = ctx.metricLabel.trim() || formatMetricLabel(ctx);
-  const dim = ctx.dimensionLabel.trim() || "category";
-  const other = opts?.otherMetricLabel?.trim();
+  const met = followUpMetricPhrase(
+    ctx.metricLabel.trim() || formatMetricLabel(ctx)
+  );
+  const dim = resolveFollowUpDimensionPhrase(
+    ctx.dimensionLabel.trim() || "category",
+    ctx.dimension,
+    ctx.dimensionLabel
+  );
+  const otherRaw = opts?.otherMetricLabel?.trim();
 
   switch (kind) {
-    case "compare":
-      if (other) return `Compare ${met} with ${other}`;
+    case "compare": {
+      const other = otherRaw ? followUpMetricPhrase(otherRaw) : "";
+      if (other) {
+        if (metricsAreEquivalentForCompare(met, other)) return "";
+        return `Compare ${met} with ${other}`;
+      }
       return `Compare ${met} with another measure`;
+    }
     case "drill":
-      return `Which ${dim.toLowerCase()} has the highest ${met}?`;
+      return `Which ${dim} has the highest ${met}?`;
     case "rank_high":
       if (opts?.categoryName) return `Why is ${opts.categoryName} highest?`;
-      return `What drives the top ${dim.toLowerCase()}?`;
+      return `What drives the top ${dim}?`;
     case "trend":
       return "Which period changed most recently?";
     default:
@@ -239,19 +271,34 @@ export function fromAlignedAnalysis(
   if (!metCol?.trim() && !metDisp?.trim() && !catCol?.trim() && !catDisp?.trim()) {
     return null;
   }
-  const aggKey =
+  let aggKey =
     analysis?.aggregationKey ??
     analysis?.aggregation ??
     viz?.provenance?.aggregationKey ??
     viz?.provenance?.aggregation ??
     null;
   const aggLabel = analysis?.aggregation ?? viz?.provenance?.aggregation ?? null;
+  if (chartKind === "scatter") {
+    aggKey = "scatter";
+  }
+
+  let metricDispOut = metDisp;
+  let categoryDispOut = catDisp;
+  if (chartKind === "scatter") {
+    const sx = viz?.scatterXLabel?.trim();
+    const sy = viz?.scatterYLabel?.trim();
+    if (sx) categoryDispOut = sx;
+    if (sy) metricDispOut = sy;
+    if (metricDispOut && /\bvs\.?\b/i.test(metricDispOut) && sy) {
+      metricDispOut = sy;
+    }
+  }
 
   return buildContextCore({
     metricCol: metCol,
-    metricDisp: metDisp,
+    metricDisp: metricDispOut,
     categoryCol: catCol,
-    categoryDisp: catDisp,
+    categoryDisp: categoryDispOut,
     aggregationKey: typeof aggKey === "string" ? aggKey : String(aggKey ?? ""),
     aggregationLabel: typeof aggLabel === "string" ? aggLabel : null,
     chartType: chartKind,

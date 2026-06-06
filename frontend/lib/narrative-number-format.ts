@@ -90,13 +90,23 @@ export function augmentDualMetricRoasLead(
   return `${bestRoasLead} ${t}`;
 }
 
+function dedupeNarrativeArtifacts(text: string): string {
+  let out = text.replace(/\btotal\s+total\b/gi, "total");
+  out = out.replace(
+    /\b(Key findings|What this may indicate|Suggested next steps|Statistical observations|How this was calculated)\b(\s*:\s*)\1\b/gi,
+    "$1$2"
+  );
+  return out.replace(/(\b[\w\s,'"%-]{20,140}[.!?])\s+\1/g, "$1");
+}
+
 /** Full narrative polish pipeline for AI insight prose. */
 export function polishInsightNarrativeText(
   text: string,
   opts?: { dualMetricRoasLead?: DualMetricRoasLead | null }
 ): string {
   if (!text?.trim()) return text;
-  let out = formatNarrativeNumbers(text);
+  let out = dedupeNarrativeArtifacts(text);
+  out = formatNarrativeNumbers(out);
   out = polishNarrativeEfficiencyTerms(out);
   if (opts?.dualMetricRoasLead) {
     out = augmentDualMetricRoasLead(out, opts.dualMetricRoasLead);
