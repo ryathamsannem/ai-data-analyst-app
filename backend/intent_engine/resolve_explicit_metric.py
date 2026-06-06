@@ -13,6 +13,7 @@ from intent_engine.column_resolve import (
     column_matches_token,
     find_column_for_token,
     numeric_columns,
+    resolve_synonym_metric_column,
 )
 
 _COMPARE_METRIC_PATTERNS: Tuple[re.Pattern[str], ...] = (
@@ -37,6 +38,15 @@ _RECORD_COUNT_RE = re.compile(
 _FREQUENCY_RE = re.compile(r"\b(?:frequency|occurrences?)\b", re.I)
 
 _HEADCOUNT_RE = re.compile(r"\bheadcount\b", re.I)
+
+_BY_METRIC_SUFFIX_RE = re.compile(
+    r"\bby\s+(headcount|patient\s+volumes?|fte)\b",
+    re.I,
+)
+_HIGHEST_METRIC_RE = re.compile(
+    r"\bhighest\s+(headcount|patient\s+volumes?)\b",
+    re.I,
+)
 
 
 def _clean_metric_phrase(raw: str) -> str:
@@ -98,6 +108,13 @@ def extract_explicit_metric_phrases(question: str) -> List[str]:
             _add(f"{noun} count")
             _add(noun)
 
+    for m in _BY_METRIC_SUFFIX_RE.finditer(ql):
+        _add(m.group(1))
+    for m in _HIGHEST_METRIC_RE.finditer(ql):
+        _add(m.group(1))
+    if _HEADCOUNT_RE.search(ql):
+        _add("headcount")
+
     return sorted(phrases, key=lambda x: (-len(x), x))
 
 
@@ -130,6 +147,10 @@ def resolve_explicit_metric_column(
     nums = numeric_columns(cols, profile)
     if not nums:
         return None
+
+    synonym = resolve_synonym_metric_column(question, df, profile)
+    if synonym:
+        return synonym
 
     best: Optional[str] = None
     best_score = 0
@@ -215,8 +236,10 @@ def question_requests_record_count(
         return True
     if _FREQUENCY_RE.search(ql):
         return True
-    if _HEADCOUNT_RE.search(ql) and not resolved_metric_col:
-        return True
+    if _HEADCOUNT_RE.search(ql):
+        if resolved_metric_col and column_matches_token(str(resolved_metric_col), "units"):
+            return False
+        return not resolved_metric_col
 
     if re.search(r"\bcount\b", ql) and not resolved_metric_col:
         if _METRIC_COUNT_PHRASE_RE.search(ql):

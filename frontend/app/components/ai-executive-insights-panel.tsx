@@ -45,8 +45,6 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
   useDevRenderCount("AiExecutiveInsightsPanel");
   const [briefExpanded, setBriefExpanded] = useState(false);
 
-  if (!cards.length) return null;
-
   const briefRaw = narrativeBrief?.trim() ?? "";
   const briefIsNumbered = isNumberedExecutiveBrief(briefRaw);
   const brief = briefIsNumbered
@@ -54,7 +52,7 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
     : briefRaw.replace(/\s+/g, " ").trim();
 
   const { briefDisplay, briefCanExpand, briefPreLine } = useMemo(() => {
-    if (!brief) {
+    if (!cards.length || !brief) {
       return { briefDisplay: "", briefCanExpand: false, briefPreLine: false };
     }
     if (briefIsNumbered) {
@@ -81,7 +79,9 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
         ? `${slice.slice(0, sp).trim()}…`
         : `${slice.trim()}…`;
     return { briefDisplay: clipped, briefCanExpand: true, briefPreLine: false };
-  }, [brief, briefExpanded, briefIsNumbered]);
+  }, [brief, briefExpanded, briefIsNumbered, cards.length]);
+
+  if (!cards.length) return null;
 
   return (
     <div className={aiInsightsExecutiveShell}>

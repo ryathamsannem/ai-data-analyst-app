@@ -5,7 +5,6 @@
 import {
   formatPearsonCoefficient,
   pearsonCorrelationFromRows,
-  type RelationshipInsightsPayload,
   type RelationshipScatterRow,
 } from "@/lib/relationship-visualization";
 

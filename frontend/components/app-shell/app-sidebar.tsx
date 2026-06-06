@@ -2,6 +2,8 @@
 
 import { memo, useCallback } from "react";
 import type { MainNavTabId } from "@/app/components/home/main-nav-tabs";
+import { BrandMark } from "@/components/branding/brand-mark";
+import { BRANDING } from "@/lib/branding-config";
 import { APP_NAV_ITEMS } from "./nav-config";
 
 export const AppSidebar = memo(function AppSidebar({
@@ -38,25 +40,19 @@ export const AppSidebar = memo(function AppSidebar({
       aria-label="Main navigation"
     >
       <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-[color:var(--sidebar-border)] px-3 lg:h-16 lg:px-4">
-        <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[color:var(--accent)] text-[color:var(--accent-fg)] shadow-[0_0_20px_-4px_var(--accent-glow)]"
-          aria-hidden
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path
-              d="M4 14l4-6 4 4 4-6 4 8"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
+        <BrandMark />
         {!collapsed ? (
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold tracking-tight text-[color:var(--foreground)]">
-              AI Data Analyst
-            </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="truncate text-sm font-semibold tracking-tight text-[color:var(--foreground)]">
+                {BRANDING.appName}
+              </p>
+              {BRANDING.version ? (
+                <span className="shrink-0 rounded-md border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-subtle)]">
+                  {BRANDING.version}
+                </span>
+              ) : null}
+            </div>
             <p className="truncate text-[11px] text-[color:var(--text-muted)]">
               Analytics workspace
             </p>

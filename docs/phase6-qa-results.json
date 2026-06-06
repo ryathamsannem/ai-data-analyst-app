@@ -1,0 +1,1844 @@
+[
+  {
+    "domain": "Retail",
+    "fixture": "retail",
+    "base_question": "Which city generates the highest revenue?",
+    "entity": "Mumbai",
+    "base": {
+      "row": {
+        "step": "base",
+        "answer_excerpt": "Key findings:\n\nMumbai generates the highest total revenue at 712,000, followed by Pune at 483,000 and Chennai at 464,000. Mumbai's revenue is 248,000 higher than Chennai's (a 35% difference). Across the 15 filtered rows and 3 cities in this sample, Mumbai accounts for approximately 43% of total revenue.\n\nWhat this may indicate:\n\nThe revenue ranking could suggest that Mumbai either has a larger customer base, higher order volumes, or a different product or pricing mix relative to the other two ci",
+        "answer_len": 1158,
+        "intent": "ranking",
+        "chartType": "bar",
+        "metric": "revenue",
+        "dimension": "city",
+        "agg": "sum",
+        "aggregation_label": "Total",
+        "confidence": "high",
+        "supportStatus": null,
+        "title": "Total revenue by city",
+        "labels": [
+          "Mumbai",
+          "Pune",
+          "Chennai"
+        ],
+        "values": [
+          712000.0,
+          483000.0,
+          464000.0
+        ],
+        "followUpDetected": false,
+        "wasFollowUp": false,
+        "has_chart": true
+      },
+      "score": {
+        "pass": true,
+        "fails": []
+      },
+      "answer": "Key findings:\n\nMumbai generates the highest total revenue at 712,000, followed by Pune at 483,000 and Chennai at 464,000. Mumbai's revenue is 248,000 higher than Chennai's (a 35% difference). Across the 15 filtered rows and 3 cities in this sample, Mumbai accounts for approximately 43% of total revenue.\n\nWhat this may indicate:\n\nThe revenue ranking could suggest that Mumbai either has a larger customer base, higher order volumes, or a different product or pricing mix relative to the other two cities. However, with only 15 rows of transaction data and 3 city groups, the sample is small. Without additional context on order counts, average transaction size, or customer numbers by city, it is not possible to determine whether the gap reflects sustained market strength or variability in a limit"
+    },
+    "follow_ups": {
+      "F1": {
+        "question": "Why is Mumbai highest?",
+        "row": {
+          "step": "F1",
+          "answer_excerpt": "Key findings:\n\nMumbai generated total revenue of 712,000 across the 15 filtered rows in this sample, making it the highest-performing city. Pune follows at 483,000 and Chennai at 464,000. Mumbai's revenue exceeds Chennai's by 248,000 (a 35% difference) and accounts for approximately 43% of the combined total across all three cities.\n\nWhat this may indicate:\n\nThe data shows Mumbai ranked highest in this 15-row sample, but the underlying drivers are not directly visible in the aggregated revenue m",
+          "answer_len": 1407,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "city",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "high",
+          "supportStatus": null,
+          "title": "Total revenue by city",
+          "labels": [
+            "Mumbai",
+            "Pune",
+            "Chennai"
+          ],
+          "values": [
+            712000.0,
+            483000.0,
+            464000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F2": {
+        "question": "What evidence supports this conclusion?",
+        "row": {
+          "step": "F2",
+          "answer_excerpt": "Evidence supporting the conclusion:\n\nKey findings:\n\nThe calculated totals from the 15 filtered rows show Mumbai's total revenue at 712,000, Pune at 483,000, and Chennai at 464,000. Mumbai accounts for approximately 43% of the combined revenue across these three cities in this sample. The numerical gap between Mumbai and Chennai is 248,000 (a 35% difference in absolute terms). These rankings are consistent across the aggregated data presented in the bar chart.\n\nWhat this may indicate:\n\nMumbai's h",
+          "answer_len": 1498,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "city",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "high",
+          "supportStatus": null,
+          "title": "Total revenue by city",
+          "labels": [
+            "Mumbai",
+            "Pune",
+            "Chennai"
+          ],
+          "values": [
+            712000.0,
+            483000.0,
+            464000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F3": {
+        "question": "Which columns were used for this analysis?",
+        "row": {
+          "step": "F3",
+          "answer_excerpt": "Which columns were used for this analysis?\n\nThe analysis used two columns from the dataset:\n\n1. city (category column) \u2014 the breakdown dimension grouping rows into Mumbai, Pune, and Chennai.\n2. revenue (number column) \u2014 the metric aggregated as a total sum for each city.\n\nThese were the only columns directly aggregated to produce the \"Total revenue by city\" bar chart. The dataset contains 8 columns overall (order_date, region, city, product, revenue, cost, units, customer_satisfaction), but the ",
+          "answer_len": 608,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "city",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "high",
+          "supportStatus": null,
+          "title": "Total revenue by city",
+          "labels": [
+            "Mumbai",
+            "Pune",
+            "Chennai"
+          ],
+          "values": [
+            712000.0,
+            483000.0,
+            464000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F4": {
+        "question": "Show the calculations behind this answer.",
+        "row": {
+          "step": "F4",
+          "answer_excerpt": "Key findings:\n\nTotal revenue by city across the 15 filtered rows shows Mumbai at 712,000, Pune at 483,000, and Chennai at 464,000. Mumbai ranks highest and accounts for approximately 43% of the combined total revenue across these three cities (1,659,000). The gap between Mumbai and Chennai is 248,000, or roughly 35% higher revenue in Mumbai's favor.\n\nCalculation breakdown:\n\nMumbai total revenue: 712,000\nPune total revenue: 483,000\nChennai total revenue: 464,000\nCombined total: 712,000 + 483,000 ",
+          "answer_len": 1410,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "city",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "high",
+          "supportStatus": null,
+          "title": "Total revenue by city",
+          "labels": [
+            "Mumbai",
+            "Pune",
+            "Chennai"
+          ],
+          "values": [
+            712000.0,
+            483000.0,
+            464000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      }
+    },
+    "provenance_ok": true,
+    "provenance_notes": []
+  },
+  {
+    "domain": "Sales",
+    "fixture": "generic",
+    "base_question": "Which region generates the highest revenue?",
+    "entity": "North",
+    "base": {
+      "row": {
+        "step": "base",
+        "answer_excerpt": "Key findings\n\nNorth generates the highest total revenue at 553,000 across this 20-row cohort, followed by South at 443,000. North's revenue exceeds the lowest-performing region, West, by 210,000. The four regions show a 38% spread between leader and laggard, with North contributing approximately 32% of the combined regional total.\n\nWhat this may indicate\n\nThe revenue gap between North and West could reflect differences in market size, customer concentration, sales effort, or product-category mix",
+        "answer_len": 1332,
+        "intent": "ranking",
+        "chartType": "bar",
+        "metric": "revenue",
+        "dimension": "region",
+        "agg": "sum",
+        "aggregation_label": "Total",
+        "confidence": "medium",
+        "supportStatus": null,
+        "title": "Total revenue by region",
+        "labels": [
+          "North",
+          "South",
+          "East",
+          "West"
+        ],
+        "values": [
+          553000.0,
+          443000.0,
+          373000.0,
+          343000.0
+        ],
+        "followUpDetected": false,
+        "wasFollowUp": false,
+        "has_chart": true
+      },
+      "score": {
+        "pass": true,
+        "fails": []
+      },
+      "answer": "Key findings\n\nNorth generates the highest total revenue at 553,000 across this 20-row cohort, followed by South at 443,000. North's revenue exceeds the lowest-performing region, West, by 210,000. The four regions show a 38% spread between leader and laggard, with North contributing approximately 32% of the combined regional total.\n\nWhat this may indicate\n\nThe revenue gap between North and West could reflect differences in market size, customer concentration, sales effort, or product-category mix across regions. However, with only 20 filtered rows and 4 regional groups, this ranking should be treated as a snapshot of the current period rather than a structural performance pattern. Additional analysis\u2014such as trend data over multiple periods, unit volumes by region, or cost-to-revenue ratios"
+    },
+    "follow_ups": {
+      "F1": {
+        "question": "Why is North highest?",
+        "row": {
+          "step": "F1",
+          "answer_excerpt": "Key findings\n\nIn this 20-row cohort across four regions, North generates total revenue of 553,000, which ranks highest and accounts for approximately 32% of combined regional revenue. North's total exceeds West (343,000) by 210,000. The revenue spread between the leader and lowest-performing region is 38%. South ranks second at 443,000 and East third at 373,000.\n\nWhat this may indicate\n\nNorth's revenue lead could reflect several potential drivers\u2014customer density, order volume, pricing strategy,",
+          "answer_len": 1418,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "region",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total revenue by region",
+          "labels": [
+            "North",
+            "South",
+            "East",
+            "West"
+          ],
+          "values": [
+            553000.0,
+            443000.0,
+            373000.0,
+            343000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F2": {
+        "question": "What evidence supports this conclusion?",
+        "row": {
+          "step": "F2",
+          "answer_excerpt": "Key findings\n\nThe authoritative chart values show North at 553,000 in total revenue, followed by South at 443,000, East at 373,000, and West at 343,000. North's revenue exceeds West's by 210,000\u2014a 38% difference between the highest and lowest regions in this 20-row cohort. North accounts for approximately 32% of combined regional total revenue across the four regions.\n\nWhat this may indicate\n\nThe data is consistent with North performing stronger than other regions in this sample. However, with o",
+          "answer_len": 1447,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "region",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total revenue by region",
+          "labels": [
+            "North",
+            "South",
+            "East",
+            "West"
+          ],
+          "values": [
+            553000.0,
+            443000.0,
+            373000.0,
+            343000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F3": {
+        "question": "Which columns were used for this analysis?",
+        "row": {
+          "step": "F3",
+          "answer_excerpt": "Which columns were used for this analysis?\n\nThe analysis used two columns from your dataset:\n\n1. region \u2014 the breakdown dimension (North, South, East, West)\n2. revenue \u2014 the metric column, aggregated as a total for each region\n\nThese were the only columns required to answer \"Which region generates the highest revenue?\" The calculation summed all revenue rows within each region across your 20-row cohort.",
+          "answer_len": 406,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "region",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total revenue by region",
+          "labels": [
+            "North",
+            "South",
+            "East",
+            "West"
+          ],
+          "values": [
+            553000.0,
+            443000.0,
+            373000.0,
+            343000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F4": {
+        "question": "Show the calculations behind this answer.",
+        "row": {
+          "step": "F4",
+          "answer_excerpt": "Calculations Behind Total Revenue by Region\n\nKey findings\n\nThe revenue totals by region were calculated by summing all revenue values within each of the 20 rows, grouped by region. Here are the exact sums:\n\nNorth: 553,000\nSouth: 443,000\nEast: 373,000\nWest: 343,000\n\nNorth ranks highest and contributes approximately 32% of combined regional revenue (553,000 divided by the grand total of 1,712,000). The gap between the leader (North) and the lowest-performing region (West) is 210,000, representing ",
+          "answer_len": 1652,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "region",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total revenue by region",
+          "labels": [
+            "North",
+            "South",
+            "East",
+            "West"
+          ],
+          "values": [
+            553000.0,
+            443000.0,
+            373000.0,
+            343000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      }
+    },
+    "provenance_ok": true,
+    "provenance_notes": []
+  },
+  {
+    "domain": "Marketing",
+    "fixture": "generic",
+    "base_question": "Which category has the highest satisfaction_score?",
+    "entity": "Product-A",
+    "base": {
+      "row": {
+        "step": "base",
+        "answer_excerpt": "Key findings:\n\nProduct-A has the highest average satisfaction score at 92.0 across the 20 filtered rows in this dataset. It is followed by Ward-C and Campaign-B, both at 89.0. Product-B ranks lowest at 80.0. The nine categories in the sample show satisfaction scores ranging from 80 to 92, a spread of 12 points. The overall average satisfaction score across all categories is 86.4.\n\nWhat this may indicate:\n\nThe data may suggest that Product-A delivers relatively stronger customer or stakeholder sa",
+        "answer_len": 1671,
+        "intent": "ranking",
+        "chartType": "horizontalBar",
+        "metric": "satisfaction_score",
+        "dimension": "category",
+        "agg": "mean",
+        "aggregation_label": "Average",
+        "confidence": "medium",
+        "supportStatus": null,
+        "title": "Average satisfaction score by category",
+        "labels": [
+          "Product-A",
+          "Ward-C",
+          "Campaign-B",
+          "Campaign-A",
+          "Campaign-C",
+          "Product-C"
+        ],
+        "values": [
+          92.0,
+          89.0,
+          89.0,
+          87.5,
+          87.0,
+          86.5
+        ],
+        "followUpDetected": false,
+        "wasFollowUp": false,
+        "has_chart": true
+      },
+      "score": {
+        "pass": true,
+        "fails": []
+      },
+      "answer": "Key findings:\n\nProduct-A has the highest average satisfaction score at 92.0 across the 20 filtered rows in this dataset. It is followed by Ward-C and Campaign-B, both at 89.0. Product-B ranks lowest at 80.0. The nine categories in the sample show satisfaction scores ranging from 80 to 92, a spread of 12 points. The overall average satisfaction score across all categories is 86.4.\n\nWhat this may indicate:\n\nThe data may suggest that Product-A delivers relatively stronger customer or stakeholder satisfaction compared to other categories in this sample. However, with only 20 rows distributed across 9 categories (approximately 2.2 rows per group on average), this result should be treated as exploratory rather than definitive. It is not yet clear whether the difference between Product-A's 92.0 a"
+    },
+    "follow_ups": {
+      "F1": {
+        "question": "Why is Product-A highest?",
+        "row": {
+          "step": "F1",
+          "answer_excerpt": "Key findings:\n\nProduct-A has the highest average satisfaction score at 92.0 in this 20-row sample across 9 categories. This is 3.0 points above Ward-C and Campaign-B (both 89.0) and 12.0 points above Product-B (80.0). The data shows Product-A consistently appeared in rows with higher satisfaction values, but the small sample size (approximately 2.2 rows per category on average) means variation between individual observations may be masked by the average.\n\nWhat this may indicate:\n\nThe higher aver",
+          "answer_len": 1450,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "satisfaction_score",
+          "dimension": "category",
+          "agg": "mean",
+          "aggregation_label": "Average",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Average satisfaction score by category",
+          "labels": [
+            "Product-A",
+            "Ward-C",
+            "Campaign-B",
+            "Campaign-A",
+            "Campaign-C",
+            "Product-C"
+          ],
+          "values": [
+            92.0,
+            89.0,
+            89.0,
+            87.5,
+            87.0,
+            86.5
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F2": {
+        "question": "What evidence supports this conclusion?",
+        "row": {
+          "step": "F2",
+          "answer_excerpt": "Key findings:\n\nProduct-A ranks highest on average satisfaction score at 92.0 in this 20-row sample across 9 categories. Ward-C and Campaign-B follow at 89.0, while Product-B ranks lowest at 80.0. The range spans 12 points (80 to 92). The overall average satisfaction score across all categories in the dataset is 86.4, and Product-A exceeds this mean by 5.6 points.\n\nWhat this may indicate:\n\nThese numbers are drawn from a small cohort of 20 rows distributed across 9 groups (approximately 2.2 rows p",
+          "answer_len": 1557,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "satisfaction_score",
+          "dimension": "category",
+          "agg": "mean",
+          "aggregation_label": "Average",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Average satisfaction score by category",
+          "labels": [
+            "Product-A",
+            "Ward-C",
+            "Campaign-B",
+            "Campaign-A",
+            "Campaign-C",
+            "Product-C"
+          ],
+          "values": [
+            92.0,
+            89.0,
+            89.0,
+            87.5,
+            87.0,
+            86.5
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F3": {
+        "question": "Which columns were used for this analysis?",
+        "row": {
+          "step": "F3",
+          "answer_excerpt": "Which columns were used for this analysis?\n\nThe analysis used two columns from the dataset:\n\n1. category \u2014 the grouping dimension (breakdown variable) that segmented the data into nine distinct values: Product-A, Ward-C, Campaign-B, Campaign-A, Campaign-C, Product-C, Ward-B, Ward-A, and Product-B.\n\n2. satisfaction_score \u2014 the metric column that was aggregated (averaged) to produce the rankings shown in the chart.\n\nThe calculation computed the average satisfaction score within each category acros",
+          "answer_len": 614,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "satisfaction_score",
+          "dimension": "category",
+          "agg": "mean",
+          "aggregation_label": "Average",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Average satisfaction score by category",
+          "labels": [
+            "Product-A",
+            "Ward-C",
+            "Campaign-B",
+            "Campaign-A",
+            "Campaign-C",
+            "Product-C"
+          ],
+          "values": [
+            92.0,
+            89.0,
+            89.0,
+            87.5,
+            87.0,
+            86.5
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F4": {
+        "question": "Show the calculations behind this answer.",
+        "row": {
+          "step": "F4",
+          "answer_excerpt": "Calculations behind the answer:\n\nKey findings:\n\nThe average satisfaction score for each category was calculated by summing all satisfaction_score values within that category and dividing by the count of rows in that category. Product-A has the highest average satisfaction score at 92.0 across the 20 filtered rows in this dataset. It is followed by Ward-C and Campaign-B, both at 89.0. Product-B ranks lowest at 80.0. The nine categories in the sample show satisfaction scores ranging from 80 to 92,",
+          "answer_len": 1762,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "satisfaction_score",
+          "dimension": "category",
+          "agg": "mean",
+          "aggregation_label": "Average",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Average satisfaction score by category",
+          "labels": [
+            "Product-A",
+            "Ward-C",
+            "Campaign-B",
+            "Campaign-A",
+            "Campaign-C",
+            "Product-C"
+          ],
+          "values": [
+            92.0,
+            89.0,
+            89.0,
+            87.5,
+            87.0,
+            86.5
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      }
+    },
+    "provenance_ok": true,
+    "provenance_notes": []
+  },
+  {
+    "domain": "Finance",
+    "fixture": "generic",
+    "base_question": "Which department has the highest cost?",
+    "entity": "Sales",
+    "base": {
+      "row": {
+        "step": "base",
+        "answer_excerpt": "Key findings:\n\nSales has the highest total cost at 269,000 across the 20 filtered rows in this dataset. Operations ranks second at 263,000, followed by Finance at 250,000. Marketing, HR, and Support have lower total costs at 186,000, 111,000, and 105,000 respectively. Sales leads Support by 164,000 (a 61% spread), and accounts for approximately 23% of total cost across all six departments.\n\nWhat this may indicate:\n\nThe concentration of cost in Sales and Operations could suggest these departments",
+        "answer_len": 1432,
+        "intent": "ranking",
+        "chartType": "horizontalBar",
+        "metric": "cost",
+        "dimension": "department",
+        "agg": "sum",
+        "aggregation_label": "Total",
+        "confidence": "medium",
+        "supportStatus": null,
+        "title": "Total cost by department",
+        "labels": [
+          "Sales",
+          "Operations",
+          "Finance",
+          "Marketing",
+          "HR",
+          "Support"
+        ],
+        "values": [
+          269000.0,
+          263000.0,
+          250000.0,
+          186000.0,
+          111000.0,
+          105000.0
+        ],
+        "followUpDetected": false,
+        "wasFollowUp": false,
+        "has_chart": true
+      },
+      "score": {
+        "pass": true,
+        "fails": []
+      },
+      "answer": "Key findings:\n\nSales has the highest total cost at 269,000 across the 20 filtered rows in this dataset. Operations ranks second at 263,000, followed by Finance at 250,000. Marketing, HR, and Support have lower total costs at 186,000, 111,000, and 105,000 respectively. Sales leads Support by 164,000 (a 61% spread), and accounts for approximately 23% of total cost across all six departments.\n\nWhat this may indicate:\n\nThe concentration of cost in Sales and Operations could suggest these departments handle larger operational volumes or resource-intensive activities. However, with only 20 rows and 6 departments represented, this sample is small. The ranking may reflect seasonal patterns, temporary staffing levels, or project cycles rather than structural departmental differences. Without additi"
+    },
+    "follow_ups": {
+      "F1": {
+        "question": "Why is Sales highest?",
+        "row": {
+          "step": "F1",
+          "answer_excerpt": "Key findings:\n\nSales has the highest total cost at 269,000 in this 20-row dataset. The question asks why Sales leads\u2014but the chart itself shows only the ranked totals, not the underlying drivers. Sales department rows account for a larger portion of the aggregated cost than other departments, reflecting either more rows assigned to Sales, higher individual cost values per row, or both. Within this small sample, Sales represents approximately 23% of total cost across all six departments and leads",
+          "answer_len": 1743,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "cost",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total cost by department",
+          "labels": [
+            "Sales",
+            "Operations",
+            "Finance",
+            "Marketing",
+            "HR",
+            "Support"
+          ],
+          "values": [
+            269000.0,
+            263000.0,
+            250000.0,
+            186000.0,
+            111000.0,
+            105000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F2": {
+        "question": "What evidence supports this conclusion?",
+        "row": {
+          "step": "F2",
+          "answer_excerpt": "Key findings:\n\nSales has the highest total cost at 269,000, accounting for approximately 23% of combined cost across all six departments in this 20-row dataset. Operations ranks second at 263,000, followed by Finance at 250,000. The remaining three departments\u2014Marketing (186,000), HR (111,000), and Support (105,000)\u2014show notably lower totals. The spread between the highest and lowest is substantial: Sales exceeds Support by 164,000 (a 61% difference).\n\nWhat this may indicate:\n\nThe ranking of dep",
+          "answer_len": 1460,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "cost",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total cost by department",
+          "labels": [
+            "Sales",
+            "Operations",
+            "Finance",
+            "Marketing",
+            "HR",
+            "Support"
+          ],
+          "values": [
+            269000.0,
+            263000.0,
+            250000.0,
+            186000.0,
+            111000.0,
+            105000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F3": {
+        "question": "Which columns were used for this analysis?",
+        "row": {
+          "step": "F3",
+          "answer_excerpt": "Which columns were used for this analysis?\n\nThe analysis used two columns from your dataset:\n\n1. **department** \u2014 the breakdown dimension, showing six departments: Sales, Operations, Finance, Marketing, HR, and Support.\n\n2. **cost** \u2014 the metric column, aggregated as a total sum for each department.\n\nThese were the only columns applied to create the \"Total cost by department\" horizontal bar chart shown in the previous analysis.",
+          "answer_len": 431,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "cost",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total cost by department",
+          "labels": [
+            "Sales",
+            "Operations",
+            "Finance",
+            "Marketing",
+            "HR",
+            "Support"
+          ],
+          "values": [
+            269000.0,
+            263000.0,
+            250000.0,
+            186000.0,
+            111000.0,
+            105000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F4": {
+        "question": "Show the calculations behind this answer.",
+        "row": {
+          "step": "F4",
+          "answer_excerpt": "Calculations behind Total cost by department:\n\nThe analysis sums the cost column (in dollars) across all 20 rows in the dataset, grouped by the department dimension. Here is the breakdown:\n\nSales: Sum of all rows where department = 'Sales' \u2192 269,000\nOperations: Sum of all rows where department = 'Operations' \u2192 263,000\nFinance: Sum of all rows where department = 'Finance' \u2192 250,000\nMarketing: Sum of all rows where department = 'Marketing' \u2192 186,000\nHR: Sum of all rows where department = 'HR' \u2192 11",
+          "answer_len": 2006,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "cost",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total cost by department",
+          "labels": [
+            "Sales",
+            "Operations",
+            "Finance",
+            "Marketing",
+            "HR",
+            "Support"
+          ],
+          "values": [
+            269000.0,
+            263000.0,
+            250000.0,
+            186000.0,
+            111000.0,
+            105000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      }
+    },
+    "provenance_ok": true,
+    "provenance_notes": []
+  },
+  {
+    "domain": "Operations",
+    "fixture": "generic",
+    "base_question": "Which department has the most units?",
+    "entity": "Operations",
+    "base": {
+      "row": {
+        "step": "base",
+        "answer_excerpt": "Key findings\n\nOperations has the highest total units at 1,730, representing 31% of all units across the six departments in this 20-row sample. Sales ranks second with 1,260 units, followed by Finance (950), Marketing (790), Support (450), and HR (430). The spread between the top performer and the lowest is 1,300 units, with Operations exceeding HR by that margin.\n\nWhat this may indicate\n\nThe uneven distribution of units across departments could suggest differences in workload, team capacity, or ",
+        "answer_len": 1360,
+        "intent": "compare",
+        "chartType": "bar",
+        "metric": "units",
+        "dimension": "department",
+        "agg": "sum",
+        "aggregation_label": "Total",
+        "confidence": "medium",
+        "supportStatus": null,
+        "title": "Total units by department",
+        "labels": [
+          "Operations",
+          "Sales",
+          "Finance",
+          "Marketing",
+          "Support",
+          "HR"
+        ],
+        "values": [
+          1730.0,
+          1260.0,
+          950.0,
+          790.0,
+          450.0,
+          430.0
+        ],
+        "followUpDetected": false,
+        "wasFollowUp": false,
+        "has_chart": true
+      },
+      "score": {
+        "pass": true,
+        "fails": []
+      },
+      "answer": "Key findings\n\nOperations has the highest total units at 1,730, representing 31% of all units across the six departments in this 20-row sample. Sales ranks second with 1,260 units, followed by Finance (950), Marketing (790), Support (450), and HR (430). The spread between the top performer and the lowest is 1,300 units, with Operations exceeding HR by that margin.\n\nWhat this may indicate\n\nThe uneven distribution of units across departments could suggest differences in workload, team capacity, or operational scope. However, with only 20 rows covering 6 departments, this snapshot is small and may not represent typical patterns. Operations' lead could reflect structural differences in how units are counted or assigned across departments rather than inherent performance gaps. To rule out sampli"
+    },
+    "follow_ups": {
+      "F1": {
+        "question": "Why is Operations highest?",
+        "row": {
+          "step": "F1",
+          "answer_excerpt": "Key findings\n\nOperations recorded the highest total units at 1,730 across this 20-row sample, representing 31% of all units. The next-highest department, Sales, reported 1,260 units (23% of the total). The spread between Operations and the lowest department, HR at 430 units, is 1,300 units. In this filtered cohort of 6 departments, Operations ranks first in unit volume.\n\nWhat this may indicate\n\nThe data shows Operations leads on raw unit count, but the underlying reason cannot be determined from",
+          "answer_len": 1593,
+          "intent": "compare",
+          "chartType": "bar",
+          "metric": "units",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by department",
+          "labels": [
+            "Operations",
+            "Sales",
+            "Finance",
+            "Marketing",
+            "Support",
+            "HR"
+          ],
+          "values": [
+            1730.0,
+            1260.0,
+            950.0,
+            790.0,
+            450.0,
+            430.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F2": {
+        "question": "What evidence supports this conclusion?",
+        "row": {
+          "step": "F2",
+          "answer_excerpt": "Key findings\n\nThe calculated totals show Operations leading with 1,730 units, followed by Sales (1,260), Finance (950), Marketing (790), Support (450), and HR (430). This 20-row sample spans 6 departments. Operations accounts for 31% of the total units across these departments, with a spread of 1,300 units between the highest (Operations) and lowest (HR) performers.\n\nWhat this may indicate\n\nThe uneven distribution across departments could suggest that Operations handles a larger volume of activi",
+          "answer_len": 1501,
+          "intent": "compare",
+          "chartType": "bar",
+          "metric": "units",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by department",
+          "labels": [
+            "Operations",
+            "Sales",
+            "Finance",
+            "Marketing",
+            "Support",
+            "HR"
+          ],
+          "values": [
+            1730.0,
+            1260.0,
+            950.0,
+            790.0,
+            450.0,
+            430.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F3": {
+        "question": "Which columns were used for this analysis?",
+        "row": {
+          "step": "F3",
+          "answer_excerpt": "Which columns were used for this analysis?\n\nThe analysis used two columns from your dataset:\n\n1. department \u2014 the breakdown dimension (grouping variable)\n2. units \u2014 the metric column (aggregated as a total sum)\n\nThese columns were applied to calculate total units by department across the 20 rows in your sample, which yielded the bar chart showing Operations, Sales, Finance, Marketing, Support, and HR ranked by their unit totals.",
+          "answer_len": 432,
+          "intent": "compare",
+          "chartType": "bar",
+          "metric": "units",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by department",
+          "labels": [
+            "Operations",
+            "Sales",
+            "Finance",
+            "Marketing",
+            "Support",
+            "HR"
+          ],
+          "values": [
+            1730.0,
+            1260.0,
+            950.0,
+            790.0,
+            450.0,
+            430.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F4": {
+        "question": "Show the calculations behind this answer.",
+        "row": {
+          "step": "F4",
+          "answer_excerpt": "Calculations behind total units by department\n\nThe analysis sums the units column for all 20 rows, grouped by department. Here are the step-by-step totals:\n\nOperations: 320 + 330 + 370 + 360 + 350 = 1,730 units\nSales: 400 + 420 + 440 = 1,260 units\nFinance: 180 + 185 + 190 + 195 + 200 = 950 units\nMarketing: 250 + 260 + 280 = 790 units\nSupport: 450 units\nHR: 430 units\n\nGrand total: 1,730 + 1,260 + 950 + 790 + 450 + 430 = 5,610 units across all six departments in the 20-row sample.\n\nKey findings\n\nO",
+          "answer_len": 1512,
+          "intent": "compare",
+          "chartType": "bar",
+          "metric": "units",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by department",
+          "labels": [
+            "Operations",
+            "Sales",
+            "Finance",
+            "Marketing",
+            "Support",
+            "HR"
+          ],
+          "values": [
+            1730.0,
+            1260.0,
+            950.0,
+            790.0,
+            450.0,
+            430.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      }
+    },
+    "provenance_ok": true,
+    "provenance_notes": []
+  },
+  {
+    "domain": "HR",
+    "fixture": "generic",
+    "base_question": "Rank departments by headcount",
+    "entity": "Operations",
+    "base": {
+      "row": {
+        "step": "base",
+        "answer_excerpt": "KEY FINDINGS\n\nThe dataset contains 20 rows across 6 departments. When totaling units by department, Operations ranks highest with 1,730 units, followed by Sales at 1,260 units. Operations accounts for approximately 31% of total units in this sample. The remaining departments cluster below Sales: Finance contributes 950 units, Marketing 790 units, Support 450 units, and HR 430 units. The spread between the top performer (Operations at 1,730) and the lowest (HR at 430) is 1,300 units.\n\nWHAT THIS M",
+        "answer_len": 1686,
+        "intent": "ranking",
+        "chartType": "horizontalBar",
+        "metric": "units",
+        "dimension": "department",
+        "agg": "sum",
+        "aggregation_label": "Total",
+        "confidence": "medium",
+        "supportStatus": null,
+        "title": "Total units by department",
+        "labels": [
+          "Operations",
+          "Sales",
+          "Finance",
+          "Marketing",
+          "Support",
+          "HR"
+        ],
+        "values": [
+          1730.0,
+          1260.0,
+          950.0,
+          790.0,
+          450.0,
+          430.0
+        ],
+        "followUpDetected": false,
+        "wasFollowUp": false,
+        "has_chart": true
+      },
+      "score": {
+        "pass": true,
+        "fails": []
+      },
+      "answer": "KEY FINDINGS\n\nThe dataset contains 20 rows across 6 departments. When totaling units by department, Operations ranks highest with 1,730 units, followed by Sales at 1,260 units. Operations accounts for approximately 31% of total units in this sample. The remaining departments cluster below Sales: Finance contributes 950 units, Marketing 790 units, Support 450 units, and HR 430 units. The spread between the top performer (Operations at 1,730) and the lowest (HR at 430) is 1,300 units.\n\nWHAT THIS MAY INDICATE\n\nOperations' higher unit total may suggest it processes or handles a larger volume of activity relative to other departments in this period. However, with only 20 rows and 6 department groups, this ranking is based on a small sample and should not be treated as a structural or permanent "
+    },
+    "follow_ups": {
+      "F1": {
+        "question": "Why is Operations highest?",
+        "row": {
+          "step": "F1",
+          "answer_excerpt": "Key findings\n\nIn this 20-row sample across 6 departments, Operations totals 1,730 units\u201431% of all units recorded\u2014and ranks highest by a substantial margin. Sales follows with 1,260 units (22%), Finance with 950 units (17%), Marketing with 790 units (14%), Support with 450 units (8%), and HR with 430 units (8%). Operations exceeds HR by 1,300 units, a 75% spread between the top and bottom performer in this filtered cohort.\n\nWhat this may indicate\n\nThe data shows Operations accumulates the most u",
+          "answer_len": 1477,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "units",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by department",
+          "labels": [
+            "Operations",
+            "Sales",
+            "Finance",
+            "Marketing",
+            "Support",
+            "HR"
+          ],
+          "values": [
+            1730.0,
+            1260.0,
+            950.0,
+            790.0,
+            450.0,
+            430.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F2": {
+        "question": "What evidence supports this conclusion?",
+        "row": {
+          "step": "F2",
+          "answer_excerpt": "Key findings\n\nThe dataset contains 20 rows across 6 departments. When totaling units by department, Operations ranks highest with 1,730 units, followed by Sales at 1,260 units and Finance at 950 units. The remaining three departments\u2014Marketing, Support, and HR\u2014contribute 790, 450, and 430 units respectively. Operations accounts for approximately 31% of total units in this small sample, and the spread between the highest (Operations at 1,730) and lowest (HR at 430) is 1,300 units.\n\nWhat this may ",
+          "answer_len": 1640,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "units",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by department",
+          "labels": [
+            "Operations",
+            "Sales",
+            "Finance",
+            "Marketing",
+            "Support",
+            "HR"
+          ],
+          "values": [
+            1730.0,
+            1260.0,
+            950.0,
+            790.0,
+            450.0,
+            430.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F3": {
+        "question": "Which columns were used for this analysis?",
+        "row": {
+          "step": "F3",
+          "answer_excerpt": "Which columns were used for this analysis?\n\nThe analysis used two columns from your dataset:\n\n1. department \u2014 the breakdown dimension (grouping variable)\n2. units \u2014 the metric column being summed\n\nThese were aggregated as a total sum across all 20 rows to rank each of the 6 departments by their unit contribution. The department column carries the category labels (Operations, Sales, Finance, Marketing, Support, HR), and the units column contains the numeric values that were totaled per department",
+          "answer_len": 501,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "units",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by department",
+          "labels": [
+            "Operations",
+            "Sales",
+            "Finance",
+            "Marketing",
+            "Support",
+            "HR"
+          ],
+          "values": [
+            1730.0,
+            1260.0,
+            950.0,
+            790.0,
+            450.0,
+            430.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F4": {
+        "question": "Show the calculations behind this answer.",
+        "row": {
+          "step": "F4",
+          "answer_excerpt": "CALCULATION BREAKDOWN\n\nThe ranking was derived by summing the units column for each department across all 20 rows in the dataset. Here is how each department total was computed:\n\nOperations: Sum of all rows where department = \"Operations\" \u2192 1,730 units\nSales: Sum of all rows where department = \"Sales\" \u2192 1,260 units\nFinance: Sum of all rows where department = \"Finance\" \u2192 950 units\nMarketing: Sum of all rows where department = \"Marketing\" \u2192 790 units\nSupport: Sum of all rows where department = \"Su",
+          "answer_len": 1800,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "units",
+          "dimension": "department",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by department",
+          "labels": [
+            "Operations",
+            "Sales",
+            "Finance",
+            "Marketing",
+            "Support",
+            "HR"
+          ],
+          "values": [
+            1730.0,
+            1260.0,
+            950.0,
+            790.0,
+            450.0,
+            430.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      }
+    },
+    "provenance_ok": true,
+    "provenance_notes": []
+  },
+  {
+    "domain": "Support",
+    "fixture": "generic",
+    "base_question": "Which department has the lowest satisfaction_score?",
+    "entity": "Finance",
+    "base": {
+      "row": {
+        "step": "base",
+        "answer_excerpt": "Key findings:\n\nFinance has the lowest average satisfaction score at 81, based on analysis of 20 filtered rows across 6 departments. The ranking from lowest to highest is: Finance (81), Operations (85.6), Support (87), Marketing (88), HR (90.5), and Sales (92). The spread between the lowest and highest department is 11 points, with Finance trailing the leader Sales by 11 points.\n\nWhat this may indicate:\n\nThe lower satisfaction score in Finance could suggest operational or service-delivery challen",
+        "answer_len": 1654,
+        "intent": "ranking",
+        "chartType": "horizontalBar",
+        "metric": "satisfaction_score",
+        "dimension": "department",
+        "agg": "mean",
+        "aggregation_label": "Average",
+        "confidence": "medium",
+        "supportStatus": null,
+        "title": "Average satisfaction score by department",
+        "labels": [
+          "Sales",
+          "HR",
+          "Marketing",
+          "Support",
+          "Operations",
+          "Finance"
+        ],
+        "values": [
+          92.0,
+          90.5,
+          88.0,
+          87.0,
+          85.6,
+          81.0
+        ],
+        "followUpDetected": false,
+        "wasFollowUp": false,
+        "has_chart": true
+      },
+      "score": {
+        "pass": true,
+        "fails": []
+      },
+      "answer": "Key findings:\n\nFinance has the lowest average satisfaction score at 81, based on analysis of 20 filtered rows across 6 departments. The ranking from lowest to highest is: Finance (81), Operations (85.6), Support (87), Marketing (88), HR (90.5), and Sales (92). The spread between the lowest and highest department is 11 points, with Finance trailing the leader Sales by 11 points.\n\nWhat this may indicate:\n\nThe lower satisfaction score in Finance could suggest operational or service-delivery challenges within that department relative to peers. However, with only 20 rows across 6 departments (approximately 3\u20134 records per department), this sample is small and may not be representative of broader trends. The observed gap could reflect temporary conditions, recent staffing changes, or how satisfa"
+    },
+    "follow_ups": {
+      "F1": {
+        "question": "Why is Finance lowest?",
+        "row": {
+          "step": "F1",
+          "answer_excerpt": "Key findings:\n\nFinance has the lowest average satisfaction score at 81 in this cohort of 20 rows across 6 departments. The Finance department scores 11 points below Sales (92), the highest-ranked department. The spread from lowest to highest is 11 points. Within the Finance department records in this sample, satisfaction scores range from 79 to 80 across the visible entries.\n\nWhat this may indicate:\n\nThe lower satisfaction score in Finance could suggest a range of potential drivers\u2014such as workl",
+          "answer_len": 1829,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "satisfaction_score",
+          "dimension": "department",
+          "agg": "mean",
+          "aggregation_label": "Average",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Average satisfaction score by department",
+          "labels": [
+            "Sales",
+            "HR",
+            "Marketing",
+            "Support",
+            "Operations",
+            "Finance"
+          ],
+          "values": [
+            92.0,
+            90.5,
+            88.0,
+            87.0,
+            85.6,
+            81.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F2": {
+        "question": "What evidence supports this conclusion?",
+        "row": {
+          "step": "F2",
+          "answer_excerpt": "Key findings\n\nThe calculated average satisfaction scores across the 20 filtered rows show Finance at 81, Operations at 85.6, Support at 87, Marketing at 88, HR at 90.5, and Sales at 92. Finance ranks lowest among the six departments, trailing the highest-scoring department (Sales) by 11 points. The spread reflects variation across a small sample of 20 rows distributed across 6 departments.\n\nWhat this may indicate\n\nThe lower satisfaction score in Finance could suggest lower employee or stakeholde",
+          "answer_len": 1756,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "satisfaction_score",
+          "dimension": "department",
+          "agg": "mean",
+          "aggregation_label": "Average",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Average satisfaction score by department",
+          "labels": [
+            "Sales",
+            "HR",
+            "Marketing",
+            "Support",
+            "Operations",
+            "Finance"
+          ],
+          "values": [
+            92.0,
+            90.5,
+            88.0,
+            87.0,
+            85.6,
+            81.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F3": {
+        "question": "Which columns were used for this analysis?",
+        "row": {
+          "step": "F3",
+          "answer_excerpt": "Which columns were used for this analysis?\n\nThe analysis used two columns:\n\n1. department \u2014 the breakdown dimension (grouping variable) with 6 categories: Sales, HR, Marketing, Support, Operations, and Finance.\n\n2. satisfaction_score \u2014 the metric column, aggregated as the average (mean) across the 20 rows in the dataset.\n\nThese two columns were selected to answer which department has the lowest satisfaction score. The dataset contains 8 columns total (report_date, region, department, category, r",
+          "answer_len": 628,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "satisfaction_score",
+          "dimension": "department",
+          "agg": "mean",
+          "aggregation_label": "Average",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Average satisfaction score by department",
+          "labels": [
+            "Sales",
+            "HR",
+            "Marketing",
+            "Support",
+            "Operations",
+            "Finance"
+          ],
+          "values": [
+            92.0,
+            90.5,
+            88.0,
+            87.0,
+            85.6,
+            81.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F4": {
+        "question": "Show the calculations behind this answer.",
+        "row": {
+          "step": "F4",
+          "answer_excerpt": "Key findings:\n\nThe calculation aggregates satisfaction_score by department across all 20 rows in the dataset. Each department's average is computed by summing all satisfaction_score values for that department, then dividing by the count of rows assigned to it.\n\nFinance: 79 + 80 = 159 \u00f7 2 rows = 79.5 (note: the rounded result shown is 81, reflecting additional Finance rows in the full dataset beyond the sample rows provided).\n\nOperations: 83 + 84 = 167 \u00f7 2 rows = 83.5 (shown result: 85.6, indicat",
+          "answer_len": 1896,
+          "intent": "ranking",
+          "chartType": "horizontalBar",
+          "metric": "satisfaction_score",
+          "dimension": "department",
+          "agg": "mean",
+          "aggregation_label": "Average",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Average satisfaction score by department",
+          "labels": [
+            "Sales",
+            "HR",
+            "Marketing",
+            "Support",
+            "Operations",
+            "Finance"
+          ],
+          "values": [
+            92.0,
+            90.5,
+            88.0,
+            87.0,
+            85.6,
+            81.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      }
+    },
+    "provenance_ok": true,
+    "provenance_notes": []
+  },
+  {
+    "domain": "Healthcare",
+    "fixture": "generic",
+    "base_question": "Compare patient volume across wards",
+    "entity": "Product-A",
+    "base": {
+      "row": {
+        "step": "base",
+        "answer_excerpt": "Note on wording: Your question asks about patient volume across wards, but the dataset labels this dimension \"category\" and the metric as \"units\" in a business operations context (sales, marketing, operations, finance departments). The calculated result includes ward-named entries (Ward-A, Ward-B, Ward-C) alongside product and campaign categories, so I'll interpret units as the relevant volume metric.\n\nKey findings:\n\nAcross 20 rows of data, units are distributed unevenly across 9 categories. Pro",
+        "answer_len": 2212,
+        "intent": "compare",
+        "chartType": "horizontalBar",
+        "metric": "units",
+        "dimension": "category",
+        "agg": "sum",
+        "aggregation_label": "Total",
+        "confidence": "medium",
+        "supportStatus": null,
+        "title": "Total units by category",
+        "labels": [
+          "Product-A",
+          "Product-C",
+          "Ward-B",
+          "Ward-A",
+          "Product-B",
+          "Campaign-A"
+        ],
+        "values": [
+          1260.0,
+          825.0,
+          710.0,
+          650.0,
+          555.0,
+          510.0
+        ],
+        "followUpDetected": false,
+        "wasFollowUp": false,
+        "has_chart": true
+      },
+      "score": {
+        "pass": true,
+        "fails": []
+      },
+      "answer": "Note on wording: Your question asks about patient volume across wards, but the dataset labels this dimension \"category\" and the metric as \"units\" in a business operations context (sales, marketing, operations, finance departments). The calculated result includes ward-named entries (Ward-A, Ward-B, Ward-C) alongside product and campaign categories, so I'll interpret units as the relevant volume metric.\n\nKey findings:\n\nAcross 20 rows of data, units are distributed unevenly across 9 categories. Product-A ranks highest with 1,260 total units (approximately 22% of the cohort total), followed by Product-C with 825 units and Ward-B with 710 units. The three ward-labeled categories (Ward-A, Ward-B, Ward-C) account for 1,730 combined units, while the three campaign categories total 1,240 units. The"
+    },
+    "follow_ups": {
+      "F1": {
+        "question": "Why is Product-A highest?",
+        "row": {
+          "step": "F1",
+          "answer_excerpt": "Key findings\n\nProduct-A totals 1,260 units across the 20 rows in this sample, making it the highest-ranked category. This represents approximately 22% of the combined total across all nine categories. The second-place category, Product-C, reaches 825 units \u2014 a gap of 435 units. The spread between the leader (Product-A at 1,260) and the lowest entry (Campaign-B at 280) is substantial, at 980 units or roughly 78% of Campaign-B's volume.\n\nWhat this may indicate\n\nThe concentration in Product-A could",
+          "answer_len": 1631,
+          "intent": "compare",
+          "chartType": "horizontalBar",
+          "metric": "units",
+          "dimension": "category",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by category",
+          "labels": [
+            "Product-A",
+            "Product-C",
+            "Ward-B",
+            "Ward-A",
+            "Product-B",
+            "Campaign-A"
+          ],
+          "values": [
+            1260.0,
+            825.0,
+            710.0,
+            650.0,
+            555.0,
+            510.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F2": {
+        "question": "What evidence supports this conclusion?",
+        "row": {
+          "step": "F2",
+          "answer_excerpt": "Key findings\n\nThe prior analysis aggregated units across 20 rows spanning 9 distinct categories (Product-A, Product-C, Ward-B, Ward-A, Product-B, Campaign-A, Campaign-C, Ward-C, Campaign-B). Product-A recorded the highest total units at 1,260, followed by Product-C at 825 units. The remaining seven categories ranged from Campaign-B (lowest at 280 units) to Ward-B (710 units). The spread between the top performer (Product-A) and the lowest (Campaign-B) is 980 units, or a 78% difference. Product-A",
+          "answer_len": 1905,
+          "intent": "compare",
+          "chartType": "horizontalBar",
+          "metric": "units",
+          "dimension": "category",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by category",
+          "labels": [
+            "Product-A",
+            "Product-C",
+            "Ward-B",
+            "Ward-A",
+            "Product-B",
+            "Campaign-A"
+          ],
+          "values": [
+            1260.0,
+            825.0,
+            710.0,
+            650.0,
+            555.0,
+            510.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F3": {
+        "question": "Which columns were used for this analysis?",
+        "row": {
+          "step": "F3",
+          "answer_excerpt": "Which columns were used for this analysis?\n\nThe analysis used two columns from the dataset:\n\n1. category \u2014 the breakdown dimension (grouping variable) that identifies the nine distinct entities: Product-A, Product-C, Ward-B, Ward-A, Product-B, Campaign-A, Campaign-C, Ward-C, and Campaign-B.\n\n2. units \u2014 the metric column (aggregated by sum) that quantifies the volume across each category.\n\nThese two columns were combined to produce the horizontal bar chart titled \"Total units by category,\" which ",
+          "answer_len": 583,
+          "intent": "compare",
+          "chartType": "horizontalBar",
+          "metric": "units",
+          "dimension": "category",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by category",
+          "labels": [
+            "Product-A",
+            "Product-C",
+            "Ward-B",
+            "Ward-A",
+            "Product-B",
+            "Campaign-A"
+          ],
+          "values": [
+            1260.0,
+            825.0,
+            710.0,
+            650.0,
+            555.0,
+            510.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F4": {
+        "question": "Show the calculations behind this answer.",
+        "row": {
+          "step": "F4",
+          "answer_excerpt": "Calculations Behind Total Units by Category\n\nKey findings:\n\nThe chart aggregates units across all 20 rows in the dataset, grouped by the category column. Each category's total is the sum of all unit values in rows matching that category label.\n\nProduct-A totals 1,260 units (sum of all rows where category = 'Product-A'). Product-C totals 825 units. Ward-B contributes 710 units, Ward-A contributes 650 units, and Product-B contributes 555 units. Campaign-A sums to 510 units, Campaign-C to 450 units",
+          "answer_len": 1964,
+          "intent": "compare",
+          "chartType": "horizontalBar",
+          "metric": "units",
+          "dimension": "category",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total units by category",
+          "labels": [
+            "Product-A",
+            "Product-C",
+            "Ward-B",
+            "Ward-A",
+            "Product-B",
+            "Campaign-A"
+          ],
+          "values": [
+            1260.0,
+            825.0,
+            710.0,
+            650.0,
+            555.0,
+            510.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      }
+    },
+    "provenance_ok": false,
+    "provenance_notes": [
+      "ward_proxy_not_in_user_visible_text"
+    ]
+  },
+  {
+    "domain": "Geography",
+    "fixture": "geographic",
+    "base_question": "Which city generates the highest revenue?",
+    "entity": "Mumbai",
+    "base": {
+      "row": {
+        "step": "base",
+        "answer_excerpt": "Key findings:\n\nMumbai ranks highest on revenue at 520,000 across the 8 cities in this sample. New Delhi follows closely at 500,000, and Bengaluru is third at 470,000. Kochi has the lowest revenue at 210,000. The spread between the top city (Mumbai) and lowest (Kochi) is 310,000, representing a 60% difference. The eight cities show a fairly wide range: mean revenue across the cohort is 395,000 with a standard deviation of about 109,400.\n\nWhat this may indicate:\n\nThe concentration of revenue in th",
+        "answer_len": 1385,
+        "intent": "ranking",
+        "chartType": "bar",
+        "metric": "revenue",
+        "dimension": "city",
+        "agg": "sum",
+        "aggregation_label": "Total",
+        "confidence": "medium",
+        "supportStatus": null,
+        "title": "Total revenue by city",
+        "labels": [
+          "Mumbai",
+          "New Delhi",
+          "Bengaluru",
+          "Hyderabad",
+          "Pune",
+          "Chennai"
+        ],
+        "values": [
+          520000.0,
+          500000.0,
+          470000.0,
+          450000.0,
+          380000.0,
+          340000.0
+        ],
+        "followUpDetected": false,
+        "wasFollowUp": false,
+        "has_chart": true
+      },
+      "score": {
+        "pass": true,
+        "fails": []
+      },
+      "answer": "Key findings:\n\nMumbai ranks highest on revenue at 520,000 across the 8 cities in this sample. New Delhi follows closely at 500,000, and Bengaluru is third at 470,000. Kochi has the lowest revenue at 210,000. The spread between the top city (Mumbai) and lowest (Kochi) is 310,000, representing a 60% difference. The eight cities show a fairly wide range: mean revenue across the cohort is 395,000 with a standard deviation of about 109,400.\n\nWhat this may indicate:\n\nThe concentration of revenue in the top three cities\u2014Mumbai, New Delhi, and Bengaluru\u2014could suggest these regions have stronger customer bases or market demand. However, this is a small cohort of 8 cities, so the pattern may not generalize. The data does not reveal whether differences are driven by customer density, pricing, product"
+    },
+    "follow_ups": {
+      "F1": {
+        "question": "Why is Mumbai highest?",
+        "row": {
+          "step": "F1",
+          "answer_excerpt": "Key findings:\n\nMumbai ranks highest on total revenue at 520,000 in this 8-city sample. New Delhi follows closely at 500,000, and Bengaluru is third at 470,000. The data shows Mumbai also leads on customer count (4,200 customers) and growth rate (18%). Mumbai's revenue advantage over Kochi (the lowest at 210,000) spans 310,000, representing a 60% spread across the cohort.\n\nWhat this may indicate:\n\nMumbai's top-ranking position could be driven by multiple factors working together. The dataset show",
+          "answer_len": 1510,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "city",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total revenue by city",
+          "labels": [
+            "Mumbai",
+            "New Delhi",
+            "Bengaluru",
+            "Hyderabad",
+            "Pune",
+            "Chennai"
+          ],
+          "values": [
+            520000.0,
+            500000.0,
+            470000.0,
+            450000.0,
+            380000.0,
+            340000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F2": {
+        "question": "What evidence supports this conclusion?",
+        "row": {
+          "step": "F2",
+          "answer_excerpt": "Key findings:\n\nThe data from this 8-city sample shows Mumbai with total revenue of 520,000, the highest among the cohort. New Delhi ranks second at 500,000, followed by Bengaluru at 470,000. Kochi records the lowest total revenue at 210,000. The range between the top and bottom cities is 310,000 (a 60% difference). The mean revenue across the eight cities is 395,000.\n\nWhat this may indicate:\n\nMumbai's revenue lead could be associated with several factors present in the dataset. The sample shows ",
+          "answer_len": 1863,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "city",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total revenue by city",
+          "labels": [
+            "Mumbai",
+            "New Delhi",
+            "Bengaluru",
+            "Hyderabad",
+            "Pune",
+            "Chennai"
+          ],
+          "values": [
+            520000.0,
+            500000.0,
+            470000.0,
+            450000.0,
+            380000.0,
+            340000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F3": {
+        "question": "Which columns were used for this analysis?",
+        "row": {
+          "step": "F3",
+          "answer_excerpt": "Which columns were used for this analysis?\n\nThe analysis used two columns from the geographic_performance.csv dataset:\n\n1. city \u2014 the breakdown/grouping dimension (8 unique cities: Mumbai, New Delhi, Bengaluru, Hyderabad, Pune, Chennai, Ahmedabad, Kochi)\n2. revenue \u2014 the metric column (aggregated as Total across each city)\n\nThe dataset also contains state, customers, and growth_rate columns, but these were not included in the \"Total revenue by city\" analysis.",
+          "answer_len": 463,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "city",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total revenue by city",
+          "labels": [
+            "Mumbai",
+            "New Delhi",
+            "Bengaluru",
+            "Hyderabad",
+            "Pune",
+            "Chennai"
+          ],
+          "values": [
+            520000.0,
+            500000.0,
+            470000.0,
+            450000.0,
+            380000.0,
+            340000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      },
+      "F4": {
+        "question": "Show the calculations behind this answer.",
+        "row": {
+          "step": "F4",
+          "answer_excerpt": "Calculations Behind the Answer\n\nThe analysis aggregates the revenue column by city across all 8 rows in the dataset. Here is the step-by-step breakdown:\n\nStep 1: Data Input\nThe dataset contains 8 cities with individual revenue values:\n- Mumbai: 520,000\n- New Delhi: 500,000\n- Bengaluru: 470,000\n- Hyderabad: 450,000\n- Pune: 380,000\n- Chennai: 340,000\n- Ahmedabad: 290,000\n- Kochi: 210,000\n\nStep 2: Aggregation Method\nEach city appears once in the dataset, so total revenue per city equals the single ",
+          "answer_len": 1682,
+          "intent": "ranking",
+          "chartType": "bar",
+          "metric": "revenue",
+          "dimension": "city",
+          "agg": "sum",
+          "aggregation_label": "Total",
+          "confidence": "medium",
+          "supportStatus": null,
+          "title": "Total revenue by city",
+          "labels": [
+            "Mumbai",
+            "New Delhi",
+            "Bengaluru",
+            "Hyderabad",
+            "Pune",
+            "Chennai"
+          ],
+          "values": [
+            520000.0,
+            500000.0,
+            470000.0,
+            450000.0,
+            380000.0,
+            340000.0
+          ],
+          "followUpDetected": true,
+          "wasFollowUp": true,
+          "has_chart": true
+        },
+        "score": {
+          "pass": true,
+          "fails": []
+        }
+      }
+    },
+    "provenance_ok": true,
+    "provenance_notes": []
+  }
+]

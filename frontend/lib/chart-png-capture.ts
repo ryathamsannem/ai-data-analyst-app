@@ -494,9 +494,6 @@ function layoutHeaderExport(
 
   const fontFamily =
     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  const kickerFont = `600 10px ${fontFamily}`;
-  const titleFont = `600 18px ${fontFamily}`;
-  const subtitleFont = `400 13px ${fontFamily}`;
   const chipLabelFont = `600 10px ${fontFamily}`;
   const chipValueFont = `500 11px ${fontFamily}`;
   const reasonFont = `400 12px ${fontFamily}`;

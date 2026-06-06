@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useState } from "react";
+import { scheduleEffectUpdate } from "@/lib/effect-scheduler";
 import {
   applyResolvedTheme,
   persistTheme,
@@ -19,11 +20,13 @@ export const ThemeToggle = memo(function ThemeToggle({
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const stored = readStoredTheme();
-    const initial = resolveTheme(stored);
-    applyResolvedTheme(initial);
-    setResolved(initial);
-    setMounted(true);
+    scheduleEffectUpdate(() => {
+      const stored = readStoredTheme();
+      const initial = resolveTheme(stored);
+      applyResolvedTheme(initial);
+      setResolved(initial);
+      setMounted(true);
+    });
   }, []);
 
   useEffect(() => {

@@ -249,7 +249,7 @@ function presentationLabel(
   return `Vertical bar chart (${dim} comparison)`;
 }
 
-function kindsStrictPresentationMatch(recK: ChartKind, curK: ChartKind): boolean {
+function _kindsStrictPresentationMatch(recK: ChartKind, curK: ChartKind): boolean {
   if (recK === curK) return true;
   if (
     (recK === "pie" || recK === "donut") &&
@@ -283,7 +283,8 @@ export function detectScatterRelationshipAnomaly(args: {
     yLabel?: string;
   }[];
 }): string | null {
-  const { rows, xLabel, yLabel, scatterX, strongestOutliers } = args;
+  const { rows, xLabel, yLabel, scatterX: _scatterX, strongestOutliers } = args;
+  void _scatterX;
   if (!rows.length) return null;
   const apiOut = strongestOutliers?.[0];
   if (apiOut && Number.isFinite(Number(apiOut.x)) && Number.isFinite(Number(apiOut.y))) {
@@ -372,7 +373,7 @@ type RecommendArgs = {
   categoryAxis?: string;
 };
 
-function recommendCore(args: RecommendArgs): {
+function _recommendCore(args: RecommendArgs): {
   kind: ChartKind;
   histogramStyle: boolean;
   blurb: string;
