@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { scheduleEffectUpdate } from "@/lib/effect-scheduler";
 import {
   PLAN_TIER_CHANGED_EVENT,
   USAGE_REFRESH_EVENT,
@@ -35,7 +36,9 @@ export function usePlanUsage(options: UsePlanUsageOptions = {}) {
 
   useEffect(() => {
     if (!enabled) return;
-    refresh();
+    scheduleEffectUpdate(() => {
+      void refresh();
+    });
     const onRefresh = () => {
       refresh();
     };

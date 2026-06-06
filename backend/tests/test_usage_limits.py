@@ -73,6 +73,20 @@ class TestUsageTracker(unittest.TestCase):
             self.assertTrue(ok, msg)
             self.tracker.record_pdf_export(session_id)
 
+    def test_refund_last_pdf_export_restores_quota(self) -> None:
+        session_id = "test-pdf-refund"
+        self.tracker.record_pdf_export(session_id)
+        ok, _ = self.tracker.check_pdf_export(session_id, "free")
+        self.assertFalse(ok)
+        refunded = self.tracker.refund_last_pdf_export(session_id)
+        self.assertTrue(refunded)
+        ok, _ = self.tracker.check_pdf_export(session_id, "free")
+        self.assertTrue(ok)
+
+    def test_refund_without_record_is_noop(self) -> None:
+        session_id = "test-pdf-refund-empty"
+        self.assertFalse(self.tracker.refund_last_pdf_export(session_id))
+
 
 if __name__ == "__main__":
     unittest.main()

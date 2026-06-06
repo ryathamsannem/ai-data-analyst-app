@@ -13,7 +13,7 @@ import {
   labelsLookTemporalForPresentation,
 } from "@/lib/relationship-scatter-presentation";
 
-function labelLooksTemporal(name: string): boolean {
+function _labelLooksTemporal(name: string): boolean {
   const s = String(name ?? "").trim();
   if (!s) return false;
   if (/^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(s))
@@ -260,7 +260,7 @@ export function alignInsightProvenanceToPresentation(
   } | null
   | undefined,
   presentationKind: ChartKind,
-  question?: string
+  _question?: string
 ): typeof prov {
   if (!prov) return prov;
   const label = chartKindToProvenanceLabel(presentationKind);

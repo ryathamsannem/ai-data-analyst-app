@@ -86,6 +86,16 @@ class UsageTracker:
     def record_pdf_export(self, session_id: str) -> None:
         self._record(session_id, "pdf_exports")
 
+    def refund_last_pdf_export(self, session_id: str) -> bool:
+        """Remove the most recent PDF export event for this session (export failure refund)."""
+        with self._lock:
+            bucket = self._bucket(session_id)
+            events = bucket.get("pdf_exports") or []
+            if not events:
+                return False
+            bucket["pdf_exports"] = events[:-1]
+            return True
+
     def get_usage_snapshot(self, session_id: str, tier: PlanTier) -> dict[str, Any]:
         limits = get_limits(tier)
         if tier == "free":

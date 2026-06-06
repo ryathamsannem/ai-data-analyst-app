@@ -1,5 +1,8 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 import pandas as pd
 from anthropic import (
@@ -28,6 +31,12 @@ from services.file_parsers import (
     load_dataframe_from_upload,
     unsupported_format_message,
 )
+from services.cors_config import parse_allowed_origins
+from services.readiness import (
+    get_health_payload,
+    get_ready_payload,
+    validate_startup_config,
+)
 from services.plan_limits import (
     PAID_MAX_DATASET_ROWS,
     file_size_limit_message,
@@ -47,11 +56,18 @@ logger = logging.getLogger(__name__)
 
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    validate_startup_config()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=parse_allowed_origins(os.getenv("ALLOWED_ORIGINS")),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -252,6 +268,18 @@ class PreviewRequest(BaseModel):
 @app.get("/")
 def home():
     return {"message": "AI Data Analyst Backend Running"}
+
+
+@app.get("/health")
+def health():
+    return get_health_payload()
+
+
+@app.get("/ready")
+def ready():
+    payload = get_ready_payload()
+    status_code = 200 if payload["ready"] else 503
+    return JSONResponse(status_code=status_code, content=payload)
 
 
 def detect_header_row(raw_df):
@@ -5322,6 +5350,13 @@ def record_pdf_export(request: Request):
             detail=limit_error_detail("pdf_exports", msg or ""),
         )
     usage_tracker.record_pdf_export(session_id)
+    return _plan_usage_envelope(request)
+
+
+@app.post("/usage/pdf-export/refund")
+def refund_pdf_export(request: Request):
+    session_id = resolve_session_id(request)
+    usage_tracker.refund_last_pdf_export(session_id)
     return _plan_usage_envelope(request)
 
 

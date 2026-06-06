@@ -13,7 +13,6 @@ import {
   ovFilterControl,
   ovFilterLabel,
   ovInteractiveFiltersShell,
-  ovMuted,
   ovSectionDesc,
   ovSectionTitle,
 } from "@/lib/overview-ui";

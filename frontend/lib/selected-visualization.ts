@@ -8,7 +8,7 @@ import {
   chartKindToApiChartType,
   computeFinalChartPresentation,
 } from "@/lib/final-chart-presentation";
-import { polishMetricDisplay } from "@/lib/analytics-metadata";
+import { humanizeColumnName, polishMetricDisplay } from "@/lib/analytics-metadata";
 import { aggregationPrefixLabel, metricStemFromRawTitle } from "@/lib/canonical-chart-title";
 import { resolveTrendBucketLabel } from "@/lib/chart-semantic-metadata";
 import {
@@ -18,7 +18,6 @@ import {
   normalizeAggregationKey,
   type SemanticMetricContext,
 } from "@/lib/semantic-metric-engine";
-import { apiChartStringToKind } from "@/lib/smart-chart-intelligence";
 import {
   buildRelationshipScatterAiContext,
   isRelationshipScatterPresentation,
@@ -64,7 +63,7 @@ export type VisualizationContract = {
 
 export type SelectedVisualization = VisualizationContract;
 
-function labelLooksTemporal(name: string): boolean {
+function _labelLooksTemporal(name: string): boolean {
   const s = String(name ?? "").trim();
   if (!s) return false;
   if (/^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(s))
@@ -91,7 +90,7 @@ export function isTrendMode(
   return contract?.mode === "trend" || Boolean(contract?.isTimeSeries);
 }
 
-function extractTimeBucketLabel(title: string): string {
+function _extractTimeBucketLabel(title: string): string {
   const paren = title.match(/\(([^)]+)\)\s*$/);
   if (paren) {
     const inner = paren[1].trim().toLowerCase();

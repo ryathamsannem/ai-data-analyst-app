@@ -1,7 +1,6 @@
+import { apiUrl } from "@/lib/api-base";
 import type { PlanLimits, PlanTier } from "@/lib/plan-limits";
 import { saasRequestHeaders } from "@/lib/saas-session";
-
-const API_BASE = "http://localhost:8000";
 
 export type UsageSnapshot = {
   ai_questions_used: number;
@@ -18,7 +17,7 @@ export type PlanUsageResponse = {
 };
 
 export async function fetchPlan(): Promise<PlanUsageResponse> {
-  const response = await fetch(`${API_BASE}/plan`, {
+  const response = await fetch(apiUrl("/plan"), {
     headers: saasRequestHeaders(),
   });
   if (!response.ok) {
@@ -28,7 +27,7 @@ export async function fetchPlan(): Promise<PlanUsageResponse> {
 }
 
 export async function fetchPlanUsage(): Promise<PlanUsageResponse> {
-  const response = await fetch(`${API_BASE}/usage`, {
+  const response = await fetch(apiUrl("/usage"), {
     headers: saasRequestHeaders(),
   });
   if (!response.ok) {
@@ -38,7 +37,7 @@ export async function fetchPlanUsage(): Promise<PlanUsageResponse> {
 }
 
 export async function reservePdfExport(): Promise<PlanUsageResponse> {
-  const response = await fetch(`${API_BASE}/usage/pdf-export`, {
+  const response = await fetch(apiUrl("/usage/pdf-export"), {
     method: "POST",
     headers: saasRequestHeaders({ "Content-Type": "application/json" }),
   });
@@ -53,6 +52,17 @@ export async function reservePdfExport(): Promise<PlanUsageResponse> {
     err.detail = body?.detail;
     err.status = response.status;
     throw err;
+  }
+  return (await response.json()) as PlanUsageResponse;
+}
+
+export async function refundPdfExport(): Promise<PlanUsageResponse> {
+  const response = await fetch(apiUrl("/usage/pdf-export/refund"), {
+    method: "POST",
+    headers: saasRequestHeaders({ "Content-Type": "application/json" }),
+  });
+  if (!response.ok) {
+    throw new Error(`Unable to refund PDF export quota (${response.status})`);
   }
   return (await response.json()) as PlanUsageResponse;
 }

@@ -15,12 +15,13 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ChartRow } from "@/app/chart-types";
 import type { ExecutivePdfExportInput } from "@/app/pdf-report";
+import { buildExportPdfFilename } from "@/lib/branding-config";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const OUT = join(ROOT, "docs/pdf-validation-screenshots");
 const MANIFEST = join(OUT, "phase7-manifest.json");
 const FRONTEND = join(ROOT, "frontend");
-const EXPORT_PDF = join(FRONTEND, "Phase-7-QA-2026-06-06.pdf");
+const EXPORT_PDF = join(FRONTEND, buildExportPdfFilename());
 
 type DatasetKey = "retail" | "generic" | "geographic";
 type ComboId =

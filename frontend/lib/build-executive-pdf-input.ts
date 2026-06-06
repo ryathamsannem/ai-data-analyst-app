@@ -670,7 +670,7 @@ function buildInsightSectionsForPdf(
   if (!options.includeAIInsight) return null;
 
   const pdfContract = chartPrep?.contract;
-  const pdfTrendMode = chartPrep?.trendMode ?? false;
+  const _pdfTrendMode = chartPrep?.trendMode ?? false;
 
   const parsed =
     chartScope === "insight"

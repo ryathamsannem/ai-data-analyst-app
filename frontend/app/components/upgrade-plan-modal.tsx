@@ -7,6 +7,7 @@ import {
   type LimitKind,
   type PlanTier,
 } from "@/lib/plan-limits";
+import { BRANDING } from "@/lib/branding-config";
 import type { PlanUsageResponse } from "@/lib/usage-api";
 
 type UpgradePlanModalProps = {
@@ -86,8 +87,8 @@ export function UpgradePlanModal({
           </div>
 
           <p>
-            Payment is not wired yet — use the plan menu in the header to preview
-            Paid access during development.
+            Payment is not wired yet — use the plan menu in the {BRANDING.appName}{" "}
+            header to preview Paid access during development.
           </p>
           <div className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-subtle)]">

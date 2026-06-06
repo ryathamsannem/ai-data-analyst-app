@@ -9,7 +9,6 @@ import {
   pdfExecutiveHierarchyHeadings,
   pdfTextsAreSimilar,
   polishLensSectionCopy,
-  resolvePdfExecutiveLens,
   rewriteObservationAsAction,
   rewriteOpportunityLensNarrative,
 } from "@/lib/pdf-executive-content";

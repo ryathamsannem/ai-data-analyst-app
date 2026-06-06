@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { scheduleEffectUpdate } from "@/lib/effect-scheduler";
 import { UsageDashboard } from "@/app/components/usage-dashboard";
 import type { PlanTier } from "@/lib/plan-limits";
 import {
@@ -18,12 +19,11 @@ import { usePlanUsage } from "@/lib/use-plan-usage";
 
 export const PlanUsageMenu = memo(function PlanUsageMenu() {
   const [open, setOpen] = useState(false);
-  const [tier, setTierState] = useState<PlanTier>("free");
+  const [tier, setTierState] = useState<PlanTier>(() => getPlanTier());
   const rootRef = useRef<HTMLDivElement>(null);
   const { data, loading, error, refresh } = usePlanUsage({ enabled: open });
 
   useEffect(() => {
-    setTierState(getPlanTier());
     const onChange = (event: Event) => {
       const detail = (event as CustomEvent<PlanTier>).detail;
       setTierState(detail ?? getPlanTier());
@@ -34,7 +34,9 @@ export const PlanUsageMenu = memo(function PlanUsageMenu() {
 
   useEffect(() => {
     if (!open) return;
-    refresh();
+    scheduleEffectUpdate(() => {
+      void refresh();
+    });
   }, [open, refresh]);
 
   useEffect(() => {

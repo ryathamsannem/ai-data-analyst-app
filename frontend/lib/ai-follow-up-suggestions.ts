@@ -823,7 +823,7 @@ export function buildAiFollowUpQuestionChips(ctx: AiFollowUpChipContext): string
     chips.push("What is the most important business insight?");
   }
 
-  let out = dedupeFollowUpChips(chips, 12);
+  const out = dedupeFollowUpChips(chips, 12);
   return filterMeaningfulFollowUpChips(out.slice(0, 5), metricNoun, qualityCtx);
 }
 

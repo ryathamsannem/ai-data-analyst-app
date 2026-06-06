@@ -1,7 +1,9 @@
 "use client";
 
 import { memo } from "react";
+import { BrandMark } from "@/components/branding/brand-mark";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { BRANDING, getBrandInitials } from "@/lib/branding-config";
 import { PlanUsageMenu } from "./plan-usage-menu";
 
 export const AppHeader = memo(function AppHeader({
@@ -25,10 +27,16 @@ export const AppHeader = memo(function AppHeader({
           <MenuIcon />
         </button>
 
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-            {pageTitle}
-          </h1>
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+          <BrandMark size="sm" className="lg:hidden" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] font-medium text-[color:var(--text-subtle)] lg:hidden">
+              {BRANDING.appName}
+            </p>
+            <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+              {pageTitle}
+            </h1>
+          </div>
         </div>
 
         <div className="hidden max-w-[12rem] flex-1 sm:block md:max-w-xs lg:max-w-sm">
@@ -61,7 +69,7 @@ export const AppHeader = memo(function AppHeader({
             aria-label="Profile (coming soon)"
             title="Profile (coming soon)"
           >
-            <span aria-hidden>AA</span>
+            <span aria-hidden>{getBrandInitials()}</span>
           </button>
         </div>
       </div>

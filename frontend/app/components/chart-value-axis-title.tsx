@@ -108,10 +108,10 @@ function labelCoord(v: unknown): number | null {
  */
 export function CartesianXAxisTitleLabelContent(props: {
   viewBox?: unknown;
-  value?: string | number;
-  x?: number | string;
-  y?: number | string;
-  textAnchor?: string;
+  value?: unknown;
+  x?: unknown;
+  y?: unknown;
+  textAnchor?: unknown;
 }): ReactElement | null {
   const disp = String(props.value ?? "").trim();
   if (!disp) return null;
@@ -125,8 +125,10 @@ export function CartesianXAxisTitleLabelContent(props: {
     if (y == null) y = vb.y + vb.height;
   }
 
-  const anchor =
-    typeof props.textAnchor === "string" && props.textAnchor.trim()
+  const anchor: "start" | "middle" | "end" | "inherit" =
+    props.textAnchor === "start" ||
+    props.textAnchor === "end" ||
+    props.textAnchor === "inherit"
       ? props.textAnchor
       : "middle";
 
