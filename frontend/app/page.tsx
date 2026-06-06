@@ -364,6 +364,33 @@ import {
 import { FilterPanel } from "./components/home/filter-panel";
 import { type MainNavTabId } from "./components/home/main-nav-tabs";
 import { AppShell } from "@/components/app-shell/app-shell";
+import { UpgradePlanModal } from "./components/upgrade-plan-modal";
+import {
+  canAskAiQuestion,
+  canExportPdf,
+  fileSizeLimitMessage,
+  getPlanLimits,
+  isFileWithinPlanLimit,
+  previewRowOptionsForTier,
+  type LimitKind,
+  type PlanTier,
+} from "@/lib/plan-limits";
+import {
+  extractApiErrorMessage,
+  parseLimitErrorDetail,
+} from "@/lib/limit-error";
+import {
+  fetchPlanUsage,
+  reservePdfExport,
+  type PlanUsageResponse,
+} from "@/lib/usage-api";
+import {
+  getPlanTier,
+  notifyUsageRefresh,
+  PLAN_TIER_CHANGED_EVENT,
+  saasRequestHeaders,
+  setPlanTier,
+} from "@/lib/saas-session";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
 import { OverviewUploadSelectedState } from "./components/home/overview-upload-selected-state";
 import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-summary";
@@ -6541,6 +6568,57 @@ function HomeInner() {
   }, [mappingMessage]);
 
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
+  const [planTier, setPlanTierState] = useState<PlanTier>("free");
+  const [planUsage, setPlanUsage] = useState<PlanUsageResponse | null>(null);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeLimit, setUpgradeLimit] = useState<LimitKind | null>(null);
+  const [upgradeMessage, setUpgradeMessage] = useState("");
+
+  const openUpgradeModal = useCallback((limit: LimitKind, message: string) => {
+    setUpgradeLimit(limit);
+    setUpgradeMessage(message);
+    setUpgradeModalOpen(true);
+  }, []);
+
+  const handleApiLimitDetail = useCallback(
+    (detail: unknown): boolean => {
+      const parsed = parseLimitErrorDetail(detail);
+      if (parsed?.upgrade_required) {
+        openUpgradeModal(parsed.limit, parsed.message);
+        return true;
+      }
+      return false;
+    },
+    [openUpgradeModal]
+  );
+
+  const applyPlanEnvelope = useCallback((plan: PlanUsageResponse | undefined) => {
+    if (!plan) return;
+    setPlanTierState(plan.tier);
+    setPlanUsage(plan);
+    notifyUsageRefresh();
+  }, []);
+
+  useEffect(() => {
+    setPlanTierState(getPlanTier());
+    const refreshUsage = () => {
+      fetchPlanUsage()
+        .then((payload) => setPlanUsage(payload))
+        .catch(() => {});
+    };
+    refreshUsage();
+    const onPlanChange = () => {
+      setPlanTierState(getPlanTier());
+      refreshUsage();
+    };
+    window.addEventListener(PLAN_TIER_CHANGED_EVENT, onPlanChange);
+    return () => window.removeEventListener(PLAN_TIER_CHANGED_EVENT, onPlanChange);
+  }, []);
+
+  const previewRowSelectOptions = useMemo(
+    () => previewRowOptionsForTier(planTier),
+    [planTier]
+  );
 
   const mappingModalOpenRef = useRef(mappingModalOpen);
   const mappingMessageRef = useRef(mappingMessage);
@@ -7017,20 +7095,25 @@ function HomeInner() {
     try {
       const response = await fetch("http://localhost:8000/preview", {
         method: "POST",
-        headers: {
+        headers: saasRequestHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           row_limit: limit === "all" ? null : limit,
         }),
       });
       if (!response.ok) {
         const maybeJson = await response.json().catch(() => null);
-        throw new Error(maybeJson?.detail || "Unable to fetch preview rows.");
+        const detail = maybeJson?.detail;
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        throw new Error(extractApiErrorMessage(detail) || "Unable to fetch preview rows.");
       }
       const data = await response.json();
       setPreview(data.preview || []);
       setRows(data.rows || rows);
+      applyPlanEnvelope(data.plan);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to fetch preview rows.");
     } finally {
@@ -7077,11 +7160,19 @@ function HomeInner() {
     setLoading(true);
 
     try {
+      const tier = getPlanTier();
+      if (!isFileWithinPlanLimit(tier, file.size)) {
+        const msg = fileSizeLimitMessage(tier, file.size);
+        openUpgradeModal("file_size", msg);
+        throw new Error(msg);
+      }
+
       const formData = new FormData();
       formData.append("file", file);
 
       const response = await fetch("http://localhost:8000/upload", {
         method: "POST",
+        headers: saasRequestHeaders(),
         body: formData,
       });
 
@@ -7093,26 +7184,15 @@ function HomeInner() {
           "detail" in maybeJson
             ? (maybeJson as { detail: unknown }).detail
             : null;
-        const message =
-          typeof detail === "string"
-            ? detail
-            : Array.isArray(detail)
-              ? detail
-                  .map((item) =>
-                    item &&
-                    typeof item === "object" &&
-                    "msg" in item &&
-                    typeof (item as { msg: unknown }).msg === "string"
-                      ? (item as { msg: string }).msg
-                      : null
-                  )
-                  .filter(Boolean)
-                  .join(" ") || "Upload failed"
-              : "Upload failed";
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        const message = extractApiErrorMessage(detail) || "Upload failed";
         throw new Error(message);
       }
 
       const data = await response.json();
+      applyPlanEnvelope(data.plan);
 
       setUploadMeta(data.file || null);
       setProfile(data.profile || null);
@@ -7202,9 +7282,9 @@ function HomeInner() {
     try {
       const response = await fetch("http://localhost:8000/select-sheet", {
         method: "POST",
-        headers: {
+        headers: saasRequestHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           sheet_name: sheetName,
         }),
@@ -7212,10 +7292,15 @@ function HomeInner() {
 
       if (!response.ok) {
         const maybeJson = await response.json().catch(() => null);
-        throw new Error(maybeJson?.detail || "Sheet selection failed");
+        const detail = maybeJson?.detail;
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        throw new Error(extractApiErrorMessage(detail) || "Sheet selection failed");
       }
 
       const data = await response.json();
+      applyPlanEnvelope(data.plan);
 
       setUploadMeta(data.file || uploadMeta || null);
       setProfile(data.profile || null);
@@ -7283,10 +7368,17 @@ function HomeInner() {
       setError(OVERVIEW_UPLOAD_INVALID_MSG);
       return;
     }
+    const tier = getPlanTier();
+    if (!isFileWithinPlanLimit(tier, next.size)) {
+      const msg = fileSizeLimitMessage(tier, next.size);
+      openUpgradeModal("file_size", msg);
+      setError(msg);
+      return;
+    }
     setError("");
     dismissMappingMessage();
     setFile(next);
-  }, [dismissMappingMessage]);
+  }, [dismissMappingMessage, openUpgradeModal]);
 
   const openOverviewReplaceUpload = useCallback(() => {
     dismissMappingMessage();
@@ -7368,6 +7460,18 @@ function HomeInner() {
     }
     if (overrideQuestion != null && overrideQuestion.trim()) {
       setQuestion(overrideQuestion.trim());
+    }
+
+    const aiRemaining = planUsage?.usage.ai_questions_remaining;
+    if (!canAskAiQuestion(planTier, aiRemaining)) {
+      const limits = getPlanLimits(planTier);
+      const msg =
+        planTier === "free"
+          ? `You've reached today's limit of ${limits.ai_questions_limit} AI questions. Upgrade to Paid for 300 questions per month.`
+          : `You've reached this month's limit of ${limits.ai_questions_limit} AI questions.`;
+      openUpgradeModal("ai_questions", msg);
+      setError(msg);
+      return;
     }
 
     const parentAnalysisContext = buildParentAnalysisContext({
@@ -7474,9 +7578,9 @@ function HomeInner() {
 
       const response = await fetch("http://localhost:8000/ask", {
         method: "POST",
-        headers: {
+        headers: saasRequestHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           question: qRaw,
           conversation_context: conversationPayload,
@@ -7506,27 +7610,26 @@ function HomeInner() {
       });
 
       if (!response.ok) {
-        let detail = `AI request failed (${response.status})`;
+        let detail: unknown = `AI request failed (${response.status})`;
         try {
           const errBody = (await response.json()) as { detail?: unknown };
-          if (typeof errBody.detail === "string" && errBody.detail.trim()) {
-            detail = errBody.detail.trim();
-          } else if (Array.isArray(errBody.detail)) {
-            detail = errBody.detail
-              .map((d) =>
-                typeof d === "object" && d && "msg" in d
-                  ? String((d as { msg: string }).msg)
-                  : String(d),
-              )
-              .join(" ");
-          }
+          detail = errBody.detail ?? detail;
         } catch {
           /* ignore parse errors */
         }
-        throw new Error(detail);
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        throw new Error(extractApiErrorMessage(detail));
       }
 
       const data = await response.json();
+      fetchPlanUsage()
+        .then((payload) => {
+          setPlanUsage(payload);
+          notifyUsageRefresh();
+        })
+        .catch(() => {});
 
       if (typeof data.filter_breadcrumb === "string") {
         setFilterBreadcrumb(data.filter_breadcrumb);
@@ -10256,6 +10359,28 @@ function HomeInner() {
   downloadReportImplRef.current = async (options?: Partial<ExportOptions>) => {
     try {
       setError("");
+      const pdfRemaining = planUsage?.usage.pdf_exports_remaining;
+      if (!canExportPdf(planTier, pdfRemaining)) {
+        const msg =
+          "You've reached today's limit of 1 PDF export. Upgrade to Paid for unlimited PDF exports.";
+        openUpgradeModal("pdf_exports", msg);
+        setError(msg);
+        return;
+      }
+      try {
+        const nextUsage = await reservePdfExport();
+        setPlanUsage(nextUsage);
+        setPlanTierState(nextUsage.tier);
+        notifyUsageRefresh();
+      } catch (err) {
+        const detail = (err as { detail?: unknown }).detail;
+        if (handleApiLimitDetail(detail)) {
+          setError(extractApiErrorMessage(detail));
+          return;
+        }
+        setError("Unable to reserve PDF export.");
+        return;
+      }
       const resolved: ExportOptions = {
         ...exportOptions,
         ...options,
@@ -11576,11 +11701,11 @@ function HomeInner() {
                     }}
                     className={dpControl}
                   >
-                    <option value="10">10 rows</option>
-                    <option value="25">25 rows</option>
-                    <option value="50">50 rows</option>
-                    <option value="100">100 rows</option>
-                    <option value="all">All rows</option>
+                    {previewRowSelectOptions.map((opt) => (
+                      <option key={String(opt)} value={String(opt)}>
+                        {opt === "all" ? "All rows" : `${opt} rows`}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -13562,6 +13687,20 @@ function HomeInner() {
             </div>
           </div>
         )}
+
+        <UpgradePlanModal
+          open={upgradeModalOpen}
+          limit={upgradeLimit}
+          tier={planTier}
+          message={upgradeMessage}
+          planUsage={planUsage}
+          onClose={() => setUpgradeModalOpen(false)}
+          onSwitchToPaid={() => {
+            setPlanTier("paid");
+            setPlanTierState("paid");
+            setUpgradeModalOpen(false);
+          }}
+        />
 
         </div>
     </AppShell>

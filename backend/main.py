@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 import pandas as pd
@@ -28,6 +28,18 @@ from services.file_parsers import (
     load_dataframe_from_upload,
     unsupported_format_message,
 )
+from services.plan_limits import (
+    PAID_MAX_DATASET_ROWS,
+    file_size_limit_message,
+    dataset_rows_limit_message,
+    get_limits,
+)
+from services.saas_context import (
+    limit_error_detail,
+    resolve_plan_tier,
+    resolve_session_id,
+)
+from services.usage_tracker import usage_tracker
 
 load_dotenv()
 
@@ -5262,11 +5274,73 @@ def _compose_empty_filtered_payload(
     return _json_safe(payload)
 
 
+def _enforce_dataset_row_cap(tier: str, row_count: int) -> None:
+    if tier == "paid" and row_count > PAID_MAX_DATASET_ROWS:
+        raise HTTPException(
+            status_code=413,
+            detail=limit_error_detail(
+                "dataset_rows",
+                dataset_rows_limit_message(row_count),
+            ),
+        )
+
+
+def _plan_usage_envelope(request: Request) -> Dict[str, Any]:
+    session_id = resolve_session_id(request)
+    tier = resolve_plan_tier(request)
+    return {
+        "tier": tier,
+        "limits": get_limits(tier),
+        "usage": usage_tracker.get_usage_snapshot(session_id, tier),
+    }
+
+
+@app.get("/plan")
+def get_plan(request: Request):
+    session_id = resolve_session_id(request)
+    tier = resolve_plan_tier(request)
+    return {
+        "tier": tier,
+        "limits": get_limits(tier),
+        "usage": usage_tracker.get_usage_snapshot(session_id, tier),
+    }
+
+
+@app.get("/usage")
+def get_usage(request: Request):
+    return _plan_usage_envelope(request)
+
+
+@app.post("/usage/pdf-export")
+def record_pdf_export(request: Request):
+    session_id = resolve_session_id(request)
+    tier = resolve_plan_tier(request)
+    ok, msg = usage_tracker.check_pdf_export(session_id, tier)
+    if not ok:
+        raise HTTPException(
+            status_code=429,
+            detail=limit_error_detail("pdf_exports", msg or ""),
+        )
+    usage_tracker.record_pdf_export(session_id)
+    return _plan_usage_envelope(request)
+
+
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(request: Request, file: UploadFile = File(...)):
     global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile, available_sheet_names, column_mapping_metadata
 
+    tier = resolve_plan_tier(request)
+    plan_limits = get_limits(tier)
+
     uploaded_file_bytes = await file.read()
+    if len(uploaded_file_bytes) > plan_limits["max_file_bytes"]:
+        raise HTTPException(
+            status_code=413,
+            detail=limit_error_detail(
+                "file_size",
+                file_size_limit_message(tier, len(uploaded_file_bytes)),
+            ),
+        )
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing file name.")
 
@@ -5292,11 +5366,14 @@ async def upload_file(file: UploadFile = File(...)):
         df = clean_dataframe(df)
         if df.empty:
             raise HTTPException(status_code=400, detail="Uploaded file has no data.")
+        _enforce_dataset_row_cap(tier, len(df))
         selected_sheet_name = sheet_label
         dataset_profile = build_profile(df)
         apply_semantic_column_mapping(df, dataset_profile)
         available_sheet_names = [sheet_label]
-        return build_upload_response([sheet_label])
+        payload = build_upload_response([sheet_label])
+        payload["plan"] = _plan_usage_envelope(request)
+        return payload
 
     if fmt == "excel":
         try:
@@ -5323,12 +5400,15 @@ async def upload_file(file: UploadFile = File(...)):
         df = best_df
         if df is None or df.empty:
             raise HTTPException(status_code=400, detail="Uploaded file has no usable tabular data.")
+        _enforce_dataset_row_cap(tier, len(df))
         selected_sheet_name = best_sheet
         dataset_profile = build_profile(df)
         apply_semantic_column_mapping(df, dataset_profile)
         available_sheet_names = list(sheet_names)
 
-        return build_upload_response(sheet_names)
+        payload = build_upload_response(sheet_names)
+        payload["plan"] = _plan_usage_envelope(request)
+        return payload
 
     logger.warning("Upload rejected (%s): unsupported format", uploaded_file_name)
     raise HTTPException(status_code=400, detail=unsupported_format_message())
@@ -5348,8 +5428,10 @@ def _log_parquet_upload_support() -> None:
 
 
 @app.post("/select-sheet")
-def select_sheet(data: SheetRequest):
+def select_sheet(data: SheetRequest, request: Request):
     global df, uploaded_file_bytes, uploaded_file_name, selected_sheet_name, column_mapping, dataset_profile, available_sheet_names, column_mapping_metadata
+
+    tier = resolve_plan_tier(request)
 
     if uploaded_file_bytes is None:
         raise HTTPException(status_code=400, detail="Please upload an Excel file first.")
@@ -5367,34 +5449,52 @@ def select_sheet(data: SheetRequest):
     selected_sheet_name = data.sheet_name
     if df.empty:
         raise HTTPException(status_code=400, detail="Selected sheet has no usable data.")
+    _enforce_dataset_row_cap(tier, len(df))
     dataset_profile = build_profile(df)
     apply_semantic_column_mapping(df, dataset_profile)
     available_sheet_names = list(sheet_names)
 
-    return build_upload_response(sheet_names)
+    payload = build_upload_response(sheet_names)
+    payload["plan"] = _plan_usage_envelope(request)
+    return payload
 
 
 @app.post("/preview")
-def get_preview(data: PreviewRequest):
+def get_preview(data: PreviewRequest, request: Request):
     global df
 
     if df is None:
         raise HTTPException(status_code=400, detail="Please upload a CSV or Excel file first.")
+
+    tier = resolve_plan_tier(request)
+    max_preview = get_limits(tier)["max_preview_rows"]
 
     limit = data.row_limit
     if limit is not None and limit <= 0:
         raise HTTPException(status_code=400, detail="row_limit must be a positive number or null for all rows.")
 
     if limit is None:
-        view = df
+        safe_limit = min(len(df), max_preview)
     else:
-        # Guardrail for accidental huge responses.
-        safe_limit = min(int(limit), 10000)
-        view = df.head(safe_limit)
+        safe_limit = min(int(limit), max_preview)
+
+    if limit is not None and int(limit) > max_preview:
+        raise HTTPException(
+            status_code=403,
+            detail=limit_error_detail(
+                "preview_rows",
+                f"Preview is limited to {max_preview:,} rows on the {tier.title()} plan. "
+                "Upgrade to Paid for larger previews.",
+            ),
+        )
+
+    view = df.head(safe_limit)
 
     return _json_safe({
         "rows": int(len(df)),
         "preview": view.to_dict(orient="records"),
+        "preview_capped_at": safe_limit,
+        "plan": _plan_usage_envelope(request),
     })
 
 
@@ -15062,7 +15162,7 @@ def _compute_visualization_for_question_body(
 
 
 @app.post("/ask")
-def ask_question(data: QuestionRequest):
+def ask_question(data: QuestionRequest, request: Request):
     global df, dataset_profile
 
     if df is None:
@@ -15071,6 +15171,15 @@ def ask_question(data: QuestionRequest):
             "visualization": None,
             "analysis": None,
         }
+
+    session_id = resolve_session_id(request)
+    tier = resolve_plan_tier(request)
+    ai_ok, ai_msg = usage_tracker.check_ai_question(session_id, tier)
+    if not ai_ok:
+        raise HTTPException(
+            status_code=429,
+            detail=limit_error_detail("ai_questions", ai_msg or ""),
+        )
 
     plan = resolve_follow_up_turn(
         data.question,
@@ -15094,6 +15203,8 @@ def ask_question(data: QuestionRequest):
                 },
             }
         )
+
+    usage_tracker.record_ai_question(session_id)
 
     prev_filters: List[str] = []
     if data.conversation_context and data.conversation_context.filtersApplied:

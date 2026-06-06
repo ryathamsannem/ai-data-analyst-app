@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PlanUsageMenu } from "./plan-usage-menu";
 
 export const AppHeader = memo(function AppHeader({
   pageTitle,
@@ -50,6 +51,7 @@ export const AppHeader = memo(function AppHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <PlanUsageMenu />
           <DatasetStatus loaded={datasetLoaded} />
           <ThemeToggle />
           <button
