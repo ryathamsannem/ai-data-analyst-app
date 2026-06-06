@@ -1,4 +1,5 @@
 import type { ChartKind, ChartRow } from "@/app/chart-types";
+import { buildGroupedBarChartBlurb, type GroupedBarSeriesMeta } from "@/lib/smart-chart-intelligence";
 
 export type ChartReasonMetadata = {
   groupCount?: number;
@@ -11,6 +12,8 @@ export type ChartReasonMetadata = {
   detectedIntent?: string | null;
   /** Short routing blurb from smart chart intel when aligned. */
   recommendationHint?: string | null;
+  groupedBar?: boolean;
+  groupedBarMeta?: GroupedBarSeriesMeta | null;
 };
 
 export type GenerateChartReasonParams = {
@@ -127,6 +130,16 @@ function reasonForKind(
 ): string | null {
   const temporal = Boolean(meta.temporalCategories);
   const histStyle = Boolean(meta.histogramStyle);
+
+  if (
+    meta.groupedBar &&
+    (kind === "bar" || kind === "bar_horizontal")
+  ) {
+    return buildGroupedBarChartBlurb(meta.groupedBarMeta, {
+      valueAxis: met,
+      categoryAxis: dim,
+    });
+  }
 
   if (meta.stackedOrMultiSeries && (kind === "bar" || kind === "bar_horizontal")) {
     return `Stacked bars show how ${met} splits within each ${dim} group — useful for mix and part-to-whole reads.`;

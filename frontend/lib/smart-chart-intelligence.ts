@@ -1,6 +1,81 @@
 import type { ChartKind, ChartRow } from "@/app/chart-types";
+import {
+  humanizeColumnName,
+  polishMetricDisplay,
+  stripIntentNoiseFromMetricLabel,
+} from "@/lib/analytics-metadata";
 import type { SemanticMetricContext } from "@/lib/semantic-metric-engine";
 import { buildChartNarrative } from "@/lib/ux-narrative";
+
+/** Grouped dual-metric bar metadata — same source as visualization `multiSeries`. */
+export type GroupedBarSeriesMeta = {
+  seriesKeys?: string[];
+  seriesLabels?: Record<string, string>;
+  categoryAxisTitle?: string | null;
+};
+
+const GROUPED_BAR_FALLBACK_BLURB =
+  "If multiple measures are compared, grouped bars show differences across categories.";
+
+function formatMeasureList(labels: string[]): string | null {
+  const parts = labels.map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  if (parts.length === 1) return parts[0]!;
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+}
+
+function pluralizeDimensionLabel(label: string): string {
+  const t = label.trim();
+  if (!t) return "categories";
+  const lc = t.toLowerCase();
+  if (/\bregions?\b/.test(lc)) return "regions";
+  if (/\bproducts?\b/.test(lc)) return "products";
+  if (/\bcampaigns?\b/.test(lc)) return "campaigns";
+  if (/\bdepartments?\b/.test(lc)) return "departments";
+  if (/\bchannels?\b/.test(lc)) return "channels";
+  if (/\bcustomers?\b/.test(lc)) return "customers";
+  if (/\bsegments?\b/.test(lc)) return "segments";
+  if (/\bcategories?\b/.test(lc)) return "categories";
+  if (/s$/i.test(t)) return lc;
+  if (/^[A-Za-z][\w\s-]*$/.test(t) && !/\s/.test(t)) return `${lc}s`;
+  return lc;
+}
+
+function measureLabelsFromMeta(
+  meta: GroupedBarSeriesMeta | null | undefined,
+  valueAxisFallback: string
+): string[] {
+  const keys = meta?.seriesKeys ?? [];
+  const fromMeta = keys
+    .map((k) => meta?.seriesLabels?.[k]?.trim() || k.trim())
+    .filter(Boolean);
+  if (fromMeta.length) return fromMeta;
+  const fromAxis = valueAxisFallback
+    .split(/\s*&\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return fromAxis;
+}
+
+/** One-line “why grouped bars” copy from visualization multi-series metadata. */
+export function buildGroupedBarChartBlurb(
+  meta: GroupedBarSeriesMeta | null | undefined,
+  axisFallback?: { valueAxis?: string; categoryAxis?: string }
+): string {
+  const measures = formatMeasureList(
+    measureLabelsFromMeta(meta, axisFallback?.valueAxis ?? "")
+  );
+  const dimRaw =
+    meta?.categoryAxisTitle?.trim() ||
+    axisFallback?.categoryAxis?.trim() ||
+    "";
+  const dim = pluralizeDimensionLabel(dimRaw);
+  if (measures && dim) {
+    return `Grouped side-by-side bars compare ${measures} across ${dim}.`;
+  }
+  return GROUPED_BAR_FALLBACK_BLURB;
+}
 
 export type ChartRoutingRec = {
   detectedIntent?: string;
@@ -117,18 +192,61 @@ export function apiChartStringToKind(api: string): ChartKind {
   return "bar";
 }
 
-function presentationLabel(kind: ChartKind, histogramStyle: boolean): string {
-  if (kind === "histogram")
-    return "Histogram (value distribution)";
+const GENERIC_DIMENSION_LABEL_RE =
+  /^(category|categories|dimension|group|groups|breakdown|segment)$/i;
+
+/** Lowercase dimension noun for chart view labels (zone, product, department, …). */
+export function dimensionPhraseForComparison(
+  categoryAxis: string,
+  semanticContext?: SemanticMetricContext | null,
+  groupedCategoryTitle?: string | null
+): string {
+  const polish = (raw: string): string => {
+    let t = raw.trim();
+    if (!t || t.length > 52 || /\?/.test(t)) return "";
+    if (/^(is|are|what|which|how)\b/i.test(t)) return "";
+    t = polishMetricDisplay(stripIntentNoiseFromMetricLabel(t));
+    t = humanizeColumnName(t.replace(/_/g, " ")).trim();
+    t = t.replace(/\s+name$/i, "").trim();
+    return t.toLowerCase() || "";
+  };
+
+  const candidates = [
+    semanticContext?.dimensionLabel?.trim(),
+    groupedCategoryTitle?.trim(),
+    categoryAxis.trim(),
+  ].filter(Boolean) as string[];
+
+  for (const raw of candidates) {
+    const phrase = polish(raw);
+    if (phrase && !GENERIC_DIMENSION_LABEL_RE.test(phrase)) {
+      return phrase;
+    }
+  }
+  for (const raw of candidates) {
+    const phrase = polish(raw);
+    if (phrase) return phrase;
+  }
+  return "category";
+}
+
+function presentationLabel(
+  kind: ChartKind,
+  histogramStyle: boolean,
+  dimensionPhrase: string
+): string {
+  const dim = dimensionPhrase.trim().toLowerCase() || "category";
+  if (kind === "histogram") return `Histogram (${dim} distribution)`;
   if (histogramStyle && kind === "bar")
-    return "Vertical bar chart (distribution view)";
-  if (kind === "line") return "Line chart (trend)";
-  if (kind === "area") return "Area chart (trend)";
-  if (kind === "pie") return "Pie chart (share)";
-  if (kind === "donut") return "Donut chart (share)";
+    return `Vertical bar chart (${dim} distribution)`;
+  if (kind === "line") return `Line chart (${dim} trend)`;
+  if (kind === "area") return `Area chart (${dim} trend)`;
+  if (kind === "pie") return `Pie chart (${dim} share)`;
+  if (kind === "donut") return `Donut chart (${dim} share)`;
   if (kind === "scatter") return "Scatter plot (numeric relationship)";
-  if (kind === "bar_horizontal") return "Horizontal bar chart (ranking / long labels)";
-  return "Vertical bar chart (category comparison)";
+  if (kind === "bar_horizontal")
+    return `Horizontal bar chart (${dim} comparison)`;
+  return `Vertical bar chart (${dim} comparison)`;
 }
 
 function kindsStrictPresentationMatch(recK: ChartKind, curK: ChartKind): boolean {
@@ -153,10 +271,43 @@ function stdDev(values: number[]): number {
   return Math.sqrt(s / (n - 1));
 }
 
+export function detectScatterRelationshipAnomaly(args: {
+  rows: ChartRow[];
+  xLabel: string;
+  yLabel: string;
+  scatterX?: number[];
+  strongestOutliers?: {
+    x?: number | null;
+    y?: number | null;
+    xLabel?: string;
+    yLabel?: string;
+  }[];
+}): string | null {
+  const { rows, xLabel, yLabel, scatterX, strongestOutliers } = args;
+  if (!rows.length) return null;
+  const apiOut = strongestOutliers?.[0];
+  if (apiOut && Number.isFinite(Number(apiOut.x)) && Number.isFinite(Number(apiOut.y))) {
+    const xn = (apiOut.xLabel ?? xLabel).trim() || "X";
+    const yn = (apiOut.yLabel ?? yLabel).trim() || "Y";
+    const xv = Number(apiOut.x);
+    const yv = Number(apiOut.y);
+    const fmt = (n: number) =>
+      Math.abs(n) >= 1000
+        ? n.toLocaleString(undefined, { maximumFractionDigits: 0 })
+        : n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return `Potential outlier detected near ${xn}=${fmt(xv)}, ${yn}=${fmt(yv)}.`;
+  }
+  if (rows.length >= 3) {
+    return "One observation appears outside the normal cluster.";
+  }
+  return null;
+}
+
 export function detectNumericAnomalies(
   rows: ChartRow[],
   kind: ChartKind
 ): string | null {
+  if (kind === "scatter") return null;
   if (!rows.length || kind === "pie" || kind === "donut") return null;
   const vals = rows
     .map((r) => Number(r.value))
@@ -342,6 +493,52 @@ function recommendCore(args: RecommendArgs): {
   };
 }
 
+function blurbForRenderedChart(params: {
+  kind: ChartKind;
+  histogramStyle: boolean;
+  valueAxis: string;
+  categoryAxis: string;
+  groupedDualMetric?: boolean;
+  groupedBarMeta?: GroupedBarSeriesMeta | null;
+}): string {
+  const met = params.valueAxis.trim() || "your metric";
+  const dim = params.categoryAxis.trim() || "each category";
+  if (params.groupedDualMetric) {
+    return buildGroupedBarChartBlurb(params.groupedBarMeta, {
+      valueAxis: met,
+      categoryAxis: dim,
+    });
+  }
+  if (params.kind === "histogram") {
+    return `Bins ${met} into ranges to show spread and tail behavior across the cohort.`;
+  }
+  if (params.kind === "bar_horizontal") {
+    return `Horizontal bars rank ${dim} by ${met} — easiest when labels are long or you are comparing many groups.`;
+  }
+  if (params.kind === "line") {
+    const dimLc = dim.toLowerCase();
+    const timeBuckets =
+      /\bbuckets?\b/.test(dimLc) ||
+      /\b(monthly|weekly|daily|hourly|quarterly|yearly)\b/.test(dimLc);
+    return timeBuckets
+      ? `Line chart shows how ${met} moves across ordered ${dim}.`
+      : `Line chart shows how ${met} moves across ordered ${dim} periods.`;
+  }
+  if (params.kind === "area") {
+    return `Area chart emphasizes trend and movement of ${met} across ${dim}.`;
+  }
+  if (params.kind === "scatter") {
+    return `Scatter plot relates two numeric measures to surface correlation patterns.`;
+  }
+  if (params.kind === "pie" || params.kind === "donut") {
+    return `Shows how ${met} splits across a modest set of ${dim} segments (part-to-whole).`;
+  }
+  if (params.histogramStyle && params.kind === "bar") {
+    return `Vertical bars show how ${met} spreads across ${dim} buckets.`;
+  }
+  return `Vertical bars compare ${met} side-by-side across ${dim}.`;
+}
+
 function buildWhyThisChart(params: {
   currentLabel: string;
   categoryAxis: string;
@@ -349,10 +546,15 @@ function buildWhyThisChart(params: {
   routing: ChartRoutingRec;
   answerSummary?: string;
   semanticContext?: SemanticMetricContext | null;
+  chartBlurb?: string;
 }): string {
   const expl = params.routing?.selectionExplanation?.trim();
   const dim = params.categoryAxis.trim() || "categories";
   const met = params.valueAxis.trim() || "values";
+
+  if (params.chartBlurb?.trim()) {
+    return params.chartBlurb.trim();
+  }
 
   if (params.semanticContext) {
     const narrative = buildChartNarrative(params.semanticContext, {
@@ -364,7 +566,7 @@ function buildWhyThisChart(params: {
 
   if (expl && expl.length > 0) {
     const clipped = expl.length > 320 ? `${expl.slice(0, 317)}…` : expl;
-    return `${clipped} The view is rendered as ${params.currentLabel.toLowerCase()} using “${met}” by “${dim}”.`;
+    return `${clipped} Rendered as ${params.currentLabel.toLowerCase()} using “${met}” by “${dim}”.`;
   }
   const hint = params.answerSummary?.trim();
   const base = `This ${params.currentLabel.toLowerCase()} maps “${met}” across “${dim}”, which matches how the assistant structured the answer for your question.`;
@@ -382,106 +584,123 @@ export function computeSmartChartIntel(params: {
   apiChartType: string;
   presentationKind: ChartKind;
   stackedOrMultiSeries: boolean;
+  multiSeriesLayout?: string | null;
+  groupedBarMeta?: GroupedBarSeriesMeta | null;
   categoryAxis: string;
   valueAxis: string;
   routing: ChartRoutingRec;
   answerSummary?: string;
   semanticContext?: SemanticMetricContext | null;
+  relationshipInsights?: {
+    strongestOutliers?: {
+      x?: number | null;
+      y?: number | null;
+      xLabel?: string;
+      yLabel?: string;
+    }[];
+  } | null;
+  scatterXValues?: number[];
+  nearPerfectCorrelationCaution?: string | null;
 }): SmartChartIntel | null {
-  if (!params.rows.length || params.stackedOrMultiSeries) {
-    if (params.stackedOrMultiSeries && params.rows.length) {
-      const cur = params.presentationKind;
-      const curLab = presentationLabel(cur, false);
-      return {
-        active: true,
-        recommendedKind: cur,
-        histogramStyle: false,
-        recommendedLabel: curLab,
-        recommendationBlurb:
-          "Each stack shows sub-parts within a category — useful for mix effects while keeping the same cohort.",
-        currentKind: cur,
-        currentLabel: curLab,
-        suggestedKind: cur,
-        suggestedLabel: curLab,
-        alignsWithRecommendation: true,
-        whyThisChart: buildWhyThisChart({
-          currentLabel: curLab,
-          categoryAxis: params.categoryAxis,
-          valueAxis: params.valueAxis,
-          routing: params.routing,
-          answerSummary: params.answerSummary,
-          semanticContext: params.semanticContext,
-        }),
-        anomalyNote: detectNumericAnomalies(params.rows, params.presentationKind),
-      };
-    }
+  if (!params.rows.length) {
     return null;
   }
 
-  const lockedTimeSeries =
-    params.presentationKind === "line" ||
-    params.presentationKind === "area" ||
-    params.semanticContext?.chartType === "line" ||
-    params.semanticContext?.chartType === "area" ||
-    /\bweekly\b/i.test(params.semanticContext?.dimensionLabel ?? "") ||
-    rowsLookTemporal(params.rows);
-
-  const rec: { kind: ChartKind; histogramStyle: boolean; blurb: string } =
-    lockedTimeSeries
-    ? {
-        kind: params.presentationKind === "area" ? "area" : "line",
-        histogramStyle: false,
-        blurb: `Shows how ${(params.valueAxis ?? "").trim() || "your metric"} moves across ordered time buckets so trend and turning points read naturally.`,
-      }
-    : recommendCore({
-        question: params.question,
-        columns: params.columns,
-        rows: params.rows,
-        apiChartType: params.apiChartType,
-        valueAxis: params.valueAxis,
-        categoryAxis: params.categoryAxis,
-      });
-
   const currentKind = params.presentationKind || "bar";
+  const histogramStyle = false;
+  const dimensionPhrase = dimensionPhraseForComparison(
+    params.categoryAxis,
+    params.semanticContext,
+    params.groupedBarMeta?.categoryAxisTitle
+  );
   const currentLabel = presentationLabel(
     currentKind,
-    Boolean(rec.histogramStyle && currentKind === "bar")
+    histogramStyle,
+    dimensionPhrase
   );
-  const suggestedKind: ChartKind = lockedTimeSeries
-    ? currentKind === "area"
-      ? "area"
-      : "line"
-    : rec.kind;
-  const suggestedLabel = presentationLabel(
-    suggestedKind,
-    lockedTimeSeries ? false : rec.histogramStyle
-  );
-  const alignsStrict =
-    lockedTimeSeries || kindsStrictPresentationMatch(rec.kind, currentKind);
+  const groupedDual = params.multiSeriesLayout === "grouped_bar";
+  const chartBlurb = blurbForRenderedChart({
+    kind: currentKind,
+    histogramStyle,
+    valueAxis: params.valueAxis,
+    categoryAxis: params.categoryAxis,
+    groupedDualMetric: groupedDual,
+    groupedBarMeta: groupedDual ? params.groupedBarMeta ?? null : null,
+  });
 
-  const recommendationBlurb = alignsStrict
-    ? rec.blurb
-    : `You are viewing ${currentLabel.toLowerCase()}. Related note: ${rec.blurb}`;
-
-  return {
-    active: true,
-    recommendedKind: currentKind,
-    histogramStyle: Boolean(rec.histogramStyle && currentKind === "bar"),
-    recommendedLabel: currentLabel,
-    recommendationBlurb,
-    currentKind,
-    currentLabel,
-    suggestedKind,
-    suggestedLabel,
-    alignsWithRecommendation: alignsStrict,
-    whyThisChart: buildWhyThisChart({
-      currentLabel,
+  if (params.stackedOrMultiSeries) {
+    const stackedBlurb = groupedDual
+      ? chartBlurb
+      : "Each stack shows sub-parts within a category — useful for mix effects while keeping the same cohort.";
+    const whyThisChart = buildWhyThisChart({
+      currentLabel: currentLabel,
       categoryAxis: params.categoryAxis,
       valueAxis: params.valueAxis,
       routing: params.routing,
       answerSummary: params.answerSummary,
       semanticContext: params.semanticContext,
-    }),
-    anomalyNote: detectNumericAnomalies(params.rows, currentKind),
+      chartBlurb: stackedBlurb,
+    });
+    return {
+      active: true,
+      recommendedKind: currentKind,
+      histogramStyle: false,
+      recommendedLabel: currentLabel,
+      recommendationBlurb: groupedDual ? "" : stackedBlurb,
+      currentKind,
+      currentLabel,
+      suggestedKind: currentKind,
+      suggestedLabel: currentLabel,
+      alignsWithRecommendation: true,
+      whyThisChart,
+      anomalyNote: detectNumericAnomalies(params.rows, currentKind),
+    };
+  }
+
+  // Always describe the rendered chart kind — never contradict orientation via stale routing copy.
+  const whyThisChart = buildWhyThisChart({
+    currentLabel,
+    categoryAxis: params.categoryAxis,
+    valueAxis: params.valueAxis,
+    routing: params.routing,
+    answerSummary: params.answerSummary,
+    semanticContext: params.semanticContext,
+    chartBlurb,
+  });
+
+  return {
+    active: true,
+    recommendedKind: currentKind,
+    histogramStyle,
+    recommendedLabel: currentLabel,
+    recommendationBlurb: "",
+    currentKind,
+    currentLabel,
+    suggestedKind: currentKind,
+    suggestedLabel: currentLabel,
+    alignsWithRecommendation: true,
+    whyThisChart,
+    anomalyNote: (() => {
+      const parts: string[] = [];
+      const near = params.nearPerfectCorrelationCaution?.trim();
+      if (near) parts.push(near);
+      const scatter =
+        currentKind === "scatter"
+          ? detectScatterRelationshipAnomaly({
+              rows: params.rows,
+              xLabel: params.categoryAxis,
+              yLabel: params.valueAxis,
+              scatterX: params.scatterXValues,
+              strongestOutliers: params.relationshipInsights?.strongestOutliers,
+            })
+          : null;
+      if (scatter) parts.push(scatter);
+      const numeric =
+        currentKind !== "scatter"
+          ? detectNumericAnomalies(params.rows, currentKind)
+          : null;
+      if (numeric) parts.push(numeric);
+      return parts.length ? parts.join(" ") : null;
+    })(),
   };
 }

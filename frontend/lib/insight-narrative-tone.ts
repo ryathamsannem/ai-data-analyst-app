@@ -12,6 +12,20 @@ export type NarrativeToneInputs = {
   mappingConfidence?: ConfidenceLevel | string | null;
   mappingConfirmedByUser?: boolean;
   unifiedConfidenceLevel?: ConfidenceLevel | string | null;
+  /** Time-series trend charts — avoid category ranking / breakdown copy. */
+  isTrendChart?: boolean;
+  /** Growth question without multi-period evidence. */
+  isUnsupportedGrowth?: boolean;
+  /** Forecast asked but cohort has no date/time column — projection disclaimer. */
+  forecastGuardrails?: {
+    canForecast?: boolean;
+    outputLabel?: string;
+    directionalProjectionLabel?: string | null;
+    forecastConfidenceLevel?: string;
+    reliabilityMessage?: string | null;
+    disclaimer?: string | null;
+    lacksTimeSeries?: boolean;
+  } | null;
 };
 
 function normLevel(raw: string | null | undefined): ConfidenceLevel {
@@ -64,12 +78,16 @@ export function narrativeToneDisclaimer(
     }
     if (!inputs.mappingConfirmedByUser && normLevel(inputs.mappingConfidence) === "low") {
       parts.push(
-        "Column mapping is still inferred — confirm metric and breakdown fields before acting on rankings."
+        inputs.isUnsupportedGrowth || inputs.isTrendChart
+          ? "Column mapping is still inferred — confirm the date and metric columns before acting on short-term trend changes."
+          : "Column mapping is still inferred — confirm metric and breakdown fields before acting on rankings."
       );
     }
     if (pts > 0 && pts <= 5) {
       parts.push(
-        `Only ${pts} comparison group(s) appear in the chart — avoid over-interpreting small gaps.`
+        inputs.isTrendChart
+          ? `Only ${pts} time step(s) in this series — avoid over-interpreting short-term swings.`
+          : `Only ${pts} comparison group(s) appear in the chart — avoid over-interpreting small gaps.`
       );
     }
     if (!parts.length) {
@@ -82,6 +100,21 @@ export function narrativeToneDisclaimer(
 
   if (tone === "balanced" && rows > 0 && rows < 500) {
     return "Moderate sample size — qualify strong claims and confirm field mapping when stakes are high.";
+  }
+
+  const fg = inputs.forecastGuardrails;
+  if (fg && (fg.canForecast === false || fg.lacksTimeSeries)) {
+    const label = fg.outputLabel?.trim() || "Scenario estimate";
+    const dir = fg.directionalProjectionLabel?.trim();
+    const conf = fg.forecastConfidenceLevel?.trim() || "Low";
+    const rel =
+      fg.reliabilityMessage?.trim() ||
+      "Reliable forecasting cannot be performed because historical time-series data is unavailable.";
+    const parts = [`${label}`, dir ? `(${dir})` : null, `Forecast Confidence: ${conf}.`, rel];
+    if (fg.disclaimer?.trim()) {
+      parts.push(fg.disclaimer.trim());
+    }
+    return parts.filter(Boolean).join(" ");
   }
 
   return null;
@@ -97,20 +130,53 @@ const DEFINITIVE_PATTERNS: [RegExp, string][] = [
   [/\bwithout doubt\b/gi, "with some uncertainty"],
   [/\bmust be\b/gi, "could be"],
   [/\balways\b/gi, "often"],
-  [/\bthe main driver is\b/gi, "a plausible driver may be"],
+  [/\bthe main driver is\b/gi, "the strongest observed relationship may be"],
+  [/\bdominant driver\b/gi, "strongest observed relationship"],
+  [/\bprimary driver\b/gi, "strongest available predictor"],
+  [/\bdrives revenue\b/gi, "is associated with revenue"],
+  [/\bdrives the highest\b/gi, "shows the highest"],
+  [/\bdrives the most\b/gi, "shows the strongest association with"],
+  [/\b(is|are)\s+the\s+driver\b/gi, "may be associated"],
   [/\bis the best\b/gi, "may rank highest in this cohort"],
   [/\bis the top\b/gi, "ranks highest in this filtered view"],
-  [/\bdrives the highest\b/gi, "shows the highest"],
   [/\bdominates\b/gi, "leads in this sample"],
   [/\bconfirms that\b/gi, "is consistent with"],
 ];
+
+const SPECULATIVE_DRIVER_RE =
+  /\b(higher|lower|larger|smaller|stronger|weaker)\s+(customer\s+density|order\s+volumes?|product[- ]?category\s+mix|pricing(?:\s+pressure)?)\b/i;
+
+const DRIVER_DISCLAIMER =
+  "Potential drivers could include customer density, order volume, pricing, or product mix. Additional analysis is required.";
+
+/** Soften operational driver claims that are not computed in this cohort. */
+export function softenSpeculativeOperationalDrivers(text: string): string {
+  const raw = text.trim();
+  if (!raw || !SPECULATIVE_DRIVER_RE.test(raw)) return text;
+  if (/\bpotential drivers could include\b/i.test(raw)) return text;
+
+  let t = raw
+    .replace(
+      /\b(?:due to|because of|driven by|reflects?|indicates?)\s+(?:higher|larger|stronger)\s+customer\s+density\b/gi,
+      "may be consistent with factors such as customer density"
+    )
+    .replace(/\bhigher customer density\b/gi, "customer density")
+    .replace(/\blarger order volumes?\b/gi, "order volume")
+    .replace(/\bstronger product[- ]category mix\b/gi, "product mix")
+    .replace(/\bbetter pricing\b/gi, "pricing");
+
+  if (!/\b(may|might|could|potential|not measured|additional analysis)\b/i.test(t)) {
+    t = `${t.replace(/\.$/, "")}. ${DRIVER_DISCLAIMER}`;
+  }
+  return t;
+}
 
 export function softenAssertiveProse(
   text: string,
   tone: NarrativeTone
 ): string {
   if (!text.trim() || tone === "confident") return text;
-  let t = text;
+  let t = softenSpeculativeOperationalDrivers(text);
   for (const [re, repl] of DEFINITIVE_PATTERNS) {
     t = t.replace(re, repl);
   }

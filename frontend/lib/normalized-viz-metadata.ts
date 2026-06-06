@@ -17,6 +17,11 @@ import {
 } from "@/lib/chart-semantic-metadata";
 import { apiChartStringToKind } from "@/lib/smart-chart-intelligence";
 import {
+  buildRelationshipMeasureLabel,
+  buildRelationshipScatterDisplayTitle,
+  looksLikeDuplicatedRelationshipTitle,
+} from "@/lib/relationship-scatter-labels";
+import {
   buildInsightTitle,
   fromAlignedAnalysis,
   type SemanticMetricContext,
@@ -86,7 +91,10 @@ function templateChartTitle(
   const cat = category.trim() || "Category";
   if (kind === "pie" || kind === "donut") return `${met} by ${cat}`;
   if (kind === "line" || kind === "area") return `${met} over time`;
-  if (kind === "scatter") return `${met} vs ${cat}`;
+  if (kind === "scatter") {
+    if (/\bvs\.?\b/i.test(met)) return met;
+    return buildRelationshipMeasureLabel(cat, met);
+  }
   if (kind === "histogram") return `Distribution — ${met}`;
   if (kind === "bar_horizontal") return `${met} by ${cat}`;
   return `${met} by ${cat}`;
@@ -149,11 +157,27 @@ export function buildNormalizedVizMetadata(args: {
   );
 
   const raw = args.rawPersistedTitle.replace(/\s+/g, " ").trim();
+  const relMeasure = args.viz?.relationshipMeasureLabel?.trim() ?? "";
 
   let semanticProfile: SemanticProfileKind = "heuristic_template";
   let chartTitle = semanticCtx
     ? buildInsightTitle(semanticCtx)
     : templateChartTitle(kind, metricLabel, categoryLabel);
+  if (kind === "scatter" && relMeasure) {
+    chartTitle = buildRelationshipScatterDisplayTitle({
+      question: "",
+      xLabel: categoryLabel,
+      yLabel: metricLabel,
+      persistedTitle: raw,
+      relationshipMeasureLabel: relMeasure,
+    });
+  } else if (
+    kind === "scatter" &&
+    raw &&
+    !looksLikeDuplicatedRelationshipTitle(raw)
+  ) {
+    chartTitle = polishMetricDisplay(stripIntentNoiseFromMetricLabel(raw)).trim();
+  }
   let titleForInference = chartTitle;
   const metricLabelOut = semanticCtx?.metricLabel?.trim() || metricLabel;
   const categoryLabelOut = semanticCtx?.dimensionLabel?.trim() || categoryLabel;
@@ -219,10 +243,12 @@ export function sanitizeVisualizationSemanticLabels(
   const fallbackY =
     mxd?.trim() || (mx ? humanizeColumnName(mx) : "") || "Y";
 
+  const xLooksVs = /\bvs\.?\b/i.test(xRaw);
+  const yLooksVs = /\bvs\.?\b/i.test(yRaw);
   const xLabel =
-    xRaw && !isPromptLikeVisualizationTitle(xRaw) ? xRaw : fallbackX;
+    xRaw && !isPromptLikeVisualizationTitle(xRaw) && !xLooksVs ? xRaw : fallbackX;
   const yLabel =
-    yRaw && !isPromptLikeVisualizationTitle(yRaw) ? yRaw : fallbackY;
+    yRaw && !isPromptLikeVisualizationTitle(yRaw) && !yLooksVs ? yRaw : fallbackY;
 
   if (xLabel === xRaw && yLabel === yRaw) return viz;
   return {

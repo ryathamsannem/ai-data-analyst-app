@@ -77,6 +77,9 @@ def build_metric_label(
     if ak == "max" or al.startswith("max"):
         return f"Maximum {raw_pretty}" if raw_pretty else "Maximum"
 
+    if ak == "scatter" or al == "scatter":
+        return raw_pretty or "Value"
+
     lab = str(agg_label or "").strip()
     if lab and value_col:
         return f"{lab} {raw_pretty}".strip()

@@ -22,6 +22,7 @@ import {
   TREND_X_AXIS_ANGLE_DEG,
 } from "@/lib/chart-time-x-axis";
 import {
+  CartesianXAxisTitleLabelContent,
   createHorizontalBottomAxisValueLabel,
   createVerticalValueAxisLabel,
 } from "@/app/components/chart-value-axis-title";
@@ -290,9 +291,129 @@ function ChartRendererInner({
   const metricTooltipName = rAxes.valueAxis;
 
   const stackedSpec = rViz?.multiSeries;
+  const multiBarLayout = stackedSpec?.layout;
+  const isGroupedDualMetric = multiBarLayout === "grouped_bar";
+  const isStackedMulti = multiBarLayout === "stacked_bar";
+
+  /** Dual-metric compare: side-by-side bars per category (never the summed `value` field). */
+  if (
+    isGroupedDualMetric &&
+    stackedSpec &&
+    stackedSpec.seriesKeys.length > 0
+  ) {
+    const keys = stackedSpec.seriesKeys;
+    const hb =
+      horizontalBarLayout ??
+      computeHorizontalBarAxisLayout({
+        categoryTickStrings: rData.map((r) => String(r.name ?? "")),
+        valueAxisLabel: rAxes.valueAxisCompact,
+        valueAxisFull: rAxes.valueAxis,
+        categoryAxisLabel: rAxes.categoryAxis,
+        chartLayoutMode,
+      });
+    const hmBalanced = balanceHorizontalOuterMargins({
+      marginLeft: hb.marginLeft,
+      chartLayoutMode,
+    });
+    return (
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart
+          layout="vertical"
+          data={rData}
+          margin={{
+            left: hmBalanced.marginLeft,
+            right: hmBalanced.marginRight,
+            top: 16,
+            bottom: Math.max(hb.marginBottom, compact ? 14 : 22),
+          }}
+        >
+          <CartesianGrid
+            horizontal={false}
+            vertical
+            stroke={GRID_STROKE}
+            strokeDasharray="4 12"
+            strokeOpacity={0.38}
+          />
+          <XAxis
+            type="number"
+            tick={{ fontSize: 11, fill: AXIS_TICK }}
+            axisLine={{ stroke: CHART_AXIS_LINE }}
+            tickLine={{ stroke: CHART_AXIS_LINE }}
+            tickFormatter={valueTickFormatter}
+          >
+            {hb.showValueAxisTitle ? (
+              <Label
+                content={createHorizontalBottomAxisValueLabel(
+                  hb.valueAxisTitleFull,
+                  hb.valueAxisTitleDisplay
+                )}
+              />
+            ) : null}
+          </XAxis>
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={hb.categoryAxisWidth}
+            interval={compact ? 0 : rData.length > 18 ? 1 : 0}
+            tick={
+              <WrappedCategoryYAxisTick
+                chartLayoutMode={chartLayoutMode}
+                compact={compact}
+              />
+            }
+            axisLine={{ stroke: CHART_AXIS_LINE }}
+            tickLine={{ stroke: CHART_AXIS_LINE }}
+          />
+          <Tooltip
+            {...CHART_TOOLTIP_FRAME}
+            formatter={(v, name) => {
+              const seriesKey = String(name ?? "");
+              const label =
+                stackedSpec.seriesLabels[seriesKey]?.trim() || seriesKey;
+              const shown =
+                v == null || v === ""
+                  ? "—"
+                  : typeof v === "number"
+                    ? valueTickFormatter(v)
+                    : String(v);
+              return [shown, label];
+            }}
+            labelFormatter={(l) =>
+              `${rAxes.categoryAxis} · ${tickTruncate(String(l ?? ""))}`
+            }
+          />
+          <Legend
+            wrapperStyle={{ fontSize: 10, paddingTop: 8 }}
+            formatter={(v) => tickTruncate(String(v))}
+          />
+          {keys.map((k, i) => (
+            <Bar
+              key={k}
+              dataKey={k}
+              name={stackedSpec.seriesLabels[k] ?? k}
+              fill={PIE_COLORS[i % PIE_COLORS.length]}
+              radius={[0, 6, 6, 0]}
+              maxBarSize={compact ? 22 : insightUi ? 32 : 26}
+              isAnimationActive={rechartsAnimActive}
+              cursor={canInsightDrill ? "pointer" : "default"}
+              onClick={(entry: unknown) => {
+                if (!canInsightDrill) return;
+                const pl = entry as ChartRow & { name?: string };
+                const nm = String(pl?.name ?? "").trim();
+                if (!nm) return;
+                onInsightDrill(nm, k);
+              }}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  }
+
   if (
     rKind === "bar" &&
-    stackedSpec?.layout === "stacked_bar" &&
+    isStackedMulti &&
+    stackedSpec &&
     stackedSpec.seriesKeys.length > 0
   ) {
     const keys = stackedSpec.seriesKeys;
@@ -328,7 +449,7 @@ function ChartRendererInner({
               value={rAxes.categoryAxis}
               position="insideBottom"
               offset={insightVBarLabelOffset}
-              style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
+              content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
           <YAxis
@@ -416,7 +537,7 @@ function ChartRendererInner({
               value={rAxes.categoryAxis}
               position="insideBottom"
               offset={-6}
-              style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
+              content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
           <YAxis
@@ -690,7 +811,7 @@ function ChartRendererInner({
               value={rAxes.categoryAxis}
               position="insideBottom"
               offset={insightUi ? -14 : compact ? -20 : -24}
-              style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
+              content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
           <YAxis
@@ -810,7 +931,7 @@ function ChartRendererInner({
             value={rAxes.categoryAxis}
             position="insideBottom"
             offset={insightVBarLabelOffset}
-            style={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
+            content={CartesianXAxisTitleLabelContent}
           />
         </XAxis>
         <YAxis

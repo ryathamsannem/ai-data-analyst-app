@@ -8,6 +8,10 @@ import type { ChartKind, ChartRow } from "@/app/chart-types";
 import { grainLabelFromTimeMeta } from "@/lib/chart-semantic-metadata";
 import { humanizeColumnName } from "@/lib/analytics-metadata";
 import { apiChartStringToKind } from "@/lib/smart-chart-intelligence";
+import {
+  isRelationshipScatterPresentation,
+  labelsLookTemporalForPresentation,
+} from "@/lib/relationship-scatter-presentation";
 
 function labelLooksTemporal(name: string): boolean {
   const s = String(name ?? "").trim();
@@ -21,14 +25,8 @@ function labelLooksTemporal(name: string): boolean {
 }
 
 function rowsLookTemporal(rows: ChartRow[]): boolean {
-  if (rows.length < 2) return false;
-  return rows.every((r) => labelLooksTemporal(String(r.name ?? "")));
-}
-
-function rowsHaveScatterPoints(rows: ChartRow[]): boolean {
-  return rows.some(
-    (r) => typeof r.x === "number" && Number.isFinite(r.x as number)
-  );
+  const labels = rows.map((r) => String(r.name ?? ""));
+  return labelsLookTemporalForPresentation(labels);
 }
 
 /** API / persistence string aligned with backend `_chart_type_for_api`. */
@@ -89,6 +87,17 @@ function rankIntentFromText(title: string, question?: string): boolean {
   ) {
     return true;
   }
+  if (
+    /\b(top|best|highest|lowest|leading|trailing)\s+performing\b/i.test(blob)
+  ) {
+    return true;
+  }
+  if (/\bperforming\s+(city|cities|region|regions|zone|zones)\b/i.test(blob)) {
+    return true;
+  }
+  if (/\bgenerates?\s+the\s+(highest|lowest|most|least)\b/i.test(blob)) {
+    return true;
+  }
   return /\b(rank|ranking|top\s*\d+|bottom\s*\d+|highest|lowest|leading|trailing|sorted)\b/i.test(
     blob
   );
@@ -143,8 +152,16 @@ function barFamilyKindFromRows(args: {
   const rankIntent = rankIntentFromText(title, question);
   const shortLabels = maxLen <= 14 && avgLen <= 10;
   const useVerticalBar = n <= 6 && shortLabels && !rankIntent;
+  const geoRankCompact =
+    rankIntent &&
+    n >= 2 &&
+    n <= 8 &&
+    shortLabels &&
+    /\b(city|cities|region|regions|zone|zones|performing)\b/i.test(
+      `${title} ${question ?? ""}`
+    );
 
-  if (useVerticalBar) {
+  if (useVerticalBar || geoRankCompact) {
     return "bar";
   }
 
@@ -180,7 +197,16 @@ export function computeFinalChartPresentation(args: {
   const api = apiChartStringToKind(args.apiChartType);
   const { rows, title, question } = args;
 
-  if (api === "scatter" && rowsHaveScatterPoints(rows)) {
+  if (
+    isRelationshipScatterPresentation({
+      apiChartType: args.apiChartType,
+      rows,
+    })
+  ) {
+    return "scatter";
+  }
+
+  if (api === "scatter" && rows.length >= 2) {
     return "scatter";
   }
 
@@ -188,8 +214,6 @@ export function computeFinalChartPresentation(args: {
   if (api === "line") return "line";
   if (api === "pie") return "pie";
   if (api === "donut") return "donut";
-  if (api === "bar_horizontal") return "bar_horizontal";
-
   const apiBarLike: ChartKind =
     api === "scatter"
       ? "bar"
@@ -203,6 +227,76 @@ export function computeFinalChartPresentation(args: {
     question,
     rows,
   });
+}
+
+export function chartKindToProvenanceLabel(kind: ChartKind): string {
+  switch (kind) {
+    case "bar_horizontal":
+      return "Horizontal bar chart";
+    case "bar":
+      return "Vertical bar chart";
+    case "line":
+      return "Line chart";
+    case "area":
+      return "Area chart";
+    case "pie":
+      return "Pie chart";
+    case "donut":
+      return "Donut chart";
+    case "scatter":
+      return "Scatter plot";
+    case "histogram":
+      return "Histogram";
+    default:
+      return "Chart";
+  }
+}
+
+export function alignInsightProvenanceToPresentation(
+  prov: {
+    visualizationType?: string;
+    chartTypeApi?: string;
+    chartSelectionReason?: string | null;
+  } | null
+  | undefined,
+  presentationKind: ChartKind,
+  question?: string
+): typeof prov {
+  if (!prov) return prov;
+  const label = chartKindToProvenanceLabel(presentationKind);
+  const api = chartKindToApiChartType(presentationKind);
+  let reason = prov.chartSelectionReason ?? null;
+  if (presentationKind === "bar" && reason && /horizontal\s+bar/i.test(reason)) {
+    reason =
+      "Compact geographic ranking — vertical bars for side-by-side comparison.";
+  } else if (
+    presentationKind === "bar_horizontal" &&
+    reason &&
+    /vertical\s+bar/i.test(reason)
+  ) {
+    reason =
+      "Ranking-style layout; horizontal bars for readable ordering.";
+  }
+  return {
+    ...prov,
+    visualizationType: label,
+    chartTypeApi: api,
+    chartSelectionReason: reason,
+  };
+}
+
+export function resolveInsightRenderedChartKind(args: {
+  presentationKind: ChartKind;
+  categoryPlan?: { renderAsHorizontalBar?: boolean } | null;
+}): ChartKind {
+  const { presentationKind, categoryPlan } = args;
+  if (
+    presentationKind === "bar" &&
+    categoryPlan?.renderAsHorizontalBar
+  ) {
+    return "bar_horizontal";
+  }
+  return presentationKind;
 }
 
 export function buildFinalChartPresentationMeta(

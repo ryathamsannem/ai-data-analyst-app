@@ -85,7 +85,11 @@ export function buildChartNarrative(
   } else if (kind === "pie" || kind === "donut") {
     base = `This view shows how ${met} splits across ${dimLc} — useful when you care about share of the whole.`;
   } else if (kind === "scatter") {
-    base = `Each point pairs ${dimLc} with ${met}; use it to spot clusters, gaps, and values that sit outside the norm.`;
+    if (/\bvs\.?\b/i.test(met) || /\bvs\.?\b/i.test(dimLc)) {
+      base = `This scatter plot compares ${dimLc} and ${met} to show how the two measures move together across observations.`;
+    } else {
+      base = `This scatter plot compares ${dimLc} with ${met} across observations — use it to spot clusters, gaps, and values outside the norm.`;
+    }
   } else if (kind === "bar_horizontal") {
     base = `This ranks ${dimLc} by ${met} — ideal when labels are long or you want a clear leaderboard-style read.`;
   } else if (kind === "histogram") {

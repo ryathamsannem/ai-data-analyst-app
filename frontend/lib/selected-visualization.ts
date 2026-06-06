@@ -9,11 +9,8 @@ import {
   computeFinalChartPresentation,
 } from "@/lib/final-chart-presentation";
 import { polishMetricDisplay } from "@/lib/analytics-metadata";
-import {
-  aggregationPrefixLabel,
-  metricStemFromRawTitle,
-  trendGrainFromTitle,
-} from "@/lib/canonical-chart-title";
+import { aggregationPrefixLabel, metricStemFromRawTitle } from "@/lib/canonical-chart-title";
+import { resolveTrendBucketLabel } from "@/lib/chart-semantic-metadata";
 import {
   buildContextCore,
   formatAggregationLabel,
@@ -22,6 +19,11 @@ import {
   type SemanticMetricContext,
 } from "@/lib/semantic-metric-engine";
 import { apiChartStringToKind } from "@/lib/smart-chart-intelligence";
+import {
+  buildRelationshipScatterAiContext,
+  isRelationshipScatterPresentation,
+  labelsLookTemporalForPresentation,
+} from "@/lib/relationship-scatter-presentation";
 import { buildChartNarrative } from "@/lib/ux-narrative";
 
 export type VisualizationSource = "overview" | "ai" | "charts" | "auto_dashboard";
@@ -31,7 +33,8 @@ export type VisualizationMode =
   | "trend"
   | "category"
   | "distribution"
-  | "comparison";
+  | "comparison"
+  | "relationship";
 
 /** Canonical pinned visualization payload (alias: SelectedVisualization). */
 export type VisualizationContract = {
@@ -75,8 +78,7 @@ function labelLooksTemporal(name: string): boolean {
 }
 
 export function labelsLookTemporal(labels: string[]): boolean {
-  if (labels.length < 2) return false;
-  return labels.every((l) => labelLooksTemporal(l));
+  return labelsLookTemporalForPresentation(labels);
 }
 
 export function isTimeSeriesChartKind(kind: ChartKind): boolean {
@@ -112,12 +114,15 @@ function buildTrendMetricLabel(stem: string, aggregation: string): string {
   return `${agg} ${core}`;
 }
 
-function buildTrendDisplayTitle(
-  rawTitle: string,
-  metricLabel: string
-): string {
-  const grain = trendGrainFromTitle(rawTitle);
-  return `${metricLabel} trend (${grain})`;
+export function buildTrendDisplayTitle(metricLabel: string, timeBucketLabel: string): string {
+  const bucket = timeBucketLabel.trim();
+  if (/\bmonth/i.test(bucket)) return `Monthly ${metricLabel} trend`;
+  if (/\bweek/i.test(bucket)) return `Weekly ${metricLabel} trend`;
+  if (/\bday/i.test(bucket)) return `Daily ${metricLabel} trend`;
+  if (/\bquarter/i.test(bucket)) return `Quarterly ${metricLabel} trend`;
+  if (/\byear/i.test(bucket)) return `Yearly ${metricLabel} trend`;
+  if (/\bhour/i.test(bucket)) return `Hourly ${metricLabel} trend`;
+  return `${metricLabel} trend`;
 }
 
 function buildComparisonDisplayTitle(
@@ -138,6 +143,9 @@ export function inferVisualizationMode(args: {
   isTimeSeries: boolean;
   labels: string[];
 }): VisualizationMode {
+  if (args.chartType === "scatter") {
+    return "relationship";
+  }
   const titleLc = args.title.toLowerCase();
   if (
     args.isTimeSeries ||
@@ -171,13 +179,25 @@ export function freezeVisualizationContract(args: {
   question?: string;
   metricColumn?: string | null;
   categoryColumn?: string | null;
+  scatterXLabel?: string | null;
+  scatterYLabel?: string | null;
   aggregationKey?: string;
   datasetDomain?: string;
   aiContext?: Record<string, unknown> | null;
+  /** Engine adaptive bucket (Monthly, Weekly, …) — wins over title parsing. */
+  timeBucketLabelOverride?: string | null;
+  timeSeriesAnalysis?: Record<string, unknown> | null;
 }): VisualizationContract {
   const rawTitle = args.title.trim() || "Chart";
-  const temporalLabels = labelsLookTemporal(args.labels);
-  const titleImpliesTrend = /\btrend\b/i.test(rawTitle);
+  const relationshipScatter = isRelationshipScatterPresentation({
+    apiChartType: args.apiChartType,
+    chartKindPinned: args.chartKindPinned,
+    rows: args.rows,
+  });
+  const temporalLabels =
+    !relationshipScatter && labelsLookTemporal(args.labels);
+  const titleImpliesTrend =
+    !relationshipScatter && /\btrend\b/i.test(rawTitle);
 
   let chartType =
     args.chartKindPinned ??
@@ -188,13 +208,22 @@ export function freezeVisualizationContract(args: {
       rows: args.rows,
     });
 
-  const aggregation = normalizeAggregationKey(args.aggregationKey ?? "sum", "sum");
-  const aggregationLabel = formatAggregationLabel(aggregation);
+  if (relationshipScatter) {
+    chartType = "scatter";
+  }
 
-  let isTimeSeries =
-    isTimeSeriesChartKind(chartType) ||
-    temporalLabels ||
-    titleImpliesTrend;
+  const aggregation = relationshipScatter
+    ? "relationship"
+    : normalizeAggregationKey(args.aggregationKey ?? "sum", "sum");
+  const aggregationLabel = relationshipScatter
+    ? "Relationship"
+    : formatAggregationLabel(aggregation);
+
+  let isTimeSeries = relationshipScatter
+    ? false
+    : isTimeSeriesChartKind(chartType) ||
+      temporalLabels ||
+      titleImpliesTrend;
 
   if (
     isTimeSeries &&
@@ -203,16 +232,19 @@ export function freezeVisualizationContract(args: {
     chartType = "line";
   }
 
-  const effectiveKind: ChartKind = isTimeSeries
-    ? isTimeSeriesChartKind(chartType)
-      ? chartType
-      : "line"
-    : chartType;
+  const effectiveKind: ChartKind = relationshipScatter
+    ? "scatter"
+    : isTimeSeries
+      ? isTimeSeriesChartKind(chartType)
+        ? chartType
+        : "line"
+      : chartType;
 
-  isTimeSeries =
-    isTimeSeries ||
-    isTimeSeriesChartKind(effectiveKind) ||
-    titleImpliesTrend;
+  isTimeSeries = relationshipScatter
+    ? false
+    : isTimeSeries ||
+      isTimeSeriesChartKind(effectiveKind) ||
+      titleImpliesTrend;
 
   const mode = inferVisualizationMode({
     title: rawTitle,
@@ -222,13 +254,21 @@ export function freezeVisualizationContract(args: {
   });
 
   const timeBucketLabel =
-    mode === "trend" ? extractTimeBucketLabel(rawTitle) : "";
+    mode === "trend"
+      ? resolveTrendBucketLabel({
+          title: rawTitle,
+          timeSeriesAnalysis: args.timeSeriesAnalysis,
+          timeBucketLabelOverride: args.timeBucketLabelOverride,
+          question: args.question,
+          labels: args.labels,
+        })
+      : "";
 
   let metricLabel = polishMetricDisplay(metricStemFromRawTitle(rawTitle) || rawTitle);
   let displayTitle = rawTitle;
   if (mode === "trend") {
     metricLabel = buildTrendMetricLabel(rawTitle, aggregation);
-    displayTitle = buildTrendDisplayTitle(rawTitle, metricLabel);
+    displayTitle = buildTrendDisplayTitle(metricLabel, timeBucketLabel);
   } else if (mode === "comparison" || /\s+by\s+/i.test(rawTitle)) {
     displayTitle = buildComparisonDisplayTitle(rawTitle, aggregation);
     const byIdx = rawTitle.toLowerCase().indexOf(" by ");
@@ -242,7 +282,36 @@ export function freezeVisualizationContract(args: {
 
   let semanticContext: SemanticMetricContext | null = null;
 
-  if (mode === "trend") {
+  if (mode === "relationship") {
+    const xDisp =
+      polishMetricDisplay(
+        args.scatterXLabel?.trim() ||
+          (args.categoryColumn
+            ? humanizeColumnName(args.categoryColumn)
+            : "") ||
+          "X"
+      ) || "X";
+    const yDisp =
+      polishMetricDisplay(
+        args.scatterYLabel?.trim() ||
+          (args.metricColumn
+            ? humanizeColumnName(args.metricColumn)
+            : "") ||
+          "Y"
+      ) || "Y";
+    semanticContext = buildContextCore({
+      metricCol: args.metricColumn?.trim() || null,
+      metricDisp: yDisp,
+      categoryCol: args.categoryColumn?.trim() || null,
+      categoryDisp: xDisp,
+      aggregationKey: "relationship",
+      aggregationLabel: "Relationship",
+      chartType: "scatter",
+      datasetDomain: args.datasetDomain,
+    });
+    metricLabel = `${xDisp} vs ${yDisp}`;
+    displayTitle = rawTitle;
+  } else if (mode === "trend") {
     semanticContext = buildContextCore({
       metricCol: args.metricColumn ?? null,
       metricDisp: metricLabel,
@@ -321,6 +390,21 @@ export function narrativeCopyForContract(
   contract: VisualizationContract | null | undefined
 ): string {
   if (!contract) return "";
+  if (contract.mode === "relationship" && contract.chartType === "scatter") {
+    if (contract.semanticContext) {
+      const ctx = contract.semanticContext;
+      return buildRelationshipScatterAiContext({
+        xLabel: ctx.dimensionLabel,
+        yLabel: ctx.metricLabel,
+        observationCount: contract.labels.length,
+      });
+    }
+    return buildRelationshipScatterAiContext({
+      xLabel: contract.dimension ?? "X",
+      yLabel: contract.metricLabel,
+      observationCount: contract.labels.length,
+    });
+  }
   if (contract.mode === "trend") {
     if (contract.semanticContext) {
       return buildChartNarrative(contract.semanticContext);
