@@ -45,11 +45,11 @@ DOMAIN_QUALITY_MATRIX: List[DomainRow] = [
     ("Sales", "trend", "generic", "How did revenue change over time?", {"intent": "trend", "metric_contains": "revenue", "dimension_contains": "date", "chartType_in": ("line", "area")}),
     ("Sales", "ranking", "generic", "Rank products by revenue", {"intent_in": ("ranking", "compare"), "metric_contains": "revenue", "dimension_contains": "category", "chartType_in": ("bar", "horizontalBar")}),
     # --- Marketing ---
-    ("Marketing", "compare", "generic", "Compare satisfaction_score by category", {"intent": "compare", "metric_contains": "satisfaction", "dimension_contains": "category", "chartType_in": ("bar", "horizontalBar")}),
-    ("Marketing", "compare_across", "generic", "Compare satisfaction_score across categories", {"intent": "compare", "metric_contains": "satisfaction", "dimension_contains": "category", "chartType_in": ("bar", "horizontalBar"), "not_requested_dimension_missing": True}),
+    ("Marketing", "compare", "generic", "Compare satisfaction_score by category", {"intent": "compare", "metric_contains": "satisfaction", "dimension_contains": "category", "aggregationKey": "mean", "chartType_in": ("bar", "horizontalBar")}),
+    ("Marketing", "compare_across", "generic", "Compare satisfaction_score across categories", {"intent": "compare", "metric_contains": "satisfaction", "dimension_contains": "category", "aggregationKey": "mean", "chartType_in": ("bar", "horizontalBar"), "not_requested_dimension_missing": True}),
     ("Marketing", "compare", "generic", "Compare spend across campaigns", {"intent": "compare", "metric_contains": "cost", "dimension_contains": "category", "chartType_in": ("bar", "horizontalBar")}),
-    ("Marketing", "trend", "generic", "Monthly trend of satisfaction score", {"intent": "trend", "metric_contains": "satisfaction", "dimension_contains": "date", "chartType_in": ("line", "area")}),
-    ("Marketing", "trend", "generic", "Track satisfaction score over periods", {"intent": "trend", "metric_contains": "satisfaction", "dimension_contains": "date", "chartType_in": ("line", "area")}),
+    ("Marketing", "trend", "generic", "Monthly trend of satisfaction score", {"intent": "trend", "metric_contains": "satisfaction", "dimension_contains": "date", "aggregationKey": "mean", "chartType_in": ("line", "area")}),
+    ("Marketing", "trend", "generic", "Track satisfaction score over periods", {"intent": "trend", "metric_contains": "satisfaction", "dimension_contains": "date", "aggregationKey": "mean", "chartType_in": ("line", "area")}),
     ("Marketing", "relationship", "generic", "Is revenue correlated with satisfaction_score?", {"intent": "relationship", "chartType": "scatter"}),
     # --- Finance ---
     ("Finance", "compare", "generic", "Compare cost across departments", {"intent_in": ("compare", "ranking", "profitability"), "metric_contains": "cost", "chartType_in": ("bar", "horizontalBar")}),
@@ -64,14 +64,17 @@ DOMAIN_QUALITY_MATRIX: List[DomainRow] = [
     ("HR", "ranking", "generic", "Rank departments by units", {"intent_in": ("ranking", "compare"), "metric_contains": "unit", "chartType_in": ("bar", "horizontalBar")}),
     ("HR", "compare", "generic", "Compare units across departments", {"intent_in": ("compare", "ranking"), "metric_contains": "unit", "chartType_in": ("bar", "horizontalBar")}),
     ("HR", "synonym", "generic", "Compare headcount across departments", {"intent": "compare", "metric_contains": "unit", "dimension_contains": "department", "chartType_in": ("bar", "horizontalBar")}),
+    ("HR", "ranking", "generic", "Which department has the highest headcount?", {"intent_in": ("ranking", "compare"), "metric_contains": "unit", "dimension_contains": "department", "aggregationKey": "sum", "chartType_in": ("bar", "horizontalBar")}),
+    ("HR", "ranking", "generic", "Rank departments by headcount", {"intent_in": ("ranking", "compare"), "metric_contains": "unit", "dimension_contains": "department", "aggregationKey": "sum", "chartType_in": ("bar", "horizontalBar")}),
     # --- Customer Support ---
-    ("Customer Support", "compare", "generic", "Compare satisfaction_score across departments", {"intent_in": ("compare", "ranking"), "metric_contains": "satisfaction", "chartType_in": ("bar", "horizontalBar")}),
-    ("Customer Support", "ranking", "generic", "Which department has the lowest satisfaction_score?", {"intent_in": ("ranking", "compare"), "metric_contains": "satisfaction", "chartType_in": ("bar", "horizontalBar")}),
+    ("Customer Support", "compare", "generic", "Compare satisfaction_score across departments", {"intent_in": ("compare", "ranking"), "metric_contains": "satisfaction", "aggregationKey": "mean", "chartType_in": ("bar", "horizontalBar")}),
+    ("Customer Support", "ranking", "generic", "Which department has the lowest satisfaction_score?", {"intent_in": ("ranking", "compare"), "metric_contains": "satisfaction", "aggregationKey": "mean", "chartType_in": ("bar", "horizontalBar")}),
     ("Customer Support", "synonym", "generic", "Compare resolution across departments", {"intent": "compare", "metric_contains": "satisfaction", "dimension_contains": "department", "chartType_in": ("bar", "horizontalBar")}),
     # --- Healthcare-style (generic ward/department vocabulary) ---
     ("Healthcare", "compare", "generic", "Compare units across departments", {"intent_in": ("compare", "ranking"), "metric_contains": "unit", "chartType_in": ("bar", "horizontalBar")}),
     ("Healthcare", "ranking", "generic", "Rank departments by units", {"intent_in": ("ranking", "compare"), "metric_contains": "unit", "chartType_in": ("bar", "horizontalBar")}),
-    ("Healthcare", "synonym", "generic", "Compare patient volume across wards", {"intent": "compare", "metric_contains": "unit", "dimension_contains": "category", "chartType_in": ("bar", "horizontalBar")}),
+    ("Healthcare", "synonym", "generic", "Compare patient volume across wards", {"intent": "compare", "metric_contains": "unit", "dimension_contains": "category", "chartType_in": ("bar", "horizontalBar"), "dimension_notes_contains": "category column"}),
+    ("Healthcare", "ranking", "generic", "Which ward has highest patient volume?", {"intent_in": ("ranking", "compare"), "metric_contains": "unit", "dimension_contains": "category", "aggregationKey": "sum", "chartType_in": ("bar", "horizontalBar"), "dimension_notes_contains": "category column"}),
     # --- Geography (dedicated fixture) ---
     ("Geography", "compare", "geographic", "Compare revenue across zones", {"intent_in": ("compare", "ranking"), "metric_contains": "revenue", "dimension_contains": "zone", "chartType": "bar"}),
     ("Geography", "ranking", "geographic", "Which city generates the highest revenue?", {"intent_in": ("ranking", "compare"), "metric_contains": "revenue", "dimension_contains": "city", "chartType_in": ("bar", "horizontalBar")}),
@@ -230,6 +233,27 @@ class TestDomainQualityMatrix(unittest.TestCase):
                 msg=f"{domain}: {question} should not redirect dimension",
             )
 
+        if expect.get("aggregationKey"):
+            agg = str(analysis.get("aggregationKey") or "").lower()
+            self.assertEqual(
+                agg,
+                str(expect["aggregationKey"]).lower(),
+                msg=f"{domain}: {question} agg={agg}",
+            )
+
+        if expect.get("dimension_notes_contains"):
+            intent = self.main._describe_aggregate_intent(
+                question,
+                self.main.df,
+                self.main.dataset_profile,
+            )
+            notes = str((intent or {}).get("dimension_notes") or "").lower()
+            self.assertIn(
+                str(expect["dimension_notes_contains"]).lower(),
+                notes,
+                msg=f"{domain}: {question} notes={notes!r}",
+            )
+
     def test_domain_quality_matrix(self) -> None:
         seen: set[Tuple[str, str, str]] = set()
         for domain, pattern, fixture_key, question, expect in DOMAIN_QUALITY_MATRIX:
@@ -312,6 +336,41 @@ class TestDomainQualityMatrix(unittest.TestCase):
                 _col_has(hit, expected_sub),
                 msg=f"{phrase!r} -> {hit}, expected ~{expected_sub}",
             )
+
+    def test_score_metric_synonym_resolution(self) -> None:
+        self._bind_fixture("generic")
+        df = self._frames["generic"]
+        profile = self.main.build_profile(df)
+        from intent_engine.column_resolve import (
+            column_prefers_mean_aggregation,
+            resolve_synonym_metric_column,
+        )
+        from intent_engine.resolve_explicit_metric import (
+            question_requests_record_count,
+            resolve_explicit_metric_column,
+        )
+
+        self.assertEqual(
+            resolve_synonym_metric_column(
+                "Which department has the highest headcount?", df, profile
+            ),
+            "units",
+        )
+        self.assertEqual(
+            resolve_explicit_metric_column(
+                "Rank departments by headcount", df, profile
+            ),
+            "units",
+        )
+        self.assertFalse(
+            question_requests_record_count(
+                "Which department has the highest headcount?",
+                resolved_metric_col="units",
+            )
+        )
+        self.assertTrue(column_prefers_mean_aggregation("satisfaction_score"))
+        self.assertFalse(column_prefers_mean_aggregation("units"))
+        self.assertFalse(column_prefers_mean_aggregation("revenue"))
 
     def test_analysis_payload_pdf_provenance_fields(self) -> None:
         """PDF readiness: analysis must expose metric/dimension for appendix."""

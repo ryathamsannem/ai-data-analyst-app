@@ -1014,6 +1014,18 @@ def _resolve_agg_label_and_key(
         "average" not in q and "mean" not in q and "avg" not in q
     ):
         return "Total", "sum"
+    try:
+        from intent_engine.column_resolve import column_prefers_mean_aggregation
+
+        if (
+            value_col
+            and column_prefers_mean_aggregation(value_col)
+            and _ranking_or_leaderboard_intent(q)
+            and not re.search(r"\b(sum|total)\b", q)
+        ):
+            return "Average", "mean"
+    except Exception:
+        pass
     if "minimum" in q or "lowest" in q or re.search(r"\bmin\b", q):
         return "Minimum", "min"
     if _explicit_max_aggregation_intent(q):
@@ -1040,6 +1052,14 @@ def _resolve_agg_label_and_key(
         )
     ) or re.search(r"\b(by|per)\s+(day|date|week|month|year|quarter)\b", q):
         return "Total", "sum"
+    try:
+        from intent_engine.column_resolve import column_prefers_mean_aggregation
+
+        if value_col and column_prefers_mean_aggregation(value_col):
+            if not re.search(r"\b(sum|total)\b", q):
+                return "Average", "mean"
+    except Exception:
+        pass
     if _ranking_or_leaderboard_intent(q) or _column_looks_additive_metric(value_col):
         return "Total", "sum"
     if any(k in q for k in ("compare", "versus", " vs ")):
@@ -6315,6 +6335,17 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     if metric_spec:
         _apply_metric_spec_to_intent(out_intent, metric_spec)
     try:
+        from intent_engine.column_resolve import dimension_vocabulary_provenance_note
+
+        vocab_note = dimension_vocabulary_provenance_note(question_str, gcol, df)
+        if vocab_note:
+            existing = out_intent.get("dimension_notes")
+            out_intent["dimension_notes"] = (
+                f"{existing} {vocab_note}".strip() if existing else vocab_note
+            )
+    except Exception:
+        pass
+    try:
         from intent_engine.geographic_scope import question_geographic_scope_level
 
         geo_level = question_geographic_scope_level(question_str)
@@ -7906,11 +7937,18 @@ def _try_build_trend_line_visualization(
 
     ql = question.lower().strip()
     force_freq = _forced_time_bucket_from_question(ql)
+    try:
+        from intent_engine.column_resolve import column_prefers_mean_aggregation
+
+        agg_key = "mean" if column_prefers_mean_aggregation(ncol) else "sum"
+    except Exception:
+        agg_key = "sum"
+    agg_label = "Average" if agg_key == "mean" else "Total"
     g_series, ts_meta = _adaptive_time_series_grouped(
         df_in[[dcol, ncol]].copy(),
         str(dcol),
         str(ncol),
-        agg_key="sum",
+        agg_key=agg_key,
         force_freq=force_freq,
     )
     if g_series is None or len(g_series) < 2:
@@ -7918,13 +7956,13 @@ def _try_build_trend_line_visualization(
 
     chart_data = _time_series_rows_from_grouped(g_series)
     tb_l = _freq_human_label(str(ts_meta.get("timeBucket") or force_freq or "M"))
-    met_lbl = _business_metric_series_label("sum", "Total", str(ncol))
+    met_lbl = _business_metric_series_label(agg_key, agg_label, str(ncol))
     title = f"{met_lbl} trend ({tb_l})"
     intent_debug: Dict[str, Any] = {
         "group_col": dcol,
         "value_col": ncol,
-        "agg_label": "Total",
-        "agg_key": "sum",
+        "agg_label": agg_label,
+        "agg_key": agg_key,
         "normalized_question": ql,
         "trend_time_series": True,
         "time_bucket": ts_meta.get("timeBucket"),
@@ -7933,8 +7971,8 @@ def _try_build_trend_line_visualization(
         "routing": "trend_time_series",
         "category_column": dcol,
         "numeric_column": ncol,
-        "aggregation": "sum",
-        "aggregation_key": "sum",
+        "aggregation": agg_key,
+        "aggregation_key": agg_key,
         "rows_analyzed": int(len(df_in)),
         "notes": ts_meta.get("selectionReason")
         or f"Trend chart: {met_lbl} by {tb_l} period.",

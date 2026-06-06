@@ -25,7 +25,7 @@ DOMAIN_FOLLOW_UP_CHAINS: List[Tuple[str, str]] = [
     ("Marketing", "Which category has the highest satisfaction_score?"),
     ("Finance", "Which department has the highest cost?"),
     ("Operations", "Which department has the most units?"),
-    ("HR", "Rank departments by units"),
+    ("HR", "Rank departments by headcount"),
     ("Support", "Which department has the lowest satisfaction_score?"),
     ("Healthcare", "Compare patient volume across wards"),
 ]

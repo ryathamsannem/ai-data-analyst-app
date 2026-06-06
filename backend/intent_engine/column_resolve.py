@@ -41,7 +41,6 @@ DIMENSION_PHRASE_ALIASES: Dict[str, Tuple[str, ...]] = {
     "teams": ("department",),
     "division": ("department",),
     "divisions": ("department",),
-    "headcount": ("department",),
     "ticket": ("department", "category"),
     "tickets": ("department", "category"),
     "incident": ("department", "category"),
@@ -247,6 +246,78 @@ def find_column_for_token(
     for c in pool:
         if column_matches_token(str(c), token_l):
             return str(c)
+    return None
+
+
+_METRIC_SYNONYM_PATTERNS: Tuple[Tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\bheadcount\b", re.I), "headcount"),
+    (re.compile(r"\bpatient\s+volumes?\b", re.I), "patient volume"),
+    (re.compile(r"\bfte\b", re.I), "headcount"),
+)
+
+_SCORE_RATING_SUBSTRINGS: Tuple[str, ...] = (
+    "score",
+    "rating",
+    "satisfaction",
+    "nps",
+    "csat",
+)
+
+
+def resolve_synonym_metric_column(
+    question: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+) -> Optional[str]:
+    """Map domain metric vocabulary (headcount, patient volume, …) to a numeric column."""
+    if df is None or df.empty:
+        return None
+    ql = str(question or "")
+    if not ql.strip():
+        return None
+    cols = df.columns.tolist()
+    for pat, token in _METRIC_SYNONYM_PATTERNS:
+        if pat.search(ql):
+            hit = find_column_for_token(
+                token,
+                cols,
+                numeric_only=True,
+                profile=profile,
+            )
+            if hit:
+                return str(hit)
+    return None
+
+
+def column_prefers_mean_aggregation(col_name: Optional[str]) -> bool:
+    """Score/rating-style columns should aggregate with mean, not sum."""
+    if not col_name:
+        return False
+    cn = _norm_col(str(col_name))
+    if any(k in cn for k in ("revenue", "sales", "cost", "spend", "profit", "units")):
+        return False
+    return any(sub in cn for sub in _SCORE_RATING_SUBSTRINGS)
+
+
+def dimension_vocabulary_provenance_note(
+    question: str,
+    resolved_dim_col: Optional[str],
+    df: pd.DataFrame,
+) -> Optional[str]:
+    """Explain when domain vocabulary (e.g. ward) maps to a proxy column (e.g. category)."""
+    if df is None or df.empty or not resolved_dim_col:
+        return None
+    ql = str(question or "").lower()
+    if not re.search(r"\bwards?\b", ql):
+        return None
+    has_ward_col = any("ward" in _norm_col(str(c)) for c in df.columns.tolist())
+    if has_ward_col:
+        return None
+    if _norm_col(str(resolved_dim_col)) == "category":
+        return (
+            "Question refers to wards; breakdown uses the category column "
+            "(ward labels such as Ward-A appear as category values)."
+        )
     return None
 
 

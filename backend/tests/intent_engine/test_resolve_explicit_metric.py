@@ -52,6 +52,29 @@ class TestResolveExplicitMetric(unittest.TestCase):
             )
         )
 
+    def test_headcount_synonym_resolves_to_units(self) -> None:
+        generic = pd.read_csv(
+            BACKEND_ROOT / "tests" / "fixtures" / "domain_quality_generic.csv"
+        )
+        import main as main_mod
+
+        profile = main_mod.build_profile(generic)
+        for question in (
+            "Which department has the highest headcount?",
+            "Rank departments by headcount",
+            "Which ward has highest patient volume?",
+        ):
+            col = resolve_explicit_metric_column(question, generic, profile)
+            self.assertEqual(col, "units", msg=question)
+
+    def test_headcount_is_not_row_count(self) -> None:
+        self.assertFalse(
+            question_requests_record_count(
+                "Which department has the highest headcount?",
+                resolved_metric_col="units",
+            )
+        )
+
     def test_row_count_question(self) -> None:
         self.assertTrue(
             question_requests_record_count("How many records are in the dataset?")
