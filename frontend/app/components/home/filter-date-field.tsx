@@ -25,6 +25,7 @@ import {
   ovFilterDatePickerWeekday,
   ovFilterDatePickerWeekdays,
 } from "@/lib/overview-ui";
+import { scheduleEffectUpdate } from "@/lib/effect-scheduler";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -154,7 +155,8 @@ function FilterDateFieldInner({
   useEffect(() => {
     const parsed = parseIsoDate(value);
     if (parsed) {
-      setViewMonth(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+      const next = new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+      scheduleEffectUpdate(() => setViewMonth(next));
     }
   }, [value]);
 

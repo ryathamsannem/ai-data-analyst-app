@@ -20,19 +20,16 @@ import {
   buildAxisLabelFromAggColumn,
   buildChartSubtitle,
   buildCompactAxisValueLabel,
-  buildKpiTitle,
   buildMetricLabel,
   compactAxisLabelFromFullPhrase,
   humanizeColumnName,
   polishMetricDisplay,
   remapLegacyKpiTitle,
-  stripIntentNoiseFromMetricLabel,
   type MetricLabelContext,
 } from "@/lib/analytics-metadata";
 import {
   alternateNumericMetricLabels,
   buildAiFollowUpQuestionChips,
-  filterAlternateMetricLabels,
   filterMeaningfulFollowUpChips,
   isInvalidMetricCompareChip,
   isLowQualityFollowUpChip,
@@ -58,13 +55,11 @@ import {
   type ResolveExecutiveMeasureArgs,
 } from "@/lib/insight-card-titles";
 import {
-  balanceHorizontalOuterMargins,
   balanceVerticalOuterMargins,
   collectSampleTickStrings,
   computeCategoryAxisBottomMargin,
   computeHorizontalBarAxisLayout,
   wrapCategoryLabelLines,
-  computePieChartMargins,
   computeVerticalCategoryAxisPlan,
   computeVerticalValueAxisLayout,
   estimateCartesianPlotInnerWidthPx,
@@ -79,10 +74,6 @@ import {
   sortChartRowsChronologically,
   TREND_X_AXIS_ANGLE_DEG,
 } from "@/lib/chart-time-x-axis";
-import {
-  createHorizontalBottomAxisValueLabel,
-  createVerticalValueAxisLabel,
-} from "./components/chart-value-axis-title";
 import {
   alignInsightProvenanceToPresentation,
   buildFinalChartPresentationMeta,
@@ -127,8 +118,6 @@ import { generateChartReason } from "@/lib/generate-chart-reason";
 import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
 import {
   formatAxisTickFromRows,
-  formatAxisTickFromScatterX,
-  formatChartAxisCategoryTick,
 } from "@/lib/chart-axis-formatters";
 import { PIE_COLORS } from "@/lib/chart-palette";
 import type {
@@ -137,8 +126,6 @@ import type {
 } from "@/lib/chart-semantic-metadata";
 import {
   buildChartSemanticHeader,
-  pdfXAxisLineTitle,
-  pdfYAxisLineTitle,
   resolveHistogramMeasureChipLabel,
   resolveSemanticCategoryAxisForCharts,
 } from "@/lib/chart-semantic-metadata";
@@ -171,9 +158,7 @@ import {
 import {
   AI_INSIGHT_SECTION_LABELS,
   aiAnswerLeadIn,
-  buildChartNarrative,
   buildKpiContextLine,
-  normalizeAiSectionTitle,
   schemaAwareFollowUpSeeds,
   semanticTopBucketCaption,
 } from "@/lib/ux-narrative";
@@ -271,14 +256,12 @@ import {
   aiInsightsProvenanceDivider,
   aiInsightsProvenanceMetaLabel,
   aiInsightsProvenanceMetaValue,
-  aiInsightsProvenanceSectionBody,
   aiInsightsProvenanceSectionBodyEmphasis,
   aiInsightsProvenanceSectionLabel,
   aiInsightsProvenanceShell,
   aiInsightsProvenanceToggle,
   aiInsightsProvenanceToggleTitle,
   aiInsightsSmartPanelDivider,
-  aiInsightsStrongText,
   aiInsightsSubtleText,
   aiInsightsVizCard,
   aiInsightsVizChartStage,
@@ -364,6 +347,37 @@ import {
 import { FilterPanel } from "./components/home/filter-panel";
 import { type MainNavTabId } from "./components/home/main-nav-tabs";
 import { AppShell } from "@/components/app-shell/app-shell";
+import { UpgradePlanModal } from "./components/upgrade-plan-modal";
+import {
+  canAskAiQuestion,
+  canExportPdf,
+  fileSizeLimitMessage,
+  getPlanLimits,
+  isFileWithinPlanLimit,
+  previewRowOptionsForTier,
+  type LimitKind,
+  type PlanTier,
+} from "@/lib/plan-limits";
+import {
+  extractApiErrorMessage,
+  parseLimitErrorDetail,
+} from "@/lib/limit-error";
+import {
+  fetchPlanUsage,
+  refundPdfExport,
+  reservePdfExport,
+  type PlanUsageResponse,
+} from "@/lib/usage-api";
+import { apiUrl } from "@/lib/api-base";
+import { scheduleEffectUpdate } from "@/lib/effect-scheduler";
+import { shouldReservePdfExportQuota } from "@/lib/pdf-export-quota";
+import {
+  getPlanTier,
+  notifyUsageRefresh,
+  PLAN_TIER_CHANGED_EVENT,
+  saasRequestHeaders,
+  setPlanTier,
+} from "@/lib/saas-session";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
 import { OverviewUploadSelectedState } from "./components/home/overview-upload-selected-state";
 import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-summary";
@@ -371,7 +385,6 @@ import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
 import {
   ovBtnPrimaryAccent,
   formatOverviewFilenameMiddle,
-  ovBtnSecondary,
   ovBtnSecondarySm,
   ovOverviewSecondaryBtn,
   OVERVIEW_UPLOAD_ACCEPT,
@@ -405,10 +418,8 @@ import {
   ovDataLabel,
   ovDataValue,
   ovDataValueMono,
-  ovFilterControl,
   ovCard,
   ovCardElevated,
-  ovCardInteractive,
   ovInset,
   ovLabel,
   ovModalInput,
@@ -516,7 +527,6 @@ import {
   stripContradictoryCorrelationNarrative,
   titleCaseRelationshipPhrase,
 } from "@/lib/relationship-scatter-labels";
-import { buildRelationshipScatterFollowUpChips } from "@/lib/ai-follow-up-suggestions";
 import {
   buildUnsupportedMultiMetricExecutiveCards,
   buildUnsupportedMultiMetricFollowUpChips,
@@ -577,16 +587,11 @@ import {
   Cell,
   Legend,
   CartesianGrid,
-  ScatterChart,
-  Scatter,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
 const RECHARTS_ANIMATION_MAX_POINTS = 72;
 
-const GRID_STROKE = "#eef2f7";
-const CHART_AXIS_LINE = "#e2e8f0";
-const AXIS_TICK = "#64748b";
 /** Shared Recharts tooltip frame (session + overview mini charts). */
 const CHART_TOOLTIP_FRAME = {
   cursor: false,
@@ -613,8 +618,6 @@ const CHART_TOOLTIP_FRAME = {
   },
   wrapperStyle: { outline: "none" as const },
 } as const;
-/** Slight horizontal offset so numeric Y ticks clear the rotated axis title band. */
-const AXIS_Y_TICK_VAL = { fontSize: 11, fill: AXIS_TICK, dx: 6 } as const;
 
 type ChartAxes = {
   categoryAxis: string;
@@ -631,7 +634,7 @@ function shortenLabel(s: string, maxLen: number): string {
 
 function inferChartAxesFromContext(
   title: string,
-  subtitle: string,
+  _subtitle: string,
   _question: string,
   _datasetKind: string
 ): ChartAxes {
@@ -1019,7 +1022,7 @@ function buildSemanticIntentKeyFromAsk(args: {
   });
 }
 
-function formatAggForBadge(raw: string): string {
+function _formatAggForBadge(raw: string): string {
   const t = raw.trim().toUpperCase().replace(/\s+/g, "");
   if (!t) return "AGG";
   return t.slice(0, 14);
@@ -1556,7 +1559,7 @@ function isAscendingValueIntent(
   return null;
 }
 
-function applyBarChartSort(
+function _applyBarChartSort(
   rows: ChartRow[],
   kind: ChartKind,
   ascending: boolean | null
@@ -2669,9 +2672,6 @@ function hydrateVisualizationFromApi(raw: unknown): {
     const sl = String(
       (riFromApi as { summaryLine?: string }).summaryLine ?? ""
     ).trim();
-    const oo = (riFromApi as {
-      strongestOutliers?: { point?: string; x?: number; y?: number }[];
-    }).strongestOutliers;
     const outlierHint = "";
     if (sl) {
       mergedSubtitle = `${mergedSubtitle}\n${sl}`;
@@ -2786,7 +2786,6 @@ function buildGroupedMetricExecutiveInsights(
     "bg-rose-500",
     "bg-amber-500",
   ] as const;
-  const dim = shortenLabel(dimLabel, 36) || "Category";
   const out: ExecutiveVizInsightCard[] = [];
 
   keys.forEach((k, ki) => {
@@ -3364,6 +3363,8 @@ type AlignedAnalysisContext = {
   profitMarginUnavailable?: boolean;
   /** Phase 2 debug — parsed from `analysis.intent`; does not drive UI behavior. */
   analysisIntent?: AnalysisIntentPayload | null;
+  dimensionRedirectHandled?: boolean;
+  requestedDimensionMissing?: boolean;
   forecastGuardrails?: {
     canForecast?: boolean;
     outputLabel?: string;
@@ -3653,6 +3654,8 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
     derivedProfitMargin: Boolean(o.derivedProfitMargin),
     profitMarginUnavailable: Boolean(o.profitMarginUnavailable),
     analysisIntent: parseAnalysisIntent(o.intent),
+    dimensionRedirectHandled: Boolean(o.dimensionRedirectHandled),
+    requestedDimensionMissing: Boolean(o.requestedDimensionMissing),
     forecastGuardrails: parseForecastGuardrails(o.forecastGuardrails),
   };
 }
@@ -3884,7 +3887,7 @@ function formatColumnProfileNumber(n: number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-function buildNumericDistributionBlurb(
+function _buildNumericDistributionBlurb(
   col: string,
   profile: DatasetProfile | null
 ): string {
@@ -4292,12 +4295,6 @@ function buildAutoDashboardKpiContextLine(args: {
   ) {
     const mean = readProfileDescribeStat(primaryMetricColumn, "mean", profile);
     if (mean != null && Number.isFinite(mean)) {
-      const label =
-        datasetKind === "hr"
-          ? "employees"
-          : datasetKind === "sales" || datasetKind === "ecommerce"
-            ? "orders or transactions"
-            : "records";
       const metricPhrase = humanizeColumnName(primaryMetricColumn);
       const line = `Average ${metricPhrase.toLowerCase()} per time bucket is approximately ${formatNumberForExecutiveSummary(mean)} in this extract.`;
       if (!redundantWithSubtitle(line)) return line;
@@ -4418,7 +4415,7 @@ function computeOverviewDashboardChartPresentation(args: {
   rows: ChartRow[];
 }): ChartKind {
   const api = apiChartStringToKind(args.apiChartType);
-  const { rows, title } = args;
+  const { rows } = args;
 
   if (
     api === "pie" ||
@@ -5340,7 +5337,6 @@ type DatasetProfile = {
   summary_stats: Record<string, unknown>;
 };
 
-type ConfidenceLevel = "High" | "Medium" | "Low";
 
 type DatasetKindSlug =
   | "hr"
@@ -6117,7 +6113,7 @@ function buildDataPreviewSuggestedQuestions(args: {
     raw.push(`${shortColumnLabel(dateCol)} range`);
   }
 
-  let out = dedupeSuggestedQuestionsNear(dedupeSuggestedQuestions(raw));
+  const out = dedupeSuggestedQuestionsNear(dedupeSuggestedQuestions(raw));
   const filler = [
     "Top drivers",
     "Biggest gaps",
@@ -6169,9 +6165,7 @@ function DataPreviewColumnProfilePopover({
   const missPct = columnProfileMissingPercent(col, profile, rows);
   const missLabel = missPct != null ? `${missPct.toFixed(1)}%` : "—";
 
-  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
-
-  useLayoutEffect(() => {
+  const panelStyle = useMemo((): CSSProperties => {
     const margin = 8;
     const estW = 300;
     const estH = 300;
@@ -6184,7 +6178,7 @@ function DataPreviewColumnProfilePopover({
     if (top + estH > vh - margin) {
       top = Math.max(margin, anchor.top - Math.min(estH, anchor.top - margin) - 6);
     }
-    setPanelStyle({ top, left, width: estW });
+    return { top, left, width: estW };
   }, [anchor]);
 
   const statRow = (label: string, value: ReactNode) => (
@@ -6404,19 +6398,19 @@ function HomeInner() {
     number | null
   >(null);
   const [selectedSheet, setSelectedSheet] = useState("");
-  const [sheets, setSheets] = useState<string[]>([]);
+  const [, setSheets] = useState<string[]>([]);
 
   useEffect(() => {
     if (autoDashboard) {
-      setAutoDashboardUpdatedAt(Date.now());
+      scheduleEffectUpdate(() => setAutoDashboardUpdatedAt(Date.now()));
     } else {
-      setAutoDashboardUpdatedAt(null);
+      scheduleEffectUpdate(() => setAutoDashboardUpdatedAt(null));
     }
   }, [autoDashboard]);
 
   useEffect(() => {
     if (columns.length === 0) {
-      setOverviewUploadExpanded(true);
+      scheduleEffectUpdate(() => setOverviewUploadExpanded(true));
     }
   }, [columns.length]);
 
@@ -6426,7 +6420,6 @@ function HomeInner() {
     activeId: activeChartId,
     insightSnapshot,
     insightChartId,
-    setActiveChart,
     selectChart,
     pushAIChart,
     replaceAutoDashboardCharts,
@@ -6537,6 +6530,59 @@ function HomeInner() {
   }, [mappingMessage]);
 
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
+  const [planTier, setPlanTierState] = useState<PlanTier>("free");
+  const [planUsage, setPlanUsage] = useState<PlanUsageResponse | null>(null);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeLimit, setUpgradeLimit] = useState<LimitKind | null>(null);
+  const [upgradeMessage, setUpgradeMessage] = useState("");
+
+  const openUpgradeModal = useCallback((limit: LimitKind, message: string) => {
+    setUpgradeLimit(limit);
+    setUpgradeMessage(message);
+    setUpgradeModalOpen(true);
+  }, []);
+
+  const handleApiLimitDetail = useCallback(
+    (detail: unknown): boolean => {
+      const parsed = parseLimitErrorDetail(detail);
+      if (parsed?.upgrade_required) {
+        openUpgradeModal(parsed.limit, parsed.message);
+        return true;
+      }
+      return false;
+    },
+    [openUpgradeModal]
+  );
+
+  const applyPlanEnvelope = useCallback((plan: PlanUsageResponse | undefined) => {
+    if (!plan) return;
+    setPlanTierState(plan.tier);
+    setPlanUsage(plan);
+    notifyUsageRefresh();
+  }, []);
+
+  useEffect(() => {
+    const refreshUsage = () => {
+      fetchPlanUsage()
+        .then((payload) => setPlanUsage(payload))
+        .catch(() => {});
+    };
+    scheduleEffectUpdate(() => {
+      setPlanTierState(getPlanTier());
+      refreshUsage();
+    });
+    const onPlanChange = () => {
+      setPlanTierState(getPlanTier());
+      refreshUsage();
+    };
+    window.addEventListener(PLAN_TIER_CHANGED_EVENT, onPlanChange);
+    return () => window.removeEventListener(PLAN_TIER_CHANGED_EVENT, onPlanChange);
+  }, []);
+
+  const previewRowSelectOptions = useMemo(
+    () => previewRowOptionsForTier(planTier),
+    [planTier]
+  );
 
   const mappingModalOpenRef = useRef(mappingModalOpen);
   const mappingMessageRef = useRef(mappingMessage);
@@ -6545,13 +6591,13 @@ function HomeInner() {
 
   /** Clear mapping toast when user changes tab. */
   useEffect(() => {
-    dismissMappingMessage();
+    scheduleEffectUpdate(() => dismissMappingMessage());
   }, [activeTab, dismissMappingMessage]);
 
   /** Clear mapping toast when user edits mapping fields in the open modal. */
   useEffect(() => {
     if (!mappingModalOpenRef.current || !mappingMessageRef.current.trim()) return;
-    dismissMappingMessage();
+    scheduleEffectUpdate(() => dismissMappingMessage());
   }, [
     productColumn,
     salesColumn,
@@ -6631,11 +6677,13 @@ function HomeInner() {
 
   useEffect(() => {
     if (!insightChartId) return;
-    setAiConversationState((prev) =>
-      prev.lastInsightChartId === insightChartId
-        ? prev
-        : { ...prev, lastInsightChartId: insightChartId }
-    );
+    scheduleEffectUpdate(() => {
+      setAiConversationState((prev) =>
+        prev.lastInsightChartId === insightChartId
+          ? prev
+          : { ...prev, lastInsightChartId: insightChartId }
+      );
+    });
   }, [insightChartId]);
 
   const onAutoDashboardDrill = useCallback(
@@ -6676,7 +6724,7 @@ function HomeInner() {
           : null;
       void (async () => {
         try {
-          const res = await fetch("http://localhost:8000/filtered-dashboard", {
+          const res = await fetch(apiUrl("/filtered-dashboard"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,
@@ -7011,22 +7059,27 @@ function HomeInner() {
     if (columns.length === 0) return;
     setPreviewLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/preview", {
+      const response = await fetch(apiUrl("/preview"), {
         method: "POST",
-        headers: {
+        headers: saasRequestHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           row_limit: limit === "all" ? null : limit,
         }),
       });
       if (!response.ok) {
         const maybeJson = await response.json().catch(() => null);
-        throw new Error(maybeJson?.detail || "Unable to fetch preview rows.");
+        const detail = maybeJson?.detail;
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        throw new Error(extractApiErrorMessage(detail) || "Unable to fetch preview rows.");
       }
       const data = await response.json();
       setPreview(data.preview || []);
       setRows(data.rows || rows);
+      applyPlanEnvelope(data.plan);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to fetch preview rows.");
     } finally {
@@ -7073,11 +7126,19 @@ function HomeInner() {
     setLoading(true);
 
     try {
+      const tier = getPlanTier();
+      if (!isFileWithinPlanLimit(tier, file.size)) {
+        const msg = fileSizeLimitMessage(tier, file.size);
+        openUpgradeModal("file_size", msg);
+        throw new Error(msg);
+      }
+
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("http://localhost:8000/upload", {
+      const response = await fetch(apiUrl("/upload"), {
         method: "POST",
+        headers: saasRequestHeaders(),
         body: formData,
       });
 
@@ -7089,26 +7150,15 @@ function HomeInner() {
           "detail" in maybeJson
             ? (maybeJson as { detail: unknown }).detail
             : null;
-        const message =
-          typeof detail === "string"
-            ? detail
-            : Array.isArray(detail)
-              ? detail
-                  .map((item) =>
-                    item &&
-                    typeof item === "object" &&
-                    "msg" in item &&
-                    typeof (item as { msg: unknown }).msg === "string"
-                      ? (item as { msg: string }).msg
-                      : null
-                  )
-                  .filter(Boolean)
-                  .join(" ") || "Upload failed"
-              : "Upload failed";
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        const message = extractApiErrorMessage(detail) || "Upload failed";
         throw new Error(message);
       }
 
       const data = await response.json();
+      applyPlanEnvelope(data.plan);
 
       setUploadMeta(data.file || null);
       setProfile(data.profile || null);
@@ -7172,7 +7222,7 @@ function HomeInner() {
     }
   };
 
-  const selectSheet = async (sheetName: string) => {
+  const _selectSheet = async (sheetName: string) => {
     setError("");
     dismissMappingMessage();
     setAnswer("");
@@ -7196,11 +7246,11 @@ function HomeInner() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/select-sheet", {
+      const response = await fetch(apiUrl("/select-sheet"), {
         method: "POST",
-        headers: {
+        headers: saasRequestHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           sheet_name: sheetName,
         }),
@@ -7208,10 +7258,15 @@ function HomeInner() {
 
       if (!response.ok) {
         const maybeJson = await response.json().catch(() => null);
-        throw new Error(maybeJson?.detail || "Sheet selection failed");
+        const detail = maybeJson?.detail;
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        throw new Error(extractApiErrorMessage(detail) || "Sheet selection failed");
       }
 
       const data = await response.json();
+      applyPlanEnvelope(data.plan);
 
       setUploadMeta(data.file || uploadMeta || null);
       setProfile(data.profile || null);
@@ -7279,10 +7334,17 @@ function HomeInner() {
       setError(OVERVIEW_UPLOAD_INVALID_MSG);
       return;
     }
+    const tier = getPlanTier();
+    if (!isFileWithinPlanLimit(tier, next.size)) {
+      const msg = fileSizeLimitMessage(tier, next.size);
+      openUpgradeModal("file_size", msg);
+      setError(msg);
+      return;
+    }
     setError("");
     dismissMappingMessage();
     setFile(next);
-  }, [dismissMappingMessage]);
+  }, [dismissMappingMessage, openUpgradeModal]);
 
   const openOverviewReplaceUpload = useCallback(() => {
     dismissMappingMessage();
@@ -7364,6 +7426,18 @@ function HomeInner() {
     }
     if (overrideQuestion != null && overrideQuestion.trim()) {
       setQuestion(overrideQuestion.trim());
+    }
+
+    const aiRemaining = planUsage?.usage.ai_questions_remaining;
+    if (!canAskAiQuestion(planTier, aiRemaining)) {
+      const limits = getPlanLimits(planTier);
+      const msg =
+        planTier === "free"
+          ? `You've reached today's limit of ${limits.ai_questions_limit} AI questions. Upgrade to Paid for 300 questions per month.`
+          : `You've reached this month's limit of ${limits.ai_questions_limit} AI questions.`;
+      openUpgradeModal("ai_questions", msg);
+      setError(msg);
+      return;
     }
 
     const parentAnalysisContext = buildParentAnalysisContext({
@@ -7468,11 +7542,11 @@ function HomeInner() {
           activeDashboardFilters: dashboardFilterLines,
         } as ConversationSnapshot);
 
-      const response = await fetch("http://localhost:8000/ask", {
+      const response = await fetch(apiUrl("/ask"), {
         method: "POST",
-        headers: {
+        headers: saasRequestHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           question: qRaw,
           conversation_context: conversationPayload,
@@ -7502,27 +7576,26 @@ function HomeInner() {
       });
 
       if (!response.ok) {
-        let detail = `AI request failed (${response.status})`;
+        let detail: unknown = `AI request failed (${response.status})`;
         try {
           const errBody = (await response.json()) as { detail?: unknown };
-          if (typeof errBody.detail === "string" && errBody.detail.trim()) {
-            detail = errBody.detail.trim();
-          } else if (Array.isArray(errBody.detail)) {
-            detail = errBody.detail
-              .map((d) =>
-                typeof d === "object" && d && "msg" in d
-                  ? String((d as { msg: string }).msg)
-                  : String(d),
-              )
-              .join(" ");
-          }
+          detail = errBody.detail ?? detail;
         } catch {
           /* ignore parse errors */
         }
-        throw new Error(detail);
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        throw new Error(extractApiErrorMessage(detail));
       }
 
       const data = await response.json();
+      fetchPlanUsage()
+        .then((payload) => {
+          setPlanUsage(payload);
+          notifyUsageRefresh();
+        })
+        .catch(() => {});
 
       if (typeof data.filter_breadcrumb === "string") {
         setFilterBreadcrumb(data.filter_breadcrumb);
@@ -7814,23 +7887,20 @@ function HomeInner() {
     dismissMappingMessage();
 
     try {
-      const response = await fetch(
-        "http://localhost:8000/update-column-mapping",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            product_column: productColumn || null,
-            sales_column: salesColumn || null,
-            region_column: regionColumn || null,
-            customer_column: customerColumn || null,
-            profit_column: profitColumn || null,
-            date_column: dateColumn || null,
-          }),
-        }
-      );
+      const response = await fetch(apiUrl("/update-column-mapping"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product_column: productColumn || null,
+          sales_column: salesColumn || null,
+          region_column: regionColumn || null,
+          customer_column: customerColumn || null,
+          profit_column: profitColumn || null,
+          date_column: dateColumn || null,
+        }),
+      });
 
       if (!response.ok) {
         throw new Error("Column mapping save failed");
@@ -8060,12 +8130,10 @@ function HomeInner() {
             : null,
       chartTypeInternal: alignedAnalysis.chartTypeInternal,
       dimensionRedirectHandled: Boolean(
-        alignedAnalysis?.intent?.dimensionRedirectHandled ??
-          alignedAnalysis?.dimensionRedirectHandled
+        alignedAnalysis?.dimensionRedirectHandled
       ),
       requestedDimensionMissing: Boolean(
-        alignedAnalysis?.intent?.requestedDimensionMissing ??
-          alignedAnalysis?.requestedDimensionMissing
+        alignedAnalysis?.requestedDimensionMissing
       ),
       analysisKind:
         alignedAnalysis.chartTypeInternal === "scatter" ||
@@ -8311,18 +8379,20 @@ function HomeInner() {
 
   /** Reset to page 1 when sort, search, or rows-per-page changes. */
   useEffect(() => {
-    setDataPreviewPageIndex(0);
+    scheduleEffectUpdate(() => setDataPreviewPageIndex(0));
   }, [deferredDataPreviewSearch, previewRowLimit, dataPreviewSortKey]);
 
   useEffect(() => {
-    setDataPreviewSearchQuery("");
-    setDataPreviewSuggestionsExpanded(false);
-    setDataPreviewPageIndex(0);
-    setDataPreviewSort(null);
+    scheduleEffectUpdate(() => {
+      setDataPreviewSearchQuery("");
+      setDataPreviewSuggestionsExpanded(false);
+      setDataPreviewPageIndex(0);
+      setDataPreviewSort(null);
+    });
   }, [selectedSheet, uploadMeta?.name]);
 
   useEffect(() => {
-    setDataPreviewProfileOpen(null);
+    scheduleEffectUpdate(() => setDataPreviewProfileOpen(null));
   }, [selectedSheet, uploadMeta?.name]);
 
   useEffect(() => {
@@ -8330,7 +8400,7 @@ function HomeInner() {
       dataPreviewProfileOpen &&
       !columns.includes(dataPreviewProfileOpen.column)
     ) {
-      setDataPreviewProfileOpen(null);
+      scheduleEffectUpdate(() => setDataPreviewProfileOpen(null));
     }
   }, [columns, dataPreviewProfileOpen]);
 
@@ -8345,7 +8415,7 @@ function HomeInner() {
 
   useEffect(() => {
     if (activeTab !== "preview" || columns.length === 0) {
-      setDataPreviewTableHeaderElevated(false);
+      scheduleEffectUpdate(() => setDataPreviewTableHeaderElevated(false));
       return;
     }
     const surface = dataPreviewTableSurfaceRef.current;
@@ -8363,7 +8433,7 @@ function HomeInner() {
       );
     };
 
-    updateElevated();
+    scheduleEffectUpdate(updateElevated);
     window.addEventListener("scroll", updateElevated, { passive: true });
     window.addEventListener("resize", updateElevated, { passive: true });
     return () => {
@@ -10252,9 +10322,17 @@ function HomeInner() {
   >(async () => {});
 
   downloadReportImplRef.current = async (options?: Partial<ExportOptions>) => {
-    try {
-      setError("");
-      const resolved: ExportOptions = {
+      try {
+        setError("");
+        const pdfRemaining = planUsage?.usage.pdf_exports_remaining;
+        if (!canExportPdf(planTier, pdfRemaining)) {
+          const msg =
+            "You've reached today's limit of 1 PDF export. Upgrade to Paid for unlimited PDF exports.";
+          openUpgradeModal("pdf_exports", msg);
+          setError(msg);
+          return;
+        }
+        const resolved: ExportOptions = {
         ...exportOptions,
         ...options,
       };
@@ -10775,7 +10853,47 @@ function HomeInner() {
         return;
       }
 
-      await runExecutivePdfExport(built.input);
+      if (
+        !shouldReservePdfExportQuota({
+          contractCheckOk: exportContractCheck.ok,
+          buildInputOk: built.ok,
+        })
+      ) {
+        setError("Export blocked: preflight checks did not pass.");
+        return;
+      }
+
+      let quotaReserved = false;
+      try {
+        const nextUsage = await reservePdfExport();
+        quotaReserved = true;
+        setPlanUsage(nextUsage);
+        setPlanTierState(nextUsage.tier);
+        notifyUsageRefresh();
+      } catch (err) {
+        const detail = (err as { detail?: unknown }).detail;
+        if (handleApiLimitDetail(detail)) {
+          setError(extractApiErrorMessage(detail));
+          return;
+        }
+        setError("Unable to reserve PDF export.");
+        return;
+      }
+
+      try {
+        await runExecutivePdfExport(built.input);
+      } catch (exportErr) {
+        if (quotaReserved) {
+          try {
+            const refunded = await refundPdfExport();
+            setPlanUsage(refunded);
+            notifyUsageRefresh();
+          } catch (refundErr) {
+            console.warn("[PDF export] quota refund failed", refundErr);
+          }
+        }
+        throw exportErr;
+      }
     } catch (err) {
       console.error("PDF generation failed:", err);
       setError("Unable to generate PDF report.");
@@ -11574,11 +11692,11 @@ function HomeInner() {
                     }}
                     className={dpControl}
                   >
-                    <option value="10">10 rows</option>
-                    <option value="25">25 rows</option>
-                    <option value="50">50 rows</option>
-                    <option value="100">100 rows</option>
-                    <option value="all">All rows</option>
+                    {previewRowSelectOptions.map((opt) => (
+                      <option key={String(opt)} value={String(opt)}>
+                        {opt === "all" ? "All rows" : `${opt} rows`}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -13560,6 +13678,20 @@ function HomeInner() {
             </div>
           </div>
         )}
+
+        <UpgradePlanModal
+          open={upgradeModalOpen}
+          limit={upgradeLimit}
+          tier={planTier}
+          message={upgradeMessage}
+          planUsage={planUsage}
+          onClose={() => setUpgradeModalOpen(false)}
+          onSwitchToPaid={() => {
+            setPlanTier("paid");
+            setPlanTierState("paid");
+            setUpgradeModalOpen(false);
+          }}
+        />
 
         </div>
     </AppShell>

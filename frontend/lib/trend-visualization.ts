@@ -67,6 +67,7 @@ export function buildTrendExecutiveVizInsights(
   kind: ChartKind,
   roundingHint?: string
 ): TrendInsightCard[] {
+  void roundingHint;
   if (!rows.length) return [];
 
   let stripeIdx = 0;

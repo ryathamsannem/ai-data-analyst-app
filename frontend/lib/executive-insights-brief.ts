@@ -139,7 +139,8 @@ function formatAggregateAmount(total: number, template?: string): string {
   if (template?.trim()) {
     const digits = template.replace(/[^\d.,-]/g, "");
     if (digits) {
-      const hasDec = digits.includes(".");
+      const _hasDec = digits.includes(".");
+      void _hasDec;
       const n = Number(digits.replace(/,/g, ""));
       if (Number.isFinite(n) && Math.abs(n - total) < Math.max(1, total * 0.02)) {
         return template.trim();

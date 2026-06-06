@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { BrandingStyles } from "@/components/branding/branding-styles";
+import { APP_METADATA } from "@/lib/branding-config";
 import { ThemeScript } from "@/components/theme-script";
 import "./globals.css";
 
@@ -14,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Data Analyst",
-  description: "Upload business data and explore it with AI-powered insights.",
+  title: APP_METADATA.title,
+  description: APP_METADATA.description,
 };
 
 export default function RootLayout({
@@ -33,6 +35,7 @@ export default function RootLayout({
         <ThemeScript />
       </head>
       <body className="min-h-full w-full overflow-x-hidden bg-background font-sans text-foreground">
+        <BrandingStyles />
         {children}
       </body>
     </html>

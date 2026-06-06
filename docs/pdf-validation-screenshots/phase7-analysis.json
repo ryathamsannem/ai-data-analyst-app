@@ -1,0 +1,531 @@
+[
+  {
+    "dataset": "retail",
+    "combo": "kpi_only",
+    "file": "phase7-retail-kpi_only.pdf",
+    "pageCount": 2,
+    "textLength": 743,
+    "markers": {
+      "kpi": true,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [],
+    "conversationQuestionCount": 0,
+    "pngPreviews": [
+      "phase7-retail-kpi_only-page1.png",
+      "phase7-retail-kpi_only-page2.png"
+    ]
+  },
+  {
+    "dataset": "retail",
+    "combo": "kpi_insight",
+    "file": "phase7-retail-kpi_insight.pdf",
+    "pageCount": 2,
+    "textLength": 1179,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?"
+    ],
+    "conversationQuestionCount": 1,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "retail",
+    "combo": "kpi_insight_chart",
+    "file": "phase7-retail-kpi_insight_chart.pdf",
+    "pageCount": 3,
+    "textLength": 1578,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?"
+    ],
+    "conversationQuestionCount": 1,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "retail",
+    "combo": "all_sections",
+    "file": "phase7-retail-all_sections.pdf",
+    "pageCount": 6,
+    "textLength": 3240,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": true,
+      "dataQuality": true,
+      "conversation": true,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": true,
+    "hasAnalysisMetadata": true,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?",
+      "Why is Mumbai highest?",
+      "What evidence supports this conclusion?",
+      "Which columns were used for this analysis?",
+      "Show the calculations behind this answer."
+    ],
+    "conversationQuestionCount": 5,
+    "pngPreviews": [
+      "phase7-retail-all_sections-page1.png",
+      "phase7-retail-all_sections-page2.png",
+      "phase7-retail-all_sections-page3.png"
+    ]
+  },
+  {
+    "dataset": "retail",
+    "combo": "conversation_only",
+    "file": "phase7-retail-conversation_only.pdf",
+    "pageCount": 2,
+    "textLength": 913,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": true,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?",
+      "Why is Mumbai highest?",
+      "What evidence supports this conclusion?",
+      "Which columns were used for this analysis?",
+      "Show the calculations behind this answer."
+    ],
+    "conversationQuestionCount": 5,
+    "pngPreviews": [
+      "phase7-retail-conversation_only-page1.png",
+      "phase7-retail-conversation_only-page2.png"
+    ]
+  },
+  {
+    "dataset": "retail",
+    "combo": "appendix_only",
+    "file": "phase7-retail-appendix_only.pdf",
+    "pageCount": 2,
+    "textLength": 1024,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": true,
+    "hasAnalysisMetadata": true,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [],
+    "conversationQuestionCount": 0,
+    "pngPreviews": [
+      "phase7-retail-appendix_only-page1.png",
+      "phase7-retail-appendix_only-page2.png"
+    ]
+  },
+  {
+    "dataset": "generic",
+    "combo": "kpi_only",
+    "file": "phase7-generic-kpi_only.pdf",
+    "pageCount": 2,
+    "textLength": 738,
+    "markers": {
+      "kpi": true,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [],
+    "conversationQuestionCount": 0,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "kpi_insight",
+    "file": "phase7-generic-kpi_insight.pdf",
+    "pageCount": 2,
+    "textLength": 1174,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?"
+    ],
+    "conversationQuestionCount": 1,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "kpi_insight_chart",
+    "file": "phase7-generic-kpi_insight_chart.pdf",
+    "pageCount": 3,
+    "textLength": 1568,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?"
+    ],
+    "conversationQuestionCount": 1,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "all_sections",
+    "file": "phase7-generic-all_sections.pdf",
+    "pageCount": 6,
+    "textLength": 3229,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": true,
+      "dataQuality": true,
+      "conversation": true,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": true,
+    "hasAnalysisMetadata": true,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?",
+      "Why is Mumbai highest?",
+      "What evidence supports this conclusion?",
+      "Which columns were used for this analysis?",
+      "Show the calculations behind this answer."
+    ],
+    "conversationQuestionCount": 5,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "conversation_only",
+    "file": "phase7-generic-conversation_only.pdf",
+    "pageCount": 2,
+    "textLength": 908,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": true,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?",
+      "Why is Mumbai highest?",
+      "What evidence supports this conclusion?",
+      "Which columns were used for this analysis?",
+      "Show the calculations behind this answer."
+    ],
+    "conversationQuestionCount": 5,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "appendix_only",
+    "file": "phase7-generic-appendix_only.pdf",
+    "pageCount": 2,
+    "textLength": 1019,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": true,
+    "hasAnalysisMetadata": true,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [],
+    "conversationQuestionCount": 0,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "kpi_only",
+    "file": "phase7-geographic-kpi_only.pdf",
+    "pageCount": 2,
+    "textLength": 828,
+    "markers": {
+      "kpi": true,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [],
+    "conversationQuestionCount": 0,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "kpi_insight",
+    "file": "phase7-geographic-kpi_insight.pdf",
+    "pageCount": 2,
+    "textLength": 1264,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?"
+    ],
+    "conversationQuestionCount": 1,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "kpi_insight_chart",
+    "file": "phase7-geographic-kpi_insight_chart.pdf",
+    "pageCount": 3,
+    "textLength": 1658,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?"
+    ],
+    "conversationQuestionCount": 1,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "all_sections",
+    "file": "phase7-geographic-all_sections.pdf",
+    "pageCount": 6,
+    "textLength": 3195,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": true,
+      "dataQuality": true,
+      "conversation": true,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": true,
+    "hasAnalysisMetadata": true,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?",
+      "Why is Mumbai highest?",
+      "What evidence supports this conclusion?",
+      "Which columns were used for this analysis?",
+      "Show the calculations behind this answer."
+    ],
+    "conversationQuestionCount": 5,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "conversation_only",
+    "file": "phase7-geographic-conversation_only.pdf",
+    "pageCount": 2,
+    "textLength": 998,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": true,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": false,
+    "hasAnalysisMetadata": false,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [
+      "Which city generates the highest revenue?",
+      "Why is Mumbai highest?",
+      "What evidence supports this conclusion?",
+      "Which columns were used for this analysis?",
+      "Show the calculations behind this answer."
+    ],
+    "conversationQuestionCount": 5,
+    "pngPreviews": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "appendix_only",
+    "file": "phase7-geographic-appendix_only.pdf",
+    "pageCount": 2,
+    "textLength": 1109,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": [],
+    "hasRawJson": false,
+    "hasProvenanceNotes": true,
+    "hasAnalysisMetadata": true,
+    "hasRoutingPlanBlock": false,
+    "conversationQuestionsPresent": [],
+    "conversationQuestionCount": 0,
+    "pngPreviews": []
+  }
+]

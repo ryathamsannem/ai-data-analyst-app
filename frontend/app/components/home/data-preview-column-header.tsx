@@ -58,10 +58,7 @@ export const DataPreviewColumnHeader = memo(function DataPreviewColumnHeader({
         type="button"
         className={`${dpThSortBtn}${active ? " data-preview-th-sort--active" : ""}`}
         onClick={() => onSort(column)}
-        aria-label={`Sort ${column}`}
-        aria-sort={
-          active ? (direction === "asc" ? "ascending" : "descending") : "none"
-        }
+        aria-label={`Sort ${column}${active ? (direction === "asc" ? ", ascending" : ", descending") : ""}`}
       >
         <span className={dpThName}>{column}</span>
         <span className={dpThSortIcon} aria-hidden>

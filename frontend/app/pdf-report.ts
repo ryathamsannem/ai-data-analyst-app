@@ -5,7 +5,6 @@
 
 import { Canvg } from "canvg";
 import type { ChartKind, ChartRow } from "./chart-types";
-import { pdfXAxisLineTitle, pdfYAxisLineTitle } from "@/lib/chart-semantic-metadata";
 import { isNumberedExecutiveBrief } from "@/lib/executive-insights-brief";
 import {
   formatExecutiveMetricValue,
@@ -39,6 +38,12 @@ import {
   pdfLineHeight,
 } from "@/lib/pdf-enterprise-style";
 import {
+  buildExportPdfFilename,
+  buildPdfFooterCenterLine,
+  buildPdfSupportLine,
+  BRANDING,
+} from "@/lib/branding-config";
+import {
   buildPdfExecutiveContentPlan,
   pdfExecutiveHierarchyHeadings,
   type PdfExecutiveContentPlan,
@@ -47,10 +52,9 @@ import {
 type JsPdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
 
 /** PDF-only insight section labels (executive report tone). */
-const PDF_APP_NAME = "AI Data Analyst App";
 const PDF_REPORT_TITLE = "Executive insight report";
 
-const PDF_INSIGHT_SECTION_LABELS = {
+const _PDF_INSIGHT_SECTION_LABELS = {
   overview: "Executive overview",
   findings: "Key findings",
   interpretation: "Business interpretation",
@@ -760,7 +764,7 @@ export type ReportBranding = {
 export const DEFAULT_REPORT_BRANDING: ReportBranding = {
   companyName: "",
   tagline: "",
-  accentHex: "#0f766e",
+  accentHex: BRANDING.primaryColor,
 };
 
 export function loadReportBranding(): ReportBranding {
@@ -1465,7 +1469,7 @@ function drawSparkline(
   const span = mx - mn || 1;
   const n = Math.min(vals.length, 48);
   const slice = vals.length > n ? vals.slice(-n) : vals;
-  const step = w / Math.max(slice.length, 1);
+  void (w / Math.max(slice.length, 1));
   doc.setFillColor(
     PDF_TABLE_THEME.stripe[0],
     PDF_TABLE_THEME.stripe[1],
@@ -1652,7 +1656,7 @@ async function captureChartPlotToPng(
   };
 }
 
-function sanitizeFileBase(s: string): string {
+function _sanitizeFileBase(s: string): string {
   const t = s.trim().slice(0, 48) || "analytics-brief";
   return t.replace(/[^a-zA-Z0-9-_]+/g, "-").replace(/^-+|-+$/g, "") || "analytics-brief";
 }
@@ -1714,7 +1718,7 @@ function drawPdfChartKindBadge(
   doc.setTextColor(0, 0, 0);
 }
 
-function drawPdfSessionThumbnailCard(
+function _drawPdfSessionThumbnailCard(
   doc: JsPdfDocument,
   x: number,
   yTop: number,
@@ -1911,7 +1915,7 @@ function pdfChartMetricFormatContext(
 
 function effectivePdfMetricNumber(
   row: ChartRow,
-  ctx: MetricFormatContext
+  _ctx: MetricFormatContext
 ): number {
   const raw = readChartRowRawValue(row);
   if (!Number.isFinite(raw)) {
@@ -2366,7 +2370,7 @@ function stripRankingLeadIn(s: string): string {
 }
 
 /** Up to `max` lines like "Category: 79,750" for the highlighted-signals box. */
-function highlightSignalsToBulletLines(raw: string, max: number): string[] {
+function _highlightSignalsToBulletLines(raw: string, max: number): string[] {
   const t = raw.replace(/\s+/g, " ").trim();
   if (!t) return [];
   const chunks = t
@@ -2549,7 +2553,7 @@ export async function runExecutivePdfExport(
   const accent = hexToRgb(input.branding.accentHex || DEFAULT_REPORT_BRANDING.accentHex);
   const company =
     input.branding.companyName.trim() ||
-    "Analytics workspace";
+    BRANDING.appName;
   const tagline = input.branding.tagline.trim();
 
   /** Print-safe palette — same for app light/dark UI (see buildPdfExportTheme). */
@@ -2688,7 +2692,7 @@ export async function runExecutivePdfExport(
     doc.setTextColor(0, 0, 0);
   };
 
-  const bodyParagraphs = (text: string) => {
+  const _bodyParagraphs = (text: string) => {
     const raw = text.trim();
     if (!raw) {
       drawPremiumEmptyState(
@@ -2712,7 +2716,7 @@ export async function runExecutivePdfExport(
   };
 
   /** Height (mm) for text rendered like {@link bodyParagraphs} at a given font size. */
-  const estimateInsightBodyHeightMm = (
+  const _estimateInsightBodyHeightMm = (
     text: string,
     fontSize = 10
   ): number => {
@@ -3141,12 +3145,10 @@ export async function runExecutivePdfExport(
     ensurePageSpace(blockH + PDF_SPACING.subsectionBefore);
 
     let fx = margin;
-    let row = 0;
     items.forEach((item, i) => {
       if (i > 0 && i % cols === 0) {
         fx = margin;
         y += cardH + gap;
-        row++;
         ensurePageSpace(cardH + gap + 4);
       }
       pdfDrawEnterprisePanel(doc, fx, y, colW, cardH, {
@@ -4501,6 +4503,8 @@ export async function runExecutivePdfExport(
       company,
       reportTitle: PDF_REPORT_TITLE,
       sourceLabel: sourceShort,
+      generatedByLine: buildPdfFooterCenterLine(BRANDING),
+      supportLine: buildPdfSupportLine(BRANDING.supportEmail),
       accent: theme.accent,
       ink: theme.ink,
       muted: theme.muted,
@@ -4509,6 +4513,5 @@ export async function runExecutivePdfExport(
     });
   }
 
-  const base = sanitizeFileBase(input.branding.companyName || "analytics-brief");
-  doc.save(`${base}-${input.generatedAt.toISOString().slice(0, 10)}.pdf`);
+  doc.save(buildExportPdfFilename(BRANDING.exportFilePrefix));
 }

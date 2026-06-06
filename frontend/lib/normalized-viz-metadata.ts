@@ -78,7 +78,7 @@ export type NormalizedVizMetadata = {
   confidence: "high" | "medium" | "low";
 };
 
-function isTimeSeriesKind(kind: ChartKind): boolean {
+function _isTimeSeriesKind(kind: ChartKind): boolean {
   return kind === "line" || kind === "area";
 }
 

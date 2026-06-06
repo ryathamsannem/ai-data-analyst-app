@@ -1,0 +1,344 @@
+[
+  {
+    "dataset": "retail",
+    "combo": "kpi_only",
+    "file": "phase7-retail-kpi_only.pdf",
+    "pageCount": 2,
+    "textLength": 17417,
+    "markers": {
+      "kpi": true,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "retail",
+    "combo": "kpi_insight",
+    "file": "phase7-retail-kpi_insight.pdf",
+    "pageCount": 2,
+    "textLength": 20539,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "retail",
+    "combo": "kpi_insight_chart",
+    "file": "phase7-retail-kpi_insight_chart.pdf",
+    "pageCount": 3,
+    "textLength": 30006,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "retail",
+    "combo": "all_sections",
+    "file": "phase7-retail-all_sections.pdf",
+    "pageCount": 6,
+    "textLength": 65666,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": true,
+      "dataQuality": true,
+      "conversation": true,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "retail",
+    "combo": "conversation_only",
+    "file": "phase7-retail-conversation_only.pdf",
+    "pageCount": 2,
+    "textLength": 15844,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": true,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "retail",
+    "combo": "appendix_only",
+    "file": "phase7-retail-appendix_only.pdf",
+    "pageCount": 2,
+    "textLength": 26006,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "kpi_only",
+    "file": "phase7-generic-kpi_only.pdf",
+    "pageCount": 2,
+    "textLength": 17412,
+    "markers": {
+      "kpi": true,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "kpi_insight",
+    "file": "phase7-generic-kpi_insight.pdf",
+    "pageCount": 2,
+    "textLength": 20534,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "kpi_insight_chart",
+    "file": "phase7-generic-kpi_insight_chart.pdf",
+    "pageCount": 3,
+    "textLength": 29996,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "all_sections",
+    "file": "phase7-generic-all_sections.pdf",
+    "pageCount": 6,
+    "textLength": 65670,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": true,
+      "dataQuality": true,
+      "conversation": true,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "conversation_only",
+    "file": "phase7-generic-conversation_only.pdf",
+    "pageCount": 2,
+    "textLength": 15839,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": true,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "generic",
+    "combo": "appendix_only",
+    "file": "phase7-generic-appendix_only.pdf",
+    "pageCount": 2,
+    "textLength": 26001,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "kpi_only",
+    "file": "phase7-geographic-kpi_only.pdf",
+    "pageCount": 2,
+    "textLength": 17562,
+    "markers": {
+      "kpi": true,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "kpi_insight",
+    "file": "phase7-geographic-kpi_insight.pdf",
+    "pageCount": 2,
+    "textLength": 20684,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "kpi_insight_chart",
+    "file": "phase7-geographic-kpi_insight_chart.pdf",
+    "pageCount": 3,
+    "textLength": 30163,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "all_sections",
+    "file": "phase7-geographic-all_sections.pdf",
+    "pageCount": 6,
+    "textLength": 64238,
+    "markers": {
+      "kpi": true,
+      "aiInsight": true,
+      "chart": true,
+      "preview": true,
+      "dataQuality": true,
+      "conversation": true,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "conversation_only",
+    "file": "phase7-geographic-conversation_only.pdf",
+    "pageCount": 2,
+    "textLength": 15989,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": true,
+      "appendix": false,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  },
+  {
+    "dataset": "geographic",
+    "combo": "appendix_only",
+    "file": "phase7-geographic-appendix_only.pdf",
+    "pageCount": 2,
+    "textLength": 26151,
+    "markers": {
+      "kpi": false,
+      "aiInsight": false,
+      "chart": false,
+      "preview": false,
+      "dataQuality": false,
+      "conversation": false,
+      "appendix": true,
+      "executiveSummary": true,
+      "pageFooter": true
+    },
+    "failures": []
+  }
+]

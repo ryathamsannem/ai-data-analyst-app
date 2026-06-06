@@ -1,0 +1,60 @@
+[
+  {
+    "dataset": "retail",
+    "method": "cursor-browser-mcp",
+    "steps": [
+      "upload_ok",
+      "q1_ok",
+      "q2_ok",
+      "q3_ok",
+      "q4_ok",
+      "q5_ok",
+      "export_all_sections_ok",
+      "download_ok"
+    ],
+    "pdf": "docs/pdf-validation-screenshots/p7-005-retail-manual-export.pdf",
+    "analysis": {
+      "file": "p7-005-retail-manual-export.pdf",
+      "pages": 7,
+      "pass": true
+    }
+  },
+  {
+    "dataset": "generic",
+    "method": "playwright-chrome",
+    "steps": [
+      "upload_ok",
+      "q1_ok",
+      "q2_ok",
+      "q3_ok",
+      "q4_ok",
+      "q5_ok"
+    ],
+    "pdf": "docs/pdf-validation-screenshots/p7-005-generic-manual-export.pdf",
+    "download_ms": 777,
+    "analysis": {
+      "file": "p7-005-generic-manual-export.pdf",
+      "pages": 7,
+      "pass": true
+    }
+  },
+  {
+    "dataset": "geographic",
+    "method": "playwright-chrome",
+    "steps": [
+      "upload_ok",
+      "q1_ok",
+      "q2_ok",
+      "q3_ok",
+      "q4_ok",
+      "q5_ok"
+    ],
+    "pdf": "docs/pdf-validation-screenshots/p7-005-geographic-manual-export.pdf",
+    "download_ms": 668,
+    "analysis": {
+      "file": "p7-005-geographic-manual-export.pdf",
+      "pages": 7,
+      "pass": true
+    }
+  }
+]
