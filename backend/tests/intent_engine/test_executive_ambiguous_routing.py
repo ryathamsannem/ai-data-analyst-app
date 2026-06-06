@@ -20,6 +20,16 @@ from intent_engine.executive_lens import detect_executive_lens  # noqa: E402
 
 FIXTURE_CSV = BACKEND_ROOT / "tests" / "fixtures" / "retail_analytics_regression.csv"
 
+EXECUTIVE_RISK_PHRASES = [
+    ("What keeps leadership up at night?", "executive_risk", "risk"),
+    ("What is our biggest exposure?", "executive_risk", "risk"),
+    ("What strategic threats should we monitor?", "executive_risk", "risk"),
+    ("What is the biggest problem right now?", "executive_risk", "risk"),
+    ("What executive risks worry you?", "executive_risk", "risk"),
+    ("What are the biggest risks?", "executive_risk", "risk"),
+    ("What leadership concerns should we address?", "executive_risk", "risk"),
+]
+
 FIVE_QUESTIONS = [
     (
         "What should management focus on?",
@@ -64,6 +74,23 @@ class TestExecutiveAmbiguousClassification(unittest.TestCase):
             )
             self.assertEqual(detect_executive_lens(question), lens, msg=question)
             self.assertEqual(bucket_to_executive_lens(bucket), lens, msg=question)
+
+    def test_executive_risk_phrases_classify_before_compare(self) -> None:
+        for question, bucket, lens in EXECUTIVE_RISK_PHRASES:
+            self.assertEqual(
+                classify_executive_ambiguous_bucket(question),
+                bucket,
+                msg=question,
+            )
+            self.assertEqual(detect_executive_lens(question), lens, msg=question)
+
+    def test_leadership_prioritize_stays_strategy_not_risk(self) -> None:
+        question = "What should leadership prioritize?"
+        self.assertEqual(
+            classify_executive_ambiguous_bucket(question),
+            "executive_strategy",
+        )
+        self.assertEqual(detect_executive_lens(question), "strategy")
 
 
 class TestExecutiveAmbiguousVizRouting(unittest.TestCase):
@@ -155,6 +182,15 @@ class TestExecutiveAmbiguousVizRouting(unittest.TestCase):
                     kinds & {"risk", "concentration"},
                     msg=f"{question} kinds={kinds}",
                 )
+                titles = [
+                    str(c.get("title") or "")
+                    for c in ranked
+                    if isinstance(c, dict)
+                ]
+                self.assertTrue(
+                    any("primary concern" in t.lower() for t in titles),
+                    msg=f"{question} missing Primary concern in {titles}",
+                )
             if lens == "opportunity":
                 self.assertTrue(
                     kinds & {"opportunity", "gap", "concentration"},
@@ -172,6 +208,28 @@ class TestExecutiveAmbiguousVizRouting(unittest.TestCase):
                     any(t in joined for t in terms),
                     msg=f"{question} missing narrative terms in {joined[:200]}",
                 )
+
+    def test_executive_risk_phrases_route_with_primary_goal(self) -> None:
+        for question, bucket, lens in EXECUTIVE_RISK_PHRASES:
+            _exact, _viz, analysis = self._run(question)
+            self.assertEqual(
+                str(analysis.get("executiveAmbiguousBucket") or ""),
+                bucket,
+                msg=question,
+            )
+            self.assertEqual(
+                str(analysis.get("executiveLens") or "").lower(),
+                lens,
+                msg=question,
+            )
+            intent = analysis.get("intent") or {}
+            self.assertEqual(
+                str(intent.get("primaryGoal") or ""),
+                "executive_risk",
+                msg=question,
+            )
+            cat = str(analysis.get("categoryColumn") or "").lower()
+            self.assertNotEqual(cat, "product", msg=question)
 
 
 if __name__ == "__main__":

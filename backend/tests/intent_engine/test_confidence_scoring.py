@@ -193,6 +193,58 @@ class TestConfidenceScoring(unittest.TestCase):
         joined = " ".join(meta.get("insightConfidenceReasons") or []).lower()
         self.assertIn("ranking", joined)
 
+    def test_simple_ranking_unambiguous_high_band(self) -> None:
+        """Which city contributes most revenue? — 36 rows, 4 groups, resolved metric."""
+        meta = compute_insight_confidence_meta(
+            36,
+            4,
+            "high",
+            intent_structured=True,
+            analysis_kind="ranking",
+            chart_type="bar",
+        )
+        self.assertGreaterEqual(meta["insightConfidenceScore"], 70)
+        self.assertEqual(meta["insightConfidenceLevel"], "high")
+        joined = " ".join(meta.get("insightConfidenceReasons") or []).lower()
+        self.assertIn("ranking question", joined)
+
+    def test_compare_unambiguous_high_band(self) -> None:
+        meta = compute_insight_confidence_meta(
+            36,
+            4,
+            "high",
+            intent_structured=True,
+            analysis_kind="compare",
+            chart_type="bar",
+        )
+        self.assertGreaterEqual(meta["insightConfidenceScore"], 70)
+        self.assertEqual(meta["insightConfidenceLevel"], "high")
+
+    def test_simple_ranking_structured_without_mapping_high_band(self) -> None:
+        meta = compute_insight_confidence_meta(
+            36,
+            4,
+            None,
+            intent_structured=True,
+            analysis_kind="ranking",
+            chart_type="bar",
+        )
+        self.assertGreaterEqual(meta["insightConfidenceScore"], 70)
+        self.assertEqual(meta["insightConfidenceLevel"], "high")
+
+    def test_sparse_ranking_groups_stays_below_high(self) -> None:
+        """Truly sparse groups (~2 rows/group) should not reach high band."""
+        meta = compute_insight_confidence_meta(
+            12,
+            6,
+            "high",
+            intent_structured=True,
+            analysis_kind="ranking",
+            chart_type="bar",
+        )
+        self.assertLess(meta["insightConfidenceScore"], 70)
+        self.assertIn(meta["insightConfidenceLevel"], ("low", "medium"))
+
     def test_small_scatter_rationale_mentions_joint_pairs(self) -> None:
         meta = compute_insight_confidence_meta(
             8,

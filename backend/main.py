@@ -95,6 +95,29 @@ class ConversationContextPayload(BaseModel):
     datasetDomain: Optional[str] = None
     """Human-readable active explorer filters from the client (current ask)."""
     activeDashboardFilters: List[str] = Field(default_factory=list)
+    """First question in the BI thread — stable scope for meta follow-ups."""
+    rootQuestion: Optional[str] = None
+
+
+class ParentAnalysisContextPayload(BaseModel):
+    """Client snapshot of the prior resolved analysis (follow-up lineage)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    rootQuestion: Optional[str] = None
+    priorQuestion: Optional[str] = None
+    metricColumn: Optional[str] = None
+    categoryColumn: Optional[str] = None
+    metricColumnDisplay: Optional[str] = None
+    categoryColumnDisplay: Optional[str] = None
+    aggregation: Optional[str] = None
+    chartType: Optional[str] = None
+    chartTitle: Optional[str] = None
+    intentBucket: Optional[str] = None
+    routingIntent: Optional[str] = None
+    followUpChain: List[str] = Field(default_factory=list)
+    lastAiAnswer: Optional[str] = None
+    turnId: Optional[str] = None
 
 
 def _pretty_join_dimension_metric(
@@ -184,6 +207,8 @@ class QuestionRequest(BaseModel):
 
     question: str
     conversation_context: Optional[ConversationContextPayload] = None
+    parent_analysis_context: Optional[ParentAnalysisContextPayload] = None
+    continuation_intent: bool = False
     dashboard_filters: List[DashboardFilterEntryModel] = Field(default_factory=list)
     date_range: Optional[DashboardDateRangeModel] = None
 
@@ -12000,8 +12025,9 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
         )
     elif exec_amb == "executive_risk":
         lines.append(
-            "- **Concern / risk question** — Lead with concentration, weak segments, growth or "
-            "margin risks; avoid a generic revenue leaderboard."
+            "- **Executive risk question** — Identify top business risk, concentration/dependency "
+            "exposure, and weakest performers. Structure as Primary concern, Secondary concern, "
+            "and Watch item; avoid a generic revenue leaderboard."
         )
     elif exec_amb == "executive_opportunity":
         lines.append(
@@ -12501,6 +12527,10 @@ def _build_unified_analysis_payload(
         lpc = intent_debug["lossProfitabilityContext"]
         out["lossProfitabilityContext"] = lpc
         conf["lossProfitabilityAnalysis"] = True
+    if intent_debug and isinstance(intent_debug.get("executiveRiskContext"), dict):
+        erc = intent_debug["executiveRiskContext"]
+        out["executiveRiskContext"] = erc
+        conf["executiveRiskAnalysis"] = True
     if conf.get("insightConfidenceBreakdown"):
         out["insightConfidenceBreakdown"] = conf["insightConfidenceBreakdown"]
     if forecast_guardrails and forecast_guardrails.get("active"):
@@ -12578,7 +12608,13 @@ _THREAD_META_FOLLOW_UP = re.compile(
     r"anything\s+else\s+to\s+(?:check|try|look\s+at)|"
     r"(?:go|dig)\s+deeper|"
     r"how\s+should\s+we\s+proceed|"
-    r"what\s+are\s+the\s+next\s+steps"
+    r"what\s+are\s+the\s+next\s+steps|"
+    r"what\s+evidence\s+supports|"
+    r"which\s+columns?\s+(?:were\s+)?(?:used|involved)|"
+    r"show\s+the\s+calculations?\s+behind|"
+    r"how\s+(?:was|were)\s+(?:this|these)\s+(?:calculated|computed)|"
+    r"what\s+columns?\s+(?:did\s+you\s+use|were\s+used)|"
+    r"this\s+(?:answer|conclusion|analysis|result)\b"
     r")\b",
     re.I,
 )
@@ -12612,9 +12648,26 @@ def _is_explanation_follow_up(q: str) -> bool:
     s = (q or "").strip()
     if not s:
         return False
-    if len(s) > 48:
+    if len(s) <= 48 and re.match(
+        r"^\s*(why|explain)(\s+that|\s+this|\s+it)?\s*\??\s*$", s, re.I
+    ):
+        return True
+    if len(s) > 120:
         return False
-    return bool(re.match(r"^\s*(why|explain)(\s+that|\s+this|\s+it)?\s*\??\s*$", s, re.I))
+    if re.search(
+        r"\bwhy\s+is\b.+\b(highest|lowest|top|leading|largest|best|worst|most)\b",
+        s,
+        re.I,
+    ):
+        return True
+    if re.search(r"\bwhat\s+explains\b.+\b(highest|lowest|being)\b", s, re.I):
+        return True
+    return False
+
+
+def _scoped_follow_up_question(q: str) -> bool:
+    """Follow-ups that reuse prior analysis scope without concatenating a new intent."""
+    return _is_explanation_follow_up(q) or _is_thread_meta_follow_up(q)
 
 
 def _parse_forced_chart_mutation(q: str) -> Optional[str]:
@@ -12848,6 +12901,9 @@ def _try_build_follow_up_filtered_df(
 def resolve_follow_up_turn(
     raw_question: str,
     ctx: Optional[ConversationContextPayload],
+    *,
+    continuation_intent: bool = False,
+    parent_ctx: Optional[ParentAnalysisContextPayload] = None,
 ) -> Dict[str, Any]:
     """
     Deterministic follow-up routing. Returns keys used by /ask:
@@ -12869,7 +12925,11 @@ def resolve_follow_up_turn(
         return out
 
     prior = (ctx.lastQuestion or "").strip() if ctx else ""
-    is_follow = _looks_like_follow_up_question(rq, has_prior=bool(prior))
+    if not prior and parent_ctx:
+        prior = (parent_ctx.priorQuestion or parent_ctx.rootQuestion or "").strip()
+    is_follow = bool(continuation_intent and prior)
+    if not is_follow:
+        is_follow = _looks_like_follow_up_question(rq, has_prior=bool(prior))
 
     if is_follow and not prior:
         out["blocked"] = True
@@ -12878,19 +12938,37 @@ def resolve_follow_up_turn(
         )
         return out
 
-    if not is_follow or not ctx:
+    if not is_follow:
         return out
+
+    if not ctx and not parent_ctx:
+        return out
+
+    root_q = (
+        (ctx.rootQuestion or "").strip()
+        if ctx and (ctx.rootQuestion or "").strip()
+        else (parent_ctx.rootQuestion or "").strip()
+        if parent_ctx and (parent_ctx.rootQuestion or "").strip()
+        else prior
+    )
+    scope_q = root_q or prior
 
     explanation = _is_explanation_follow_up(rq)
     thread_meta = _is_thread_meta_follow_up(rq)
-    if explanation or thread_meta:
-        eff = prior
+    scoped = explanation or thread_meta
+    if scoped:
+        eff = scope_q
     else:
         eff = f"{prior} {rq}".strip()
 
     out["effective_question"] = eff
 
-    prev_summary = (ctx.lastChartTitle or "").strip() or prior[:120]
+    prev_summary = (ctx.lastChartTitle or "").strip() if ctx else ""
+    if not prev_summary and parent_ctx:
+        prev_summary = (parent_ctx.chartTitle or scope_q or "")[:120]
+    if not prev_summary:
+        prev_summary = scope_q[:120]
+
     applied_bits: List[str] = []
     if explanation:
         applied_bits.append("Explain / why (same calculation as previous question)")
@@ -12935,36 +13013,80 @@ def resolve_follow_up_turn(
             return "—"
         return t if len(t) <= n else t[: n - 1] + "…"
 
-    labs = [x for x in (ctx.lastChartLabelSample or []) if str(x).strip()][:12]
+    labs = (
+        [x for x in (ctx.lastChartLabelSample or []) if str(x).strip()][:12]
+        if ctx
+        else []
+    )
     lab_line = ", ".join(str(x).strip() for x in labs) if labs else "—"
-    cmap = ctx.columnMapping or {}
+    cmap = dict(ctx.columnMapping or {}) if ctx else {}
+    if parent_ctx:
+        if parent_ctx.metricColumn and not cmap.get("sales"):
+            cmap.setdefault("sales", parent_ctx.metricColumn)
+        if parent_ctx.categoryColumn and not cmap.get("region"):
+            cmap.setdefault("region", parent_ctx.categoryColumn)
     cmap_lines = "\n".join(
         f"  - {k}: {v}" for k, v in sorted(cmap.items()) if str(v).strip()
     )
-    dash_chip = ctx.activeDashboardFilters or []
+    dash_chip = ctx.activeDashboardFilters if ctx else []
     dash_lines = "\n".join(f"  - {ln}" for ln in dash_chip if str(ln).strip())
-    prev_ans = _clip(ctx.lastAiAnswer, 3600)
+    prev_ans = _clip(
+        (ctx.lastAiAnswer if ctx else None)
+        or (parent_ctx.lastAiAnswer if parent_ctx else None),
+        3600,
+    )
+    metric_col = (
+        (ctx.metricColumn if ctx else None)
+        or (parent_ctx.metricColumn if parent_ctx else None)
+        or "—"
+    )
+    cat_col = (
+        (ctx.categoryColumn if ctx else None)
+        or (parent_ctx.categoryColumn if parent_ctx else None)
+        or "—"
+    )
+    agg_val = (
+        (ctx.aggregation if ctx else None)
+        or (parent_ctx.aggregation if parent_ctx else None)
+        or "—"
+    )
+    chart_type_val = (
+        (ctx.chartType if ctx else None)
+        or (parent_ctx.chartType if parent_ctx else None)
+        or "—"
+    )
+    chain = list(ctx.followUpChain or []) if ctx else []
+    if not chain and parent_ctx and parent_ctx.followUpChain:
+        chain = list(parent_ctx.followUpChain)
 
     ai_block = (
         "Conversation Context\n"
         "(Follow-up turn — keep reasoning aligned with this thread. "
         "The user's latest message may be short; infer missing subjects from the prior turn.)\n"
         f"- Latest user message: {rq}\n"
+        f"- Root question (analysis scope): {scope_q}\n"
         f"- Previous question: {prior}\n"
-        f"- Previous chart title: {ctx.lastChartTitle or '—'}\n"
-        f"- Previous chart subtitle: {ctx.lastChartSubtitle or '—'}\n"
+        f"- Follow-up chain: {', '.join(chain) if chain else '—'}\n"
+        f"- Previous chart title: {(ctx.lastChartTitle if ctx else None) or (parent_ctx.chartTitle if parent_ctx else None) or '—'}\n"
+        f"- Previous chart subtitle: {(ctx.lastChartSubtitle if ctx else None) or '—'}\n"
         f"- Sample category labels (prior chart): {lab_line}\n"
-        f"- Prior chart type: {ctx.chartType or '—'}\n"
-        f"- Metric column (prior focus): {ctx.metricColumn or '—'}\n"
-        f"- Category / grouping column (prior): {ctx.categoryColumn or '—'}\n"
-        f"- Aggregation (prior): {ctx.aggregation or '—'}\n"
-        f"- Dataset domain hint: {ctx.datasetDomain or '—'}\n"
+        f"- Prior chart type: {chart_type_val}\n"
+        f"- Metric column (prior focus): {metric_col}\n"
+        f"- Category / grouping column (prior): {cat_col}\n"
+        f"- Aggregation (prior): {agg_val}\n"
+        f"- Dataset domain hint: {(ctx.datasetDomain if ctx else None) or '—'}\n"
     )
+    if parent_ctx and (parent_ctx.metricColumnDisplay or parent_ctx.categoryColumnDisplay):
+        ai_block += (
+            "- Resolved labels (prior): "
+            f"metric={parent_ctx.metricColumnDisplay or metric_col}, "
+            f"dimension={parent_ctx.categoryColumnDisplay or cat_col}\n"
+        )
     if cmap_lines.strip():
         ai_block += "- Column mapping (semantic role → column):\n" + cmap_lines + "\n"
     if dash_lines.strip():
         ai_block += "- Active dashboard filters (this request):\n" + dash_lines + "\n"
-    if ctx.filtersApplied:
+    if ctx and ctx.filtersApplied:
         ai_block += "- Row-scope notes from prior turns:\n" + "\n".join(
             f"  - {ln}" for ln in ctx.filtersApplied if str(ln).strip()
         ) + "\n"
@@ -12973,6 +13095,12 @@ def resolve_follow_up_turn(
         "not from memory if they differ):\n"
         f"{prev_ans}\n"
     )
+    if thread_meta and re.search(r"columns?\s+(?:were\s+)?used", rq, re.I):
+        ai_block += (
+            "\nThread meta (columns): List only the metric and breakdown columns "
+            "from the prior analysis above. Do not invent columns that are not in "
+            "the dataset context or prior analysis metadata.\n"
+        )
     out["ai_context_block"] = ai_block
     out["conversation_sidecar"] = {
         "wasFollowUp": True,
@@ -12980,7 +13108,10 @@ def resolve_follow_up_turn(
         "followUpApplied": follow_line,
         "contextUsedLine": ctx_used,
         "originalFollowUp": rq,
+        "rootQuestion": scope_q,
     }
+    out["scope_question"] = scope_q
+    out["scoped_follow_up"] = scoped
     return out
 
 
@@ -14766,6 +14897,14 @@ def _compute_visualization_for_question_body(
             er_tail = (exact_result or "").strip()
             exact_result = f"{loss_block}\n\n{er_tail}" if er_tail else loss_block
 
+    if intent_debug and isinstance(intent_debug.get("executiveRiskContext"), dict):
+        risk_block = str(
+            intent_debug["executiveRiskContext"].get("exactBlock") or ""
+        ).strip()
+        if risk_block:
+            er_tail = (exact_result or "").strip()
+            exact_result = f"{risk_block}\n\n{er_tail}" if er_tail else risk_block
+
     analysis_ctx = _build_unified_analysis_payload(
         question=question,
         intent_debug=intent_debug,
@@ -14791,6 +14930,22 @@ def _compute_visualization_for_question_body(
         time_series_analysis_for_intent=ts_meta,
     )
     try:
+        from intent_engine.routing_consistency import attach_routing_backbone
+
+        attach_routing_backbone(
+            question=question,
+            analysis=analysis_ctx,
+            visualization=visualization,
+        )
+    except Exception as _rb_exc:
+        print(
+            "[routing_plan] attach skipped:",
+            type(_rb_exc).__name__,
+            str(_rb_exc)[:300],
+            flush=True,
+        )
+
+    try:
         print(
             "[viz] outgoing_visualization=",
             str(
@@ -14802,6 +14957,7 @@ def _compute_visualization_for_question_body(
                     "sample_values": visualization["values"][:4],
                     "fallback_aggregate_used": fallback_used,
                     "alignment_repaired": alignment_repaired,
+                    "routingIntent": (analysis_ctx.get("routingPlan") or {}).get("intent"),
                 }
             )[:950],
             flush=True,
@@ -14822,7 +14978,12 @@ def ask_question(data: QuestionRequest):
             "analysis": None,
         }
 
-    plan = resolve_follow_up_turn(data.question, data.conversation_context)
+    plan = resolve_follow_up_turn(
+        data.question,
+        data.conversation_context,
+        continuation_intent=bool(data.continuation_intent),
+        parent_ctx=data.parent_analysis_context,
+    )
     if plan.get("blocked"):
         return _json_safe(
             {
@@ -15336,8 +15497,25 @@ Rules:
         viz_title = ""
         if visualization and isinstance(visualization.get("title"), str):
             viz_title = visualization["title"].strip()
+        conv_scope_q = str(plan.get("scope_question") or "").strip()
+        conv_root_q = (
+            conv_scope_q
+            or (
+                data.conversation_context.rootQuestion
+                if data.conversation_context
+                and (data.conversation_context.rootQuestion or "").strip()
+                else None
+            )
+            or eff_q
+        )
+        conv_last_q = (
+            conv_scope_q
+            if plan.get("scoped_follow_up") and conv_scope_q
+            else eff_q
+        )
         conv_out = {
-            "lastQuestion": eff_q,
+            "lastQuestion": conv_last_q,
+            "rootQuestion": conv_root_q,
             "lastChartTitle": viz_title
             or str(analysis_ctx.get("chartTitle") or "").strip(),
             "metricColumn": analysis_ctx.get("metricColumn"),

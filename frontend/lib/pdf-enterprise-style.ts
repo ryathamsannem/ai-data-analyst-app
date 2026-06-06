@@ -107,6 +107,10 @@ export const PDF_EMPTY_STATES = {
     title: "Quality profile unavailable",
     body: "Re-upload the dataset or refresh the session to include missing-value and duplicate checks.",
   },
+  conversationThread: {
+    title: "Conversation thread unavailable",
+    body: "No prior conversation entries captured. Ask a question in AI Insights and use follow-up chips to build a thread before exporting.",
+  },
 } as const;
 
 /** Typography scale (pt) — executive report hierarchy. */

@@ -341,6 +341,11 @@ def _compose_evidence_summary_line(
         )
 
     if n > 0 and n < 100:
+        if band == "high" and _is_unambiguous_categorical_ranking(inp):
+            return (
+                f"Score {rounded}/100 ({band}): resolved ranking across {cp} group(s) "
+                f"from {n:,} filtered row(s)."
+            )
         return (
             f"Score {rounded}/100 ({band}): small cohort ({n:,} rows, {cp} chart group(s)) — "
             "use hedged language and mention sample size once."
@@ -410,19 +415,59 @@ def _routing_analysis_points(inp: InsightConfidenceInput) -> Tuple[float, List[s
     return pts, reasons
 
 
+def _is_unambiguous_categorical_ranking(inp: InsightConfidenceInput) -> bool:
+    """
+    Simple ranking/compare with resolved columns, suitable chart, and enough
+    rows per group that the leader/lagger read is not sample-starved.
+    """
+    kind = (inp.analysis_kind or "").strip().lower()
+    if kind not in ("ranking", "compare", "aggregation"):
+        return False
+    if not inp.intent_structured:
+        return False
+    if (
+        inp.trend_request_unsatisfied
+        or inp.growth_request_unsatisfied
+        or inp.decline_request_unsatisfied
+        or inp.multi_metric_request_unsatisfied
+    ):
+        return False
+    if (
+        inp.partial_visualization_warning
+        or inp.alignment_repaired
+        or inp.dimension_redirect_handled
+    ):
+        return False
+    mapping = (inp.mapping_confidence or "").strip().lower()
+    if mapping == "low":
+        return False
+    n = max(0, int(inp.row_count))
+    cp = max(0, int(inp.chart_point_count))
+    if cp < 2 or cp > 24 or n < 10:
+        return False
+    rpg = float(n) / float(cp) if cp else 0.0
+    if rpg < 3:
+        return False
+    ct = normalize_confidence_chart_type(inp.chart_type)
+    if ct not in ("bar", "bar_horizontal", "histogram", "pie", "donut", ""):
+        return False
+    return True
+
+
 def _sample_evidence_points(inp: InsightConfidenceInput) -> Tuple[float, List[str]]:
     """Sample-size and statistical-support evidence (separate from routing)."""
     pts = 0.0
     reasons: List[str] = []
     n = max(0, int(inp.row_count))
     cp = max(0, int(inp.chart_point_count))
+    unambiguous = _is_unambiguous_categorical_ranking(inp)
 
-    if n > 0 and n < 100:
+    if n > 0 and n < 100 and not unambiguous:
         pts -= 6.0
         reasons.append(f"Small filtered cohort ({n:,} row(s))")
     if cp > 0 and n > 0:
         rpg = float(n) / float(cp)
-        if rpg < 3 and not inp.relationship_scatter:
+        if rpg < 3 and not inp.relationship_scatter and not unambiguous:
             pts -= 5.0
             reasons.append(f"Sparse groups (~{rpg:.1f} rows per chart group)")
 
@@ -471,7 +516,19 @@ def _calibrate_confidence_score(
         return max(55.0, min(69.0, max(score, blended)))
 
     if (
-        kind in ("outlier", "ranking", "compare")
+        kind in ("ranking", "compare")
+        and inp.intent_structured
+        and 2 <= cp <= 12
+        and n > 0
+        and n < 100
+    ):
+        if _is_unambiguous_categorical_ranking(inp):
+            return score
+        blended = 0.55 * routing_pts + 0.45 * max(38.0, 100.0 + sample_pts)
+        return max(45.0, min(60.0, max(score, blended)))
+
+    if (
+        kind == "outlier"
         and inp.intent_structured
         and 2 <= cp <= 12
         and n > 0

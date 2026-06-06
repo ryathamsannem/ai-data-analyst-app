@@ -39,6 +39,11 @@ import {
   buildProfitMarginFollowUpChips,
 } from "@/lib/ai-follow-up-suggestions";
 import {
+  appendThreadMetaFollowUpChips,
+  buildParentAnalysisContext,
+  shouldSendFollowUpContinuation,
+} from "@/lib/ai-conversation-context";
+import {
   buildRankedCategoryExecutiveCards,
   parseRankedExecutiveInsights,
   rankedInsightsToExecutiveCards,
@@ -198,6 +203,11 @@ import {
   isExecutiveTakeawaysQuestion,
   isGeographicRankingQuestion,
 } from "@/lib/executive-insights-brief";
+import {
+  followUpLensFromRouting,
+  parseRoutingPlan,
+  type RoutingPlanPayload,
+} from "@/lib/routing-plan";
 import { WrappedCategoryYAxisTick } from "./components/chart-category-axis-tick";
 import {
   aiInsightsAnswerCard,
@@ -526,7 +536,6 @@ import { dashboardChartKeyFromTitle } from "@/contexts/chart-session-context";
 import {
   buildTrendAxisPresentation,
   buildTrendExecutiveVizInsights,
-  buildTrendPdfRankedSignals,
   trendInsightBadgeFromRows,
 } from "@/lib/trend-visualization";
 import {
@@ -542,10 +551,15 @@ import {
   loadReportBranding,
   runExecutivePdfExport,
   saveReportBranding,
-  type PdfInsightSections,
-  type PdfRankedSignal,
   type ReportBranding,
 } from "./pdf-report";
+import {
+  buildExecutivePdfExportInput,
+  computePdfRankedSignalsFromChartRows,
+  parseAnswerIntoSections,
+  sortRowsForPresentation,
+  type PdfChartPrepContext,
+} from "@/lib/build-executive-pdf-input";
 import {
   BarChart,
   Bar,
@@ -1561,100 +1575,6 @@ function applyBarChartSort(
   return copy;
 }
 
-function sortRowsForPresentation(
-  rows: ChartRow[],
-  kind: ChartKind,
-  ascending: boolean | null,
-  trendMode: boolean
-): ChartRow[] {
-  if (trendMode) return sortChartRowsChronologically(rows);
-  return applyBarChartSort(rows, kind, ascending);
-}
-
-/** Same numeric ranking as key-figure cards: argmax by `value` on chart rows (deduped by category), display strings match the chart. */
-function computePdfRankedSignalsFromChartRows(
-  rows: ChartRow[],
-  kind: ChartKind,
-  max = 3,
-  /** Original series order (e.g. unsorted snapshot) for stable ties — matches key-figure `iMax` walk. */
-  orderForTieBreak?: ChartRow[],
-  trendMode = false,
-  /** Ascending = lowest/min first; false = highest first; null = highest (default). */
-  ascending: boolean | null = null,
-  trendBucketLabel = "Weekly"
-): PdfRankedSignal[] | null {
-  if (trendMode) {
-    const trendSignals = buildTrendPdfRankedSignals(
-      rows,
-      kind,
-      max,
-      trendBucketLabel
-    );
-    if (trendSignals?.length) return trendSignals;
-  }
-  if (kind === "scatter" || !rows.length) return null;
-
-  const dispKind: ChartKind =
-    kind === "pie" || kind === "donut"
-      ? "bar_horizontal"
-      : kind === "bar_horizontal"
-        ? "bar_horizontal"
-        : "bar";
-
-  const orderBase =
-    orderForTieBreak && orderForTieBreak.length ? orderForTieBreak : rows;
-  const firstIndex = new Map<string, number>();
-  orderBase.forEach((row, idx) => {
-    const cat = String(row.name ?? "").trim() || "—";
-    if (!firstIndex.has(cat)) firstIndex.set(cat, idx);
-  });
-
-  const merged = new Map<string, ChartRow>();
-  for (const row of rows) {
-    const cat = String(row.name ?? "").trim() || "—";
-    const v = Number(row.value);
-    if (!Number.isFinite(v)) continue;
-    const prev = merged.get(cat);
-    if (!prev || v > Number(prev.value)) {
-      merged.set(cat, { ...row, name: cat, value: v });
-    }
-  }
-
-  const deduped = [...merged.values()];
-  if (!deduped.length) return null;
-
-  const preferLow = ascending === true;
-  deduped.sort((a, b) => {
-    const va = Number(a.value);
-    const vb = Number(b.value);
-    const delta = preferLow ? va - vb : vb - va;
-    if (delta !== 0) return delta;
-    const ia = firstIndex.get(String(a.name)) ?? 0;
-    const ib = firstIndex.get(String(b.name)) ?? 0;
-    return ia - ib;
-  });
-
-  const rankWords = preferLow
-    ? (["Lowest", "Second lowest", "Third lowest"] as const)
-    : ascending === false
-      ? (["Highest", "Second highest", "Third highest"] as const)
-      : kind === "pie" || kind === "donut"
-        ? (["Largest", "Second", "Third"] as const)
-        : (["Highest", "Second", "Third"] as const);
-
-  return deduped.slice(0, max).map((row, i) => {
-    const v = Number(row.value);
-    const valueDisplay =
-      row.displayValue?.trim() ||
-      fallbackChartNumericDisplay(dispKind, v);
-    return {
-      rank: rankWords[i] ?? `#${i + 1}`,
-      category: String(row.name ?? "").trim() || "—",
-      valueDisplay,
-    };
-  });
-}
-
 function valueAxisCompactFromProvenance(
   fullValueAxis: string,
   viz: StoredVisualization | null,
@@ -1995,78 +1915,6 @@ function buildChartAxisPresentationBundle(args: {
   };
 }
 
-type ParsedAnswerSections = {
-  summary: string;
-  statistical?: string;
-  hypotheses?: string;
-  recommendations?: string;
-  methodology?: string;
-  moreDetail?: string;
-};
-
-function parseAnswerIntoSections(
-  raw: string,
-  insightSummary?: string
-): ParsedAnswerSections {
-  const t = raw.trim();
-  if (!t) return { summary: (insightSummary ?? "").trim() };
-
-  if (/(^|\n)##\s+\S/m.test(t)) {
-    const parts = t.split(/(?=\n##\s+)/);
-    const head = (parts[0] ?? "").trim();
-    const sections: ParsedAnswerSections = {
-      summary: head || insightSummary?.trim() || "",
-    };
-    for (let i = 1; i < parts.length; i++) {
-      const block = parts[i].trim();
-      const nl = block.indexOf("\n");
-      const titleLine = nl >= 0 ? block.slice(0, nl) : block;
-      const body = nl >= 0 ? block.slice(nl + 1).trim() : "";
-      const titleRaw = titleLine.replace(/^##\s+/, "").trim();
-      const titleNorm = normalizeAiSectionTitle(titleRaw).toLowerCase();
-      if (/statistical|key finding/.test(titleNorm)) sections.statistical = body;
-      else if (/hypothes|may indicate|inferred/.test(titleNorm))
-        sections.hypotheses = body;
-      else if (/recommend|next step/.test(titleNorm))
-        sections.recommendations = body;
-      else if (/method/.test(titleNorm)) sections.methodology = body;
-      else {
-        sections.moreDetail =
-          (sections.moreDetail ? `${sections.moreDetail}\n\n` : "") +
-          `${titleLine}\n${body}`.trim();
-      }
-    }
-    return sections;
-  }
-
-  const lines = t.split(/\r?\n/);
-  const maxLines = 6;
-  if (lines.length <= maxLines) return { summary: t };
-  return {
-    summary: lines.slice(0, maxLines).join("\n"),
-    moreDetail: lines.slice(maxLines).join("\n"),
-  };
-}
-
-function mergeParsedSectionsForPdfExport(
-  p: ParsedAnswerSections
-): PdfInsightSections {
-  const summaryCore = p.summary.trim();
-  const tail = [p.methodology, p.moreDetail].filter(Boolean).join("\n\n").trim();
-  const summary =
-    tail && !summaryCore
-      ? tail
-      : tail && summaryCore
-        ? `${summaryCore}\n\n${tail}`
-        : summaryCore;
-  return {
-    summary,
-    statistical: p.statistical?.trim() || undefined,
-    hypotheses: p.hypotheses?.trim() || undefined,
-    recommendations: p.recommendations?.trim() || undefined,
-  };
-}
-
 function humanizeRecommendedChartApi(chart: string): string {
   const c = String(chart || "bar").trim();
   if (c === "horizontalBar") return "Horizontal bar chart";
@@ -2091,6 +1939,7 @@ type ChartRecommendation = {
 /** Server round-trip snapshot for follow-up questions (`/ask` request + response). */
 type ConversationSnapshot = {
   lastQuestion: string;
+  rootQuestion?: string;
   lastChartTitle: string;
   metricColumn: string | null;
   categoryColumn: string | null;
@@ -2185,6 +2034,10 @@ function parseConversationSnapshot(raw: unknown): ConversationSnapshot | null {
     : [];
   return {
     lastQuestion: fq,
+    rootQuestion:
+      typeof o.rootQuestion === "string" && o.rootQuestion.trim()
+        ? o.rootQuestion.trim()
+        : chain[0] || fq,
     lastChartTitle:
       typeof o.lastChartTitle === "string" ? o.lastChartTitle.trim() : "",
     metricColumn:
@@ -3462,45 +3315,6 @@ function formatNumberForExecutiveSummary(n: number): string {
   });
 }
 
-function polishExecutiveSummaryMetricText(raw: string): string {
-  const t = raw.replace(/\s+/g, " ").trim();
-  if (!t) return t;
-  const trailing = t.match(/^(.+)\s+(-?[\d,]+(?:\.[\d]+)?)\s*$/);
-  if (trailing) {
-    const label = trailing[1].trim();
-    const num = Number(trailing[2].replace(/,/g, ""));
-    if (Number.isFinite(num) && label.length > 0) {
-      return `${label} ${formatNumberForExecutiveSummary(num)}`;
-    }
-  }
-  const only = t.replace(/,/g, "");
-  if (/^-?[\d.]+$/.test(only)) {
-    const num = Number(only);
-    if (Number.isFinite(num)) return formatNumberForExecutiveSummary(num);
-  }
-  return t;
-}
-
-function formatExecutiveSummaryKpiLine(card: KpiCard): string {
-  const title = card.title.replace(/\s+/g, " ").trim();
-  const value = polishExecutiveSummaryMetricText(String(card.value ?? ""));
-  const sub = card.subtitle?.trim()
-    ? polishExecutiveSummaryMetricText(String(card.subtitle))
-    : "";
-  return sub ? `${title}: ${value} — ${sub}` : `${title}: ${value}`;
-}
-
-function firstSentenceForExecutiveSummary(text: string, maxLen: number): string {
-  const t = text.replace(/\s+/g, " ").trim();
-  if (!t) return "";
-  const parts = t.split(/(?<=[.!?])\s+/).filter(Boolean);
-  const first = (parts[0] ?? t).trim();
-  if (first.length <= maxLen) return first;
-  const slice = first.slice(0, maxLen);
-  const sp = slice.lastIndexOf(" ");
-  return sp > 48 ? `${slice.slice(0, sp)}…` : `${slice}…`;
-}
-
 /** Single `/ask` `analysis` payload — same metric as chart, KPI focus, and AI appendix. */
 type AlignedAnalysisContext = {
   metricColumn: string | null;
@@ -3534,6 +3348,8 @@ type AlignedAnalysisContext = {
   insightConfidenceReasons?: string[];
   insightConfidenceBreakdown?: InsightConfidenceBreakdown | null;
   executiveLens?: string | null;
+  routingPlan?: RoutingPlanPayload | null;
+  routingConsistencyWarnings?: string[];
   evidenceSummaryLine: string;
   dualMetricCompare?: boolean;
   unsupportedGrowthAnalysis?: UnsupportedGrowthAnalysis | null;
@@ -3787,6 +3603,12 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
       typeof o.executiveLens === "string" && o.executiveLens.trim()
         ? o.executiveLens.trim().toLowerCase()
         : null,
+    routingPlan: parseRoutingPlan(o.routingPlan),
+    routingConsistencyWarnings: Array.isArray(o.routingConsistencyWarnings)
+      ? (o.routingConsistencyWarnings as unknown[])
+          .map((x) => String(x).trim())
+          .filter(Boolean)
+      : undefined,
     evidenceSummaryLine:
       typeof o.evidenceSummaryLine === "string"
         ? o.evidenceSummaryLine.trim()
@@ -5477,88 +5299,6 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   );
 });
 
-/** When API did not send kpi_cards (stale session): rows/columns plus sales tiles only if kpis populated them. */
-function buildFallbackKpiCards(
-  kpis: KPIs | null,
-  profile: DatasetProfile | null,
-  columns: string[],
-  datasetKind?: string,
-  primaryMetricColumn?: string | null,
-  primaryBreakdownColumn?: string | null
-): KpiCard[] {
-  if (!kpis) return [];
-
-  const remapOpts = {
-    metricColumn: primaryMetricColumn ?? null,
-    breakdownColumn: primaryBreakdownColumn ?? null,
-  };
-  const dk = (datasetKind || "").trim();
-
-  const hasSalesSlice =
-    kpis.total_sales != null ||
-    kpis.top_product != null ||
-    kpis.unique_products != null;
-
-  if (hasSalesSlice) {
-    const out: KpiCard[] = [
-      { title: "Total Rows", value: kpis.total_rows.toLocaleString() },
-    ];
-    if (kpis.total_sales != null) {
-      const metricCol =
-        primaryMetricColumn ||
-        inferSalesColumn(columns, profile, "", datasetKind);
-      const title =
-        metricCol && ["operations", "manufacturing"].includes(dk.toLowerCase())
-          ? buildKpiTitle({
-              aggregationKey: "sum",
-              aggregationLabel: "total",
-              metricColumn: metricCol,
-            })
-          : remapLegacyKpiTitle("Total Sales", dk, remapOpts);
-      out.push({
-        title,
-        value: kpis.total_sales.toLocaleString(),
-      });
-    }
-    if (kpis.top_product) {
-      out.push({
-        title: remapLegacyKpiTitle("Top Product", dk, remapOpts),
-        value: kpis.top_product.name,
-        subtitle: kpis.top_product.value.toLocaleString(),
-      });
-    }
-    if (kpis.unique_products != null) {
-      out.push({
-        title: remapLegacyKpiTitle("Products", dk, remapOpts),
-        value: kpis.unique_products.toLocaleString(),
-      });
-    }
-    return out.slice(0, 4);
-  }
-
-  let numN = 0;
-  let catN = 0;
-  for (const c of columns) {
-    const t = profile?.column_types?.[c];
-    if (t === "number") numN++;
-    else if (t === "category" || t === "text") catN++;
-  }
-  return [
-    { title: "Records", value: kpis.total_rows.toLocaleString() },
-    { title: "Fields in file", value: kpis.total_columns.toLocaleString() },
-    {
-      title: "Metric fields",
-      value: numN.toLocaleString(),
-      subtitle: "Numeric columns (from profile)",
-    },
-    {
-      title: "Dimension fields",
-      value: catN.toLocaleString(),
-      subtitle: "Text / category columns",
-    },
-  ];
-}
-
 function normalizeKpiCardsFromApi(
   cards: unknown,
   datasetKindRaw: unknown,
@@ -5643,6 +5383,8 @@ type ExportOptions = {
   includeTechnicalAppendix?: boolean;
   /** Which chart drives the PDF capture: AI insight vs Charts-tab selection. */
   chartScope?: "insight" | "session";
+  /** Default executive — analyst mode enables technical appendix + metadata sections. */
+  pdfMode?: "executive" | "analyst";
 };
 
 function inferSalesColumn(
@@ -6825,6 +6567,7 @@ function HomeInner() {
     null
   );
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
+    pdfMode: "executive",
     includeKPIs: true,
     includeAIInsight: true,
     includeChart: true,
@@ -7610,7 +7353,10 @@ function HomeInner() {
     aiAnswerByChartId,
   ]);
 
-  const askAI = async (overrideQuestion?: string) => {
+  const askAI = async (
+    overrideQuestion?: string,
+    opts?: { fromFollowUpChip?: boolean }
+  ) => {
     const qRaw = (overrideQuestion ?? question).trim();
     if (!qRaw) {
       setError("Please enter a question.");
@@ -7619,6 +7365,26 @@ function HomeInner() {
     if (overrideQuestion != null && overrideQuestion.trim()) {
       setQuestion(overrideQuestion.trim());
     }
+
+    const parentAnalysisContext = buildParentAnalysisContext({
+      conversationSnapshot,
+      alignedAnalysis,
+      lastAskedQuestion,
+      answer,
+      aiConversationState,
+    });
+    const continuationIntent = shouldSendFollowUpContinuation(
+      parentAnalysisContext,
+      {
+        fromFollowUpChip: opts?.fromFollowUpChip,
+        manualSubmit: Boolean(
+          parentAnalysisContext?.priorQuestion?.trim() &&
+            (conversationSnapshot?.lastQuestion?.trim() ||
+              aiConversationState.lastQuestion.trim() ||
+              hasValidAIAnswer)
+        ),
+      }
+    );
 
     setError("");
     setAnswer("");
@@ -7630,7 +7396,7 @@ function HomeInner() {
     setLoading(true);
 
     let lineageParentChartId = insightChartId;
-    if (insightSnapshot?.source === "ai") {
+    if (insightSnapshot?.source === "ai" && !continuationIntent) {
       const snapQ = normalizeQuestionForMatch(
         insightSnapshot.question ?? lastAskedQuestion
       );
@@ -7681,6 +7447,18 @@ function HomeInner() {
         conversationSnapshot &&
         ({
           ...conversationSnapshot,
+          rootQuestion:
+            conversationSnapshot.rootQuestion ??
+            parentAnalysisContext?.rootQuestion ??
+            conversationSnapshot.lastQuestion,
+          metricColumn:
+            conversationSnapshot.metricColumn ??
+            parentAnalysisContext?.metricColumn ??
+            undefined,
+          categoryColumn:
+            conversationSnapshot.categoryColumn ??
+            parentAnalysisContext?.categoryColumn ??
+            undefined,
           lastInsightChartId:
             insightChartId ?? conversationSnapshot.lastInsightChartId ?? undefined,
           activeDrillPath:
@@ -7698,6 +7476,26 @@ function HomeInner() {
         body: JSON.stringify({
           question: qRaw,
           conversation_context: conversationPayload,
+          parent_analysis_context: parentAnalysisContext
+            ? {
+                rootQuestion: parentAnalysisContext.rootQuestion,
+                priorQuestion: parentAnalysisContext.priorQuestion,
+                metricColumn: parentAnalysisContext.metricColumn,
+                categoryColumn: parentAnalysisContext.categoryColumn,
+                metricColumnDisplay: parentAnalysisContext.metricColumnDisplay,
+                categoryColumnDisplay:
+                  parentAnalysisContext.categoryColumnDisplay,
+                aggregation: parentAnalysisContext.aggregation,
+                chartType: parentAnalysisContext.chartType,
+                chartTitle: parentAnalysisContext.chartTitle,
+                intentBucket: parentAnalysisContext.intentBucket,
+                routingIntent: parentAnalysisContext.routingIntent,
+                followUpChain: parentAnalysisContext.followUpChain,
+                lastAiAnswer: parentAnalysisContext.lastAiAnswer,
+                turnId: parentAnalysisContext.turnId,
+              }
+            : null,
+          continuation_intent: continuationIntent,
           dashboard_filters: dashboardFilters,
           date_range: dateAskPayload,
         }),
@@ -9628,7 +9426,11 @@ function HomeInner() {
             insightSemanticContext?.dimensionLabel ??
             null
           : null,
-      executiveLens: alignedAnalysis?.executiveLens ?? null,
+      executiveLens: followUpLensFromRouting(
+        alignedAnalysis?.routingPlan,
+        alignedAnalysis?.executiveLens ?? null
+      ),
+      routingIntent: alignedAnalysis?.routingPlan?.intent ?? null,
     });
 
     const seeds = dualMetricCompare
@@ -9669,7 +9471,11 @@ function HomeInner() {
       merged.push(t);
       if (merged.length >= 5) break;
     }
-    return filterMeaningfulFollowUpChips(merged, axisMet, followUpQuality).slice(0, 5);
+    return filterMeaningfulFollowUpChips(
+      appendThreadMetaFollowUpChips(merged, 5),
+      axisMet,
+      followUpQuality
+    ).slice(0, 5);
   }, [
     hasValidAIAnswer,
     answer,
@@ -10657,117 +10463,6 @@ function HomeInner() {
         chartScope === "insight"
           ? insightChartInsightBadge
           : chartInsightBadge;
-      const pdfExecutiveVizInsights =
-        chartScope === "insight"
-          ? insightExecutiveVizInsights
-          : executiveVizInsights;
-
-      const buildExecutiveSummaryLines = (): string[] => {
-        const lines: string[] = [];
-        const rowCount = kpis?.total_rows ?? rows;
-        const colCount = kpis?.total_columns ?? columns.length;
-        const domainLabel = datasetKindLabel(datasetKind || "generic");
-
-        lines.push(
-          `The dataset contains ${Number(rowCount).toLocaleString()} rows and ${colCount} columns (${domainLabel} profile).`
-        );
-
-        const q =
-          chartScope === "insight"
-            ? lastAskedQuestion.trim() || question.trim()
-            : question.trim() || lastAskedQuestion.trim();
-        if (q) {
-          const qShort = q.length > 200 ? `${q.slice(0, 197)}…` : q;
-          lines.push(`Question: ${qShort}`);
-        }
-
-        const mainTakeaway = (() => {
-          const tone = insightNarrativeTone;
-          const wrap = (raw: string) =>
-            softenExecutiveTakeaway(
-              firstSentenceForExecutiveSummary(raw, 200),
-              tone
-            );
-          if (pdfSnap?.source === "auto_dashboard" || pdfTrendMode) {
-            const sem = semanticContextFromContract(pdfContract);
-            if (sem) {
-              return wrap(buildChartNarrative(sem));
-            }
-            return "";
-          }
-          const fromAligned = pdfAlignedAnalysis?.insightSummary?.trim();
-          if (fromAligned) {
-            return wrap(fromAligned);
-          }
-          const fromParsed =
-            chartScope === "insight"
-              ? parseAnswerIntoSections(
-                  pdfInsightAnswer,
-                  pdfAlignedAnalysis?.insightSummary ?? undefined
-                ).summary?.trim()
-              : parsedInsightAnswer.summary?.trim();
-          if (fromParsed) {
-            return wrap(fromParsed);
-          }
-          return "";
-        })();
-        if (mainTakeaway) {
-          lines.push(`Main takeaway: ${mainTakeaway}`);
-        }
-        if (insightNarrativeDisclaimer) {
-          lines.push(insightNarrativeDisclaimer);
-        }
-
-        const execKpiCards =
-          alignedAnalysis?.focusKpis?.length
-            ? alignedAnalysis.focusKpis
-            : displayKpiCards.length
-              ? displayKpiCards
-              : buildFallbackKpiCards(
-                  kpis,
-                  profile,
-                  columns,
-                  datasetKind,
-                  effectiveSales,
-                  effectiveProduct
-                );
-        const hasChartRankedSignals =
-          pdfRankedSignals != null && pdfRankedSignals.length > 0;
-        if (!hasChartRankedSignals) {
-          execKpiCards.slice(0, 3).forEach((c) => {
-            lines.push(formatExecutiveSummaryKpiLine(c));
-          });
-        }
-        if (
-          !hasChartRankedSignals &&
-          !execKpiCards.length &&
-          columns.length === 0
-        ) {
-          lines.push(
-            "Upload data to populate KPI aggregates for this executive summary."
-          );
-        }
-        return lines.slice(0, 8);
-      };
-
-      const previewDuplicates = (): { duplicates: number; note: string } => {
-        if (!preview.length || !columns.length) {
-          return { duplicates: 0, note: "Preview sample not available." };
-        }
-        const sigs = preview.map((row) =>
-          columns.map((c) => String(row[c] ?? "")).join("\u001f")
-        );
-        const tally = new Map<string, number>();
-        sigs.forEach((s) => tally.set(s, (tally.get(s) || 0) + 1));
-        let dupExtra = 0;
-        tally.forEach((n) => {
-          if (n > 1) dupExtra += n - 1;
-        });
-        return {
-          duplicates: dupExtra,
-          note: `Estimated from the first ${preview.length} preview rows (not necessarily the entire file).`,
-        };
-      };
 
       const includeConvPdf = resolved.includeConversationContext === true;
       const followUpAssumption = lastConversationMeta?.inheritedAssumptionNote?.trim() ?? "";
@@ -10790,25 +10485,6 @@ function HomeInner() {
             notes: pdfProv.notes != null ? String(pdfProv.notes) : null,
           }
         : null;
-
-      const chartThumbnails = chartHistory
-        .filter((h) => h.chartData.length > 1)
-        .slice(-6)
-        .map((h) => ({
-          title: getCanonicalChartTitle({
-            rawTitle: h.title?.trim() || "Chart",
-            chartType: h.chartKind,
-            contract: h.contract ?? null,
-            labels: h.chartData.map((r) => String(r.name ?? "")),
-            values: h.chartData.map((r) => r.value),
-            aggregationKey: h.contract?.aggregation ?? "sum",
-          }),
-          kind: h.chartKind || h.source,
-          values: h.chartData
-            .map((r) => Number(r.value))
-            .filter((n) => Number.isFinite(n)),
-        }))
-        .filter((t) => t.values.length > 1);
 
       const conversationAppendix = includeConvPdf
         ? (() => {
@@ -10834,20 +10510,6 @@ function HomeInner() {
             };
           })()
         : null;
-
-      const cardsPdf: KpiCard[] =
-        alignedAnalysis?.focusKpis?.length
-          ? alignedAnalysis.focusKpis
-          : displayKpiCards.length
-            ? displayKpiCards
-            : buildFallbackKpiCards(
-                kpis,
-                profile,
-                columns,
-                datasetKind,
-                effectiveSales,
-                effectiveProduct
-              );
 
       const chartExportAttribution =
         pdfSnap?.source === "auto_dashboard"
@@ -11040,128 +10702,80 @@ function HomeInner() {
           })()
         : null;
 
-      await runExecutivePdfExport({
-        includes: {
-          includeKPIs: resolved.includeKPIs,
-          includeAIInsight: resolved.includeAIInsight,
-          includeChart: resolved.includeChart,
-          includeDataPreview: resolved.includeDataPreview,
-          includeDataQuality: resolved.includeDataQuality,
-          includeConversationContext: includeConvPdf,
-          includeTechnicalAppendix: resolved.includeTechnicalAppendix === true,
-        },
-        branding: reportBranding,
-        dataset: {
-          rows,
-          colCount: columns.length,
-          sheet: selectedSheet || undefined,
-          fileName: uploadMeta?.name?.trim() || "No file name supplied.",
-          datasetKind: datasetKind || "generic",
-        },
-        generatedAt: new Date(),
-        mappingConfidence,
-        execSummaryLines: buildExecutiveSummaryLines(),
-        kpiSectionTitle: alignedAnalysis?.focusKpis?.length
-          ? "KPI dashboard (aligned with your question)"
-          : "KPI dashboard",
-        kpiCards: cardsPdf,
-        question:
-          chartScope === "insight"
-            ? lastAskedQuestion.trim() || question.trim()
-            : question.trim() || lastAskedQuestion.trim(),
-        answer:
-          pdfTrendMode && pdfContract
-            ? sanitizeNarrativeForTrendContract(pdfInsightAnswer, pdfContract)
-            : pdfInsightAnswer,
-        insightSections: resolved.includeAIInsight
-          ? mergeParsedSectionsForPdfExport(
+      const chartPrep: PdfChartPrepContext | null = resolved.includeChart
+        ? {
+            presentationKind:
+              pdfChartData.length > 0
+                ? pdfPresentationKind
+                : ("" as ChartKind),
+            chartData: pdfChartData,
+            chartTitle: pdfChartTitle,
+            chartSubtitleMerged: pdfChartSubtitleMerged,
+            exportDisplayTitle: pdfExportDisplayTitle,
+            trendMode: pdfTrendMode,
+            contract: pdfContract,
+            rankedSignals: pdfRankedSignals,
+            metricColumn: pdfMetricColumn,
+            alignedMetricDisplay: pdfAlignedMetricDisplay,
+            aggregation: pdfAggregation,
+            chartInsightBadge: pdfChartInsightBadge,
+            chartAxisLabels: pdfChartAxisLabels,
+            captureEl:
               chartScope === "insight"
-                ? (() => {
-                    const parsed = parseAnswerIntoSections(
-                      pdfInsightAnswer,
-                      pdfAlignedAnalysis?.insightSummary ?? undefined
-                    );
-                    if (!isTrendMode(pdfContract)) return parsed;
-                    const sanitize = (t?: string) =>
-                      t?.trim()
-                        ? sanitizeNarrativeForTrendContract(t, pdfContract)
-                        : t;
-                    return {
-                      ...parsed,
-                      summary: sanitize(parsed.summary) ?? "",
-                      statistical: sanitize(parsed.statistical),
-                      hypotheses: sanitize(parsed.hypotheses),
-                      recommendations: sanitize(parsed.recommendations),
-                      methodology: sanitize(parsed.methodology),
-                      moreDetail: sanitize(parsed.moreDetail),
-                    };
-                  })()
-                : parsedInsightAnswer
-            )
-          : null,
-        insightSummary:
-          pdfTrendMode && pdfContract
-            ? sanitizeNarrativeForTrendContract(
-                narrativeCopyForContract(pdfContract) ||
-                  pdfAlignedAnalysis?.insightSummary?.trim() ||
-                  "",
-                pdfContract
-              )
-            : sanitizeNarrativeForTrendContract(
-                pdfAlignedAnalysis?.insightSummary?.trim() ?? "",
-                pdfContract
-              ) || pdfAlignedAnalysis?.insightSummary?.trim(),
-        insightConfidenceLevel: pdfAlignedAnalysis?.insightConfidenceLevel,
-        chartInsightBadge: pdfChartInsightBadge,
-        pdfRankedSignals:
-          pdfRankedSignals != null && pdfRankedSignals.length > 0
-            ? pdfRankedSignals
-            : undefined,
-        vizExecutiveFacts: pdfExecutiveVizInsights.map((c) => ({
-          title: c.title,
-          value: c.value,
-          hint: c.hint,
-        })),
-        executiveInsightsBrief:
-          resolved.includeAIInsight &&
-          (chartScope === "insight"
-            ? insightExecutiveBrief.trim()
-            : parsedInsightAnswer.summary?.trim() ?? "")
-            ? chartScope === "insight"
-              ? insightExecutiveBrief.trim()
-              : parsedInsightAnswer.summary?.trim()
-            : undefined,
-        provenance: provenanceSlice,
-        chart: resolved.includeChart
-          ? {
-              presentationKind:
-                pdfChartData.length > 0
-                  ? pdfPresentationKind
-                  : ("" as ChartKind),
-              data: pdfChartData,
-              title: pdfExportDisplayTitle,
-              subtitle: pdfChartSubtitleMerged,
-              captureEl:
-                chartScope === "insight"
-                  ? chartCaptureInsightRef.current
-                  : chartCaptureSessionRef.current,
-              alignedMetric: pdfMetricColumn,
-              alignedMetricDisplay: pdfAlignedMetricDisplay,
-              aggregation: pdfAggregation,
-              metricType: pdfViz?.chartRecommendation?.metricType ?? null,
-              roundingHint: pdfViz?.roundingHint ?? null,
-              chartAttribution: chartExportAttribution,
-            }
-          : null,
-        chartAxisLabels: pdfChartAxisLabels,
-        chartThumbnails,
-        preview: { rows: preview as Record<string, unknown>[], columns },
-        profile: profile
-          ? { null_counts: profile.null_counts || {} }
-          : null,
-        previewDuplicates,
+                ? chartCaptureInsightRef.current
+                : chartCaptureSessionRef.current,
+            chartAttribution: chartExportAttribution,
+            provenanceSlice,
+            metricType: pdfViz?.chartRecommendation?.metricType ?? null,
+            roundingHint: pdfViz?.roundingHint ?? null,
+            vizMetricType: pdfViz?.chartRecommendation?.metricType ?? null,
+          }
+        : null;
+
+      const built = buildExecutivePdfExportInput({
+        options: resolved,
+        chartScope,
+        chartPrep,
+        reportBranding,
+        mappingConfidence,
+        rows,
+        columns,
+        selectedSheet: selectedSheet || undefined,
+        uploadFileName: uploadMeta?.name,
+        datasetKind: datasetKind || "generic",
+        profile,
+        preview: dataPreviewSortedRows.slice(
+          0,
+          15
+        ) as Record<string, unknown>[],
+        kpis,
+        alignedAnalysis,
+        pdfAlignedAnalysis,
+        question,
+        lastAskedQuestion,
+        pdfInsightAnswer,
+        parsedInsightAnswer,
+        insightExecutiveBrief,
+        insightExecutiveVizInsights,
+        executiveVizInsights,
+        insightSmartChartIntel,
+        sessionSmartChartIntel,
+        displayKpiCards,
+        primaryMetricColumn: effectiveSales,
+        primaryBreakdownColumn: effectiveProduct,
+        insightNarrativeTone,
+        insightNarrativeDisclaimer,
+        pdfSnapSource: pdfSnap?.source,
+        chartHistory,
         conversationAppendix,
       });
+
+      if (!built.ok) {
+        if (built.error) setError(built.error);
+        return;
+      }
+
+      await runExecutivePdfExport(built.input);
     } catch (err) {
       console.error("PDF generation failed:", err);
       setError("Unable to generate PDF report.");
@@ -12839,7 +12453,7 @@ function HomeInner() {
                           type="button"
                           disabled={loading}
                           onClick={() => {
-                            void askAI(chip);
+                            void askAI(chip, { fromFollowUpChip: true });
                           }}
                           className={aiInsightsFollowupChip}
                         >

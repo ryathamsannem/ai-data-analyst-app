@@ -37,6 +37,8 @@ export type AiFollowUpChipContext = {
   breakdownDimensionLabel?: string | null;
   /** Backend executive lens: opportunity | risk | summary | driver | explain | strategy | loss | standout */
   executiveLens?: string | null;
+  /** Canonical routing backbone (preferred over executiveLens when present). */
+  routingIntent?: string | null;
 };
 
 const QUESTION_LIKE_AXIS_RE =
@@ -679,7 +681,37 @@ export function buildAiFollowUpQuestionChips(ctx: AiFollowUpChipContext): string
   const columns = ctx.columns ?? [];
   const dimPhrase = resolveFollowUpDimensionFromCtx(ctx);
   const metricNoun = resolveFollowUpMetricLabel(ctx);
+  const routingIntent = (ctx.routingIntent || "").trim().toLowerCase();
   const execLens = (ctx.executiveLens || "").trim().toLowerCase();
+
+  if (routingIntent === "profitability" && !execLens) {
+    const lossChips = buildExecutiveLensFollowUpChips(
+      "loss",
+      dimPhrase,
+      metricNoun,
+      columns
+    );
+    if (lossChips.length >= 3) {
+      return filterMeaningfulFollowUpChips(lossChips, metricNoun, qualityCtx).slice(
+        0,
+        5
+      );
+    }
+  }
+  if (routingIntent === "outlier" && !execLens) {
+    const standoutChips = buildExecutiveLensFollowUpChips(
+      "standout",
+      dimPhrase,
+      metricNoun,
+      columns
+    );
+    if (standoutChips.length >= 3) {
+      return filterMeaningfulFollowUpChips(standoutChips, metricNoun, qualityCtx).slice(
+        0,
+        5
+      );
+    }
+  }
 
   if (execLens) {
     const lensChips = buildExecutiveLensFollowUpChips(

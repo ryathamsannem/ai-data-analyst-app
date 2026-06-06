@@ -69,6 +69,22 @@ def _resolve_expected_metric(main_mod, question: str, df: pd.DataFrame, profile:
 def _resolve_expected_dimension(
     main_mod, question: str, df: pd.DataFrame, profile: Dict[str, Any]
 ) -> Optional[str]:
+    try:
+        from intent_engine.executive_ambiguous_intent import (
+            classify_executive_ambiguous_bucket,
+            pick_executive_breakdown_column,
+        )
+
+        exec_bucket = classify_executive_ambiguous_bucket(question)
+        if exec_bucket:
+            exec_dim = pick_executive_breakdown_column(
+                df, profile, question=question, bucket=exec_bucket
+            )
+            if exec_dim:
+                return str(exec_dim)
+    except Exception:
+        pass
+
     intent = main_mod._describe_aggregate_intent(question, df, profile)
     if intent and intent.get("group_col"):
         return str(intent["group_col"])

@@ -12,6 +12,32 @@ from intent_engine.insight_card_titles import build_insight_card_title
 
 ExecutiveLens = Optional[str]  # summary | opportunity | risk | driver | explain | strategy | loss | standout
 
+_EXECUTIVE_RISK_PRIORITY_LABELS = (
+    "Primary concern",
+    "Secondary concern",
+    "Watch item",
+)
+
+
+def _apply_executive_risk_prioritization(
+    cards: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Label top risk cards for executive prioritization (primary → secondary → watch)."""
+    if not cards:
+        return cards
+    ordered = sorted(cards, key=lambda c: -int(c.get("priority") or 0))
+    out: List[Dict[str, Any]] = []
+    for idx, card in enumerate(ordered):
+        row = dict(card)
+        if idx < len(_EXECUTIVE_RISK_PRIORITY_LABELS):
+            label = _EXECUTIVE_RISK_PRIORITY_LABELS[idx]
+            row["executivePriorityTier"] = label
+            base_title = str(row.get("title") or "").strip()
+            if base_title and not base_title.lower().startswith(label.lower()):
+                row["title"] = f"{label}: {base_title}"
+        out.append(row)
+    return out
+
 _OPPORTUNITY_RE = re.compile(
     r"\b("
     r"opportunit(?:y|ies)|upside|invest(?:ment)?|where\s+should\s+we\s+(?:grow|invest)|"
@@ -371,6 +397,7 @@ def build_lens_specific_insights(
                     f"{bot_name} ranks lowest on {met_label.lower()} across {dim_label.lower()}s in this cohort.",
                 )
             )
+        out = _apply_executive_risk_prioritization(out)
 
     elif lens == "opportunity":
         did_monetization_gap = False

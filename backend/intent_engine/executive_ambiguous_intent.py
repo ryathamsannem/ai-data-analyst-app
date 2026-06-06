@@ -29,10 +29,16 @@ _STANDOUT_RE = re.compile(
     r")\b",
     re.I,
 )
-_CONCERN_RE = re.compile(
+_EXECUTIVE_RISK_RE = re.compile(
     r"\b("
-    r"concern(?:s|ed)?|worri(?:ed|es)|risky|vulnerabl|warning|"
-    r"biggest\s+issue|what\s+.*\bwrong|red\s+flag|threat"
+    r"concern(?:s|ed)?|worri(?:ed|es|y)|worries|risks?|risky|exposure|"
+    r"vulnerab(?:le|ility)?|strategic\s+threats?|warning|"
+    r"biggest\s+(?:risks?|problems?|issues?)|what\s+.*\bwrong|red\s+flag|threat|"
+    r"keep\s+(?:us|me|leadership|management|executives?|the\s+team)\s+up\s+at\s+night|"
+    r"(?:what\s+)?keeps?\s+(?:us|leadership|management|executives?)\s+up\s+at\s+night|"
+    r"up\s+at\s+night|"
+    r"(?:leadership|executives?)\s+(?:concern|risk|worr|exposure|threat)|"
+    r"executive\s+risks?"
     r")\b",
     re.I,
 )
@@ -93,7 +99,7 @@ def classify_executive_ambiguous_bucket(question: str) -> ExecutiveAmbiguousBuck
         return "executive_loss_profitability"
     if _STANDOUT_RE.search(q) and not _is_explicit_outlier_identification(q):
         return "executive_outlier_standout"
-    if _CONCERN_RE.search(q) and not _IMPROVE_RE.search(q):
+    if _EXECUTIVE_RISK_RE.search(q) and not _IMPROVE_RE.search(q):
         return "executive_risk"
     if _IMPROVE_RE.search(q):
         return "executive_opportunity"
@@ -132,6 +138,10 @@ def chart_selection_bucket_override(question: str) -> Optional[str]:
 
 def question_requests_standout_analysis(question: str) -> bool:
     return classify_executive_ambiguous_bucket(question) == "executive_outlier_standout"
+
+
+def question_requests_executive_risk(question: str) -> bool:
+    return classify_executive_ambiguous_bucket(question) == "executive_risk"
 
 
 def _numeric_cols(df: pd.DataFrame, profile: Dict[str, Any]) -> List[str]:
@@ -248,6 +258,59 @@ def build_loss_profitability_context(
     }
 
 
+def build_executive_risk_context(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    *,
+    group_col: str,
+    value_col: str,
+    question: str = "",
+) -> Dict[str, Any]:
+    """Ground executive-risk answers with prioritized concentration / weakness signals."""
+    try:
+        from intent_engine.executive_lens import build_lens_specific_insights
+
+        cards = build_lens_specific_insights(
+            df,
+            profile,
+            question=question,
+            lens="risk",
+            metric_col=value_col,
+            dimension_col=group_col,
+        )
+    except Exception:
+        cards = []
+
+    lines = [
+        "Executive risk prioritization (calculated from grouped cohort totals):",
+        f"- Breakdown dimension: {group_col}",
+        f"- Primary metric: {value_col}",
+    ]
+    if cards:
+        for card in cards[:5]:
+            title = str(card.get("title") or "Risk signal").strip()
+            narrative = str(
+                card.get("narrativeLine") or card.get("hint") or ""
+            ).strip()
+            lines.append(f"- {title}: {narrative}")
+    else:
+        lines.append(
+            "- Insufficient grouped signal in this cohort for concentration or weakness cards."
+        )
+    lines.extend(
+        [
+            "- Frame the answer as Primary concern → Secondary concern → Watch item.",
+            "- Lead with top business risk, concentration/dependency exposure, and weakest performers.",
+            "- Do not answer with only a revenue or product ranking.",
+        ]
+    )
+    return {
+        "prioritizedCardCount": len(cards),
+        "prioritizedCards": cards[:5],
+        "exactBlock": "\n".join(lines),
+    }
+
+
 def apply_executive_ambiguous_routing(
     question: str,
     df: pd.DataFrame,
@@ -293,7 +356,20 @@ def apply_executive_ambiguous_routing(
         intent["value_col"] = revenue_col or intent.get("value_col")
         intent["agg_label"] = "Total"
         intent["agg_key"] = "sum"
-    elif bucket in ("executive_risk", "executive_strategy"):
+    elif bucket == "executive_risk":
+        metric_col = revenue_col or intent.get("value_col")
+        intent["value_col"] = metric_col
+        intent["agg_label"] = "Total"
+        intent["agg_key"] = "sum"
+        if metric_col:
+            intent["executiveRiskContext"] = build_executive_risk_context(
+                df,
+                profile,
+                group_col=gcol,
+                value_col=str(metric_col),
+                question=question,
+            )
+    elif bucket == "executive_strategy":
         intent["value_col"] = revenue_col or intent.get("value_col")
         intent["agg_label"] = "Total"
         intent["agg_key"] = "sum"
@@ -335,8 +411,10 @@ def executive_ambiguous_prompt_block(bucket: str) -> str:
         ),
         "executive_risk": (
             "Executive lens: CONCERNS / RISK.\n"
-            "- Emphasize concentration, weak segments, low growth, margin pressure, and data limits.\n"
-            "- Do not answer with only a revenue ranking.\n"
+            "- Identify top business risk, concentration/dependency exposure, and weakest performers.\n"
+            "- Structure the narrative as Primary concern, Secondary concern, and Watch item.\n"
+            "- Use calculated risk cards (concentration, growth risk, margin risk, weak performer) — "
+            "not a generic revenue leaderboard.\n"
             f"- {tone}"
         ),
         "executive_outlier_standout": (

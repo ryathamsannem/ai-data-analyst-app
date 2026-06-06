@@ -68,6 +68,11 @@ class TestExecutiveLensCards(unittest.TestCase):
         self.assertTrue(opp_kinds & {"opportunity"})
         self.assertTrue(risk_kinds & {"risk", "concentration"})
         self.assertNotEqual(opp_kinds, risk_kinds)
+        risk_titles = [str(x.get("title") or "") for x in risk]
+        self.assertTrue(
+            any("primary concern" in t.lower() for t in risk_titles),
+            msg=f"expected prioritization labels, got {risk_titles}",
+        )
 
     def test_opportunity_cards_avoid_unscoped_customer_claims(self) -> None:
         opp = build_lens_specific_insights(

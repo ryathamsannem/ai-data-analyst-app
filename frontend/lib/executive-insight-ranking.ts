@@ -26,6 +26,7 @@ export type ExecutiveVizInsightCard = {
   value: string;
   hint?: string;
   dotClass: string;
+  kind?: string;
 };
 
 const STRIPES = [
@@ -89,6 +90,7 @@ export function rankedInsightsToExecutiveCards(
       value: item.value,
       hint: item.hint ?? item.narrativeLine,
       dotClass: STRIPES[i % STRIPES.length],
+      kind: item.kind,
     });
   });
   return cards;
