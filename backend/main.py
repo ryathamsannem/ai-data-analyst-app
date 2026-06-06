@@ -5766,26 +5766,41 @@ def _extract_bottom_n(q: str) -> Optional[int]:
 def _match_column_from_phrase(phrase: str, columns: List[str], profile: Dict[str, Any]) -> Optional[str]:
     if not phrase:
         return None
+    try:
+        from intent_engine.column_resolve import resolve_dimension_phrase_to_column
+
+        hit = resolve_dimension_phrase_to_column(phrase, columns, profile)
+        if hit:
+            return hit
+    except Exception:
+        pass
     p = phrase.lower().replace(" ", "_").strip()
+    if p.endswith("ies") and len(p) > 4:
+        p_alt = p[:-3] + "y"
+    elif p.endswith("s") and not p.endswith("ss") and len(p) > 3:
+        p_alt = p[:-1]
+    else:
+        p_alt = p
     ct = profile.get("column_types", {})
     best = None
     best_score = 0
     for c in columns:
         cn = str(c).lower().replace(" ", "_")
-        score = 0
-        if p == cn:
-            score = 100
-        elif len(p) >= 4 and (p in cn or cn in p):
-            score = 75
-        else:
-            toks = [t for t in p.split("_") if len(t) > 1]
-            if toks and all(any(tok in cn for tok in toks) for tok in toks):
-                score = 55
-        if ct.get(c) in ("category", "text", "date"):
-            score += 4
-        if score > best_score:
-            best_score = score
-            best = c
+        for probe in (p, p_alt):
+            score = 0
+            if probe == cn:
+                score = 100
+            elif len(probe) >= 4 and (probe in cn or cn in probe):
+                score = 75
+            else:
+                toks = [t for t in probe.split("_") if len(t) > 1]
+                if toks and all(any(tok in cn for tok in toks) for tok in toks):
+                    score = 55
+            if ct.get(c) in ("category", "text", "date"):
+                score += 4
+            if score > best_score:
+                best_score = score
+                best = c
     return best if best_score >= 50 else None
 
 
@@ -5950,6 +5965,24 @@ def _infer_dimension_column_from_question(
             if str(c).lower() in ("city", "cities", "metro", "location"):
                 return str(c)
 
+    rank_dim = re.search(
+        r"\brank(?:ing)?\s+([a-z0-9][a-z0-9_\s]{0,32}?)\s+by\b",
+        ql,
+        re.I,
+    )
+    if rank_dim:
+        try:
+            from intent_engine.column_resolve import resolve_dimension_phrase_to_column
+
+            raw_rank_dim = rank_dim.group(1).strip()
+            hit = resolve_dimension_phrase_to_column(
+                raw_rank_dim, cand_dims or columns, profile
+            )
+            if hit:
+                return str(hit)
+        except Exception:
+            pass
+
     ranked_fb = _rank_category_dimensions(df, cand_dims, profile)
     if ranked_fb:
         return ranked_fb[0][0]
@@ -6069,19 +6102,28 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         if not gcol and by_cols_ordered:
             gcol = by_cols_ordered[0]
         if not gcol:
+            for phrase in dim_request_phrases:
+                if phrase_is_time_bucket(phrase):
+                    dcol = _pick_date_column_for_trend(df, profile)
+                    if dcol:
+                        gcol = dcol
+                        break
+                    continue
+                resolved = resolve_phrase_to_column(
+                    phrase,
+                    df,
+                    profile,
+                    match_column=_match_column_from_phrase,
+                    pick_date_column=_pick_date_column_for_trend,
+                    dimension_pool=_dimension_pool_columns,
+                )
+                if resolved:
+                    gcol = resolved
+                    break
+        if not gcol:
             gcol = _infer_dimension_column_from_question(question_str, df, profile)
 
     for phrase in dim_request_phrases:
-        resolved = resolve_phrase_to_column(
-            phrase,
-            df,
-            profile,
-            match_column=_match_column_from_phrase,
-            pick_date_column=_pick_date_column_for_trend,
-            dimension_pool=_dimension_pool_columns,
-        )
-        if resolved and not gcol:
-            gcol = resolved
         if phrase_is_time_bucket(phrase):
             dcol = _pick_date_column_for_trend(df, profile)
             if dcol:
@@ -7677,44 +7719,13 @@ def _assess_unsupported_growth_analysis(
 
 def _question_requests_trend_intent(q: str) -> bool:
     """True when the user asks for a time-series view (not a category ranking)."""
-    ql = (q or "").lower().strip()
-    if not ql:
-        return False
-    if any(
-        k in ql
-        for k in (
-            "trend",
-            "over time",
-            "time series",
-            "timeseries",
-            "timeline",
-            "monthly",
-            "month-wise",
-            "month wise",
-            "by month",
-            "each month",
-            "every month",
-            "per month",
-            "weekly",
-            "by week",
-            "daily",
-            "by day",
-            "quarterly",
-            "by quarter",
-            "yearly",
-            "by year",
-            "show trend",
-            "incident trend",
-            "momentum",
-        )
-    ):
-        return True
-    return bool(
-        re.search(
-            r"\b(by|per)\s+(day|date|week|month|year|quarter)\b",
-            ql,
-        )
-    )
+    try:
+        from intent_engine.trend_date_resolve import question_requests_trend_intent
+
+        return question_requests_trend_intent(q)
+    except Exception:
+        ql = (q or "").lower().strip()
+        return bool(ql and ("trend" in ql or "over time" in ql))
 
 
 def _forced_time_bucket_from_question(q: str) -> Optional[str]:
@@ -7751,6 +7762,7 @@ def _is_time_bucket_phrase(phrase: str) -> bool:
         "date",
         "time",
         "period",
+        "periods",
         "timeline",
     }:
         return True
@@ -7760,20 +7772,22 @@ def _is_time_bucket_phrase(phrase: str) -> bool:
 
 
 def _pick_date_column_for_trend(
-    df_in: pd.DataFrame, profile: Dict[str, Any]
+    df_in: pd.DataFrame,
+    profile: Dict[str, Any],
+    question: Optional[str] = None,
 ) -> Optional[str]:
     """Best date / datetime column for trend charts."""
     if df_in is None or df_in.empty:
         return None
-    ct = profile.get("column_types", {}) if profile else {}
     cols = df_in.columns.tolist()
-    candidates: List[str] = []
     mapped = get_mapped_or_detected_column(
         "date",
         [
             "date",
             "order date",
             "order_date",
+            "report date",
+            "report_date",
             "transaction date",
             "transaction_date",
             "invoice date",
@@ -7783,7 +7797,16 @@ def _pick_date_column_for_trend(
         ],
     )
     if mapped and mapped in cols:
-        candidates.append(str(mapped))
+        if _group_column_is_time_series_eligible(df_in, str(mapped)):
+            return str(mapped)
+    try:
+        from intent_engine.trend_date_resolve import pick_trend_date_column
+
+        return pick_trend_date_column(df_in, profile, question)
+    except Exception:
+        pass
+    ct = profile.get("column_types", {}) if profile else {}
+    candidates: List[str] = []
     for c in cols:
         if ct.get(c) == "date" and c not in candidates:
             candidates.append(str(c))
@@ -7811,9 +7834,42 @@ def _trend_metric_column_for_question(
             return str(vc)
     ct = profile.get("column_types", {}) if profile else {}
     numeric_cols = [c for c in df_in.columns if ct.get(c) == "number"]
+    try:
+        from intent_engine.resolve_explicit_metric import resolve_explicit_metric_column
+
+        explicit = resolve_explicit_metric_column(question, df_in, profile)
+        if explicit and str(explicit) in numeric_cols:
+            return str(explicit)
+    except Exception:
+        pass
     hit = _numeric_col_mentioned(question.lower(), numeric_cols)
     if hit:
         return str(hit)
+    ql = (question or "").lower()
+    for token in (
+        "satisfaction",
+        "satisfaction score",
+        "headcount",
+        "units",
+        "cost",
+        "profit",
+        "customers",
+        "revenue",
+    ):
+        if token in ql:
+            try:
+                from intent_engine.column_resolve import find_column_for_token
+
+                mapped = find_column_for_token(
+                    token,
+                    numeric_cols,
+                    numeric_only=True,
+                    profile=profile,
+                )
+                if mapped:
+                    return str(mapped)
+            except Exception:
+                pass
     mapped = get_mapped_or_detected_column(
         "sales",
         ["sales", "revenue", "amount", "total", "value"],
@@ -7843,7 +7899,7 @@ def _try_build_trend_line_visualization(
     Monthly/weekly/daily revenue (etc.) trend line.
     Returns (chart_rows, chart_type, title, intent_debug, smart_trace) or None.
     """
-    dcol = _pick_date_column_for_trend(df_in, profile)
+    dcol = _pick_date_column_for_trend(df_in, profile, question)
     ncol = _trend_metric_column_for_question(question, df_in, profile, metric_spec)
     if not dcol or not ncol or str(dcol) == str(ncol):
         return None

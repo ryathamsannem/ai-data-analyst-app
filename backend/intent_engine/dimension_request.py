@@ -98,6 +98,7 @@ def phrase_is_time_bucket(phrase: str) -> bool:
         "date",
         "time",
         "period",
+        "periods",
         "timeline",
     }:
         return True
@@ -116,11 +117,20 @@ def resolve_phrase_to_column(
     if phrase_is_time_bucket(phrase):
         return pick_date_column(df, profile)
     cols = dimension_pool(df, profile)
-    hit = match_column(phrase, cols or df.columns.tolist(), profile)
+    pool = cols or df.columns.tolist()
+    try:
+        from intent_engine.column_resolve import resolve_dimension_phrase_to_column
+
+        hit = resolve_dimension_phrase_to_column(phrase, pool, profile)
+        if hit:
+            return str(hit)
+    except Exception:
+        pass
+    hit = match_column(phrase, pool, profile)
     if hit:
         return str(hit)
     alt = phrase.lower().replace(" ", "_")
-    hit = match_column(alt, cols or df.columns.tolist(), profile)
+    hit = match_column(alt, pool, profile)
     return str(hit) if hit else None
 
 

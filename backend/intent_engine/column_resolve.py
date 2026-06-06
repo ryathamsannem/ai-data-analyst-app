@@ -3,13 +3,109 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
 
 def _norm_col(name: str) -> str:
     return re.sub(r"[_\s]+", " ", str(name).lower()).strip()
+
+
+def _singularize_dimension_phrase(phrase: str) -> str:
+    p = _norm_col(phrase)
+    if not p:
+        return p
+    if p.endswith("ies") and len(p) > 4:
+        return p[:-3] + "y"
+    if p.endswith("s") and not p.endswith("ss") and len(p) > 3:
+        return p[:-1]
+    return p
+
+
+# Normalized phrase -> ordered column tokens (reusable across domains).
+DIMENSION_PHRASE_ALIASES: Dict[str, Tuple[str, ...]] = {
+    "category": ("category",),
+    "categories": ("category",),
+    "campaign": ("category", "campaign"),
+    "campaigns": ("category", "campaign"),
+    "department": ("department",),
+    "departments": ("department",),
+    "region": ("region", "zone", "territory"),
+    "regions": ("region", "zone", "territory"),
+    "product": ("product", "category"),
+    "products": ("product", "category"),
+    "ward": ("category", "department"),
+    "wards": ("category", "department"),
+    "team": ("department",),
+    "teams": ("department",),
+    "division": ("department",),
+    "divisions": ("department",),
+    "headcount": ("department",),
+    "ticket": ("department", "category"),
+    "tickets": ("department", "category"),
+    "incident": ("department", "category"),
+    "incidents": ("department", "category"),
+    "clinical": ("department",),
+    "support": ("department",),
+}
+
+
+def dimension_tokens_for_phrase(phrase: str) -> List[str]:
+    """Expand a user phrase into ordered column tokens to try."""
+    raw = _norm_col(phrase)
+    singular = _singularize_dimension_phrase(raw)
+    tokens: List[str] = []
+    seen: set[str] = set()
+
+    def _add(token: str) -> None:
+        t = _singularize_dimension_phrase(_norm_col(token))
+        if not t or t in seen:
+            return
+        seen.add(t)
+        tokens.append(t)
+
+    for key in (raw, singular):
+        if key in DIMENSION_PHRASE_ALIASES:
+            for alias in DIMENSION_PHRASE_ALIASES[key]:
+                _add(alias)
+        _add(key)
+
+    return tokens
+
+
+def resolve_dimension_phrase_to_column(
+    phrase: str,
+    columns: List[str],
+    profile: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    """Map a breakdown phrase (across/by/per X) to a categorical column."""
+    if not phrase or not columns:
+        return None
+
+    pool = categorical_columns(columns, profile or {})
+    if not pool:
+        pool = list(columns)
+
+    for token in dimension_tokens_for_phrase(phrase):
+        hit = find_column_for_token(token, pool, profile=profile)
+        if hit and hit in columns:
+            return str(hit)
+
+    norm = _singularize_dimension_phrase(_norm_col(phrase))
+    best: Optional[str] = None
+    best_score = 0
+    for col in pool:
+        cn = _norm_col(str(col))
+        score = 0
+        if norm and norm == cn:
+            score = 100
+        elif norm and len(norm) >= 4 and (norm in cn or cn in norm):
+            score = 75
+        if score > best_score:
+            best_score = score
+            best = str(col)
+    return best if best_score >= 50 else None
 
 
 def categorical_columns(columns: List[str], profile: Dict[str, Any]) -> List[str]:
@@ -108,6 +204,46 @@ def find_column_for_token(
                 return str(c)
         return None
 
+    if token_l in ("satisfaction", "satisfaction score", "csat", "resolution", "resolution rate"):
+        for c in pool:
+            if "satisfaction" in _norm_col(c):
+                return str(c)
+
+    if token_l in (
+        "headcount",
+        "fte",
+        "staff",
+        "employee count",
+        "patient volume",
+        "patient volumes",
+        "volume",
+        "ticket",
+        "tickets",
+        "ticket count",
+        "ticket volume",
+    ):
+        for prefer in ("units", "headcount", "employee", "ticket", "patient", "volume"):
+            for c in pool:
+                if prefer in _norm_col(c):
+                    return str(c)
+
+    if token_l in ("downtime", "outage", "incident cost", "incidents"):
+        for c in pool:
+            cn = _norm_col(c)
+            if "downtime" in cn or ("cost" in cn and "ad" not in cn):
+                return str(c)
+
+    if token_l in ("product", "products"):
+        for c in pool:
+            if "product" in _norm_col(c):
+                return str(c)
+
+    if token_l in ("roi", "return on investment"):
+        for prefer in ("roi", "revenue", "profit"):
+            for c in pool:
+                if prefer in _norm_col(c):
+                    return str(c)
+
     for c in pool:
         if column_matches_token(str(c), token_l):
             return str(c)
@@ -134,7 +270,9 @@ def resolve_decline_dimension_column(
     ]
     for token in mention_order:
         if re.search(rf"\b{token}s?\b", ql):
-            hit = find_column_for_token(token, columns, profile=profile)
+            hit = resolve_dimension_phrase_to_column(token, columns, profile)
+            if not hit:
+                hit = find_column_for_token(token, columns, profile=profile)
             if hit:
                 return hit
 

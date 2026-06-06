@@ -10,31 +10,11 @@ from typing import Any, Dict, Optional
 import pandas as pd
 
 from intent_engine import legacy
-
-
-def _pick_date_column_local(
-    df: pd.DataFrame, profile: Optional[Dict[str, Any]]
-) -> Optional[str]:
-    ct = profile.get("column_types", {}) if profile else {}
-    date_cols = [c for c in df.columns if ct.get(c) == "date"]
-    if date_cols:
-        return str(date_cols[0])
-    for c in df.columns:
-        cl = str(c).lower().replace(" ", "_")
-        if any(h in cl for h in ("order_date", "date", "period", "month", "time")):
-            return str(c)
-    return None
-
-
-def _distinct_periods_local(df: pd.DataFrame, date_col: str) -> int:
-    try:
-        s = pd.to_datetime(df[date_col], errors="coerce")
-        valid = s.dropna()
-        if valid.empty:
-            return 0
-        return int(valid.dt.normalize().nunique())
-    except Exception:
-        return 0
+from intent_engine.trend_date_resolve import (
+    distinct_time_periods,
+    pick_trend_date_column,
+    question_requests_trend_intent,
+)
 
 
 def _recommended_action(question: str) -> str:
@@ -57,15 +37,17 @@ def assess_unsupported_trend_for_api(
     """
     When the user asks for a trend but the cohort cannot support a time-series chart.
     """
-    if not legacy.question_requests_trend_intent(question):
+    if not question_requests_trend_intent(question):
         return None
 
     date_col: Optional[str] = None
     periods = 0
     if df is not None and profile is not None:
-        date_col = _pick_date_column_local(df, profile)
+        from intent_engine.trend_date_resolve import find_trend_date_column_candidate
+
+        date_col = find_trend_date_column_candidate(df, profile, question)
         if date_col:
-            periods = _distinct_periods_local(df, date_col)
+            periods = distinct_time_periods(df, date_col)
 
     ts = time_series_analysis if isinstance(time_series_analysis, dict) else {}
     ts_buckets = int(ts.get("uniqueBuckets") or 0) if ts else 0
