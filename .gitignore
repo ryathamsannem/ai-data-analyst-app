@@ -35,6 +35,8 @@ project_backups/stable_export_pdf_phase2_backup_*/*.backend
 
 # Python cache
 .pytest_cache/
+pytest-cache-files-*/
+backend/pytest-cache-files-*/
 
 # VS Code
 .vscode/

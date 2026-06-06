@@ -3364,6 +3364,8 @@ type AlignedAnalysisContext = {
   profitMarginUnavailable?: boolean;
   /** Phase 2 debug — parsed from `analysis.intent`; does not drive UI behavior. */
   analysisIntent?: AnalysisIntentPayload | null;
+  dimensionRedirectHandled?: boolean;
+  requestedDimensionMissing?: boolean;
   forecastGuardrails?: {
     canForecast?: boolean;
     outputLabel?: string;
@@ -3653,6 +3655,8 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
     derivedProfitMargin: Boolean(o.derivedProfitMargin),
     profitMarginUnavailable: Boolean(o.profitMarginUnavailable),
     analysisIntent: parseAnalysisIntent(o.intent),
+    dimensionRedirectHandled: Boolean(o.dimensionRedirectHandled),
+    requestedDimensionMissing: Boolean(o.requestedDimensionMissing),
     forecastGuardrails: parseForecastGuardrails(o.forecastGuardrails),
   };
 }
@@ -8060,12 +8064,10 @@ function HomeInner() {
             : null,
       chartTypeInternal: alignedAnalysis.chartTypeInternal,
       dimensionRedirectHandled: Boolean(
-        alignedAnalysis?.intent?.dimensionRedirectHandled ??
-          alignedAnalysis?.dimensionRedirectHandled
+        alignedAnalysis?.dimensionRedirectHandled
       ),
       requestedDimensionMissing: Boolean(
-        alignedAnalysis?.intent?.requestedDimensionMissing ??
-          alignedAnalysis?.requestedDimensionMissing
+        alignedAnalysis?.requestedDimensionMissing
       ),
       analysisKind:
         alignedAnalysis.chartTypeInternal === "scatter" ||
