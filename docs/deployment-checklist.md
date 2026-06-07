@@ -1,8 +1,8 @@
 # Deployment Checklist (Pilot / Staging)
 
-**Phase:** 10B — Pilot Deployment Preparation  
+**Phase:** 10B — Pilot Deployment Preparation · **11.1** — Vercel + Render  
 **Date:** 2026-06-06  
-**Related:** [`deployment-guide.md`](deployment-guide.md) · [`production-readiness-review.md`](production-readiness-review.md) · [`build-validation-report.md`](build-validation-report.md)
+**Related:** [`deployment-guide.md`](deployment-guide.md) · [`production-readiness-review.md`](production-readiness-review.md) · [`build-validation-report.md`](build-validation-report.md) · [`pilot-deployment-report.md`](pilot-deployment-report.md) · [`render.yaml`](../render.yaml)
 
 Use this checklist before and during the **first real staging/pilot** deployment. This is a **single-tenant, low-traffic pilot** — not public multi-user SaaS.
 
@@ -39,6 +39,22 @@ Use this checklist before and during the **first real staging/pilot** deployment
 | Variable | Required (pilot) | Example | Notes |
 |----------|------------------|---------|-------|
 | `NEXT_PUBLIC_API_BASE_URL` | **Yes** | `https://api-staging.example.com` | Baked into build; must match backend URL |
+
+### Render (backend)
+
+| Variable | Required | Example | Notes |
+|----------|----------|---------|-------|
+| `APP_ENV` | **Yes** | `production` | Set in `render.yaml` |
+| `ANTHROPIC_API_KEY` | **Yes** | Secret in Render dashboard | Never commit |
+| `ALLOWED_ORIGINS` | **Yes** | `https://your-app.vercel.app` | Exact Vercel origin(s), comma-separated |
+| `AI_NARRATIVE_ENABLED` | No | `true` | Default in blueprint |
+| `PORT` | Auto | — | Injected by Render; used in start command |
+
+### Vercel (frontend)
+
+| Variable | Required | Example | Notes |
+|----------|----------|---------|-------|
+| `NEXT_PUBLIC_API_BASE_URL` | **Yes** | `https://ai-data-analyst-api.onrender.com` | Set for **Production** and **Preview** builds |
 
 ### Optional
 
@@ -205,9 +221,46 @@ These remain **open by design** for Phase 10B. Accept only for **controlled pilo
 
 | Item | Value |
 |------|-------|
-| Backend port | 8000 |
-| Frontend port | 3000 (`next start`) |
+| Backend (local) | port 8000 |
+| Backend (Render) | `$PORT` (platform) |
+| Frontend (local) | port 3000 (`next start`) |
+| Frontend (Vercel) | managed |
 | Health | `GET /health` |
 | Readiness | `GET /ready` |
+| Render blueprint | [`render.yaml`](../render.yaml) |
 | Env template | [`.env.example`](../.env.example) |
 | Detailed ops guide | [`deployment-guide.md`](deployment-guide.md) |
+
+---
+
+## 9. Vercel + Render checklist (Phase 11.1)
+
+### Before deploy
+
+- [ ] Repo pushed to GitHub/GitLab
+- [ ] `render.yaml` reviewed at repo root
+- [ ] Vercel project **Root Directory** = `frontend`
+- [ ] `vercel.json` **not required** (Next.js auto-detected)
+- [ ] Backend tests pass (`python run_tests.py`)
+- [ ] Frontend tests pass (`npm run test`)
+
+### Render (backend)
+
+- [ ] Create Blueprint from `render.yaml` or manual Web Service with `rootDir: backend`
+- [ ] **Build:** `pip install --upgrade pip && pip install -r requirements.txt`
+- [ ] **Start:** `uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1`
+- [ ] Set `ANTHROPIC_API_KEY` (secret)
+- [ ] Set `ALLOWED_ORIGINS` to Vercel URL(s)
+- [ ] `GET /health` → 200
+- [ ] `GET /ready` → 200, `ready: true`
+
+### Vercel (frontend)
+
+- [ ] Import repo; root = `frontend`
+- [ ] Set `NEXT_PUBLIC_API_BASE_URL` = Render service URL (no trailing slash)
+- [ ] Redeploy after any API URL change
+- [ ] App loads at Vercel URL without console CORS errors
+
+### Post-deploy smoke (Section 4)
+
+- [ ] Upload → AI → Follow-up → PDF → Usage limits on **Vercel URL**
