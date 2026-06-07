@@ -1,0 +1,28 @@
+# Render Blueprint — AI Data Analyst backend API
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy: connect repo in Render Dashboard → New → Blueprint → apply this file.
+# Frontend: deploy separately on Vercel (see docs/deployment-guide.md).
+
+services:
+  - type: web
+    name: ai-data-analyst-api
+    runtime: python
+    region: oregon
+    plan: starter
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      - key: APP_ENV
+        value: production
+      - key: AI_NARRATIVE_ENABLED
+        value: "true"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

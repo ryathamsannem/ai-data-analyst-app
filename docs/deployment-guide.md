@@ -8,14 +8,16 @@ Production startup notes for the AI Data Analyst App. See also [`production-read
 
 | Service | Stack | Default port |
 |---------|-------|--------------|
-| Backend API | FastAPI + uvicorn/gunicorn | 8000 |
-| Frontend | Next.js 16 | 3000 |
+| Backend API | FastAPI + uvicorn | 8000 (local) / `$PORT` (Render) |
+| Frontend | Next.js 16 | 3000 (local) / Vercel (managed) |
+
+**Recommended hosting (Phase 11.1):** Frontend on **Vercel**, backend on **Render** — see [Vercel + Render](#vercel--render-deployment-phase-111) below.
 
 ---
 
 ## Environment variables
 
-Copy [`.env.example`](../.env.example) to `.env` for local development. In production, inject secrets via your host's secret manager — **never commit `.env`**.
+Copy [`.env.example`](../.env.example) for local reference. In production, set variables in **Render** (backend) and **Vercel** (frontend) dashboards — **never commit `.env`**.
 
 ### Backend (required in production)
 
@@ -23,14 +25,17 @@ Copy [`.env.example`](../.env.example) to `.env` for local development. In produ
 |----------|----------|---------------|-------------|
 | `ANTHROPIC_API_KEY` | **Yes** when `APP_ENV=production` | — | Claude API key for AI narrative |
 | `APP_ENV` | Recommended | `development` | Set to `production` for prod behavior |
-| `ALLOWED_ORIGINS` | **Yes** in prod | `http://localhost:3000` | Comma-separated CORS origins |
+| `ALLOWED_ORIGINS` | **Yes** in prod | `http://localhost:3000` | Comma-separated CORS origins (exact match) |
 | `AI_NARRATIVE_ENABLED` | No | `true` | Set `false` to disable AI narrative requirement |
+| `PORT` | Render only | — | Auto-set by Render; used in start command |
 
-### Frontend (build-time)
+### Frontend (build-time — Vercel)
 
 | Variable | Required | Default (dev) | Description |
 |----------|----------|---------------|-------------|
-| `NEXT_PUBLIC_API_BASE_URL` | **Yes** in prod | `http://localhost:8000` | Backend API origin for browser fetch |
+| `NEXT_PUBLIC_API_BASE_URL` | **Yes** in prod | `http://localhost:8000` | Backend API origin (no trailing slash) |
+
+Used by [`frontend/lib/api-base.ts`](../frontend/lib/api-base.ts) for all browser `fetch` calls.
 
 ---
 
@@ -45,7 +50,7 @@ Copy [`.env.example`](../.env.example) to `.env` for local development. In produ
 - **Production:** returns `503` if `ANTHROPIC_API_KEY` is missing and AI narrative is enabled.
 - **Development:** returns `200` with a warning when the API key is missing (fallback narrative allowed).
 
-Configure your load balancer/orchestrator to use `/health` for liveness and `/ready` for readiness.
+**Render:** set `healthCheckPath: /health` in [`render.yaml`](../render.yaml).
 
 ---
 
@@ -55,7 +60,7 @@ Configure your load balancer/orchestrator to use `/health` for liveness and `/re
 # Backend
 cd backend
 pip install -r requirements.txt
-cp ../.env.example ../.env   # edit ANTHROPIC_API_KEY
+cp ../.env.example ../.env   # edit ANTHROPIC_API_KEY in backend/.env
 uvicorn main:app --reload --port 8000
 
 # Frontend (separate terminal)
@@ -68,7 +73,7 @@ Open http://localhost:3000 — frontend defaults to `http://localhost:8000` when
 
 ---
 
-## Production build
+## Production build (local verify)
 
 ```bash
 # Backend tests
@@ -81,50 +86,26 @@ npm run test
 npm run build
 ```
 
-### Backend startup (recommended)
+### Backend startup (local / VM)
 
 Do **not** use `--reload` in production.
 
 ```bash
 cd backend
 pip install -r requirements.txt
-
-# Example with gunicorn + uvicorn workers (install gunicorn separately — not in requirements.txt)
-gunicorn main:app \
-  -k uvicorn.workers.UvicornWorker \
-  -w 2 \
-  --bind 0.0.0.0:8000 \
-  --timeout 120
-```
-
-**Pilot recommendation:** use a **single uvicorn worker** until per-session dataset isolation (C3) and durable usage (H6) land:
-
-```bash
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
-See [`deployment-checklist.md`](deployment-checklist.md) for the full pilot checklist.
+> **Single worker only** until per-session dataset isolation (C3) and durable usage (H6) land.
 
-**Production env example:**
-
-```bash
-export APP_ENV=production
-export ANTHROPIC_API_KEY=sk-ant-...
-export ALLOWED_ORIGINS=https://app.example.com,https://www.example.com
-```
-
-The server **fails fast at startup** if `APP_ENV=production`, AI narrative is enabled, and `ANTHROPIC_API_KEY` is missing.
-
-### Frontend startup
+### Frontend startup (local)
 
 ```bash
 cd frontend
-export NEXT_PUBLIC_API_BASE_URL=https://api.example.com
+export NEXT_PUBLIC_API_BASE_URL=https://your-api.example.com
 npm run build
 npm run start
 ```
-
-Serve the frontend behind HTTPS. Point `NEXT_PUBLIC_API_BASE_URL` at your public backend URL (same origin or CORS-allowed cross-origin).
 
 ---
 
@@ -133,31 +114,125 @@ Serve the frontend behind HTTPS. Point `NEXT_PUBLIC_API_BASE_URL` at your public
 Set `ALLOWED_ORIGINS` to every frontend origin that will call the API:
 
 ```bash
-ALLOWED_ORIGINS=https://app.example.com,https://staging.example.com
+ALLOWED_ORIGINS=https://your-app.vercel.app,https://your-app-git-main-you.vercel.app
 ```
 
-Local dev defaults to `http://localhost:3000` when unset.
+- Origins must match **scheme + host + port** exactly.
+- Wildcards are **not** supported — list each Vercel preview URL explicitly if needed.
+- Local dev defaults to `http://localhost:3000` when unset.
+
+Configured in [`backend/services/cors_config.py`](../backend/services/cors_config.py).
+
+---
+
+## Vercel + Render deployment (Phase 11.1)
+
+Split hosting: **frontend on Vercel**, **backend API on Render**. Use [`render.yaml`](../render.yaml) for the API.
+
+### Architecture
+
+| Service | Platform | Root directory | Public URL example |
+|---------|----------|----------------|-------------------|
+| Frontend | Vercel | `frontend/` | `https://your-app.vercel.app` |
+| Backend API | Render Web Service | `backend/` | `https://ai-data-analyst-api.onrender.com` |
+
+**No `vercel.json` required** — Vercel auto-detects Next.js 16 when **Root Directory** = `frontend`.
+
+---
+
+### Step 1 — Deploy backend on Render
+
+1. Push repo to GitHub/GitLab.
+2. Render Dashboard → **New** → **Blueprint** → connect repo → apply `render.yaml`.
+3. Set secret env vars when prompted:
+   - `ANTHROPIC_API_KEY`
+   - `ALLOWED_ORIGINS` — e.g. `https://your-app.vercel.app`
+4. Note the service URL after deploy.
+
+**Commands (from `render.yaml`):**
+
+| Phase | Command |
+|-------|---------|
+| **Build** | `pip install --upgrade pip && pip install -r requirements.txt` |
+| **Start** | `uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1` |
+| **Health check** | `GET /health` |
+
+**Verify:**
+
+```bash
+curl https://YOUR-SERVICE.onrender.com/health
+curl https://YOUR-SERVICE.onrender.com/ready
+```
+
+---
+
+### Step 2 — Deploy frontend on Vercel
+
+1. Vercel → **Add New Project** → import repo.
+2. **Root Directory:** `frontend`
+3. **Environment Variables** (Production + Preview):
+
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_API_BASE_URL` | `https://YOUR-SERVICE.onrender.com` |
+
+4. Deploy.
+
+| Phase | Command |
+|-------|---------|
+| **Install** | `npm install` |
+| **Build** | `npm run build` |
+
+---
+
+### Step 3 — CORS + smoke test
+
+1. Ensure Render `ALLOWED_ORIGINS` matches the exact Vercel URL in the browser.
+2. Redeploy Render after changing `ALLOWED_ORIGINS`.
+3. Run smoke test in [`deployment-checklist.md`](deployment-checklist.md) §4 on the Vercel URL.
+
+---
+
+### Deployment risks (Vercel + Render)
+
+| Risk | Mitigation |
+|------|------------|
+| CORS mismatch | Exact Vercel URL in `ALLOWED_ORIGINS` |
+| Stale API URL in frontend | Rebuild Vercel after changing `NEXT_PUBLIC_API_BASE_URL` |
+| Render cold start | First request after idle may be slow; use Starter plan for pilot |
+| In-memory state (C3) | Single instance, single worker |
+| No auth (C1) | Restrict API URL exposure; monitor Anthropic usage |
+| Preview deployments | Add each preview origin to CORS or test production URL only |
+
+---
+
+### Rollback
+
+| Platform | Action |
+|----------|--------|
+| Vercel | Deployments → previous deployment → **Promote to Production** |
+| Render | **Rollback** to prior deploy in Events tab |
 
 ---
 
 ## Pre-deploy checklist
 
-- [ ] `APP_ENV=production` on backend
-- [ ] `ANTHROPIC_API_KEY` set in secret store
-- [ ] `ALLOWED_ORIGINS` lists production frontend URL(s)
-- [ ] `NEXT_PUBLIC_API_BASE_URL` set at frontend **build** time
-- [ ] `/health` and `/ready` return 200 on staging
-- [ ] Smoke test: upload → ask → PDF export
+- [ ] `APP_ENV=production` on Render
+- [ ] `ANTHROPIC_API_KEY` set in Render secrets
+- [ ] `ALLOWED_ORIGINS` lists Vercel frontend URL(s)
+- [ ] `NEXT_PUBLIC_API_BASE_URL` set in Vercel (Production + Preview)
+- [ ] `/health` and `/ready` return 200 on Render
+- [ ] Smoke test: upload → ask → PDF export on Vercel URL
 - [ ] Real `supportEmail` in `frontend/lib/branding-config.ts`
-- [ ] Hide mock plan toggle for production builds (Week 1+)
+
+See [`deployment-checklist.md`](deployment-checklist.md) for the full operator checklist.
 
 ---
 
-## Known Week 1+ blockers (not in Week 0 scope)
+## Known Week 1+ blockers
 
 - Authentication and server-side plan entitlements
 - Per-session dataset isolation (multi-user)
 - Durable usage tracking (Redis/DB)
-- Docker / container images
 
 See [`production-readiness-review.md`](production-readiness-review.md) remediation roadmap.
