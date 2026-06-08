@@ -27,6 +27,7 @@ export type AiExecutiveInsightFact = {
   title: string;
   value: string;
   hint?: string;
+  ariaLabel?: string;
   dotClass: string;
 };
 
@@ -118,7 +119,12 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
 
       <div className={aiInsightsExecutiveGrid}>
         {cards.map((c) => (
-          <div key={c.key} className={aiInsightsExecutiveCard}>
+          <div
+            key={c.key}
+            className={aiInsightsExecutiveCard}
+            title={c.ariaLabel}
+            aria-label={c.ariaLabel ? `${c.title}: ${c.value}. ${c.ariaLabel}` : undefined}
+          >
             <div
               className={`absolute left-0 top-0 h-full w-[3px] rounded-l-xl ${c.dotClass}`}
               aria-hidden

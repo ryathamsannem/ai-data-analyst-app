@@ -1101,6 +1101,17 @@ def _resolve_agg_label_and_key(
     except Exception:
         pass
     if _ranking_or_leaderboard_intent(q) or _column_looks_additive_metric(value_col):
+        try:
+            from intent_engine.column_resolve import column_prefers_mean_aggregation
+
+            if (
+                value_col
+                and column_prefers_mean_aggregation(value_col)
+                and not re.search(r"\b(sum|total)\b", q)
+            ):
+                return "Average", "mean"
+        except Exception:
+            pass
         return "Total", "sum"
     if any(k in q for k in ("compare", "versus", " vs ")):
         if _column_looks_additive_metric(value_col):
@@ -11696,6 +11707,22 @@ def determine_chart_type_and_reason(
                 f"{n} categories; horizontal layout reduces label overlap.",
                 "High",
             )
+
+    value_col = None
+    if intent_debug:
+        value_col = intent_debug.get("value_col")
+
+    if (
+        value_col
+        and _column_looks_ratio_only_metric(str(value_col))
+        and not _question_asks_share_or_composition_pie(ql)
+        and base in ("pie", "donut", "bar")
+    ):
+        return (
+            "bar_horizontal",
+            "Rate or percentage metric by category; horizontal bar with average per group.",
+            "High",
+        )
 
     if base == "pie":
         kind = "donut" if n >= 5 else "pie"

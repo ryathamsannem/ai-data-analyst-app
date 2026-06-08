@@ -369,6 +369,7 @@ class TestDomainQualityMatrix(unittest.TestCase):
             )
         )
         self.assertTrue(column_prefers_mean_aggregation("satisfaction_score"))
+        self.assertTrue(column_prefers_mean_aggregation("conversion_rate_pct"))
         self.assertFalse(column_prefers_mean_aggregation("units"))
         self.assertFalse(column_prefers_mean_aggregation("revenue"))
 

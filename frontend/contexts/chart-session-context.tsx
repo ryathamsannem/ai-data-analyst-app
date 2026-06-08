@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { ChartKind, ChartRow } from "../app/chart-types";
-import { fallbackChartNumericDisplay } from "../app/chart-types";
+import { formatExecutiveMetricValue } from "../lib/metric-value-format";
 import {
   buildFinalChartPresentationMeta,
   chartKindToApiChartType,
@@ -153,10 +153,17 @@ function rowsFromMiniChart(
           : chartKind === "histogram"
             ? "histogram"
             : "bar";
-    rows.push({
+    const row: ChartRow = {
       name: mini.labels[i] || "—",
       value: v,
-      displayValue: fallbackChartNumericDisplay(dispKind, v),
+    };
+    rows.push({
+      ...row,
+      displayValue: formatExecutiveMetricValue(row, {
+        metricLabel: mini.title,
+        chartTitle: mini.title,
+        presentationKind: dispKind,
+      }),
     });
   }
   return rows;

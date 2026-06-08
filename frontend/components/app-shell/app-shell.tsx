@@ -61,6 +61,14 @@ export const AppShell = memo(function AppShell({
     setCollapsed((c) => !c);
   }, []);
 
+  useEffect(() => {
+    if (!prefsReady) return;
+    const timer = window.setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, [collapsed, prefsReady]);
+
   const closeMobile = useCallback(() => {
     setMobileOpen(false);
   }, []);

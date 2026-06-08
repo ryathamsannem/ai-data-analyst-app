@@ -1916,6 +1916,8 @@ body {
   max-width: 1600px;
   margin-left: auto;
   margin-right: auto;
+  container-type: inline-size;
+  container-name: overview-charts;
 }
 
 .overview-chart-grid {
@@ -1934,8 +1936,14 @@ body {
     --overview-chart-solo-row-width: min(70%, 1240px);
   }
 
-  .overview-chart-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Two columns only when the charts container is wide enough (sidebar expanded → single col). */
+  @container overview-charts (min-width: 1000px) {
+    .overview-chart-grid {
+      grid-template-columns: repeat(
+        2,
+        minmax(min(100%, 480px), 1fr)
+      );
+    }
   }
 
   /*
@@ -2242,15 +2250,18 @@ body {
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: flex-start;
-  gap: 0.5rem;
-  row-gap: 0.5rem;
+  gap: 0.5rem 0.625rem;
+  row-gap: 0.625rem;
   max-width: 100%;
+  min-width: 0;
   overflow: visible;
 }
 
 .overview-dash-insight-chip {
   display: inline-flex;
+  flex: 0 1 auto;
   max-width: 100%;
+  min-width: 0;
   align-items: center;
   border-radius: 999px;
   border: 1px solid var(--border-default);
@@ -2262,6 +2273,34 @@ body {
   color: var(--text-muted);
   white-space: normal;
   word-break: break-word;
+}
+
+.chart-rate-quality-warning {
+  margin: 0 0 0.25rem;
+  max-width: 100%;
+  font-size: 0.625rem;
+  font-weight: 400;
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+  opacity: 0.92;
+}
+
+.dark .recharts-default-tooltip {
+  background: rgba(15, 23, 42, 0.97) !important;
+  border-color: rgba(51, 65, 85, 0.92) !important;
+  box-shadow:
+    0 12px 32px -8px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset !important;
+}
+
+.dark .recharts-default-tooltip .recharts-tooltip-label {
+  color: #f8fafc !important;
+}
+
+.dark .recharts-default-tooltip .recharts-tooltip-item-text,
+.dark .recharts-default-tooltip .recharts-tooltip-item-value,
+.dark .recharts-default-tooltip .recharts-tooltip-item-name {
+  color: #cbd5e1 !important;
 }
 
 .overview-dash-insight-chip--top {
@@ -2858,6 +2897,19 @@ body {
 .dark .ai-insights-page .ai-insights-viz .ai-insights-viz-chart-frame .recharts-cartesian-grid line,
 .dark .chart-viz-theme.ai-insights-viz .ai-insights-viz-chart-frame .recharts-cartesian-grid line {
   stroke: var(--chart-axis-line);
+}
+
+.dark .chart-viz-theme.charts-tab-viz-preview .charts-tab-viz-plot-stage .recharts-text,
+.dark .chart-viz-theme.charts-tab-viz-preview .charts-session-viz-frame .recharts-text {
+  fill: var(--chart-axis-tick);
+}
+
+.chart-viz-theme.charts-tab-viz-preview .recharts-xAxis text.recharts-label,
+.chart-viz-theme.charts-tab-viz-preview .recharts-xAxis .recharts-label text,
+.dark .chart-viz-theme.charts-tab-viz-preview .recharts-xAxis text.recharts-label,
+.dark .chart-viz-theme.charts-tab-viz-preview .recharts-xAxis .recharts-label text {
+  font-weight: 600;
+  fill: var(--chart-axis-label);
 }
 
 /* Recharts tooltip cursor — no gray plot overlay on hover */
