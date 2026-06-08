@@ -9,13 +9,14 @@ import {
   type ResolvedChartAxisTheme,
 } from "@/lib/chart-axis-theme";
 import { ensureReadableExportTextFill } from "@/lib/chart-png-export-text";
+import { applyPngExportSvgPolish } from "@/lib/chart-png-export-svg-polish";
 const EXPORT_MIN_WIDTH = 720;
 /** Plot uses most of the inner card width without stretching sparse bar SVGs. */
 const PLOT_WIDTH_UTIL = 0.9;
 const PLOT_WIDTH_UTIL_COMPACT = 0.96;
 const COMPOSITE_PAD_X = 24;
 const COMPOSITE_PAD_Y = 20;
-const HEADER_PLOT_GAP = 14;
+const HEADER_PLOT_GAP = 12;
 /** Export-only inner card padding (visible UI unchanged). */
 const EXPORT_CARD_PAD = 52;
 const EXPORT_CARD_RADIUS = 18;
@@ -78,7 +79,7 @@ function resolveExportPalette(backgroundColor?: string): ExportPalette {
       chipValue: "#f1f5f9",
       chipBg: "#1e293b",
       reason: "#94a3b8",
-      footer: "#64748b",
+      footer: "#94a3b8",
     };
   }
   return {
@@ -94,6 +95,15 @@ function resolveExportPalette(backgroundColor?: string): ExportPalette {
     reason: "#475569",
     footer: "#64748b",
   };
+}
+
+function isDarkExportBackground(background: string): boolean {
+  return (
+    background === "#0f172a" ||
+    background === "#0b1220" ||
+    (typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark"))
+  );
 }
 
 function resolveExportBackground(optionsBg?: string): string {
@@ -492,6 +502,9 @@ async function renderPlotSvgToPng(
 
   const axisTheme = readResolvedChartAxisTheme(container);
   const clone = cloneSvgWithInlineStyles(svg, plotBackground, axisTheme);
+  applyPngExportSvgPolish(clone, {
+    darkBackground: isDarkExportBackground(plotBackground),
+  });
   const tightened = tightenSvgViewBox(clone, width, height);
   width = tightened.width;
   height = tightened.height;
@@ -1070,11 +1083,11 @@ function drawExportFooter(
 ): void {
   const fontFamily =
     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  ctx.font = `400 11px ${fontFamily}`;
+  ctx.font = `500 12px ${fontFamily}`;
   ctx.fillStyle = palette.footer;
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
-  ctx.globalAlpha = 0.88;
+  ctx.globalAlpha = 0.94;
   ctx.fillText(
     footerText,
     cardX + cardW / 2,
