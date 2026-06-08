@@ -379,20 +379,27 @@ import {
   setPlanTier,
 } from "@/lib/saas-session";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
+import { OverviewLandingHero } from "./components/home/overview-landing-hero";
+import { PilotInfoModal } from "./components/home/pilot-info-modal";
+import { PilotInfoSections } from "./components/home/pilot-info-sections";
 import { OverviewUploadSelectedState } from "./components/home/overview-upload-selected-state";
+import {
+  PILOT_HEADER_NAV,
+  type PilotNavTarget,
+} from "@/lib/pilot-landing";
+import { resolvePilotNavActive } from "@/lib/pilot-nav-state";
+import {
+  shouldAutoUploadAfterPick,
+  validateOverviewUploadPick,
+} from "@/lib/upload-auto-flow";
 import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-summary";
 import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
 import {
-  ovBtnPrimaryAccent,
   formatOverviewFilenameMiddle,
   ovBtnSecondarySm,
   ovOverviewSecondaryBtn,
   OVERVIEW_UPLOAD_ACCEPT,
-  OVERVIEW_UPLOAD_EXT_PATTERN,
   OVERVIEW_UPLOAD_FORMAT_HINT,
-  OVERVIEW_UPLOAD_INVALID_MSG,
-  ovCapabilityChip,
-  ovDatasetEmptyInset,
   ovUploadDropzone,
   ovUploadDropzoneActive,
   ovUploadDropzoneIdle,
@@ -6338,10 +6345,24 @@ function HomeInner() {
   const [aiAnswerByChartId, setAiAnswerByChartId] =
     useState<ChartInsightAnswerStore>({});
   const [activeTab, setActiveTab] = useState<MainNavTabId>("overview");
+  const [pilotInfoModal, setPilotInfoModal] = useState<
+    Exclude<PilotNavTarget, "home"> | null
+  >(null);
+  const [pilotNavHighlight, setPilotNavHighlight] =
+    useState<PilotNavTarget>("home");
   const [, startTabTransition] = useTransition();
-  const handleMainTabClick = useCallback((id: MainNavTabId) => {
-    startTabTransition(() => setActiveTab(id));
-  }, []);
+  const handleMainTabClick = useCallback(
+    (id: MainNavTabId) => {
+      if (id !== "overview") {
+        setPilotInfoModal(null);
+      }
+      if (id === "overview") {
+        setPilotNavHighlight("home");
+      }
+      startTabTransition(() => setActiveTab(id));
+    },
+    [startTabTransition]
+  );
   const [viewportH, setViewportH] = useState(960);
   const [viewportW, setViewportW] = useState(1024);
   useEffect(() => {
@@ -6536,11 +6557,56 @@ function HomeInner() {
   const [upgradeLimit, setUpgradeLimit] = useState<LimitKind | null>(null);
   const [upgradeMessage, setUpgradeMessage] = useState("");
 
+  const pilotNavActive = useMemo(
+    () =>
+      resolvePilotNavActive({
+        activeTab,
+        pilotInfoModal,
+        pilotNavHighlight,
+      }),
+    [activeTab, pilotInfoModal, pilotNavHighlight]
+  );
+
+  const closePilotInfoModal = useCallback(() => {
+    setPilotInfoModal(null);
+    setPilotNavHighlight("home");
+  }, []);
+
   const openUpgradeModal = useCallback((limit: LimitKind, message: string) => {
     setUpgradeLimit(limit);
     setUpgradeMessage(message);
     setUpgradeModalOpen(true);
   }, []);
+
+  const handlePilotNav = useCallback(
+    (target: PilotNavTarget) => {
+      setPilotNavHighlight(target);
+      startTabTransition(() => setActiveTab("overview"));
+      if (target === "home") {
+        setPilotInfoModal(null);
+        requestAnimationFrame(() => {
+          const landing = document.getElementById("pilot-landing");
+          if (landing) {
+            landing.scrollIntoView({ behavior: "smooth", block: "start" });
+          } else {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }
+        });
+        return;
+      }
+      const sectionId = PILOT_HEADER_NAV.find((link) => link.id === target)?.sectionId;
+      requestAnimationFrame(() => {
+        const section = sectionId ? document.getElementById(sectionId) : null;
+        if (section) {
+          setPilotInfoModal(null);
+          section.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          setPilotInfoModal(target);
+        }
+      });
+    },
+    [startTabTransition]
+  );
 
   const handleApiLimitDetail = useCallback(
     (detail: unknown): boolean => {
@@ -7087,9 +7153,10 @@ function HomeInner() {
     }
   };
 
-  const uploadFile = async () => {
-    if (!file) {
-      setError("Please choose a CSV or Excel file first.");
+  const uploadFile = async (pickedFile?: File) => {
+    const targetFile = pickedFile ?? file;
+    if (!targetFile) {
+      setError("Please choose a supported dataset file first.");
       return;
     }
 
@@ -7127,14 +7194,14 @@ function HomeInner() {
 
     try {
       const tier = getPlanTier();
-      if (!isFileWithinPlanLimit(tier, file.size)) {
-        const msg = fileSizeLimitMessage(tier, file.size);
+      if (!isFileWithinPlanLimit(tier, targetFile.size)) {
+        const msg = fileSizeLimitMessage(tier, targetFile.size);
         openUpgradeModal("file_size", msg);
         throw new Error(msg);
       }
 
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", targetFile);
 
       const response = await fetch(apiUrl("/upload"), {
         method: "POST",
@@ -7328,23 +7395,27 @@ function HomeInner() {
     }
   };
 
-  const assignOverviewPickedFile = useCallback((next: File) => {
-    const ok = OVERVIEW_UPLOAD_EXT_PATTERN.test(next.name);
-    if (!ok) {
-      setError(OVERVIEW_UPLOAD_INVALID_MSG);
-      return;
-    }
-    const tier = getPlanTier();
-    if (!isFileWithinPlanLimit(tier, next.size)) {
-      const msg = fileSizeLimitMessage(tier, next.size);
-      openUpgradeModal("file_size", msg);
-      setError(msg);
-      return;
-    }
-    setError("");
-    dismissMappingMessage();
-    setFile(next);
-  }, [dismissMappingMessage, openUpgradeModal]);
+  const assignOverviewPickedFile = useCallback(
+    (next: File) => {
+      if (loading) return;
+      const tier = getPlanTier();
+      const validation = validateOverviewUploadPick(next, tier);
+      if (!validation.ok) {
+        if (validation.reason === "file_too_large") {
+          openUpgradeModal("file_size", validation.message);
+        }
+        setError(validation.message);
+        return;
+      }
+      setError("");
+      dismissMappingMessage();
+      setFile(validation.file);
+      if (shouldAutoUploadAfterPick(validation, loading)) {
+        void uploadFile(validation.file);
+      }
+    },
+    [dismissMappingMessage, loading, openUpgradeModal]
+  );
 
   const openOverviewReplaceUpload = useCallback(() => {
     dismissMappingMessage();
@@ -11001,6 +11072,8 @@ function HomeInner() {
       activeTab={activeTab}
       onNavigate={handleMainTabClick}
       datasetLoaded={columns.length > 0}
+      onPilotNav={handlePilotNav}
+      pilotNavActive={pilotNavActive}
     >
         {error && (
           <div className="mb-4 mt-6 flex items-start justify-between gap-3 rounded-xl border border-red-200/70 bg-red-50/90 p-3.5 text-red-800 shadow-[0_1px_2px_rgba(185,28,28,0.06)]">
@@ -11082,11 +11155,7 @@ function HomeInner() {
 
           {activeTab === "overview" && (
             <>
-            {columns.length === 0 ? (
-              <p className={`mb-3 max-w-2xl text-[15px] leading-relaxed ${ovMuted}`}>
-                Upload your CSV or Excel file and ask AI questions about your business data.
-              </p>
-            ) : null}
+            {columns.length === 0 ? <OverviewLandingHero /> : null}
             <div className="grid w-full min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-6">
               {columns.length > 0 && !overviewUploadExpanded ? (
                 <section className={`col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-1 ${ovCard}`}>
@@ -11153,17 +11222,23 @@ function HomeInner() {
                 </section>
               ) : (
                 <>
-                  <section className={`min-w-0 p-5 order-1 ${ovCard}`}>
+                  <section
+                    className={`overview-landing-upload-card min-w-0 p-5 sm:p-6 order-1 ${
+                      columns.length === 0
+                        ? "lg:col-span-2 mx-auto w-full max-w-4xl"
+                        : ""
+                    } ${ovCard}`}
+                  >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <h2 className={ovSectionTitle}>
-                          {columns.length > 0 ? "Upload a new file" : "Upload"}
+                          {columns.length > 0 ? "Upload a new file" : "Upload your dataset"}
                         </h2>
-                        {columns.length > 0 ? (
-                          <p className={`mt-1 ${ovSectionDesc}`}>
-                            CSV, Excel, JSON, or Parquet — replaces the dataset in this session.
-                          </p>
-                        ) : null}
+                        <p className={`mt-1 ${ovSectionDesc}`}>
+                          {columns.length > 0
+                            ? "CSV, Excel, JSON, or Parquet — replaces the dataset in this session."
+                            : "Drop a file or browse — upload starts automatically."}
+                        </p>
                       </div>
                     </div>
 
@@ -11227,7 +11302,9 @@ function HomeInner() {
                           if (next) assignOverviewPickedFile(next);
                         }}
                         className={`${ovUploadDropzone} rounded-xl border-2 border-dashed transition-colors ${
-                          file ? "p-3 sm:p-4" : "p-6 sm:p-8 text-center"
+                          file
+                            ? "p-3 sm:p-4"
+                            : "overview-landing-dropzone-empty p-6 sm:p-10 text-center"
                         } ${
                           overviewDropActive
                             ? ovUploadDropzoneActive
@@ -11238,6 +11315,7 @@ function HomeInner() {
                           <OverviewUploadSelectedState
                             fileName={file.name}
                             fileSizeLabel={formatBytes(file.size)}
+                            uploading={loading}
                           />
                         ) : (
                           <>
@@ -11267,22 +11345,16 @@ function HomeInner() {
                         )}
                       </div>
 
-                      <div
-                        className={`overview-upload-actions flex flex-wrap items-center gap-3 ${
-                          file ? "mt-5" : "mt-3"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (loading || !file) return;
-                            void uploadFile();
-                          }}
-                          disabled={loading || !file}
-                          className={ovBtnPrimaryAccent}
-                        >
-                          {loading ? "Uploading..." : "Upload Dataset"}
-                        </button>
+                      <div className="overview-upload-actions mt-3 flex flex-wrap items-center gap-3">
+                        {file && !loading ? (
+                          <button
+                            type="button"
+                            onClick={() => overviewFileInputRef.current?.click()}
+                            className={ovBtnSecondarySm}
+                          >
+                            Choose another file
+                          </button>
+                        ) : null}
                         {columns.length > 0 ? (
                           <button
                             type="button"
@@ -11293,32 +11365,19 @@ function HomeInner() {
                             Cancel
                           </button>
                         ) : null}
-                        {loading && (
+                        {loading ? (
                           <div className={`flex items-center gap-3 ${ovMuted}`}>
-                            <div className="h-5 w-5 rounded-full border-2 border-[color:var(--border-default)] border-t-[color:var(--foreground)] animate-spin" />
-                            <span>Processing file…</span>
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[color:var(--border-default)] border-t-[color:var(--foreground)]" />
+                            <span>Uploading and processing file…</span>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </section>
 
+                  {columns.length > 0 ? (
                   <section className={`min-w-0 p-5 order-1 ${ovCardElevated}`}>
                     <h2 className={ovSectionTitle}>Dataset</h2>
-                    {columns.length === 0 ? (
-                      <>
-                        <p className={`mt-2 text-sm ${ovMuted}`}>
-                          Upload a dataset to see KPIs, preview, charts, and insights.
-                        </p>
-                        <div className={ovDatasetEmptyInset} aria-hidden>
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className={ovCapabilityChip}>KPIs</span>
-                            <span className={ovCapabilityChip}>Charts</span>
-                            <span className={ovCapabilityChip}>AI Insights</span>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
                       <div className="mt-3 space-y-2 text-sm text-foreground">
                         {uploadMeta?.name && (
                           <p>
@@ -11350,8 +11409,8 @@ function HomeInner() {
                           </p>
                         )}
                       </div>
-                    )}
                   </section>
+                  ) : null}
                 </>
               )}
 
@@ -11662,6 +11721,7 @@ function HomeInner() {
                 </section>
               )}
             </div>
+            {columns.length === 0 ? <PilotInfoSections /> : null}
             </>
           )}
 
@@ -13678,6 +13738,11 @@ function HomeInner() {
             </div>
           </div>
         )}
+
+        <PilotInfoModal
+          section={pilotInfoModal}
+          onClose={closePilotInfoModal}
+        />
 
         <UpgradePlanModal
           open={upgradeModalOpen}

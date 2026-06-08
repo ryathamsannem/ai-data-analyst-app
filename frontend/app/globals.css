@@ -1208,6 +1208,33 @@ body {
 }
 
 /* —— Overview tab —— */
+.overview-landing-upload-card {
+  box-shadow: var(--shadow-card);
+}
+
+.overview-landing-hero {
+  padding-top: 0.25rem;
+}
+
+.overview-landing-dropzone-empty {
+  min-height: 11rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .overview-landing-dropzone-empty {
+    min-height: 13.5rem;
+  }
+}
+
+.dark .overview-landing-upload-card {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--insights-border-soft) 55%, transparent),
+    0 18px 40px -28px var(--accent-glow);
+}
+
 .overview-upload-dropzone {
   cursor: pointer;
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent);

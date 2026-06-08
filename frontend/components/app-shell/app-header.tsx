@@ -4,16 +4,22 @@ import { memo } from "react";
 import { BrandMark } from "@/components/branding/brand-mark";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BRANDING, getBrandInitials } from "@/lib/branding-config";
+import type { PilotNavTarget } from "@/lib/pilot-landing";
+import { HeaderNavLinks } from "./header-nav-links";
 import { PlanUsageMenu } from "./plan-usage-menu";
 
 export const AppHeader = memo(function AppHeader({
   pageTitle,
   datasetLoaded,
   onMenuClick,
+  onPilotNav,
+  pilotNavActive,
 }: {
   pageTitle: string;
   datasetLoaded: boolean;
   onMenuClick: () => void;
+  onPilotNav?: (target: PilotNavTarget) => void;
+  pilotNavActive?: PilotNavTarget | null;
 }) {
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-[color:var(--header-border)] bg-[color:var(--header-bg)]">
@@ -39,24 +45,9 @@ export const AppHeader = memo(function AppHeader({
           </div>
         </div>
 
-        <div className="hidden max-w-[12rem] flex-1 sm:block md:max-w-xs lg:max-w-sm">
-          <label className="sr-only" htmlFor="app-shell-search">
-            Search
-          </label>
-          <div className="relative">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-subtle)]">
-              <SearchIcon />
-            </span>
-            <input
-              id="app-shell-search"
-              type="search"
-              disabled
-              placeholder="Search…"
-              className="w-full rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-inset)] py-2 pl-9 pr-3 text-sm text-[color:var(--text-muted)] placeholder:text-[color:var(--text-subtle)] opacity-80"
-              aria-disabled
-            />
-          </div>
-        </div>
+        {onPilotNav ? (
+          <HeaderNavLinks activeNav={pilotNavActive ?? null} onNavigate={onPilotNav} />
+        ) : null}
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <PlanUsageMenu />
@@ -106,15 +97,6 @@ function MenuIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <circle cx="11" cy="11" r="7" />
-      <path d="M20 20l-3-3" strokeLinecap="round" />
     </svg>
   );
 }

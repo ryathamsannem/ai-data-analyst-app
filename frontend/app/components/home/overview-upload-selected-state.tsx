@@ -79,9 +79,11 @@ function DatasetFileTypeIcon({ kind }: { kind: DatasetFileKind }) {
 export const OverviewUploadSelectedState = memo(function OverviewUploadSelectedState({
   fileName,
   fileSizeLabel,
+  uploading = false,
 }: {
   fileName: string;
   fileSizeLabel: string;
+  uploading?: boolean;
 }) {
   const kind = detectDatasetFileKind(fileName);
   const typeLabel = datasetFileTypeLabel(fileName);
@@ -104,11 +106,15 @@ export const OverviewUploadSelectedState = memo(function OverviewUploadSelectedS
               </span>
               <span>{typeLabel}</span>
             </p>
-            <span className="overview-upload-selected__chip">Ready to upload</span>
+            <span className="overview-upload-selected__chip">
+              {uploading ? "Uploading…" : "Processing next"}
+            </span>
           </div>
         </div>
       </div>
-      <p className="overview-upload-selected__hint">Click to replace dataset</p>
+      <p className="overview-upload-selected__hint">
+        {uploading ? "Keep this tab open while we process your file" : "Choose another file"}
+      </p>
     </div>
   );
 });

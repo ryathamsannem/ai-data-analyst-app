@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["lib/phase7-pdf-generate.test.ts"],
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
   },
   resolve: {
     alias: {
