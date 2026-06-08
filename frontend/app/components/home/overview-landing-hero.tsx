@@ -19,7 +19,7 @@ export const OverviewLandingHero = memo(function OverviewLandingHero() {
       <h2 className="mt-2 max-w-3xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         {PILOT_LANDING_HERO.title}
       </h2>
-      <p className={`mt-3 max-w-2xl text-[15px] leading-relaxed sm:text-base ${ovMuted}`}>
+      <p className={`overview-landing-hero-subtitle mt-3 ${ovMuted}`}>
         {PILOT_LANDING_HERO.subtitle}
       </p>
       <div className="mt-4 flex flex-wrap gap-2" aria-label="Product capabilities">

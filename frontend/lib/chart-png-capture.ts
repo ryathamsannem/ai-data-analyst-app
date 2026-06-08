@@ -880,8 +880,7 @@ function renderHeaderChromeToPng(
   if (!ctx) return null;
 
   ctx.scale(scale, scale);
-  ctx.fillStyle = palette.background;
-  ctx.fillRect(0, 0, layout.exportWidth, layout.contentH);
+  // Transparent header layer — card inner fill shows through from composite.
 
   let y = HEADER_PAD_Y;
   const centerX = layout.exportWidth / 2;
@@ -1049,7 +1048,7 @@ function resolveCardSurfacePalette(palette: ExportPalette): {
   };
 }
 
-function drawExportReportCard(
+function drawExportCardFill(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -1065,11 +1064,50 @@ function drawExportReportCard(
   roundRect(ctx, x, y, w, h, EXPORT_CARD_RADIUS);
   ctx.fill();
   ctx.restore();
+}
 
+/** Stroke the card frame last so header/plot layers never cover the rounded border. */
+function drawExportCardBorder(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  surfaces: ReturnType<typeof resolveCardSurfacePalette>
+): void {
+  const inset = EXPORT_CARD_BORDER / 2;
+  ctx.save();
   ctx.strokeStyle = surfaces.border;
   ctx.lineWidth = EXPORT_CARD_BORDER;
-  roundRect(ctx, x, y, w, h, EXPORT_CARD_RADIUS);
+  roundRect(
+    ctx,
+    x + inset,
+    y + inset,
+    w - EXPORT_CARD_BORDER,
+    h - EXPORT_CARD_BORDER,
+    Math.max(0, EXPORT_CARD_RADIUS - inset)
+  );
   ctx.stroke();
+  ctx.restore();
+}
+
+function clipExportCardContent(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): void {
+  const inset = EXPORT_CARD_BORDER;
+  roundRect(
+    ctx,
+    x + inset,
+    y + inset,
+    w - inset * 2,
+    h - inset * 2,
+    Math.max(0, EXPORT_CARD_RADIUS - inset)
+  );
+  ctx.clip();
 }
 
 function drawExportFooter(
@@ -1163,9 +1201,13 @@ async function compositeExportPng(
   const cardW = Math.min(contentW, outW - COMPOSITE_PAD_X * 2);
   const cardH = Math.min(contentH, outH - COMPOSITE_PAD_Y * 2);
   const cardX = Math.round((outW - cardW) / 2);
-  const cardY = Math.round((outH - cardH) / 2);
+  const minCardY = COMPOSITE_PAD_Y + EXPORT_CARD_BORDER;
+  const cardY = Math.max(minCardY, Math.round((outH - cardH) / 2));
 
-  drawExportReportCard(ctx, cardX, cardY, cardW, cardH, surfaces);
+  drawExportCardFill(ctx, cardX, cardY, cardW, cardH, surfaces);
+
+  ctx.save();
+  clipExportCardContent(ctx, cardX, cardY, cardW, cardH);
 
   let y = cardY + EXPORT_CARD_PAD;
   const centerX = cardX + cardW / 2;
@@ -1186,7 +1228,10 @@ async function compositeExportPng(
     ctx.drawImage(legendImg, lx, y, legendW, legendH);
   }
 
+  ctx.restore();
+
   drawExportFooter(ctx, cardX, cardY, cardW, cardH, footerText, palette);
+  drawExportCardBorder(ctx, cardX, cardY, cardW, cardH, surfaces);
 
   return {
     dataUrl: canvas.toDataURL("image/png"),
