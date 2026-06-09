@@ -170,7 +170,7 @@ export const ovFilterClearBtn = `${ovDashboardFilterBtn} min-w-[7.5rem]`;
 /** Centered section shell — max 1600px; pairs with `.overview-chart-grid` in globals.css */
 export const ovChartsWrap = "overview-charts-wrap";
 
-/** 1 col below 768px; max 2 cols desktop (never 3). Plot height via `--overview-chart-plot-min-h`. */
+/** 1 col below 768px; 2 cols only when container ≥1000px (see globals.css @container). */
 export const ovChartGrid = "overview-chart-grid";
 
 export const ovChartCell = "overview-chart-grid__cell";
@@ -209,6 +209,8 @@ export const ovDashChartPlot = "overview-chart-plot";
 export const ovDashChartPlotInner = "overview-chart-plot-inner";
 
 export const ovDashInsightChips = "overview-dash-insight-chips";
+
+export const chartRateQualityWarningClass = "chart-rate-quality-warning";
 
 export const ovDashInsightChip = "overview-dash-insight-chip";
 

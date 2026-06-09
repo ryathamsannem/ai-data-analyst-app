@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { ChartKind, ChartRow } from "../app/chart-types";
-import { fallbackChartNumericDisplay } from "../app/chart-types";
+import { formatExecutiveMetricValue } from "../lib/metric-value-format";
 import {
   buildFinalChartPresentationMeta,
   chartKindToApiChartType,
@@ -153,10 +153,17 @@ function rowsFromMiniChart(
           : chartKind === "histogram"
             ? "histogram"
             : "bar";
-    rows.push({
+    const row: ChartRow = {
       name: mini.labels[i] || "—",
       value: v,
-      displayValue: fallbackChartNumericDisplay(dispKind, v),
+    };
+    rows.push({
+      ...row,
+      displayValue: formatExecutiveMetricValue(row, {
+        metricLabel: mini.title,
+        chartTitle: mini.title,
+        presentationKind: dispKind,
+      }),
     });
   }
   return rows;
@@ -396,6 +403,11 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
   const replaceAutoDashboardCharts = useCallback((charts: AutoDashboardLike[]) => {
     setHistory((prev) => {
       const kept = prev.filter((h) => h.source !== "auto_dashboard");
+      const existingAuto = new Map(
+        prev
+          .filter((h) => h.source === "auto_dashboard" && h.dashboardChartKey)
+          .map((h) => [h.dashboardChartKey!, h])
+      );
       const added: ChartSnapshot[] = [];
       for (const mini of charts) {
         if (!mini?.title?.trim()) continue;
@@ -408,8 +420,23 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           rows: baseRows,
         });
         const rows = rowsFromMiniChart(mini, finalKind);
-        const snapId = newId();
         const key = dashboardChartKeyFromTitle(mini.title);
+        const existing = existingAuto.get(key);
+        if (
+          existing &&
+          existing.chartKind === finalKind &&
+          existing.chartData.length === rows.length &&
+          existing.chartData.every(
+            (row, i) =>
+              String(row.name ?? "") === String(rows[i]?.name ?? "") &&
+              Number(row.value) === Number(rows[i]?.value)
+          )
+        ) {
+          added.push(existing);
+          continue;
+        }
+        const snapId = existing?.id ?? newId();
+        const createdAt = existing?.createdAt ?? Date.now();
         const contract = freezeVisualizationContract({
           id: snapId,
           source: "auto_dashboard",
@@ -424,7 +451,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
         added.push({
           id: snapId,
           source: "auto_dashboard",
-          createdAt: Date.now(),
+          createdAt,
           title: contract.displayTitle,
           subtitle: "Auto dashboard",
           chartKind: contract.chartType,

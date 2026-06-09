@@ -66,6 +66,16 @@ type ManifestEntry = {
 
 const manifest: ManifestEntry[] = [];
 
+/** Cold import of pdf-report can exceed Vitest's 5s default on first run. */
+const PHASE7_TEST_TIMEOUT_MS = 30_000;
+const PHASE7_WARMUP_TIMEOUT_MS = 60_000;
+
+type RunExecutivePdfExport = (
+  input: ExecutivePdfExportInput
+) => Promise<void>;
+
+let runExecutivePdfExport: RunExecutivePdfExport;
+
 function chartRows(labels: string[], values: number[]): ChartRow[] {
   return labels.map((name, i) => ({
     name,
@@ -369,14 +379,16 @@ function loadPdfFromFile(path: string): { buf: Buffer; pageCount: number; text: 
   return { buf, pageCount: pageCountFromText(text), text };
 }
 
-describe("Phase 7 PDF generate + validate", () => {
-  beforeAll(() => {
+describe.sequential("Phase 7 PDF generate + validate", () => {
+  beforeAll(async () => {
     mkdirSync(OUT, { recursive: true });
     globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
       cb(0);
       return 0;
     }) as typeof requestAnimationFrame;
-  });
+    const mod = await import("@/app/pdf-report");
+    runExecutivePdfExport = mod.runExecutivePdfExport;
+  }, PHASE7_WARMUP_TIMEOUT_MS);
 
   afterAll(() => {
     writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2));
@@ -385,9 +397,10 @@ describe("Phase 7 PDF generate + validate", () => {
 
   for (const dataset of DATASETS) {
     for (const combo of COMBOS) {
-      it(`${dataset} / ${combo}`, async () => {
+      it(
+        `${dataset} / ${combo}`,
+        async () => {
         if (existsSync(EXPORT_PDF)) unlinkSync(EXPORT_PDF);
-        const { runExecutivePdfExport } = await import("@/app/pdf-report");
         const input = buildInput(dataset, combo);
         await runExecutivePdfExport(input);
 
@@ -477,7 +490,9 @@ describe("Phase 7 PDF generate + validate", () => {
         });
 
         expect(failures, failures.join("; ")).toEqual([]);
-      });
+        },
+        PHASE7_TEST_TIMEOUT_MS
+      );
     }
   }
 });

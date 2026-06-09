@@ -8,8 +8,8 @@ import type { ChartKind, ChartRow } from "./chart-types";
 import { isNumberedExecutiveBrief } from "@/lib/executive-insights-brief";
 import {
   formatExecutiveMetricValue,
+  formatMetricSpreadGap,
   formatRawMetricValue,
-  metricFormatUsesPercent,
   readChartRowRawValue,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
@@ -2169,10 +2169,8 @@ function buildPdfVizExecutiveFacts(
     if (x.n < minEntry.n) minEntry = x;
     if (x.n > maxEntry.n) maxEntry = x;
   }
-  const spread = Math.max(0, Math.round(maxEntry.n - minEntry.n));
-  const spreadLabel = metricFormatUsesPercent(metricCtx)
-    ? `${spread} percentage points`
-    : formatPdfBusinessNumber(spread);
+  const spread = Math.max(0, maxEntry.n - minEntry.n);
+  const spreadLabel = formatMetricSpreadGap(spread, metricCtx);
   const fmt = (row: ChartRow) => formatPdfChartRowMetricDisplay(row, metricCtx);
   const cat = polishPdfKpiLabel(
     (categoryLabel ?? "department").replace(/^by\s+/i, "").trim() || "department"

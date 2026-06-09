@@ -4,6 +4,7 @@
 
 import type { ChartKind, ChartRow } from "@/app/chart-types";
 import { fallbackChartNumericDisplay } from "@/app/chart-types";
+import { formatMetricSpreadGap } from "@/lib/metric-value-format";
 import type { ChartSemanticHeaderModel } from "@/lib/chart-semantic-metadata";
 import type { PdfRankedSignal } from "@/app/pdf-report";
 import type { VisualizationContract } from "@/lib/selected-visualization";
@@ -180,7 +181,8 @@ export function buildTrendPdfRankedSignals(
   rows: ChartRow[],
   kind: ChartKind,
   max = 3,
-  timeBucketLabel = "Weekly"
+  timeBucketLabel = "Weekly",
+  metricLabel?: string
 ): PdfRankedSignal[] | null {
   if (rows.length < 2) return null;
 
@@ -215,7 +217,11 @@ export function buildTrendPdfRankedSignals(
     {
       rank: "Gap",
       category: `${shorten(String(maxR.name ?? ""), 16)} ↔ ${shorten(String(minR.name ?? ""), 16)}`,
-      valueDisplay: fallbackChartNumericDisplay("line", spread),
+      valueDisplay: formatMetricSpreadGap(spread, {
+        metricLabel,
+        chartTitle: metricLabel,
+        presentationKind: kind,
+      }),
     },
   ];
   return out.slice(0, max);

@@ -38,6 +38,13 @@ import {
   formatChartAxisCategoryTick,
 } from "@/lib/chart-axis-formatters";
 import { PIE_COLORS } from "@/lib/chart-palette";
+import { formatRadialTooltipValue } from "@/lib/radial-chart-format";
+import { buildChartCartesianTooltipHandlers, chartTooltipMetricLabel, formatChartTooltipCategoryLine } from "@/lib/chart-tooltip-format";
+import { type MetricFormatContext } from "@/lib/metric-value-format";
+import {
+  CHART_AXIS_CSS,
+  chartLayoutWidthKey,
+} from "@/lib/chart-axis-theme";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
@@ -64,9 +71,9 @@ import {
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
 const RECHARTS_ANIMATION_MAX_POINTS = 72;
 
-const GRID_STROKE = "#eef2f7";
-const CHART_AXIS_LINE = "#e2e8f0";
-const AXIS_TICK = "#64748b";
+const GRID_STROKE = "var(--chart-axis-line)";
+const CHART_AXIS_LINE = CHART_AXIS_CSS.line;
+const AXIS_TICK = CHART_AXIS_CSS.tick;
 const CHART_TOOLTIP_FRAME = {
   cursor: false,
   contentStyle: {
@@ -92,7 +99,20 @@ const CHART_TOOLTIP_FRAME = {
   },
   wrapperStyle: { outline: "none" as const },
 } as const;
-const AXIS_Y_TICK_VAL = { fontSize: 11, fill: AXIS_TICK, dx: 6 } as const;
+const AXIS_Y_TICK_VAL = {
+  fontSize: 11,
+  fill: AXIS_TICK,
+  dx: 6,
+} as const;
+
+function rechartsContainerKey(
+  kind: ChartKind,
+  widthPx: number,
+  heightPx: number,
+  capture = false
+): string {
+  return `${kind}-${chartLayoutWidthKey(widthPx)}-${heightPx}${capture ? "-cap" : ""}`;
+}
 
 export type ChartRendererViz = {
   multiSeries?: {
@@ -118,6 +138,8 @@ export type ChartRendererProps = {
   insightCartesianPlanMain: VerticalCategoryAxisPlan | null;
   tickTruncate: (v: string | number) => string;
   onInsightDrill: (primaryValue: string, secondaryRaw?: string) => void;
+  /** Off-screen presentation capture — disable animation for stable PNG/PDF SVG. */
+  pngCaptureMode?: boolean;
 };
 
 function ChartRendererInner({
@@ -133,6 +155,7 @@ function ChartRendererInner({
   insightCartesianPlanMain,
   tickTruncate,
   onInsightDrill,
+  pngCaptureMode = false,
 }: ChartRendererProps) {
   useDevRenderCount("ChartRenderer");
   const rData = chartRows;
@@ -156,85 +179,167 @@ function ChartRendererInner({
     [rData]
   );
 
-  if (rData.length === 0) return null;
+  const metricTooltipCtx = useMemo(
+    (): MetricFormatContext => ({
+      metricLabel: rAxes.valueAxis,
+      chartTitle: rAxes.valueAxis,
+      presentationKind: rKind,
+    }),
+    [rAxes.valueAxis, rKind]
+  );
 
-  const tickSamples = collectSampleTickStrings(rData);
-
-  const categoryPlan: VerticalCategoryAxisPlan | null =
-    rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area"
-      ? insightMode
-        ? insightCartesianPlanMain
-        : sessionCartesianPlanMain
-      : null;
-
-  const manyCategoryLegacy =
-    categoryPlan == null &&
-    (rKind === "bar_horizontal" ||
-      (rKind === "bar" && rData.length > 8) ||
-      (rKind === "histogram" && rData.length > 8) ||
-      ((rKind === "line" || rKind === "area") && rData.length > 14) ||
-      (rKind === "scatter" && rData.length > 22));
+  const cartesianTooltip = useMemo(
+    () =>
+      buildChartCartesianTooltipHandlers(
+        rAxes.categoryAxis,
+        rAxes.valueAxis,
+        metricTooltipCtx,
+        rKind === "line" || rKind === "area"
+          ? {
+              categoryFormatter: (v) =>
+                formatChartAxisCategoryTick(
+                  formatTrendXAxisTickLabel(v),
+                  compact
+                ),
+            }
+          : rKind === "bar" || rKind === "histogram"
+            ? { categoryFormatter: (v) => formatCategoryTick(v) }
+            : undefined
+      ),
+    [
+      rAxes.categoryAxis,
+      rAxes.valueAxis,
+      metricTooltipCtx,
+      rKind,
+      compact,
+      formatCategoryTick,
+    ]
+  );
 
   const chartLayoutMode = compact ? "compact" : "full";
   const insightUi = insightMode && !compact;
+
+  const categoryTickStrings = useMemo(
+    () => rData.map((r) => String(r.name ?? "")),
+    [rData]
+  );
+
+  const cartesianLayout = useMemo(() => {
+    if (rData.length === 0) return null;
+
+    const tickSamples = collectSampleTickStrings(rData);
+
+    const categoryPlan: VerticalCategoryAxisPlan | null =
+      rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area"
+        ? insightMode
+          ? insightCartesianPlanMain
+          : sessionCartesianPlanMain
+        : null;
+
+    const manyCategoryLegacy =
+      categoryPlan == null &&
+      (rKind === "bar_horizontal" ||
+        (rKind === "bar" && rData.length > 8) ||
+        (rKind === "histogram" && rData.length > 8) ||
+        ((rKind === "line" || rKind === "area") && rData.length > 14) ||
+        (rKind === "scatter" && rData.length > 22));
+
+    const plotInnerHeightPx =
+      chartLayoutMode === "full"
+        ? Math.max(120, Math.floor(chartHeight * 0.86))
+        : Math.max(72, Math.floor(chartHeight * 0.52));
+    const verticalValueLayout = computeVerticalValueAxisLayout({
+      valueAxisLabel: rAxes.valueAxisCompact,
+      valueAxisMeasureLabel: rAxes.valueAxis,
+      tickSampleStrings: tickSamples,
+      chartLayoutMode,
+      plotInnerHeightPx,
+    });
+
+    const vmBalanced = balanceVerticalOuterMargins({
+      marginLeft: verticalValueLayout.marginLeft,
+      chartLayoutMode,
+    });
+
+    const horizontalBarLayout =
+      rKind === "bar_horizontal"
+        ? computeHorizontalBarAxisLayout({
+            categoryTickStrings,
+            valueAxisLabel: rAxes.valueAxisCompact,
+            valueAxisFull: rAxes.valueAxis,
+            categoryAxisLabel: rAxes.categoryAxis,
+            chartLayoutMode,
+          })
+        : null;
+
+    const categoryAxisBottomMargin =
+      rKind === "scatter" ||
+      rKind === "pie" ||
+      rKind === "donut" ||
+      rKind === "bar_horizontal"
+        ? 0
+        : categoryPlan &&
+            (rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area")
+          ? computeCategoryAxisBottomMargin({
+              categoryTickStrings,
+              angled: categoryPlan.angled,
+              tickFontSizePx: categoryPlan.tickFontSizePx,
+              chartLayoutMode,
+            })
+          : computeCategoryAxisBottomMargin({
+              categoryTickStrings,
+              angled:
+                manyCategoryLegacy &&
+                (rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area"),
+              chartLayoutMode,
+            });
+
+    return {
+      tickSamples,
+      categoryPlan,
+      manyCategoryLegacy,
+      plotInnerHeightPx,
+      verticalValueLayout,
+      vmBalanced,
+      horizontalBarLayout,
+      categoryAxisBottomMargin,
+    };
+  }, [
+    rData,
+    rKind,
+    insightMode,
+    insightCartesianPlanMain,
+    sessionCartesianPlanMain,
+    rAxes.valueAxisCompact,
+    rAxes.valueAxis,
+    rAxes.categoryAxis,
+    chartLayoutMode,
+    chartHeight,
+    categoryTickStrings,
+  ]);
+
+  if (rData.length === 0 || !cartesianLayout) return null;
+
+  const {
+    categoryPlan,
+    manyCategoryLegacy,
+    verticalValueLayout,
+    vmBalanced,
+    horizontalBarLayout,
+    categoryAxisBottomMargin,
+  } = cartesianLayout;
+
   const insightLayoutViewportW = insightUi
     ? getInsightLayoutMetrics(rKind).planViewportPx
     : viewportW;
-  const rechartsAnimActive = rData.length <= RECHARTS_ANIMATION_MAX_POINTS;
-  const plotInnerHeightPx =
-    chartLayoutMode === "full"
-      ? Math.max(120, Math.floor(chartHeight * 0.86))
-      : Math.max(72, Math.floor(chartHeight * 0.52));
-  const verticalValueLayout = computeVerticalValueAxisLayout({
-    valueAxisLabel: rAxes.valueAxisCompact,
-    valueAxisMeasureLabel: rAxes.valueAxis,
-    tickSampleStrings: tickSamples,
-    chartLayoutMode,
-    plotInnerHeightPx,
-  });
-
-  const vmBalanced = balanceVerticalOuterMargins({
-    marginLeft: verticalValueLayout.marginLeft,
-    chartLayoutMode,
-  });
+  const rechartsAnimActive =
+    !pngCaptureMode && rData.length <= RECHARTS_ANIMATION_MAX_POINTS;
+  const rechartsAnimDuration = pngCaptureMode ? 0 : undefined;
 
   const pickCartesianMargin = (bottomForCartesian: number) =>
     verticalCartesianOuterMargins(rKind, vmBalanced, bottomForCartesian, {
       insightUi,
     });
-
-  const horizontalBarLayout =
-    rKind === "bar_horizontal"
-      ? computeHorizontalBarAxisLayout({
-          categoryTickStrings: rData.map((r) => String(r.name ?? "")),
-          valueAxisLabel: rAxes.valueAxisCompact,
-          valueAxisFull: rAxes.valueAxis,
-          categoryAxisLabel: rAxes.categoryAxis,
-          chartLayoutMode,
-        })
-      : null;
-
-  const categoryAxisBottomMargin =
-    rKind === "scatter" ||
-    rKind === "pie" ||
-    rKind === "donut" ||
-    rKind === "bar_horizontal"
-      ? 0
-      : categoryPlan &&
-          (rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area")
-        ? computeCategoryAxisBottomMargin({
-            categoryTickStrings: rData.map((r) => String(r.name ?? "")),
-            angled: categoryPlan.angled,
-            tickFontSizePx: categoryPlan.tickFontSizePx,
-            chartLayoutMode,
-          })
-        : computeCategoryAxisBottomMargin({
-            categoryTickStrings: rData.map((r) => String(r.name ?? "")),
-            angled:
-              manyCategoryLegacy &&
-              (rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area"),
-            chartLayoutMode,
-          });
 
   const insightVBarCatDense =
     insightUi &&
@@ -316,7 +421,11 @@ function ChartRendererInner({
       chartLayoutMode,
     });
     return (
-      <ResponsiveContainer width="100%" height={chartHeight}>
+      <ResponsiveContainer
+        key={rechartsContainerKey("bar_horizontal", viewportW, chartHeight, pngCaptureMode)}
+        width="100%"
+        height={chartHeight}
+      >
         <BarChart
           layout="vertical"
           data={rData}
@@ -395,6 +504,7 @@ function ChartRendererInner({
               radius={[0, 6, 6, 0]}
               maxBarSize={compact ? 22 : insightUi ? 32 : 26}
               isAnimationActive={rechartsAnimActive}
+            animationDuration={rechartsAnimDuration}
               cursor={canInsightDrill ? "pointer" : "default"}
               onClick={(entry: unknown) => {
                 if (!canInsightDrill) return;
@@ -418,7 +528,11 @@ function ChartRendererInner({
   ) {
     const keys = stackedSpec.seriesKeys;
     return (
-      <ResponsiveContainer width="100%" height={chartHeight}>
+      <ResponsiveContainer
+        key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
+        width="100%"
+        height={chartHeight}
+      >
         <BarChart
           data={rData}
           margin={pickCartesianMargin(insightVBarBottomPad)}
@@ -491,6 +605,7 @@ function ChartRendererInner({
               fill={PIE_COLORS[i % PIE_COLORS.length]}
               maxBarSize={compact ? 40 : 48}
               isAnimationActive={rechartsAnimActive}
+            animationDuration={rechartsAnimDuration}
               cursor={canInsightDrill ? "pointer" : "default"}
               onClick={(d: unknown) => {
                 if (!canInsightDrill) return;
@@ -508,7 +623,11 @@ function ChartRendererInner({
 
   if (rKind === "scatter") {
     return (
-      <ResponsiveContainer width="100%" height={chartHeight}>
+      <ResponsiveContainer
+        key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
+        width="100%"
+        height={chartHeight}
+      >
         <ScatterChart
           margin={pickCartesianMargin(
             Math.max(
@@ -588,6 +707,7 @@ function ChartRendererInner({
             fill="#6366f1"
             fillOpacity={0.88}
             isAnimationActive={rechartsAnimActive}
+            animationDuration={rechartsAnimDuration}
           />
         </ScatterChart>
       </ResponsiveContainer>
@@ -599,7 +719,11 @@ function ChartRendererInner({
       rKind === "pie" ? 0 : compact ? 52 : 62;
     const piePad = computePieChartMargins(rAxes.valueAxisCompact);
     return (
-      <ResponsiveContainer width="100%" height={chartHeight}>
+      <ResponsiveContainer
+        key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
+        width="100%"
+        height={chartHeight}
+      >
         <PieChart
           margin={radialChartOuterMargins(rKind, compact, piePad)}
         >
@@ -615,6 +739,7 @@ function ChartRendererInner({
             stroke="#fff"
             strokeWidth={2}
             isAnimationActive={rechartsAnimActive}
+            animationDuration={rechartsAnimDuration}
             cursor={canInsightDrill ? "pointer" : "default"}
             onClick={(d) => {
               if (!canInsightDrill) return;
@@ -640,17 +765,23 @@ function ChartRendererInner({
             {...CHART_TOOLTIP_FRAME}
             formatter={(v, _n, item) => {
               const p = item?.payload as ChartRow;
-              const d = p?.displayValue?.trim();
-              if (d) return [d, metricTooltipName];
-              if (typeof v === "number") return [`${v.toFixed(1)}%`, metricTooltipName];
-              if (v != null && String(v).length > 0)
-                return [`${String(v)}%`, metricTooltipName];
-              return ["—", metricTooltipName];
+              return [
+                formatRadialTooltipValue(rData, p, v),
+                `${chartTooltipMetricLabel(rAxes.valueAxis)}:`,
+              ];
             }}
-            labelFormatter={(l) => tickTruncate(String(l ?? ""))}
+            labelFormatter={(_, items) => {
+              const arr = items as unknown as readonly { payload?: ChartRow }[];
+              const p = arr?.[0]?.payload;
+              return formatChartTooltipCategoryLine(
+                rAxes.categoryAxis,
+                String(p?.name ?? "")
+              );
+            }}
           />
           <Legend
             wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
+            iconType="circle"
             formatter={(v) => tickTruncate(v)}
           />
         </PieChart>
@@ -675,7 +806,11 @@ function ChartRendererInner({
       chartLayoutMode,
     });
     return (
-      <ResponsiveContainer width="100%" height={chartHeight}>
+      <ResponsiveContainer
+        key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
+        width="100%"
+        height={chartHeight}
+      >
         <BarChart
           layout="vertical"
           data={rData}
@@ -725,13 +860,8 @@ function ChartRendererInner({
           />
           <Tooltip
             {...CHART_TOOLTIP_FRAME}
-            formatter={(v, _n, item) => {
-              const p = item?.payload as ChartRow;
-              const d = p?.displayValue?.trim();
-              const shown = d ?? (v == null ? "—" : v);
-              return [shown, metricTooltipName];
-            }}
-            labelFormatter={(l) => String(l ?? "").trim() || "—"}
+            formatter={cartesianTooltip.formatter}
+            labelFormatter={cartesianTooltip.labelFormatter}
           />
           <Bar
             dataKey="value"
@@ -740,6 +870,7 @@ function ChartRendererInner({
             maxBarSize={compact ? 28 : insightUi ? 48 : 36}
             activeBar={{ opacity: 0.88 }}
             isAnimationActive={rechartsAnimActive}
+            animationDuration={rechartsAnimDuration}
             cursor={canInsightDrill ? "pointer" : "default"}
             onClick={(entry: unknown) => {
               if (!canInsightDrill) return;
@@ -779,7 +910,11 @@ function ChartRendererInner({
     const trendXAxisHeight = lineAreaXAxisHeightPx(compact);
     const hideMarkers = rData.length > 45;
     return (
-      <ResponsiveContainer width="100%" height={chartHeight}>
+      <ResponsiveContainer
+        key={rechartsContainerKey(rKind, trendViewport, chartHeight, pngCaptureMode)}
+        width="100%"
+        height={chartHeight}
+      >
         <ChartBody
           data={rData}
           margin={pickCartesianMargin(lineAreaBottomMargin)}
@@ -850,6 +985,7 @@ function ChartRendererInner({
               fill="#6366f1"
               fillOpacity={0.22}
               isAnimationActive={rechartsAnimActive}
+            animationDuration={rechartsAnimDuration}
               dot={
                 hideMarkers
                   ? false
@@ -870,6 +1006,7 @@ function ChartRendererInner({
               stroke="#4f46e5"
               strokeWidth={2.5}
               isAnimationActive={rechartsAnimActive}
+            animationDuration={rechartsAnimDuration}
               dot={
                 hideMarkers
                   ? false
@@ -890,7 +1027,11 @@ function ChartRendererInner({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={chartHeight}>
+    <ResponsiveContainer
+      key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
+      width="100%"
+      height={chartHeight}
+    >
       <BarChart
         data={rData}
         barCategoryGap={
@@ -951,16 +1092,11 @@ function ChartRendererInner({
               : undefined
           }
         />
-        <Tooltip
-          {...CHART_TOOLTIP_FRAME}
-          formatter={(v, _n, item) => {
-            const p = item?.payload as ChartRow;
-            const d = p?.displayValue?.trim();
-            const shown = d ?? (v == null ? "—" : v);
-            return [shown, metricTooltipName];
-          }}
-          labelFormatter={(l) => tickTruncate(String(l ?? ""))}
-        />
+          <Tooltip
+            {...CHART_TOOLTIP_FRAME}
+            formatter={cartesianTooltip.formatter}
+            labelFormatter={cartesianTooltip.labelFormatter}
+          />
         <Bar
           dataKey="value"
           fill="#6366f1"
@@ -968,6 +1104,7 @@ function ChartRendererInner({
           maxBarSize={isHistogram ? (compact ? 52 : 60) : compact ? 40 : 56}
           activeBar={{ opacity: 0.9 }}
           isAnimationActive={rechartsAnimActive}
+            animationDuration={rechartsAnimDuration}
           cursor={canInsightDrill ? "pointer" : "default"}
           onClick={(entry: unknown) => {
             if (!canInsightDrill) return;
