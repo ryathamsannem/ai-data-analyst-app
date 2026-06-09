@@ -216,87 +216,130 @@ function ChartRendererInner({
     ]
   );
 
-  if (rData.length === 0) return null;
-
-  const tickSamples = collectSampleTickStrings(rData);
-
-  const categoryPlan: VerticalCategoryAxisPlan | null =
-    rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area"
-      ? insightMode
-        ? insightCartesianPlanMain
-        : sessionCartesianPlanMain
-      : null;
-
-  const manyCategoryLegacy =
-    categoryPlan == null &&
-    (rKind === "bar_horizontal" ||
-      (rKind === "bar" && rData.length > 8) ||
-      (rKind === "histogram" && rData.length > 8) ||
-      ((rKind === "line" || rKind === "area") && rData.length > 14) ||
-      (rKind === "scatter" && rData.length > 22));
-
   const chartLayoutMode = compact ? "compact" : "full";
   const insightUi = insightMode && !compact;
+
+  const categoryTickStrings = useMemo(
+    () => rData.map((r) => String(r.name ?? "")),
+    [rData]
+  );
+
+  const cartesianLayout = useMemo(() => {
+    if (rData.length === 0) return null;
+
+    const tickSamples = collectSampleTickStrings(rData);
+
+    const categoryPlan: VerticalCategoryAxisPlan | null =
+      rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area"
+        ? insightMode
+          ? insightCartesianPlanMain
+          : sessionCartesianPlanMain
+        : null;
+
+    const manyCategoryLegacy =
+      categoryPlan == null &&
+      (rKind === "bar_horizontal" ||
+        (rKind === "bar" && rData.length > 8) ||
+        (rKind === "histogram" && rData.length > 8) ||
+        ((rKind === "line" || rKind === "area") && rData.length > 14) ||
+        (rKind === "scatter" && rData.length > 22));
+
+    const plotInnerHeightPx =
+      chartLayoutMode === "full"
+        ? Math.max(120, Math.floor(chartHeight * 0.86))
+        : Math.max(72, Math.floor(chartHeight * 0.52));
+    const verticalValueLayout = computeVerticalValueAxisLayout({
+      valueAxisLabel: rAxes.valueAxisCompact,
+      valueAxisMeasureLabel: rAxes.valueAxis,
+      tickSampleStrings: tickSamples,
+      chartLayoutMode,
+      plotInnerHeightPx,
+    });
+
+    const vmBalanced = balanceVerticalOuterMargins({
+      marginLeft: verticalValueLayout.marginLeft,
+      chartLayoutMode,
+    });
+
+    const horizontalBarLayout =
+      rKind === "bar_horizontal"
+        ? computeHorizontalBarAxisLayout({
+            categoryTickStrings,
+            valueAxisLabel: rAxes.valueAxisCompact,
+            valueAxisFull: rAxes.valueAxis,
+            categoryAxisLabel: rAxes.categoryAxis,
+            chartLayoutMode,
+          })
+        : null;
+
+    const categoryAxisBottomMargin =
+      rKind === "scatter" ||
+      rKind === "pie" ||
+      rKind === "donut" ||
+      rKind === "bar_horizontal"
+        ? 0
+        : categoryPlan &&
+            (rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area")
+          ? computeCategoryAxisBottomMargin({
+              categoryTickStrings,
+              angled: categoryPlan.angled,
+              tickFontSizePx: categoryPlan.tickFontSizePx,
+              chartLayoutMode,
+            })
+          : computeCategoryAxisBottomMargin({
+              categoryTickStrings,
+              angled:
+                manyCategoryLegacy &&
+                (rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area"),
+              chartLayoutMode,
+            });
+
+    return {
+      tickSamples,
+      categoryPlan,
+      manyCategoryLegacy,
+      plotInnerHeightPx,
+      verticalValueLayout,
+      vmBalanced,
+      horizontalBarLayout,
+      categoryAxisBottomMargin,
+    };
+  }, [
+    rData,
+    rKind,
+    insightMode,
+    insightCartesianPlanMain,
+    sessionCartesianPlanMain,
+    rAxes.valueAxisCompact,
+    rAxes.valueAxis,
+    rAxes.categoryAxis,
+    chartLayoutMode,
+    chartHeight,
+    categoryTickStrings,
+  ]);
+
+  if (rData.length === 0 || !cartesianLayout) return null;
+
+  const {
+    categoryPlan,
+    manyCategoryLegacy,
+    verticalValueLayout,
+    vmBalanced,
+    horizontalBarLayout,
+    categoryAxisBottomMargin,
+  } = cartesianLayout;
+
   const insightLayoutViewportW = insightUi
     ? getInsightLayoutMetrics(rKind).planViewportPx
     : viewportW;
   const rechartsAnimActive =
     !pngCaptureMode && rData.length <= RECHARTS_ANIMATION_MAX_POINTS;
   const rechartsAnimDuration = pngCaptureMode ? 0 : undefined;
-  const plotInnerHeightPx =
-    chartLayoutMode === "full"
-      ? Math.max(120, Math.floor(chartHeight * 0.86))
-      : Math.max(72, Math.floor(chartHeight * 0.52));
-  const verticalValueLayout = computeVerticalValueAxisLayout({
-    valueAxisLabel: rAxes.valueAxisCompact,
-    valueAxisMeasureLabel: rAxes.valueAxis,
-    tickSampleStrings: tickSamples,
-    chartLayoutMode,
-    plotInnerHeightPx,
-  });
-
-  const vmBalanced = balanceVerticalOuterMargins({
-    marginLeft: verticalValueLayout.marginLeft,
-    chartLayoutMode,
-  });
 
   const pickCartesianMargin = (bottomForCartesian: number) =>
     verticalCartesianOuterMargins(rKind, vmBalanced, bottomForCartesian, {
       insightUi,
     });
-
-  const horizontalBarLayout =
-    rKind === "bar_horizontal"
-      ? computeHorizontalBarAxisLayout({
-          categoryTickStrings: rData.map((r) => String(r.name ?? "")),
-          valueAxisLabel: rAxes.valueAxisCompact,
-          valueAxisFull: rAxes.valueAxis,
-          categoryAxisLabel: rAxes.categoryAxis,
-          chartLayoutMode,
-        })
-      : null;
-
-  const categoryAxisBottomMargin =
-    rKind === "scatter" ||
-    rKind === "pie" ||
-    rKind === "donut" ||
-    rKind === "bar_horizontal"
-      ? 0
-      : categoryPlan &&
-          (rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area")
-        ? computeCategoryAxisBottomMargin({
-            categoryTickStrings: rData.map((r) => String(r.name ?? "")),
-            angled: categoryPlan.angled,
-            tickFontSizePx: categoryPlan.tickFontSizePx,
-            chartLayoutMode,
-          })
-        : computeCategoryAxisBottomMargin({
-            categoryTickStrings: rData.map((r) => String(r.name ?? "")),
-            angled:
-              manyCategoryLegacy &&
-              (rKind === "bar" || rKind === "histogram" || rKind === "line" || rKind === "area"),
-            chartLayoutMode,
-          });
 
   const insightVBarCatDense =
     insightUi &&

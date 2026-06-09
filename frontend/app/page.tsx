@@ -82,7 +82,6 @@ import {
   presentationCapturePlotStyle,
 } from "@/lib/chart-png-export-layout";
 import { ChartPngOffscreenHost } from "@/lib/chart-png-offscreen-host";
-import { runChartPngExport } from "@/lib/chart-png-export-session";
 import {
   formatExecutiveMetricValue,
   formatMetricSpreadGap,
@@ -589,7 +588,6 @@ import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   datasetKindLabel,
   loadReportBranding,
-  runExecutivePdfExport,
   saveReportBranding,
   type ReportBranding,
 } from "./pdf-report";
@@ -4401,7 +4399,9 @@ function useOverviewDashPlotHeight(): number {
 }
 
 /** Overview mini-chart grid only — reads theme tokens from globals.css. */
-function useOverviewDashGridStyle(): { stroke: string; opacity: number } {
+function useOverviewDashGridStyle(
+  enabled = true
+): { stroke: string; opacity: number } {
   const read = (): { stroke: string; opacity: number } => {
     if (typeof document === "undefined") {
       return { stroke: "#e2e8f0", opacity: 0.28 };
@@ -4420,6 +4420,7 @@ function useOverviewDashGridStyle(): { stroke: string; opacity: number } {
   };
   const [grid, setGrid] = useState(() => read());
   useEffect(() => {
+    if (!enabled) return;
     const sync = () => setGrid(read());
     sync();
     const obs = new MutationObserver(sync);
@@ -4428,8 +4429,23 @@ function useOverviewDashGridStyle(): { stroke: string; opacity: number } {
       attributeFilter: ["class"],
     });
     return () => obs.disconnect();
-  }, []);
+  }, [enabled]);
   return grid;
+}
+
+async function waitForHiddenChartCapture(
+  getEl: () => HTMLDivElement | null,
+  maxMs = 3200
+): Promise<HTMLDivElement | null> {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    const el = getEl();
+    if (el?.querySelector("svg")) return el;
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  }
+  return getEl();
 }
 
 const OV_DASH_CHART_MARGIN = {
@@ -4575,6 +4591,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   snapshotId,
   viewportWidthPx,
   plotHeightPx,
+  dashGridStyle,
   loadingPulse,
   onDashboardDrill,
   onViewInChartsTab,
@@ -4591,6 +4608,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   viewportWidthPx: number;
   /** Matches CSS `--overview-chart-plot-min-h` for Recharts explicit height. */
   plotHeightPx: number;
+  dashGridStyle: { stroke: string; opacity: number };
   /** Subtle busy state when dataset refresh is in flight. */
   loadingPulse?: boolean;
   /** Click a chart category (or slice) to tighten global dashboard filters. */
@@ -4611,7 +4629,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   const [offscreenExportLayout, setOffscreenExportLayout] = useState<ReturnType<
     typeof buildPresentationExportSpec
   > | null>(null);
-  const dashGrid = useOverviewDashGridStyle();
+  const dashGrid = dashGridStyle;
   const drillPrimary = chart.interaction?.drillDimensions.find(
     (d) => d.role === "primary"
   )
@@ -5276,6 +5294,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               });
               try {
                 setOffscreenExportLayout(spec);
+                const { runChartPngExport } = await import(
+                  "@/lib/chart-png-export-session"
+                );
                 await runChartPngExport({
                   getExportRoot: () => offscreenExportRef.current,
                   kind: displayKind,
@@ -5377,6 +5398,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   chart,
   canonicalTitle,
   snapshotId,
+  dashGridStyle,
   loadingPulse,
   onDashboardDrill,
   onOpenDashboardChartInChartsTab,
@@ -5387,6 +5409,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   chart: AutoDashboardMiniChart;
   canonicalTitle: string;
   snapshotId: string | null;
+  dashGridStyle: { stroke: string; opacity: number };
   exportFooterHint?: string | null;
   loadingPulse?: boolean;
   onDashboardDrill?: (ev: { column: string; label: string; value: string }) => void;
@@ -5438,6 +5461,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
         snapshotId={snapshotId}
         viewportWidthPx={layoutWidthPx}
         plotHeightPx={plotHeightPx}
+        dashGridStyle={dashGridStyle}
         loadingPulse={loadingPulse}
         onDashboardDrill={onDashboardDrill}
         onViewInChartsTab={snapshotId ? handleViewInChartsTab : undefined}
@@ -6485,6 +6509,8 @@ function HomeInner() {
   /** Off-screen charts for PDF/PNG capture (session vs AI insight bundles). */
   const chartCaptureSessionRef = useRef<HTMLDivElement | null>(null);
   const chartCaptureInsightRef = useRef<HTMLDivElement | null>(null);
+  const [pdfCaptureMounted, setPdfCaptureMounted] = useState(false);
+  const skipFilteredDashboardOnceRef = useRef(false);
   const chartsTabOffscreenExportRef = useRef<HTMLDivElement | null>(null);
   const [chartsTabOffscreenLayout, setChartsTabOffscreenLayout] = useState<
     ReturnType<typeof buildPresentationExportSpec> | null
@@ -6496,6 +6522,7 @@ function HomeInner() {
   const [aiAnswerByChartId, setAiAnswerByChartId] =
     useState<ChartInsightAnswerStore>({});
   const [activeTab, setActiveTab] = useState<MainNavTabId>("overview");
+  const overviewDashGridStyle = useOverviewDashGridStyle(activeTab === "overview");
   const [pilotInfoModal, setPilotInfoModal] = useState<
     Exclude<PilotNavTarget, "home"> | null
   >(null);
@@ -6770,7 +6797,6 @@ function HomeInner() {
     if (!plan) return;
     setPlanTierState(plan.tier);
     setPlanUsage(plan);
-    notifyUsageRefresh();
   }, []);
 
   useEffect(() => {
@@ -6921,6 +6947,10 @@ function HomeInner() {
 
   useEffect(() => {
     if (columns.length === 0) return;
+    if (skipFilteredDashboardOnceRef.current) {
+      skipFilteredDashboardOnceRef.current = false;
+      return;
+    }
     const controller = new AbortController();
     const t = window.setTimeout(() => {
       const datePayload =
@@ -7183,6 +7213,7 @@ function HomeInner() {
       setError("");
       setExportingChartsTabPng(true);
       setChartsTabOffscreenLayout(spec);
+      const { runChartPngExport } = await import("@/lib/chart-png-export-session");
       await runChartPngExport({
         getExportRoot: () => chartsTabOffscreenExportRef.current,
         kind: sessionChartKindRef.current,
@@ -7394,6 +7425,7 @@ function HomeInner() {
           productColumn: mapping.product_column || mapping.productColumn,
         })
       );
+      skipFilteredDashboardOnceRef.current = true;
       setAutoDashboard(parseAutoDashboardPayload(data.auto_dashboard));
       setSelectedSheet(data.selected_sheet || "");
       setSheets(data.sheets || []);
@@ -7502,6 +7534,7 @@ function HomeInner() {
           productColumn: mapping.product_column || mapping.productColumn,
         })
       );
+      skipFilteredDashboardOnceRef.current = true;
       setAutoDashboard(parseAutoDashboardPayload(data.auto_dashboard));
       setSelectedSheet(data.selected_sheet || "");
       setSheets(data.sheets || []);
@@ -7812,12 +7845,13 @@ function HomeInner() {
       }
 
       const data = await response.json();
-      fetchPlanUsage()
-        .then((payload) => {
-          setPlanUsage(payload);
-          notifyUsageRefresh();
-        })
-        .catch(() => {});
+      if (data.plan && typeof data.plan === "object") {
+        applyPlanEnvelope(data.plan as PlanUsageResponse);
+      } else {
+        fetchPlanUsage()
+          .then((payload) => setPlanUsage(payload))
+          .catch(() => {});
+      }
 
       if (typeof data.filter_breadcrumb === "string") {
         setFilterBreadcrumb(data.filter_breadcrumb);
@@ -8141,6 +8175,7 @@ function HomeInner() {
           productColumn: productColumn || undefined,
         })
       );
+      skipFilteredDashboardOnceRef.current = true;
       setAutoDashboard(parseAutoDashboardPayload(data.auto_dashboard));
       if (data.profile && typeof data.profile === "object") {
         setProfile(data.profile as DatasetProfile);
@@ -8478,7 +8513,13 @@ function HomeInner() {
     }));
   }, [autoDashboard, profile, effectiveSales, rows, columns, datasetKind]);
 
+  const dataPreviewDerivationsActive =
+    activeTab === "preview" || activeTab === "export";
+
   const previewColumnHeaderSecondaryMap = useMemo(() => {
+    if (activeTab !== "preview" || columns.length === 0) {
+      return new Map<string, ColumnQualityBadge | null>();
+    }
     const m = new Map<string, ColumnQualityBadge | null>();
     for (const col of columns) {
       m.set(
@@ -8492,19 +8533,19 @@ function HomeInner() {
       );
     }
     return m;
-  }, [columns, profile, rows, preview]);
+  }, [activeTab, columns, profile, rows, preview]);
 
   const dataPreviewQualityNotes = useMemo(
     () =>
-      columns.length > 0
+      activeTab === "preview" && columns.length > 0
         ? buildDataPreviewQualityNotes({ columns, profile, preview })
         : [],
-    [columns, profile, preview]
+    [activeTab, columns, profile, preview]
   );
 
   const dataPreviewSuggestedQuestions = useMemo(
     () =>
-      columns.length > 0
+      activeTab === "preview" && columns.length > 0
         ? buildDataPreviewSuggestedQuestions({
             columns,
             profile,
@@ -8515,6 +8556,7 @@ function HomeInner() {
           })
         : [],
     [
+      activeTab,
       columns,
       profile,
       datasetKind,
@@ -8525,14 +8567,22 @@ function HomeInner() {
   );
 
   const deferredDataPreviewSearch = useDeferredValue(
-    dataPreviewSearchQuery.replace(/\s+/g, " ").trim()
+    dataPreviewDerivationsActive
+      ? dataPreviewSearchQuery.replace(/\s+/g, " ").trim()
+      : ""
   );
 
   const dataPreviewFilteredRows = useMemo(() => {
+    if (!dataPreviewDerivationsActive) return preview;
     const q = deferredDataPreviewSearch.toLowerCase();
     if (!q) return preview;
     return preview.filter((row) => previewRowMatchesSearch(row, columns, q));
-  }, [preview, columns, deferredDataPreviewSearch]);
+  }, [
+    dataPreviewDerivationsActive,
+    preview,
+    columns,
+    deferredDataPreviewSearch,
+  ]);
 
   const dataPreviewSortedRows = useMemo(
     () =>
@@ -8578,9 +8628,11 @@ function HomeInner() {
   );
 
   const dataPreviewPageRows = useMemo(() => {
+    if (activeTab !== "preview") return [];
     const start = dataPreviewSafePageIndex * dataPreviewPageSize;
     return dataPreviewSortedRows.slice(start, start + dataPreviewPageSize);
   }, [
+    activeTab,
     dataPreviewSortedRows,
     dataPreviewSafePageIndex,
     dataPreviewPageSize,
@@ -10598,6 +10650,7 @@ function HomeInner() {
   >(async () => {});
 
   downloadReportImplRef.current = async (options?: Partial<ExportOptions>) => {
+      let pdfCaptureActive = false;
       try {
         setError("");
         const pdfRemaining = planUsage?.usage.pdf_exports_remaining;
@@ -11056,6 +11109,17 @@ function HomeInner() {
           })()
         : null;
 
+      let captureEl: HTMLDivElement | null = null;
+      if (resolved.includeChart) {
+        setPdfCaptureMounted(true);
+        pdfCaptureActive = true;
+        captureEl = await waitForHiddenChartCapture(() =>
+          chartScope === "insight"
+            ? chartCaptureInsightRef.current
+            : chartCaptureSessionRef.current
+        );
+      }
+
       const chartPrep: PdfChartPrepContext | null = resolved.includeChart
         ? {
             presentationKind:
@@ -11074,10 +11138,7 @@ function HomeInner() {
             aggregation: pdfAggregation,
             chartInsightBadge: pdfChartInsightBadge,
             chartAxisLabels: pdfChartAxisLabels,
-            captureEl:
-              chartScope === "insight"
-                ? chartCaptureInsightRef.current
-                : chartCaptureSessionRef.current,
+            captureEl,
             chartAttribution: chartExportAttribution,
             provenanceSlice,
             metricType: pdfViz?.chartRecommendation?.metricType ?? null,
@@ -11157,6 +11218,7 @@ function HomeInner() {
       }
 
       try {
+        const { runExecutivePdfExport } = await import("./pdf-report");
         await runExecutivePdfExport(built.input);
       } catch (exportErr) {
         if (quotaReserved) {
@@ -11173,6 +11235,8 @@ function HomeInner() {
     } catch (err) {
       console.error("PDF generation failed:", err);
       setError("Unable to generate PDF report.");
+    } finally {
+      if (pdfCaptureActive) setPdfCaptureMounted(false);
     }
   };
 
@@ -11326,7 +11390,7 @@ function HomeInner() {
               />
             </div>
           ) : null}
-          {chartData.length > 0 && (
+          {pdfCaptureMounted && chartData.length > 0 && (
             <div
               ref={chartCaptureSessionRef}
               className="pdf-chart-capture chart-viz-theme fixed left-[-10000px] top-0 z-0 w-[860px] min-h-[400px] overflow-hidden rounded-lg border border-slate-100/90 bg-white p-4 pb-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
@@ -11341,7 +11405,7 @@ function HomeInner() {
               </div>
             </div>
           )}
-          {insightChartData.length > 0 && (
+          {pdfCaptureMounted && insightChartData.length > 0 && (
             <div
               ref={chartCaptureInsightRef}
               className="pdf-chart-capture chart-viz-theme fixed left-[-10000px] top-0 z-0 w-[860px] min-h-0 overflow-hidden rounded-xl border border-slate-200/70 bg-white p-4 pb-5 shadow-[0_8px_28px_-10px_rgb(15_23_42_/_0.1)]"
@@ -11903,6 +11967,7 @@ function HomeInner() {
                                 chart={c}
                                 canonicalTitle={canonicalTitle}
                                 snapshotId={dashSnap?.id ?? null}
+                                dashGridStyle={overviewDashGridStyle}
                                 loadingPulse={loading}
                                 onDashboardDrill={onAutoDashboardDrill}
                                 onOpenDashboardChartInChartsTab={
