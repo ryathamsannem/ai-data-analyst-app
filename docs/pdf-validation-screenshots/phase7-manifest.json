@@ -42,7 +42,7 @@
     "combo": "kpi_insight_chart",
     "file": "phase7-retail-kpi_insight_chart.pdf",
     "pageCount": 3,
-    "textLength": 30006,
+    "textLength": 30007,
     "markers": {
       "kpi": true,
       "aiInsight": true,
@@ -61,7 +61,7 @@
     "combo": "all_sections",
     "file": "phase7-retail-all_sections.pdf",
     "pageCount": 6,
-    "textLength": 65666,
+    "textLength": 65667,
     "markers": {
       "kpi": true,
       "aiInsight": true,
@@ -156,7 +156,7 @@
     "combo": "kpi_insight_chart",
     "file": "phase7-generic-kpi_insight_chart.pdf",
     "pageCount": 3,
-    "textLength": 29996,
+    "textLength": 29997,
     "markers": {
       "kpi": true,
       "aiInsight": true,
@@ -175,7 +175,7 @@
     "combo": "all_sections",
     "file": "phase7-generic-all_sections.pdf",
     "pageCount": 6,
-    "textLength": 65670,
+    "textLength": 65671,
     "markers": {
       "kpi": true,
       "aiInsight": true,
@@ -270,7 +270,7 @@
     "combo": "kpi_insight_chart",
     "file": "phase7-geographic-kpi_insight_chart.pdf",
     "pageCount": 3,
-    "textLength": 30163,
+    "textLength": 30164,
     "markers": {
       "kpi": true,
       "aiInsight": true,
@@ -289,7 +289,7 @@
     "combo": "all_sections",
     "file": "phase7-geographic-all_sections.pdf",
     "pageCount": 6,
-    "textLength": 64238,
+    "textLength": 64239,
     "markers": {
       "kpi": true,
       "aiInsight": true,

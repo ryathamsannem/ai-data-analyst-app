@@ -30,7 +30,7 @@ export type MetricFormatContext = {
 };
 
 const PERCENT_METRIC_RE =
-  /(?:^|[_\s])(?:pct|percent|percentage|attendance_rate|utilization|share|ratio)(?:$|[_\s])|(?:pct|percent|percentage)$/i;
+  /(?:^|[_\s])(?:pct|percent|percentage|attendance_rate|utilization|conversion_rate|share|ratio|rate)(?:$|[_\s])|(?:pct|percent|percentage|_rate)$/i;
 
 const DURATION_METRIC_RE =
   /\b(duration|elapsed|latency|runtime|uptime|downtime|cycle_?time|lead_?time|wait_?time)\b|(?:^|_)(?:hours?|mins?|minutes?|seconds?|secs?|ms)(?:$|_)/i;
@@ -179,6 +179,28 @@ export function coercePercentDisplayNumber(
   return raw;
 }
 
+/** Executive chips, tooltips, and insight cards — rate metrics always show 1 decimal. */
+export function formatExecutivePercentValue(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  const rounded = Number(value.toFixed(1));
+  return `${rounded.toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })}%`;
+}
+
+/** Percentage-point spread for rate metrics — always 1 decimal + pp suffix. */
+export function formatExecutivePercentPointGap(gap: number): string {
+  if (!Number.isFinite(gap)) return "—";
+  let n = gap;
+  if (Math.abs(n) > 0 && Math.abs(n) <= 1) n = n * 100;
+  const rounded = Number(n.toFixed(1));
+  return `${rounded.toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })} pp`;
+}
+
 export function formatMetricNumber(
   value: number,
   format: MetricValueFormatKind,
@@ -288,6 +310,56 @@ export function formatRawMetricValue(
 /**
  * Executive PDF bullets and ranked signals — may use preformatted % only when metric is percent-based.
  */
+/**
+ * Top/Lowest/Gap spread — metric-aware decimals (whole $ for revenue, 1dp for %).
+ */
+export function formatMetricSpreadGap(
+  gap: number,
+  ctx: MetricFormatContext
+): string {
+  if (!Number.isFinite(gap)) return "—";
+
+  const format = resolveMetricValueFormat(ctx);
+  const abs = Math.abs(gap);
+
+  if (format === "percent") {
+    return formatExecutivePercentPointGap(gap);
+  }
+
+  if (format === "currency") {
+    return formatMetricNumber(Math.round(gap), "currency");
+  }
+
+  if (format === "duration") {
+    return formatMetricNumber(gap, "duration");
+  }
+
+  if (
+    ctx.roundingHint === "int_0" ||
+    metricLabelImpliesOperationalMetric(ctx.metricLabel)
+  ) {
+    return Math.round(gap).toLocaleString();
+  }
+
+  if (metricLabelImpliesCurrency(ctx.metricLabel ?? "")) {
+    return formatMetricNumber(Math.round(gap), "currency");
+  }
+
+  if (abs >= 100) {
+    return Math.round(gap).toLocaleString();
+  }
+
+  const label = (ctx.metricLabel ?? "").toLowerCase();
+  const scoreLike =
+    /\b(score|rating|nps|csat|satisfaction)\b/.test(label) ||
+    /_(score|rating)(?:_|$)/.test(label.replace(/\s+/g, "_"));
+  const maxFrac = scoreLike ? 1 : abs >= 10 ? 1 : 2;
+  return gap.toLocaleString(undefined, {
+    maximumFractionDigits: maxFrac,
+    minimumFractionDigits: 0,
+  });
+}
+
 export function formatExecutiveMetricValue(
   row: ChartRow,
   ctx: MetricFormatContext
@@ -298,12 +370,11 @@ export function formatExecutiveMetricValue(
     const dv = row.displayValue?.trim();
     return dv || "—";
   }
-  const dv = row.displayValue?.trim();
   if (format === "percent") {
-    if (dv?.includes("%")) return dv;
     const n = coercePercentDisplayNumber(raw, readChartRowNormalizedValue(row));
-    return formatMetricNumber(n, "percent");
+    return formatExecutivePercentValue(n);
   }
+  const dv = row.displayValue?.trim();
   if (format !== "currency" && dv && /[$€£¥]/.test(dv)) {
     return formatMetricNumber(raw, format);
   }

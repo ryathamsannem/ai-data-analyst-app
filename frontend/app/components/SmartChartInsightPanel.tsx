@@ -22,6 +22,7 @@ export type SmartInsightCard = {
   title: string;
   value: string;
   hint?: string;
+  ariaLabel?: string;
   dotClass?: string;
 };
 
@@ -63,7 +64,14 @@ export function SmartChartInsightPanel(props: {
           <p className={aiInsightsSmartReadSignalsLabel}>Signals</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-2.5">
             {strip.map((c) => (
-              <div key={c.key} className={aiInsightsSmartReadSignalCard}>
+              <div
+                key={c.key}
+                className={aiInsightsSmartReadSignalCard}
+                title={c.ariaLabel}
+                aria-label={
+                  c.ariaLabel ? `${c.title}: ${c.value}. ${c.ariaLabel}` : undefined
+                }
+              >
                 {c.dotClass ? (
                   <div
                     className={`absolute left-0 top-0 h-full w-[3px] rounded-l-xl ${c.dotClass}`}

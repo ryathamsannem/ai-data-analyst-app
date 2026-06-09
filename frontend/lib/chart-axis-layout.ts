@@ -62,13 +62,10 @@ export function balanceHorizontalOuterMargins(args: {
   const floor =
     args.minRight ??
     (mode === "compact" ? 6 : mode === "export" ? 14 : 12);
-  if (mode === "compact") {
-    return { marginLeft: ml, marginRight: Math.max(floor, ml) };
-  }
-  const capRight = mode === "export" ? 34 : 32;
+  const capRight = mode === "export" ? 28 : mode === "compact" ? 20 : 24;
   return {
     marginLeft: ml,
-    marginRight: Math.max(floor, Math.min(capRight, Math.ceil(ml * 0.12 + 12))),
+    marginRight: Math.max(floor, Math.min(capRight, Math.ceil(ml * 0.12 + 8))),
   };
 }
 
@@ -352,13 +349,11 @@ export function computeHorizontalBarAxisLayout(args: {
     : 0;
 
   const categoryAxisWidth = Math.min(
-    mode === "compact" ? 240 : 520,
-    Math.max(mode === "compact" ? 56 : 72, Math.ceil(maxCatW + (mode === "compact" ? 22 : 32)))
+    mode === "compact" ? 200 : 420,
+    Math.max(mode === "compact" ? 52 : 64, Math.ceil(maxCatW + (mode === "compact" ? 16 : 24)))
   );
-  const marginLeft = Math.min(
-    mode === "compact" ? 320 : 580,
-    Math.max(28, Math.ceil(categoryAxisWidth + (mode === "compact" ? 10 : 18)))
-  );
+  /** Category labels use `YAxis.width`; margin-left is only outer padding. */
+  const marginLeft = mode === "compact" ? 10 : 14;
 
   const marginBottom = showValueAxisTitle
     ? Math.min(52, Math.max(28, Math.ceil(titleFs * 2.2 + dispW * 0.08 + 18)))

@@ -15,6 +15,7 @@ import {
   persistSidebarCollapsed,
   readSidebarCollapsed,
 } from "@/lib/sidebar-prefs";
+import type { PilotNavTarget } from "@/lib/pilot-landing";
 import { AppHeader } from "./app-header";
 import { AppSidebar } from "./app-sidebar";
 
@@ -22,11 +23,15 @@ export const AppShell = memo(function AppShell({
   activeTab,
   onNavigate,
   datasetLoaded,
+  onPilotNav,
+  pilotNavActive,
   children,
 }: {
   activeTab: MainNavTabId;
   onNavigate: (id: MainNavTabId) => void;
   datasetLoaded: boolean;
+  onPilotNav?: (target: PilotNavTarget) => void;
+  pilotNavActive?: PilotNavTarget | null;
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -55,6 +60,14 @@ export const AppShell = memo(function AppShell({
   const toggleCollapse = useCallback(() => {
     setCollapsed((c) => !c);
   }, []);
+
+  useEffect(() => {
+    if (!prefsReady) return;
+    const timer = window.setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, [collapsed, prefsReady]);
 
   const closeMobile = useCallback(() => {
     setMobileOpen(false);
@@ -89,6 +102,8 @@ export const AppShell = memo(function AppShell({
           pageTitle={MAIN_NAV_PAGE_TITLES[activeTab]}
           datasetLoaded={datasetLoaded}
           onMenuClick={openMobile}
+          onPilotNav={onPilotNav}
+          pilotNavActive={pilotNavActive}
         />
 
         <main className="app-main-scroll">

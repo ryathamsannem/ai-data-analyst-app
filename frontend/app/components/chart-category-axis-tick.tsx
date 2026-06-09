@@ -6,7 +6,7 @@ import {
   wrapCategoryLabelLines,
 } from "@/lib/chart-axis-layout";
 
-const AXIS_TICK = "#64748b";
+const AXIS_TICK = "var(--chart-axis-tick)";
 
 type TickProps = {
   x?: number;

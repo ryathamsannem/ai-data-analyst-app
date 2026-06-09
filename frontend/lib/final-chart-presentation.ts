@@ -13,6 +13,20 @@ import {
   labelsLookTemporalForPresentation,
 } from "@/lib/relationship-scatter-presentation";
 
+const PRESENTATION_PERCENT_METRIC_RE =
+  /(?:^|[_\s])(?:pct|percent|percentage|attendance_rate|utilization|conversion_rate|conversion|ratio|rate|score|rating|satisfaction|csat|nps)(?:$|[_\s])|(?:pct|percent|percentage|_rate)$/i;
+
+function presentationMetricImpliesPercent(
+  title: string,
+  question?: string
+): boolean {
+  const blob = `${title} ${question ?? ""}`.trim();
+  if (!blob) return false;
+  const n = blob.toLowerCase().replace(/\s+/g, "_");
+  if (/\bprofit\s+margin\b/i.test(blob) || /\bmargin\s*%/.test(blob)) return true;
+  return PRESENTATION_PERCENT_METRIC_RE.test(n) || /\bpercent\b/i.test(blob);
+}
+
 function _labelLooksTemporal(name: string): boolean {
   const s = String(name ?? "").trim();
   if (!s) return false;
@@ -141,7 +155,11 @@ function barFamilyKindFromRows(args: {
         sum <= 1.02 &&
         values.every((v) => v <= 1 && v >= 0)));
 
-  if (shareLike && shareCompositionAllowed(title, question)) {
+  if (
+    shareLike &&
+    shareCompositionAllowed(title, question) &&
+    !presentationMetricImpliesPercent(title, question)
+  ) {
     return n <= 4 ? "pie" : "donut";
   }
 
@@ -212,8 +230,20 @@ export function computeFinalChartPresentation(args: {
 
   if (api === "area") return "area";
   if (api === "line") return "line";
-  if (api === "pie") return "pie";
-  if (api === "donut") return "donut";
+  if (api === "pie" || api === "donut") {
+    if (
+      !shareCompositionAllowed(title, question) ||
+      presentationMetricImpliesPercent(title, question)
+    ) {
+      return barFamilyKindFromRows({
+        apiBarLike: "bar",
+        title,
+        question,
+        rows,
+      });
+    }
+    return api;
+  }
   const apiBarLike: ChartKind =
     api === "scatter"
       ? "bar"

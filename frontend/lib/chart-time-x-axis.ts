@@ -76,7 +76,24 @@ export function formatTrendXAxisTickLabel(raw: string): string {
   const single = parseIsoDate(s);
   if (single) return formatSingleDayShort(single);
 
+  const ym = /^(\d{4})-(\d{2})$/.exec(s);
+  if (ym) {
+    const mon = MONTH_SHORT[Number(ym[2]) - 1] ?? ym[2];
+    return `${mon} '${ym[1]!.slice(2)}`;
+  }
+
   return s;
+}
+
+/** Shorter month bucket label for narrow dashboard cards. */
+export function formatCompactTrendXAxisTickLabel(raw: string): string {
+  const s = raw.trim();
+  const ym = /^(\d{4})-(\d{2})$/.exec(s);
+  if (ym) {
+    return MONTH_SHORT[Number(ym[2]) - 1] ?? s;
+  }
+  const base = formatTrendXAxisTickLabel(s);
+  return base.length > 8 ? base.slice(0, 7) + "…" : base;
 }
 
 export function temporalTickStringsForChartRows(
@@ -165,7 +182,9 @@ export function computeLineAreaXAxisInterval(
   const narrow =
     opts.compact ||
     (opts.viewportWidthPx != null && opts.viewportWidthPx < 640);
-  const maxTicks = narrow ? 6 : 10;
+  const veryNarrow =
+    opts.viewportWidthPx != null && opts.viewportWidthPx < 420;
+  const maxTicks = veryNarrow ? 4 : narrow ? 6 : 10;
 
   if (n <= 1) return 0;
   if (n <= 8) {

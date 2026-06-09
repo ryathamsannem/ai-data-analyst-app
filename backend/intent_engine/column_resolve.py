@@ -263,6 +263,15 @@ _SCORE_RATING_SUBSTRINGS: Tuple[str, ...] = (
     "csat",
 )
 
+_RATE_PCT_SUBSTRINGS: Tuple[str, ...] = (
+    "rate",
+    "pct",
+    "percent",
+    "percentage",
+    "ratio",
+    "conversion",
+)
+
 
 def resolve_synonym_metric_column(
     question: str,
@@ -290,13 +299,19 @@ def resolve_synonym_metric_column(
 
 
 def column_prefers_mean_aggregation(col_name: Optional[str]) -> bool:
-    """Score/rating-style columns should aggregate with mean, not sum."""
+    """Score/rating/rate/pct columns should aggregate with mean, not sum."""
     if not col_name:
         return False
     cn = _norm_col(str(col_name))
     if any(k in cn for k in ("revenue", "sales", "cost", "spend", "profit", "units")):
         return False
-    return any(sub in cn for sub in _SCORE_RATING_SUBSTRINGS)
+    if any(sub in cn for sub in _SCORE_RATING_SUBSTRINGS):
+        return True
+    if any(sub in cn for sub in _RATE_PCT_SUBSTRINGS):
+        return True
+    if re.search(r"(_rate|_pct|_percent|_percentage|_ratio)(?:_|$)", cn):
+        return True
+    return False
 
 
 def dimension_vocabulary_provenance_note(

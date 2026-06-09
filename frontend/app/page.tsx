@@ -55,6 +55,7 @@ import {
   type ResolveExecutiveMeasureArgs,
 } from "@/lib/insight-card-titles";
 import {
+  balanceHorizontalOuterMargins,
   balanceVerticalOuterMargins,
   collectSampleTickStrings,
   computeCategoryAxisBottomMargin,
@@ -69,11 +70,33 @@ import {
 import {
   computeLineAreaChartBottomMargin,
   computeLineAreaXAxisInterval,
+  formatCompactTrendXAxisTickLabel,
   formatTrendXAxisTickLabel,
   lineAreaXAxisHeightPx,
   sortChartRowsChronologically,
   TREND_X_AXIS_ANGLE_DEG,
 } from "@/lib/chart-time-x-axis";
+import { chartLayoutWidthKey } from "@/lib/chart-axis-theme";
+import {
+  buildPresentationExportSpec,
+  presentationCapturePlotStyle,
+} from "@/lib/chart-png-export-layout";
+import { ChartPngOffscreenHost } from "@/lib/chart-png-offscreen-host";
+import { runChartPngExport } from "@/lib/chart-png-export-session";
+import {
+  formatExecutiveMetricValue,
+  formatMetricSpreadGap,
+  metricFormatUsesPercent,
+  type MetricFormatContext,
+} from "@/lib/metric-value-format";
+import { buildChartCartesianTooltipHandlers } from "@/lib/chart-tooltip-format";
+import {
+  chartHasRateAbove100,
+  percentGapChipAriaLabel,
+  RATE_EXCEEDS_100_WARNING,
+} from "@/lib/chart-quality-warnings";
+import { useMeasuredElementWidth } from "@/lib/use-measured-element-width";
+import { CartesianXAxisTitleLabelContent } from "@/app/components/chart-value-axis-title";
 import {
   alignInsightProvenanceToPresentation,
   buildFinalChartPresentationMeta,
@@ -119,7 +142,6 @@ import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight
 import {
   formatAxisTickFromRows,
 } from "@/lib/chart-axis-formatters";
-import { PIE_COLORS } from "@/lib/chart-palette";
 import type {
   ChartSemanticHeaderModel,
   ChartSemanticVizLike,
@@ -379,20 +401,27 @@ import {
   setPlanTier,
 } from "@/lib/saas-session";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
+import { OverviewLandingHero } from "./components/home/overview-landing-hero";
+import { PilotInfoModal } from "./components/home/pilot-info-modal";
+import { PilotInfoSections } from "./components/home/pilot-info-sections";
 import { OverviewUploadSelectedState } from "./components/home/overview-upload-selected-state";
+import {
+  PILOT_HEADER_NAV,
+  type PilotNavTarget,
+} from "@/lib/pilot-landing";
+import { resolvePilotNavActive } from "@/lib/pilot-nav-state";
+import {
+  shouldAutoUploadAfterPick,
+  validateOverviewUploadPick,
+} from "@/lib/upload-auto-flow";
 import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-summary";
 import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
 import {
-  ovBtnPrimaryAccent,
   formatOverviewFilenameMiddle,
   ovBtnSecondarySm,
   ovOverviewSecondaryBtn,
   OVERVIEW_UPLOAD_ACCEPT,
-  OVERVIEW_UPLOAD_EXT_PATTERN,
   OVERVIEW_UPLOAD_FORMAT_HINT,
-  OVERVIEW_UPLOAD_INVALID_MSG,
-  ovCapabilityChip,
-  ovDatasetEmptyInset,
   ovUploadDropzone,
   ovUploadDropzoneActive,
   ovUploadDropzoneIdle,
@@ -412,6 +441,7 @@ import {
   ovDashChartTitle,
   ovDashInsightChip,
   ovDashInsightChips,
+  chartRateQualityWarningClass,
   overviewPngExportHeader,
   overviewPngExportRoot,
   ovDataHint,
@@ -582,10 +612,6 @@ import {
   Label,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
   CartesianGrid,
 } from "recharts";
 
@@ -877,6 +903,7 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
   badgeCompact: string;
   /** Highest / lead insight chip — uses detected chart data (no dataset-specific copy). */
   leadInsight?: string | null;
+  qualityWarning?: string | null;
   /** Tighter pills for AI Insights chart header. */
   compactChips?: boolean;
 }) {
@@ -935,6 +962,13 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
       </span>
       {props.leadInsight ? (
         <span className={`${leadChip} items-center`}>{props.leadInsight}</span>
+      ) : null}
+      {props.qualityWarning ? (
+        <p
+          className={`${chartRateQualityWarningClass} w-full basis-full text-center`}
+        >
+          {props.qualityWarning}
+        </p>
       ) : null}
     </div>
   );
@@ -2858,12 +2892,20 @@ function zipStoredVisualizationPairs(
   for (let i = 0; i < n; i++) {
     const v = Number(viz.values[i]);
     if (!Number.isFinite(v)) continue;
-    const fmt =
-      viz.formattedValues?.[i]?.trim() ??
-      fallbackChartNumericDisplay(
-        viz.roundingHint === "pct_1" ? "pie" : "bar",
-        v
-      );
+    const metricCtx: MetricFormatContext = {
+      metricLabel: viz.title,
+      chartTitle: viz.title,
+      roundingHint: viz.roundingHint,
+      presentationKind: viz.roundingHint === "pct_1" ? "pie" : "bar",
+    };
+    const preformatted = viz.formattedValues?.[i]?.trim();
+    const rowForFmt: ChartRow = { name: String(viz.labels[i] ?? ""), value: v };
+    let fmt: string;
+    if (preformatted && !metricFormatUsesPercent(metricCtx)) {
+      fmt = preformatted;
+    } else {
+      fmt = formatExecutiveMetricValue(rowForFmt, metricCtx);
+    }
     const xv = viz.scatterXValues?.[i];
     const xNum = typeof xv === "number" && Number.isFinite(xv) ? xv : undefined;
     const xfmt = viz.scatterXFormatted?.[i]?.trim();
@@ -2936,6 +2978,7 @@ type ExecutiveVizInsightCard = {
   title: string;
   value: string;
   hint?: string;
+  ariaLabel?: string;
   dotClass: string;
 };
 
@@ -3146,23 +3189,33 @@ function buildExecutiveVizInsights(
   ];
 
   if (rows.length > 1) {
-    const spreadDisp = formatDerivedInsightNumber(spread, roundingHint, false);
+    const gapMetricCtx: MetricFormatContext = {
+      metricLabel: measure,
+      chartTitle: measureCtx?.chartTitle,
+      presentationKind: kind,
+      roundingHint,
+    };
+    const spreadDisp = formatMetricSpreadGap(spread, gapMetricCtx);
     const pctSuffix =
-      maxR.value > 1e-9
-        ? (() => {
+      metricFormatUsesPercent(gapMetricCtx) || maxR.value <= 1e-9
+        ? ""
+        : (() => {
             const pct = (spread / maxR.value) * 100;
             if (!Number.isFinite(pct)) return "";
             const pctStr = pct >= 10 ? String(Math.round(pct)) : pct.toFixed(1);
             return ` (${pctStr}%)`;
-          })()
-        : "";
-    out.push({
+          })();
+    const gapCard: ExecutiveVizInsightCard = {
       key: "cmp-gap",
       title: buildInsightCardTitle(measure, "gap"),
       value: `${spreadDisp}${pctSuffix}`,
       hint: `${shortenLabel(maxR.label, 24)} ↔ ${shortenLabel(minR.label, 24)}`,
       dotClass: nextDot(),
-    });
+    };
+    if (metricFormatUsesPercent(gapMetricCtx)) {
+      gapCard.ariaLabel = percentGapChipAriaLabel(measure);
+    }
+    out.push(gapCard);
   }
 
   out.push({
@@ -3751,10 +3804,14 @@ function parseAutoDashboardPayload(raw: unknown): AutoDashboardPayload | null {
 type OverviewMiniInsightChip = {
   key: "top" | "lowest" | "gap";
   text: string;
+  title?: string;
 };
 
 /** Structured insight pills for overview mini charts (avoids merged single-line text). */
-function formatOverviewMiniInsightChips(rows: ChartRow[]): OverviewMiniInsightChip[] {
+function formatOverviewMiniInsightChips(
+  rows: ChartRow[],
+  opts?: { chartTitle?: string; presentationKind?: ChartKind }
+): OverviewMiniInsightChip[] {
   if (rows.length < 2) return [];
   let hi = rows[0];
   let lo = rows[0];
@@ -3764,30 +3821,35 @@ function formatOverviewMiniInsightChips(rows: ChartRow[]): OverviewMiniInsightCh
     if (r.value < lo.value) lo = r;
   }
   if (String(hi.name) === String(lo.name)) return [];
-  const hiDisp =
-    hi.displayValue?.trim() ||
-    String(hi.value ?? "").trim() ||
-    "—";
-  const loDisp =
-    lo.displayValue?.trim() ||
-    String(lo.value ?? "").trim() ||
-    "—";
+  const metricCtx: MetricFormatContext = {
+    metricLabel: opts?.chartTitle,
+    chartTitle: opts?.chartTitle,
+    presentationKind: opts?.presentationKind,
+  };
+  const hiDisp = formatExecutiveMetricValue(hi, metricCtx);
+  const loDisp = formatExecutiveMetricValue(lo, metricCtx);
   const gap =
     typeof hi.value === "number" && typeof lo.value === "number"
       ? hi.value - lo.value
       : NaN;
-  const hasDecimals = rows.some(
-    (r) => Number.isFinite(r.value) && !Number.isInteger(r.value)
-  );
   const gapDisp = Number.isFinite(gap)
-    ? hasDecimals
-      ? gap.toLocaleString(undefined, { maximumFractionDigits: 2 })
-      : Math.round(gap).toLocaleString()
+    ? formatMetricSpreadGap(gap, {
+        metricLabel: opts?.chartTitle,
+        chartTitle: opts?.chartTitle,
+        presentationKind: opts?.presentationKind,
+      })
     : "—";
+  const gapChip: OverviewMiniInsightChip = {
+    key: "gap",
+    text: `Gap: ${gapDisp}`,
+  };
+  if (metricFormatUsesPercent(metricCtx)) {
+    gapChip.title = percentGapChipAriaLabel(opts?.chartTitle);
+  }
   return [
     { key: "top", text: `Top: ${String(hi.name)} (${hiDisp})` },
     { key: "lowest", text: `Lowest: ${String(lo.name)} (${loDisp})` },
-    { key: "gap", text: `Gap: ${gapDisp}` },
+    gapChip,
   ];
 }
 
@@ -4518,10 +4580,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   onViewInChartsTab,
   onAskAiAboutChart,
   onChartExportError,
+  exportFooterHint,
 }: {
   chart: AutoDashboardMiniChart;
   canonicalTitle: string;
   snapshotId: string | null;
+  /** Optional dataset label for PNG export footer only. */
+  exportFooterHint?: string | null;
   /** Used to estimate category tick overlap for vertical bars / lines. */
   viewportWidthPx: number;
   /** Matches CSS `--overview-chart-plot-min-h` for Recharts explicit height. */
@@ -4541,8 +4606,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   /** Surface export failures (e.g. missing SVG). */
   onChartExportError?: (message: string) => void;
 }) {
-  const overviewPngExportRef = useRef<HTMLDivElement | null>(null);
+  const offscreenExportRef = useRef<HTMLDivElement | null>(null);
   const [exportingPng, setExportingPng] = useState(false);
+  const [offscreenExportLayout, setOffscreenExportLayout] = useState<ReturnType<
+    typeof buildPresentationExportSpec
+  > | null>(null);
   const dashGrid = useOverviewDashGridStyle();
   const drillPrimary = chart.interaction?.drillDimensions.find(
     (d) => d.role === "primary"
@@ -4575,22 +4643,28 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chart.chartType, chart.title, baseChartRows]
   );
 
+  const exportPlotWidth = offscreenExportLayout?.width ?? viewportWidthPx;
+  const exportPlotHeight = offscreenExportLayout?.height ?? plotHeightPx;
+
+  const overviewMetricCtx = useMemo(
+    (): MetricFormatContext => ({
+      metricLabel: chart.title,
+      chartTitle: chart.title,
+      presentationKind: displayKind,
+    }),
+    [chart.title, displayKind]
+  );
+
   const chartRows = useMemo((): ChartRow[] => {
-    const fmt: ChartKind =
-      displayKind === "pie" || displayKind === "donut"
-        ? "pie"
-        : displayKind === "bar_horizontal"
-          ? "bar_horizontal"
-          : "bar";
     const mapped = baseChartRows.map((r) => ({
       ...r,
-      displayValue: fallbackChartNumericDisplay(fmt, r.value),
+      displayValue: formatExecutiveMetricValue(r, overviewMetricCtx),
     }));
     if (displayKind === "line" || displayKind === "area") {
       return sortChartRowsChronologically(mapped);
     }
     return mapped;
-  }, [baseChartRows, displayKind]);
+  }, [baseChartRows, displayKind, overviewMetricCtx]);
 
   const valueAxisTitle = useMemo(
     () => overviewDashShortValueAxisLabel((chart.title || "Value").trim() || "Value"),
@@ -4680,15 +4754,46 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       titleFontSizePx: 10,
       maxValueAxisTitleWidthPx: Math.max(120, viewportWidthPx - 72),
     });
-    const catCap = Math.max(72, Math.floor(viewportWidthPx * 0.34));
+    const catCap = Math.max(72, Math.floor(viewportWidthPx * 0.38));
     const catW = Math.min(catCap, Math.max(base.categoryAxisWidth, 72));
-    const marginCap = Math.max(catW + 12, Math.floor(viewportWidthPx * 0.36));
     return {
       ...base,
       categoryAxisWidth: catW,
-      marginLeft: Math.min(marginCap, Math.max(base.marginLeft, catW + 10)),
     };
   }, [renderBarAsHorizontal, chartRows, valueAxisTitle, categoryAxisLabel, viewportWidthPx]);
+
+  const exportMiniCategoryPlan = useMemo(() => {
+    if (!offscreenExportLayout) return null;
+    if (displayKind === "pie" || displayKind === "donut") return null;
+    if (displayKind === "bar_horizontal") return null;
+    const rowKind: ChartKind =
+      displayKind === "line" || displayKind === "area"
+        ? displayKind
+        : displayKind === "histogram"
+          ? "histogram"
+          : "bar";
+    if (rowKind !== "bar" && rowKind !== "line" && rowKind !== "area")
+      return null;
+    return computeCartesianCategoryPlanForRender({
+      rows: chartRows,
+      kind: rowKind,
+      stackedBar: false,
+      chartHeight: exportPlotHeight,
+      compact: true,
+      insightMode: false,
+      viewportWidthPx: Math.max(exportPlotWidth, 200),
+      axes: miniAxes,
+      layoutVariant: "overview_half",
+      allowHorizontalBarFallback: rowKind === "bar",
+    });
+  }, [
+    offscreenExportLayout,
+    displayKind,
+    chartRows,
+    miniAxes,
+    exportPlotWidth,
+    exportPlotHeight,
+  ]);
 
   const dashboardBarCatBottom = useMemo(
     () =>
@@ -4714,13 +4819,52 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   );
 
   const overviewInsightChips = useMemo(
-    () => formatOverviewMiniInsightChips(chartRows),
-    [chartRows]
+    () =>
+      formatOverviewMiniInsightChips(chartRows, {
+        chartTitle: chart.title,
+        presentationKind: displayKind,
+      }),
+    [chartRows, chart.title, displayKind]
+  );
+
+  const overviewRateWarning = useMemo(
+    () =>
+      chartHasRateAbove100(chartRows, chart.title)
+        ? RATE_EXCEEDS_100_WARNING
+        : null,
+    [chartRows, chart.title]
+  );
+
+  const overviewTooltipHandlers = useMemo(
+    () =>
+      buildChartCartesianTooltipHandlers(
+        categoryAxisLabel,
+        chart.title,
+        overviewMetricCtx,
+        displayKind === "line" || displayKind === "area"
+          ? {
+              categoryFormatter: (v) => {
+                const trendVeryCompact = viewportWidthPx < 420;
+                if (trendVeryCompact) return formatCompactTrendXAxisTickLabel(v);
+                return formatOverviewTrendTickLabel(v);
+              },
+            }
+          : undefined
+      ),
+    [
+      categoryAxisLabel,
+      chart.title,
+      overviewMetricCtx,
+      displayKind,
+      viewportWidthPx,
+    ]
   );
 
   if (chartRows.length === 0) return null;
 
-  const overviewChartAnimOn = chartRows.length <= RECHARTS_ANIMATION_MAX_POINTS;
+  const overviewChartAnimOn =
+    chartRows.length <= RECHARTS_ANIMATION_MAX_POINTS;
+  const overviewAnimDuration = undefined;
 
   const tickTruncateLocal = (v: string | number) => {
     const s = String(v);
@@ -4730,81 +4874,47 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   let chartBody: ReactNode;
 
   if (displayKind === "pie" || displayKind === "donut") {
-    const innerR = displayKind === "pie" ? 0 : chartRows.length >= 8 ? 40 : 32;
     chartBody = (
-      <ResponsiveContainer
-        width="100%"
-        height={plotHeightPx}
-        minWidth={0}
-        minHeight={plotHeightPx}
-      >
-        <PieChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-          <Pie
-            data={chartRows}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            innerRadius={innerR}
-            outerRadius={Math.floor(plotHeightPx * 0.34)}
-            paddingAngle={1.5}
-            stroke="#fff"
-            strokeWidth={1}
-            isAnimationActive={overviewChartAnimOn}
-            cursor={drillable ? "pointer" : "default"}
-            onClick={(d) => {
-              if (!drillPrimary || !onDashboardDrill) return;
-              const nm =
-                typeof d === "object" &&
-                d &&
-                "name" in d &&
-                typeof (d as { name?: unknown }).name !== "undefined"
-                  ? String((d as { name?: string }).name ?? "").trim()
-                  : "";
-              if (!nm) return;
-              onDashboardDrill({
-                column: drillPrimary.column,
-                label: drillPrimary.label,
-                value: nm,
-              });
-            }}
-          >
-            {chartRows.map((_, i) => (
-              <Cell
-                key={`dash-cell-${i}`}
-                fill={PIE_COLORS[i % PIE_COLORS.length]}
-              />
-            ))}
-          </Pie>
-          <Tooltip
-            {...CHART_TOOLTIP_FRAME}
-            formatter={(v, _n, item) => {
-              const p = item?.payload as ChartRow;
-              const d = p?.displayValue?.trim();
-              const shown = d ?? (v == null ? "—" : String(v));
-              return [shown, shortenLabel(chart.title, 20)];
-            }}
-            labelFormatter={(l) => tickTruncateLocal(String(l ?? ""))}
-          />
-          <Legend
-            wrapperStyle={{ fontSize: 9, paddingTop: 6 }}
-            formatter={(v) => tickTruncateLocal(v)}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+      <ChartRenderer
+        chartHeight={plotHeightPx}
+        compact
+        insightMode={false}
+        pngCaptureMode={false}
+        chartRows={chartRows}
+        visualization={{
+          interaction: chart.interaction
+            ? { drillDimensions: chart.interaction.drillDimensions }
+            : null,
+        }}
+        presentationKind={displayKind}
+        axes={miniAxes}
+        viewportW={viewportWidthPx}
+        sessionCartesianPlanMain={null}
+        insightCartesianPlanMain={null}
+        tickTruncate={tickTruncateLocal}
+        onInsightDrill={(primaryValue) => {
+          if (!drillPrimary || !onDashboardDrill) return;
+          const nm = String(primaryValue ?? "").trim();
+          if (!nm) return;
+          onDashboardDrill({
+            column: drillPrimary.column,
+            label: drillPrimary.label,
+            value: nm,
+          });
+        }}
+      />
     );
   } else if (renderBarAsHorizontal) {
     const hb = horizontalDashLayout;
     if (!hb) return null;
-    const hbBalanced = balanceVerticalOuterMargins({
-      marginLeft: Math.min(
-        Math.floor(viewportWidthPx * 0.36),
-        Math.max(OV_DASH_CHART_MARGIN.left, hb.marginLeft)
-      ),
+    const hbBalanced = balanceHorizontalOuterMargins({
+      marginLeft: hb.marginLeft,
       chartLayoutMode: "compact",
+      minRight: 8,
     });
     chartBody = (
       <ResponsiveContainer
+        key={`ov-hbar-${chartLayoutWidthKey(viewportWidthPx)}`}
         width="100%"
         height={plotHeightPx}
         minWidth={0}
@@ -4844,13 +4954,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           />
           <Tooltip
             {...CHART_TOOLTIP_FRAME}
-            formatter={(v, _n, item) => {
-              const p = item?.payload as ChartRow;
-              const d = p?.displayValue?.trim();
-              const shown = d ?? (v == null ? "—" : String(v));
-              return [shown, shortenLabel(chart.title, 22)];
-            }}
-            labelFormatter={(l) => String(l ?? "").trim() || "—"}
+            formatter={overviewTooltipHandlers.formatter}
+            labelFormatter={overviewTooltipHandlers.labelFormatter}
           />
           <Bar
             dataKey="value"
@@ -4858,6 +4963,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             radius={[0, 6, 6, 0]}
             maxBarSize={32}
             isAnimationActive={overviewChartAnimOn}
+            animationDuration={overviewAnimDuration}
             cursor={drillable ? "pointer" : "default"}
             onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
               e?.stopPropagation?.();
@@ -4881,19 +4987,25 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     const ChartWrap = displayKind === "area" ? AreaChart : LineChart;
     const trendTickFs = OV_DASH_AXIS_LABEL_STYLE.fontSize;
     const trendCompact = viewportWidthPx < 640;
-    const trendTickMini = (v: string | number) =>
-      formatOverviewTrendTickLabel(String(v ?? ""));
+    const trendVeryCompact = viewportWidthPx < 420;
+    const trendTickMini = (v: string | number) => {
+      const raw = String(v ?? "");
+      if (trendVeryCompact) return formatCompactTrendXAxisTickLabel(raw);
+      return formatOverviewTrendTickLabel(raw);
+    };
     const temporalTickStrings = chartRows.map((r) =>
       trendTickMini(String(r.name ?? ""))
     );
     const trendInterval = computeLineAreaXAxisInterval(chartRows.length, {
       compact: trendCompact,
-      viewportWidthPx,
+      viewportWidthPx: viewportWidthPx,
     });
     const trendLabelLens = temporalTickStrings.map((s) => s.length);
     const maxTrendLabelLen = Math.max(6, ...trendLabelLens, 0);
     const needsTrendAngle =
-      chartRows.length > 6 || maxTrendLabelLen > 9;
+      trendVeryCompact ||
+      chartRows.length > 6 ||
+      maxTrendLabelLen > 9;
     const trendAngle = needsTrendAngle ? TREND_X_AXIS_ANGLE_DEG : 0;
     const trendXHeight = lineAreaXAxisHeightPx(true);
     const trendBottomRaw = computeLineAreaChartBottomMargin({
@@ -4917,6 +5029,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     };
     chartBody = (
       <ResponsiveContainer
+        key={`ov-trend-${chartLayoutWidthKey(viewportWidthPx)}-${displayKind}`}
         width="100%"
         height={plotHeightPx}
         minWidth={0}
@@ -4949,7 +5062,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               value={categoryAxisLabel}
               position="insideBottom"
               offset={-6}
-              style={OV_DASH_AXIS_LABEL_STYLE}
+              content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
           <YAxis
@@ -4961,13 +5074,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           />
           <Tooltip
             {...CHART_TOOLTIP_FRAME}
-            formatter={(v, _n, item) => {
-              const p = item?.payload as ChartRow;
-              const d = p?.displayValue?.trim();
-              const shown = d ?? (v == null ? "—" : String(v));
-              return [shown, shortenLabel(valueAxisTitle, 22)];
-            }}
-            labelFormatter={(l) => trendTickMini(String(l ?? ""))}
+            formatter={overviewTooltipHandlers.formatter}
+            labelFormatter={overviewTooltipHandlers.labelFormatter}
           />
           {displayKind === "area" ? (
             <Area
@@ -4978,6 +5086,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               fill="#6366f1"
               fillOpacity={0.18}
               isAnimationActive={overviewChartAnimOn}
+              animationDuration={overviewAnimDuration}
               dot={
                 chartRows.length > 28
                   ? false
@@ -4991,6 +5100,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               stroke="#4f46e5"
               strokeWidth={2.5}
               isAnimationActive={overviewChartAnimOn}
+              animationDuration={overviewAnimDuration}
               dot={
                 chartRows.length > 28
                   ? false
@@ -5019,6 +5129,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     };
     chartBody = (
       <ResponsiveContainer
+        key={`ov-bar-${chartLayoutWidthKey(viewportWidthPx)}`}
         width="100%"
         height={plotHeightPx}
         minWidth={0}
@@ -5068,13 +5179,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           />
           <Tooltip
             {...CHART_TOOLTIP_FRAME}
-            formatter={(v, _n, item) => {
-              const p = item?.payload as ChartRow;
-              const d = p?.displayValue?.trim();
-              const shown = d ?? (v == null ? "—" : String(v));
-              return [shown, shortenLabel(chart.title, 22)];
-            }}
-            labelFormatter={(l) => tickTruncateLocal(String(l ?? ""))}
+            formatter={overviewTooltipHandlers.formatter}
+            labelFormatter={overviewTooltipHandlers.labelFormatter}
           />
           <Bar
             dataKey="value"
@@ -5082,6 +5188,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             radius={isHist ? [3, 3, 0, 0] : [8, 8, 4, 4]}
             maxBarSize={isHist ? 44 : 42}
             isAnimationActive={overviewChartAnimOn}
+            animationDuration={overviewAnimDuration}
             cursor={drillable ? "pointer" : "default"}
             onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
               e?.stopPropagation?.();
@@ -5105,15 +5212,37 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 
   if (chartBody == null) return null;
 
+  const exportFooter =
+    overviewRateWarning || overviewInsightChips.length > 0 ? (
+      <footer className={ovDashChartFooter}>
+        {overviewRateWarning ? (
+          <p className={chartRateQualityWarningClass}>{overviewRateWarning}</p>
+        ) : null}
+        {overviewInsightChips.length > 0 ? (
+          <div className={ovDashInsightChips}>
+            {overviewInsightChips.map((chip) => (
+              <span
+                key={chip.key}
+                className={`${ovDashInsightChip} overview-dash-insight-chip--${chip.key}`}
+                title={chip.title}
+                aria-label={chip.title ? `${chip.text}. ${chip.title}` : chip.text}
+              >
+                {chip.text}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </footer>
+    ) : null;
+
   return (
     <div
       role="region"
       aria-label={canonicalTitle}
       className={`${ovDashChartCard} group ${loadingPulse ? "animate-pulse opacity-[0.92]" : ""}`}
     >
-      <div ref={overviewPngExportRef} className={overviewPngExportRoot}>
-        <header className={`${ovDashChartHead} ${overviewPngExportHeader}`}>
-          <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
+      <header className={`${ovDashChartHead} ${overviewPngExportHeader}`}>
+        <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
         <div className={ovDashChartActions} onClick={(e) => e.stopPropagation()}>
           {onViewInChartsTab && snapshotId ? (
             <button
@@ -5142,21 +5271,18 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             disabled={exportingPng}
             onClick={async () => {
               setExportingPng(true);
+              const spec = buildPresentationExportSpec(displayKind, {
+                categoryCount: chartRows.length,
+              });
               try {
-                const exportRoot = overviewPngExportRef.current;
-                if (!exportRoot?.querySelector("svg")) {
-                  throw new Error("Chart is not available to export.");
-                }
-                const { captureElementToPng } = await import(
-                  "@/lib/chart-png-capture"
-                );
-                const { dataUrl } = await captureElementToPng(exportRoot, {
-                  scale: 3,
+                setOffscreenExportLayout(spec);
+                await runChartPngExport({
+                  getExportRoot: () => offscreenExportRef.current,
+                  kind: displayKind,
+                  categoryCount: chartRows.length,
+                  filename: sanitizeChartExportFilename(canonicalTitle),
+                  datasetName: exportFooterHint,
                 });
-                const a = document.createElement("a");
-                a.href = dataUrl;
-                a.download = `${sanitizeChartExportFilename(canonicalTitle)}.png`;
-                a.click();
               } catch (err) {
                 onChartExportError?.(
                   err instanceof Error
@@ -5164,6 +5290,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                     : "Unable to export chart image."
                 );
               } finally {
+                setOffscreenExportLayout(null);
                 setExportingPng(false);
               }
             }}
@@ -5171,12 +5298,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             title="Download this chart as PNG"
             aria-label="Export this chart as a PNG image"
           >
-            {exportingPng ? "…" : "PNG"}
+            {exportingPng ? "Exporting…" : "PNG"}
           </button>
         </div>
-        </header>
-        <div
-          role={onViewInChartsTab && snapshotId ? "button" : undefined}
+      </header>
+      <div
+        role={onViewInChartsTab && snapshotId ? "button" : undefined}
         tabIndex={onViewInChartsTab && snapshotId ? 0 : undefined}
         onClick={() => {
           if (snapshotId && onViewInChartsTab) onViewInChartsTab(snapshotId);
@@ -5199,25 +5326,48 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             : undefined
         }
       >
-          <div className={`${ovDashChartPlotInner} ${chartsTabVizPlotStage}`}>
-            {chartBody}
-          </div>
+        <div className={`${ovDashChartPlotInner} ${chartsTabVizPlotStage}`}>
+          {chartBody}
         </div>
-        {overviewInsightChips.length > 0 ? (
-          <footer className={ovDashChartFooter}>
-            <div className={ovDashInsightChips}>
-              {overviewInsightChips.map((chip) => (
-                <span
-                  key={chip.key}
-                  className={`${ovDashInsightChip} overview-dash-insight-chip--${chip.key}`}
-                >
-                  {chip.text}
-                </span>
-              ))}
-            </div>
-          </footer>
-        ) : null}
       </div>
+      {exportFooter}
+
+      {offscreenExportLayout ? (
+        <ChartPngOffscreenHost
+          layout={offscreenExportLayout}
+          exportRef={offscreenExportRef}
+          rootClassName={overviewPngExportRoot}
+        >
+          <header className={`${ovDashChartHead} ${overviewPngExportHeader}`}>
+            <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
+          </header>
+          <div
+            className={`${ovDashChartPlot} ${ovDashChartPlotInner} ${chartsTabVizPlotStage}`}
+            style={presentationCapturePlotStyle(offscreenExportLayout)}
+          >
+            <ChartRenderer
+              chartHeight={offscreenExportLayout.height}
+              compact={false}
+              insightMode={false}
+              pngCaptureMode
+              chartRows={chartRows}
+              visualization={{
+                interaction: chart.interaction
+                  ? { drillDimensions: chart.interaction.drillDimensions }
+                  : null,
+              }}
+              presentationKind={displayKind}
+              axes={miniAxes}
+              viewportW={offscreenExportLayout.width}
+              sessionCartesianPlanMain={exportMiniCategoryPlan}
+              insightCartesianPlanMain={null}
+              tickTruncate={tickTruncateLocal}
+              onInsightDrill={() => {}}
+            />
+          </div>
+          {exportFooter}
+        </ChartPngOffscreenHost>
+      ) : null}
     </div>
   );
 });
@@ -5232,10 +5382,12 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   onOpenDashboardChartInChartsTab,
   onAskAiAboutDashboardChart,
   onChartExportError,
+  exportFooterHint,
 }: {
   chart: AutoDashboardMiniChart;
   canonicalTitle: string;
   snapshotId: string | null;
+  exportFooterHint?: string | null;
   loadingPulse?: boolean;
   onDashboardDrill?: (ev: { column: string; label: string; value: string }) => void;
   onOpenDashboardChartInChartsTab: (snapshotId: string) => void;
@@ -5291,6 +5443,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
         onViewInChartsTab={snapshotId ? handleViewInChartsTab : undefined}
         onAskAiAboutChart={snapshotId ? handleAskAiAboutChart : undefined}
         onChartExportError={onChartExportError}
+        exportFooterHint={exportFooterHint}
       />
     </div>
   );
@@ -6332,16 +6485,35 @@ function HomeInner() {
   /** Off-screen charts for PDF/PNG capture (session vs AI insight bundles). */
   const chartCaptureSessionRef = useRef<HTMLDivElement | null>(null);
   const chartCaptureInsightRef = useRef<HTMLDivElement | null>(null);
-  const chartsTabPngExportRef = useRef<HTMLDivElement | null>(null);
+  const chartsTabOffscreenExportRef = useRef<HTMLDivElement | null>(null);
+  const [chartsTabOffscreenLayout, setChartsTabOffscreenLayout] = useState<
+    ReturnType<typeof buildPresentationExportSpec> | null
+  >(null);
+  const [exportingChartsTabPng, setExportingChartsTabPng] = useState(false);
+  const sessionChartKindRef = useRef<ChartKind>("bar");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [aiAnswerByChartId, setAiAnswerByChartId] =
     useState<ChartInsightAnswerStore>({});
   const [activeTab, setActiveTab] = useState<MainNavTabId>("overview");
+  const [pilotInfoModal, setPilotInfoModal] = useState<
+    Exclude<PilotNavTarget, "home"> | null
+  >(null);
+  const [pilotNavHighlight, setPilotNavHighlight] =
+    useState<PilotNavTarget>("home");
   const [, startTabTransition] = useTransition();
-  const handleMainTabClick = useCallback((id: MainNavTabId) => {
-    startTabTransition(() => setActiveTab(id));
-  }, []);
+  const handleMainTabClick = useCallback(
+    (id: MainNavTabId) => {
+      if (id !== "overview") {
+        setPilotInfoModal(null);
+      }
+      if (id === "overview") {
+        setPilotNavHighlight("home");
+      }
+      startTabTransition(() => setActiveTab(id));
+    },
+    [startTabTransition]
+  );
   const [viewportH, setViewportH] = useState(960);
   const [viewportW, setViewportW] = useState(1024);
   useEffect(() => {
@@ -6367,11 +6539,6 @@ function HomeInner() {
 
   /** Match PDF/off-screen capture width so axis fallback matches exported PNG. */
   const MAIN_CHART_LAYOUT_CAP_PX = 860;
-  const viewportEffective = Math.min(
-    Math.max(viewportW, 320),
-    MAIN_CHART_LAYOUT_CAP_PX
-  );
-
   const [file, setFile] = useState<File | null>(null);
   const [uploadMeta, setUploadMeta] = useState<UploadMeta | null>(null);
   const [profile, setProfile] = useState<DatasetProfile | null>(null);
@@ -6536,11 +6703,56 @@ function HomeInner() {
   const [upgradeLimit, setUpgradeLimit] = useState<LimitKind | null>(null);
   const [upgradeMessage, setUpgradeMessage] = useState("");
 
+  const pilotNavActive = useMemo(
+    () =>
+      resolvePilotNavActive({
+        activeTab,
+        pilotInfoModal,
+        pilotNavHighlight,
+      }),
+    [activeTab, pilotInfoModal, pilotNavHighlight]
+  );
+
+  const closePilotInfoModal = useCallback(() => {
+    setPilotInfoModal(null);
+    setPilotNavHighlight("home");
+  }, []);
+
   const openUpgradeModal = useCallback((limit: LimitKind, message: string) => {
     setUpgradeLimit(limit);
     setUpgradeMessage(message);
     setUpgradeModalOpen(true);
   }, []);
+
+  const handlePilotNav = useCallback(
+    (target: PilotNavTarget) => {
+      setPilotNavHighlight(target);
+      startTabTransition(() => setActiveTab("overview"));
+      if (target === "home") {
+        setPilotInfoModal(null);
+        requestAnimationFrame(() => {
+          const landing = document.getElementById("pilot-landing");
+          if (landing) {
+            landing.scrollIntoView({ behavior: "smooth", block: "start" });
+          } else {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }
+        });
+        return;
+      }
+      const sectionId = PILOT_HEADER_NAV.find((link) => link.id === target)?.sectionId;
+      requestAnimationFrame(() => {
+        const section = sectionId ? document.getElementById(sectionId) : null;
+        if (section) {
+          setPilotInfoModal(null);
+          section.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          setPilotInfoModal(target);
+        }
+      });
+    },
+    [startTabTransition]
+  );
 
   const handleApiLimitDetail = useCallback(
     (detail: unknown): boolean => {
@@ -6815,6 +7027,14 @@ function HomeInner() {
 
   const pinnedInsightChartIdRef = useRef<string | null>(null);
   const chartsPreviewRef = useRef<HTMLDivElement | null>(null);
+  const chartsPlotWidth = useMeasuredElementWidth(
+    chartsPreviewRef,
+    activeTab === "charts"
+  );
+  const sessionChartViewportW = useMemo(() => {
+    const measured = chartsPlotWidth > 0 ? chartsPlotWidth : viewportW;
+    return Math.min(Math.max(measured, 320), MAIN_CHART_LAYOUT_CAP_PX);
+  }, [chartsPlotWidth, viewportW]);
   const chartsSessionHeadingRef = useRef<HTMLDivElement | null>(null);
   const pendingChartsPreviewScrollRef = useRef(false);
   const pendingInsightAutoAskRef = useRef<string | null>(null);
@@ -6951,36 +7171,33 @@ function HomeInner() {
   };
 
   const downloadChartPng = useCallback(async () => {
-    const exportRoot = chartsTabPngExportRef.current;
-    if (!exportRoot) {
-      setError("Chart is not available to download.");
-      return;
-    }
-    if (!exportRoot.querySelector("svg")) {
+    if (chartData.length === 0) {
       setError("Chart is not available to download.");
       return;
     }
 
+    const spec = buildPresentationExportSpec(sessionChartKindRef.current, {
+      categoryCount: chartData.length,
+    });
     try {
       setError("");
-      const { captureElementToPng } = await import("@/lib/chart-png-capture");
-      const { dataUrl } = await captureElementToPng(exportRoot, {
-        scale: 3,
-        ignoreElement: (el) =>
-          el instanceof HTMLElement &&
-          (el.classList.contains("charts-tab-preview-shimmer") ||
-            el.getAttribute("aria-hidden") === "true"),
+      setExportingChartsTabPng(true);
+      setChartsTabOffscreenLayout(spec);
+      await runChartPngExport({
+        getExportRoot: () => chartsTabOffscreenExportRef.current,
+        kind: sessionChartKindRef.current,
+        categoryCount: chartData.length,
+        filename: sanitizeChartExportFilename(chartTitle || "chart"),
+        datasetName: uploadMeta?.name,
       });
-
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${sanitizeChartExportFilename(chartTitle || "chart")}.png`;
-      a.click();
     } catch (err) {
       console.error("Chart PNG download failed:", err);
       setError("Unable to download chart image.");
+    } finally {
+      setChartsTabOffscreenLayout(null);
+      setExportingChartsTabPng(false);
     }
-  }, [chartTitle]);
+  }, [chartTitle, chartData.length, uploadMeta?.name]);
 
   const setQuestionAndResetInsightState = useCallback(
     (value: string) => {
@@ -7087,9 +7304,10 @@ function HomeInner() {
     }
   };
 
-  const uploadFile = async () => {
-    if (!file) {
-      setError("Please choose a CSV or Excel file first.");
+  const uploadFile = async (pickedFile?: File) => {
+    const targetFile = pickedFile ?? file;
+    if (!targetFile) {
+      setError("Please choose a supported dataset file first.");
       return;
     }
 
@@ -7127,14 +7345,14 @@ function HomeInner() {
 
     try {
       const tier = getPlanTier();
-      if (!isFileWithinPlanLimit(tier, file.size)) {
-        const msg = fileSizeLimitMessage(tier, file.size);
+      if (!isFileWithinPlanLimit(tier, targetFile.size)) {
+        const msg = fileSizeLimitMessage(tier, targetFile.size);
         openUpgradeModal("file_size", msg);
         throw new Error(msg);
       }
 
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", targetFile);
 
       const response = await fetch(apiUrl("/upload"), {
         method: "POST",
@@ -7328,23 +7546,27 @@ function HomeInner() {
     }
   };
 
-  const assignOverviewPickedFile = useCallback((next: File) => {
-    const ok = OVERVIEW_UPLOAD_EXT_PATTERN.test(next.name);
-    if (!ok) {
-      setError(OVERVIEW_UPLOAD_INVALID_MSG);
-      return;
-    }
-    const tier = getPlanTier();
-    if (!isFileWithinPlanLimit(tier, next.size)) {
-      const msg = fileSizeLimitMessage(tier, next.size);
-      openUpgradeModal("file_size", msg);
-      setError(msg);
-      return;
-    }
-    setError("");
-    dismissMappingMessage();
-    setFile(next);
-  }, [dismissMappingMessage, openUpgradeModal]);
+  const assignOverviewPickedFile = useCallback(
+    (next: File) => {
+      if (loading) return;
+      const tier = getPlanTier();
+      const validation = validateOverviewUploadPick(next, tier);
+      if (!validation.ok) {
+        if (validation.reason === "file_too_large") {
+          openUpgradeModal("file_size", validation.message);
+        }
+        setError(validation.message);
+        return;
+      }
+      setError("");
+      dismissMappingMessage();
+      setFile(validation.file);
+      if (shouldAutoUploadAfterPick(validation, loading)) {
+        void uploadFile(validation.file);
+      }
+    },
+    [dismissMappingMessage, loading, openUpgradeModal]
+  );
 
   const openOverviewReplaceUpload = useCallback(() => {
     dismissMappingMessage();
@@ -8941,6 +9163,38 @@ function HomeInner() {
     [chartData.length, presentationChartKind, viewportH]
   );
 
+  sessionChartKindRef.current = presentationChartKind;
+
+  const activeSessionViewportW = sessionChartViewportW;
+  const activeChartHeightMain = chartHeightMain;
+
+  const chartsTabExportCartesianPlan = useMemo(
+    () =>
+      chartsTabOffscreenLayout
+        ? computeCartesianCategoryPlanForRender({
+            rows: sortedChartData,
+            kind: presentationChartKind,
+            stackedBar: Boolean(
+              isMultiMetricBarLayout(visualization?.multiSeries?.layout) &&
+                (visualization?.multiSeries?.seriesKeys?.length ?? 0) > 0
+            ),
+            chartHeight: chartsTabOffscreenLayout.height,
+            compact: false,
+            insightMode: false,
+            viewportWidthPx: chartsTabOffscreenLayout.width,
+            axes: chartAxisLabels,
+          })
+        : null,
+    [
+      chartsTabOffscreenLayout,
+      sortedChartData,
+      presentationChartKind,
+      visualization?.multiSeries?.layout,
+      visualization?.multiSeries?.seriesKeys?.length,
+      chartAxisLabels,
+    ]
+  );
+
   const sessionCartesianPlan = useMemo(
     () =>
       computeCartesianCategoryPlanForRender({
@@ -8950,10 +9204,10 @@ function HomeInner() {
           isMultiMetricBarLayout(visualization?.multiSeries?.layout) &&
             (visualization?.multiSeries?.seriesKeys?.length ?? 0) > 0
         ),
-        chartHeight: chartHeightMain,
+        chartHeight: activeChartHeightMain,
         compact: false,
         insightMode: false,
-        viewportWidthPx: viewportEffective,
+        viewportWidthPx: activeSessionViewportW,
         axes: chartAxisLabels,
       }),
     [
@@ -8961,8 +9215,8 @@ function HomeInner() {
       presentationChartKind,
       visualization?.multiSeries?.layout,
       visualization?.multiSeries?.seriesKeys?.length,
-      chartHeightMain,
-      viewportEffective,
+      activeChartHeightMain,
+      activeSessionViewportW,
       chartAxisLabels.valueAxis,
       chartAxisLabels.valueAxisCompact,
     ]
@@ -9014,6 +9268,13 @@ function HomeInner() {
       chartSortAscending,
     ]
   );
+
+  const sessionChartRateWarning = useMemo(() => {
+    const metricLabel = visualization?.title ?? chartAxisLabels.valueAxis;
+    return chartHasRateAbove100(sortedChartData, metricLabel)
+      ? RATE_EXCEEDS_100_WARNING
+      : null;
+  }, [sortedChartData, visualization?.title, chartAxisLabels.valueAxis]);
 
   const executiveVizInsights = useMemo((): ExecutiveVizInsightCard[] => {
     if (isTrendMode(activeSnapshot?.contract) && sortedChartData.length) {
@@ -9687,6 +9948,21 @@ function HomeInner() {
       insightRelationshipBundle,
     ]
   );
+
+  const insightChartRateWarning = useMemo(() => {
+    const metricLabel =
+      insightVisualization?.title ??
+      insightChartMeasureLabel ??
+      insightChartAxisLabels.valueAxis;
+    return chartHasRateAbove100(sortedInsightChartData, metricLabel)
+      ? RATE_EXCEEDS_100_WARNING
+      : null;
+  }, [
+    sortedInsightChartData,
+    insightVisualization?.title,
+    insightChartMeasureLabel,
+    insightChartAxisLabels.valueAxis,
+  ]);
 
   const insightExecutiveVizInsights = useMemo((): ExecutiveVizInsightCard[] => {
     if (insightUnsupportedGrowth) {
@@ -10914,6 +11190,7 @@ function HomeInner() {
       chartHeight={chartHeight}
       compact={compact}
       insightMode={insightMode}
+      pngCaptureMode={false}
       chartRows={insightMode ? sortedInsightChartData : sortedChartData}
       visualization={
         (insightMode ? insightVisualization : visualization) as ChartRendererViz
@@ -10922,7 +11199,7 @@ function HomeInner() {
         insightMode ? insightPresentationChartKind : presentationChartKind
       }
       axes={insightMode ? insightChartAxisLabels : chartAxisLabels}
-      viewportW={viewportW}
+      viewportW={activeSessionViewportW}
       sessionCartesianPlanMain={sessionCartesianPlan}
       insightCartesianPlanMain={insightCartesianPlanMain}
       tickTruncate={tickTruncate}
@@ -11001,6 +11278,8 @@ function HomeInner() {
       activeTab={activeTab}
       onNavigate={handleMainTabClick}
       datasetLoaded={columns.length > 0}
+      onPilotNav={handlePilotNav}
+      pilotNavActive={pilotNavActive}
     >
         {error && (
           <div className="mb-4 mt-6 flex items-start justify-between gap-3 rounded-xl border border-red-200/70 bg-red-50/90 p-3.5 text-red-800 shadow-[0_1px_2px_rgba(185,28,28,0.06)]">
@@ -11082,11 +11361,7 @@ function HomeInner() {
 
           {activeTab === "overview" && (
             <>
-            {columns.length === 0 ? (
-              <p className={`mb-3 max-w-2xl text-[15px] leading-relaxed ${ovMuted}`}>
-                Upload your CSV or Excel file and ask AI questions about your business data.
-              </p>
-            ) : null}
+            {columns.length === 0 ? <OverviewLandingHero /> : null}
             <div className="grid w-full min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-6">
               {columns.length > 0 && !overviewUploadExpanded ? (
                 <section className={`col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-1 ${ovCard}`}>
@@ -11153,17 +11428,23 @@ function HomeInner() {
                 </section>
               ) : (
                 <>
-                  <section className={`min-w-0 p-5 order-1 ${ovCard}`}>
+                  <section
+                    className={`overview-landing-upload-card min-w-0 p-5 sm:p-6 order-1 ${
+                      columns.length === 0
+                        ? "lg:col-span-2 mx-auto w-full max-w-4xl"
+                        : ""
+                    } ${ovCard}`}
+                  >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <h2 className={ovSectionTitle}>
-                          {columns.length > 0 ? "Upload a new file" : "Upload"}
+                          {columns.length > 0 ? "Upload a new file" : "Upload your dataset"}
                         </h2>
-                        {columns.length > 0 ? (
-                          <p className={`mt-1 ${ovSectionDesc}`}>
-                            CSV, Excel, JSON, or Parquet — replaces the dataset in this session.
-                          </p>
-                        ) : null}
+                        <p className={`mt-1 ${ovSectionDesc}`}>
+                          {columns.length > 0
+                            ? "CSV, Excel, JSON, or Parquet — replaces the dataset in this session."
+                            : "Drop a file or browse — upload starts automatically."}
+                        </p>
                       </div>
                     </div>
 
@@ -11227,7 +11508,9 @@ function HomeInner() {
                           if (next) assignOverviewPickedFile(next);
                         }}
                         className={`${ovUploadDropzone} rounded-xl border-2 border-dashed transition-colors ${
-                          file ? "p-3 sm:p-4" : "p-6 sm:p-8 text-center"
+                          file
+                            ? "p-3 sm:p-4"
+                            : "overview-landing-dropzone-empty p-6 sm:p-10 text-center"
                         } ${
                           overviewDropActive
                             ? ovUploadDropzoneActive
@@ -11238,6 +11521,7 @@ function HomeInner() {
                           <OverviewUploadSelectedState
                             fileName={file.name}
                             fileSizeLabel={formatBytes(file.size)}
+                            uploading={loading}
                           />
                         ) : (
                           <>
@@ -11267,22 +11551,16 @@ function HomeInner() {
                         )}
                       </div>
 
-                      <div
-                        className={`overview-upload-actions flex flex-wrap items-center gap-3 ${
-                          file ? "mt-5" : "mt-3"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (loading || !file) return;
-                            void uploadFile();
-                          }}
-                          disabled={loading || !file}
-                          className={ovBtnPrimaryAccent}
-                        >
-                          {loading ? "Uploading..." : "Upload Dataset"}
-                        </button>
+                      <div className="overview-upload-actions mt-3 flex flex-wrap items-center gap-3">
+                        {file && !loading ? (
+                          <button
+                            type="button"
+                            onClick={() => overviewFileInputRef.current?.click()}
+                            className={ovBtnSecondarySm}
+                          >
+                            Choose another file
+                          </button>
+                        ) : null}
                         {columns.length > 0 ? (
                           <button
                             type="button"
@@ -11293,32 +11571,19 @@ function HomeInner() {
                             Cancel
                           </button>
                         ) : null}
-                        {loading && (
+                        {loading ? (
                           <div className={`flex items-center gap-3 ${ovMuted}`}>
-                            <div className="h-5 w-5 rounded-full border-2 border-[color:var(--border-default)] border-t-[color:var(--foreground)] animate-spin" />
-                            <span>Processing file…</span>
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[color:var(--border-default)] border-t-[color:var(--foreground)]" />
+                            <span>Uploading and processing file…</span>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </section>
 
+                  {columns.length > 0 ? (
                   <section className={`min-w-0 p-5 order-1 ${ovCardElevated}`}>
                     <h2 className={ovSectionTitle}>Dataset</h2>
-                    {columns.length === 0 ? (
-                      <>
-                        <p className={`mt-2 text-sm ${ovMuted}`}>
-                          Upload a dataset to see KPIs, preview, charts, and insights.
-                        </p>
-                        <div className={ovDatasetEmptyInset} aria-hidden>
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className={ovCapabilityChip}>KPIs</span>
-                            <span className={ovCapabilityChip}>Charts</span>
-                            <span className={ovCapabilityChip}>AI Insights</span>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
                       <div className="mt-3 space-y-2 text-sm text-foreground">
                         {uploadMeta?.name && (
                           <p>
@@ -11350,8 +11615,8 @@ function HomeInner() {
                           </p>
                         )}
                       </div>
-                    )}
                   </section>
+                  ) : null}
                 </>
               )}
 
@@ -11645,6 +11910,7 @@ function HomeInner() {
                                 }
                                 onAskAiAboutDashboardChart={askAiAboutDashboardChart}
                                 onChartExportError={setError}
+                                exportFooterHint={uploadMeta?.name}
                               />
                             </div>
                           </div>
@@ -11662,6 +11928,7 @@ function HomeInner() {
                 </section>
               )}
             </div>
+            {columns.length === 0 ? <PilotInfoSections /> : null}
             </>
           )}
 
@@ -12072,9 +12339,10 @@ function HomeInner() {
                 <button
                   type="button"
                   onClick={downloadChartPng}
-                  className={chartsTabDownloadBtn}
+                  disabled={exportingChartsTabPng}
+                  className={`${chartsTabDownloadBtn} disabled:cursor-not-allowed disabled:opacity-60`}
                 >
-                  Download Chart PNG
+                  {exportingChartsTabPng ? "Exporting…" : "Download Chart PNG"}
                 </button>
               ) : null}
             </div>
@@ -12096,7 +12364,7 @@ function HomeInner() {
               >
                 {chartData.length > 0 ? (
                   <div className={chartsTabVizPreviewCard}>
-                    <div ref={chartsTabPngExportRef} className={chartsTabPngExportRoot}>
+                    <div>
                       <div className={chartsTabPreviewHeaderSticky}>
                         <div
                           ref={chartsSessionHeadingRef}
@@ -12126,6 +12394,7 @@ function HomeInner() {
                             semanticHeader={sessionChartSemanticHeader}
                             badgeCompact={sessionChartMetadataBadgeCompact}
                             leadInsight={chartInsightBadge ?? undefined}
+                            qualityWarning={sessionChartRateWarning ?? undefined}
                             compactChips
                           />
                         </div>
@@ -12136,13 +12405,13 @@ function HomeInner() {
                       </div>
                       <ChartsTabPlotTransition
                         chartId={activeChartId}
-                        plotHeightPx={chartHeightMain}
+                        plotHeightPx={activeChartHeightMain}
                       >
                         <div
                           className={chartsTabVizSessionFrame}
                           style={
                             {
-                              "--insights-viz-plot-h": `${chartHeightMain}px`,
+                              "--insights-viz-plot-h": `${activeChartHeightMain}px`,
                             } as CSSProperties
                           }
                         >
@@ -12152,7 +12421,7 @@ function HomeInner() {
                           >
                             <div className={chartsTabSessionPlotSurface}>
                               {renderDatasetChart(
-                                chartHeightMain,
+                                activeChartHeightMain,
                                 false,
                                 false
                               )}
@@ -12161,6 +12430,85 @@ function HomeInner() {
                         </div>
                       </ChartsTabPlotTransition>
                     </div>
+
+                    {chartsTabOffscreenLayout ? (
+                      <ChartPngOffscreenHost
+                        layout={chartsTabOffscreenLayout}
+                        exportRef={chartsTabOffscreenExportRef}
+                        rootClassName={chartsTabPngExportRoot}
+                      >
+                        <div className={chartsTabPreviewHeaderSticky}>
+                          <div className="w-full min-w-0">
+                            <div className="mx-auto min-w-0 max-w-4xl">
+                              {chartHeadingBlock ?? (
+                                <div className={chartsTabVizHeaderZone}>
+                                  <p className={chartsTabVizKicker}>Chart preview</p>
+                                  <h3 className={aiInsightsVizTitle}>Visualization</h3>
+                                  {chartSubtitle ? (
+                                    <p className={aiInsightsVizSubtitle}>
+                                      {chartSubtitle}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div
+                            title={sessionChartMetadataLine}
+                            className={`${aiInsightsVizChipsWrap} mt-1`}
+                          >
+                            <ChartContextSummary
+                              renderedKind={sessionRenderedChartKind}
+                              metricLabel={chartAxisLabels.valueAxis}
+                              semanticHeader={sessionChartSemanticHeader}
+                              badgeCompact={sessionChartMetadataBadgeCompact}
+                              leadInsight={chartInsightBadge ?? undefined}
+                              qualityWarning={sessionChartRateWarning ?? undefined}
+                              compactChips
+                            />
+                          </div>
+                          <ChartsTabChartReason
+                            chartId={activeChartId}
+                            reason={sessionChartReason}
+                          />
+                        </div>
+                        <div
+                          className={chartsTabVizSessionFrame}
+                          style={
+                            {
+                              "--insights-viz-plot-h": `${chartsTabOffscreenLayout.height}px`,
+                              ...presentationCapturePlotStyle(chartsTabOffscreenLayout),
+                            } as CSSProperties
+                          }
+                        >
+                          <ChartInsightViewportWrapper
+                            chartKind={sessionRenderedChartKind}
+                            sessionMode
+                          >
+                            <div className={chartsTabSessionPlotSurface}>
+                              <ChartRenderer
+                                chartHeight={chartsTabOffscreenLayout.height}
+                                compact={false}
+                                insightMode={false}
+                                pngCaptureMode
+                                chartRows={sortedChartData}
+                                visualization={
+                                  visualization as ChartRendererViz
+                                }
+                                presentationKind={presentationChartKind}
+                                axes={chartAxisLabels}
+                                viewportW={chartsTabOffscreenLayout.width}
+                                sessionCartesianPlanMain={chartsTabExportCartesianPlan}
+                                insightCartesianPlanMain={null}
+                                tickTruncate={tickTruncate}
+                                onInsightDrill={insightChartDrill}
+                              />
+                            </div>
+                          </ChartInsightViewportWrapper>
+                        </div>
+                      </ChartPngOffscreenHost>
+                    ) : null}
+
                     <div className={chartsTabSmartReadWrap}>
                       <SmartChartInsightPanel
                         intel={sessionSmartChartIntel}
@@ -13103,6 +13451,7 @@ function HomeInner() {
                           semanticHeader={insightChartSemanticHeader}
                           badgeCompact={insightChartMetadataBadgeCompact}
                           leadInsight={insightChartInsightBadge ?? undefined}
+                          qualityWarning={insightChartRateWarning ?? undefined}
                           compactChips
                         />
                     </div>
@@ -13678,6 +14027,11 @@ function HomeInner() {
             </div>
           </div>
         )}
+
+        <PilotInfoModal
+          section={pilotInfoModal}
+          onClose={closePilotInfoModal}
+        />
 
         <UpgradePlanModal
           open={upgradeModalOpen}
