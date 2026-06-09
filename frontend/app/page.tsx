@@ -353,6 +353,12 @@ import {
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
 import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
+import { DataPreviewQualitySummary } from "./components/home/data-preview-quality-summary";
+import { DataPreviewDatasetInsightsSummary } from "./components/home/data-preview-dataset-insights-summary";
+import { DataPreviewSchemaPanel } from "./components/home/data-preview-schema-panel";
+import { DataPreviewColumnDetails } from "./components/home/data-preview-column-details";
+import { resolveDataPreviewSuggestedQuestions } from "@/lib/data-preview-suggested-questions";
+import { buildDataPreviewQualityInsights } from "@/lib/data-preview-quality-insights";
 import { DataPreviewColumnHeader } from "./components/home/data-preview-column-header";
 import { DataPreviewCopyCell } from "./components/home/data-preview-copy-cell";
 import {
@@ -472,6 +478,9 @@ import {
   dpEmptySearch,
   dpEmptyState,
   dpInsightsPanel,
+  dpInsightSeverityAttention,
+  dpInsightSeverityInfo,
+  dpInsightSeverityWarning,
   dpNullPill,
   dpSearchInput,
   dpSectionDesc,
@@ -489,8 +498,9 @@ import {
   dpPaginationNav,
   dpPaginationPill,
   dpSearchWrap,
+  dpTableToolbarControls,
+  dpTableToolbarRow,
   dpToolbarMatchMeta,
-  dpToolbarRow,
 } from "@/lib/data-preview-ui";
 import { SmartChartInsightPanel } from "./components/SmartChartInsightPanel";
 import { ChartsTimelineAside } from "./components/home/charts-timeline-aside";
@@ -3909,9 +3919,9 @@ function readProfileDescribeStat(
 ): number | null {
   if (!profile?.summary_stats || typeof profile.summary_stats !== "object")
     return null;
-  const block = (profile.summary_stats as Record<string, unknown>)[col];
+  const block = (profile.summary_stats as Record<string, unknown>)[stat];
   if (!block || typeof block !== "object") return null;
-  const v = (block as Record<string, unknown>)[stat];
+  const v = (block as Record<string, unknown>)[col];
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string") {
     const n = Number(v);
@@ -5512,6 +5522,7 @@ type DatasetProfile = {
   column_types: Record<string, "number" | "date" | "text" | "category">;
   null_counts: Record<string, number>;
   summary_stats: Record<string, unknown>;
+  unique_counts?: Record<string, number>;
 };
 
 
@@ -5928,79 +5939,6 @@ function pickDataPreviewHeaderSecondaryBadge(args: {
   return null;
 }
 
-function buildDataPreviewQualityNotes(args: {
-  columns: string[];
-  profile: DatasetProfile | null;
-  preview: PreviewRow[];
-}): string[] {
-  const { columns, profile, preview } = args;
-  if (!profile || columns.length === 0) return [];
-  const notes: string[] = [];
-  const seen = new Set<string>();
-
-  const push = (s: string) => {
-    const t = s.replace(/\s+/g, " ").trim();
-    if (!t || seen.has(t)) return;
-    seen.add(t);
-    notes.push(t);
-  };
-
-  for (const col of columns) {
-    const nullRaw = profile.null_counts?.[col];
-    const nullCount =
-      typeof nullRaw === "number" && Number.isFinite(nullRaw) ? nullRaw : 0;
-    if (nullCount > 0) {
-      push(`${humanizeColumnName(col)} has missing values`);
-    }
-  }
-
-  let addedHighUniq = false;
-  for (const col of columns) {
-    const type = profile.column_types?.[col];
-    const { distinct, nonNull } = previewColumnUniqueStats(preview, col);
-    const uniqRatio = nonNull > 0 ? distinct / nonNull : 0;
-    const possibleKey = columnLooksLikePossibleIdentifier({
-      col,
-      preview,
-      nonNull,
-      distinct,
-    });
-    if (possibleKey) {
-      push(`${humanizeColumnName(col)} looks like an identifier`);
-    }
-    const highCard =
-      !possibleKey &&
-      type !== "date" &&
-      nonNull >= 8 &&
-      uniqRatio >= 0.92 &&
-      (type === "category" || type === "text");
-    if (highCard && !addedHighUniq) {
-      push(`${humanizeColumnName(col)} has mostly unique values`);
-      addedHighUniq = true;
-    }
-  }
-
-  for (const col of columns) {
-    if (profile.column_types?.[col] !== "date") continue;
-    let minMs: number | null = null;
-    let maxMs: number | null = null;
-    for (const row of preview) {
-      const t = parsePreviewCellToTimestamp(row[col]);
-      if (t == null) continue;
-      if (minMs == null || t < minMs) minMs = t;
-      if (maxMs == null || t > maxMs) maxMs = t;
-    }
-    if (minMs == null || maxMs == null) continue;
-    const y0 = new Date(minMs).getFullYear();
-    const y1 = new Date(maxMs).getFullYear();
-    if (y1 - y0 >= 1) {
-      push(`${humanizeColumnName(col)} spans multiple years`);
-    }
-  }
-
-  return notes.slice(0, 5);
-}
-
 function inferProductColumn(
   cols: string[],
   profile: DatasetProfile | null,
@@ -6161,149 +6099,6 @@ function clientFallbackSuggestedQuestions(_datasetKind: string): string[] {
     ])
   );
 }
-
-function splitColumnsByTypedProfile(
-  columns: string[],
-  profile: DatasetProfile | null
-): { numbers: string[]; dates: string[]; categories: string[] } {
-  const numbers: string[] = [];
-  const dates: string[] = [];
-  const categories: string[] = [];
-  for (const c of columns) {
-    const t = profile?.column_types?.[c];
-    if (t === "number") numbers.push(c);
-    else if (t === "date") dates.push(c);
-    else if (t === "category" || t === "text") categories.push(c);
-  }
-  return { numbers, dates, categories };
-}
-
-/** Compact label for suggestion chips (keeps prompts scannable). */
-function shortColumnLabel(col: string, maxLen = 20): string {
-  const t = humanizeColumnName(col).replace(/\s+/g, " ").trim();
-  if (t.length <= maxLen) return t;
-  return `${t.slice(0, Math.max(1, maxLen - 1))}…`;
-}
-
-/** Up to 6 very short, dataset-aware question chips for Data Preview. */
-function buildDataPreviewSuggestedQuestions(args: {
-  columns: string[];
-  profile: DatasetProfile | null;
-  datasetKind: string;
-  primaryMetric: string | null;
-  primaryDate: string | null;
-  primaryBreakdown: string | null;
-}): string[] {
-  const {
-    columns,
-    profile,
-    datasetKind,
-    primaryMetric,
-    primaryDate,
-    primaryBreakdown,
-  } = args;
-  const { numbers, dates, categories } = splitColumnsByTypedProfile(
-    columns,
-    profile
-  );
-
-  const metricCol =
-    primaryMetric && numbers.includes(primaryMetric)
-      ? primaryMetric
-      : numbers[0] ?? null;
-  const dateCol =
-    primaryDate && dates.includes(primaryDate)
-      ? primaryDate
-      : dates[0] ?? null;
-  let breakdownCol =
-    primaryBreakdown && categories.includes(primaryBreakdown)
-      ? primaryBreakdown
-      : null;
-  if (!breakdownCol) {
-    breakdownCol =
-      categories.find((c) => !isIdLikeColumnNameForProduct(c)) ??
-      categories[0] ??
-      null;
-  }
-
-  const dk = (datasetKind || "").trim().toLowerCase();
-  const raw: string[] = [];
-
-  const domainChip = (): string | null => {
-    switch (dk) {
-      case "hr":
-        return "People snapshot";
-      case "sales":
-        return "Sales snapshot";
-      case "ecommerce":
-        return "Retail snapshot";
-      case "finance":
-        return "Finance snapshot";
-      case "manufacturing":
-        return "Ops snapshot";
-      case "marketing":
-        return "Marketing snapshot";
-      case "operations":
-        return "Operations snapshot";
-      default:
-        return null;
-    }
-  };
-
-  const dc = domainChip();
-  if (dc) raw.push(dc);
-
-  if (metricCol && breakdownCol) {
-    raw.push(
-      `${shortColumnLabel(metricCol)} by ${shortColumnLabel(breakdownCol)}`
-    );
-  }
-  if (metricCol && dateCol) {
-    raw.push(`${shortColumnLabel(metricCol)} trend`);
-  }
-  if (breakdownCol && dateCol) {
-    raw.push(`${shortColumnLabel(breakdownCol)} over time`);
-  }
-  if (numbers.length >= 2) {
-    const a = numbers[0];
-    const b = numbers[1];
-    raw.push(`${shortColumnLabel(a)} vs ${shortColumnLabel(b)}`);
-  }
-  if (metricCol && numbers.length >= 2) {
-    const second = numbers.find((c) => c !== metricCol);
-    if (
-      second &&
-      !(numbers[0] === metricCol && numbers[1] === second)
-    ) {
-      raw.push(
-        `${shortColumnLabel(metricCol)} vs ${shortColumnLabel(second)}`
-      );
-    }
-  }
-  if (metricCol) {
-    raw.push(`${shortColumnLabel(metricCol)} outliers`);
-  }
-  if (breakdownCol && !metricCol) {
-    raw.push(`${shortColumnLabel(breakdownCol)} mix`);
-  }
-  if (dateCol && !metricCol) {
-    raw.push(`${shortColumnLabel(dateCol)} range`);
-  }
-
-  const out = dedupeSuggestedQuestionsNear(dedupeSuggestedQuestions(raw));
-  const filler = [
-    "Top drivers",
-    "Biggest gaps",
-    "Quick wins",
-    "Risks to watch",
-  ];
-  for (const f of filler) {
-    if (out.length >= 4) break;
-    if (!out.some((o) => suggestionsLookNearDuplicate(o, f))) out.push(f);
-  }
-  return out.slice(0, 6);
-}
-
 
 type DataPreviewProfileAnchor = {
   top: number;
@@ -6639,6 +6434,9 @@ function HomeInner() {
 
   const [previewRowLimit, setPreviewRowLimit] = useState<number | "all">(10);
   const [dataPreviewSearchQuery, setDataPreviewSearchQuery] = useState("");
+  const [dataPreviewSchemaSearch, setDataPreviewSchemaSearch] = useState("");
+  const [dataPreviewSelectedSchemaCol, setDataPreviewSelectedSchemaCol] =
+    useState<string | null>(null);
   const [dataPreviewProfileOpen, setDataPreviewProfileOpen] = useState<{
     column: string;
     anchor: DataPreviewProfileAnchor;
@@ -8516,6 +8314,25 @@ function HomeInner() {
   const dataPreviewDerivationsActive =
     activeTab === "preview" || activeTab === "export";
 
+  const dataPreviewColumnMapping = useMemo(
+    () => ({
+      product: productColumn || undefined,
+      sales: salesColumn || undefined,
+      region: regionColumn || undefined,
+      customer: customerColumn || undefined,
+      profit: profitColumn || undefined,
+      date: dateColumn || undefined,
+    }),
+    [
+      productColumn,
+      salesColumn,
+      regionColumn,
+      customerColumn,
+      profitColumn,
+      dateColumn,
+    ]
+  );
+
   const previewColumnHeaderSecondaryMap = useMemo(() => {
     if (activeTab !== "preview" || columns.length === 0) {
       return new Map<string, ColumnQualityBadge | null>();
@@ -8535,24 +8352,32 @@ function HomeInner() {
     return m;
   }, [activeTab, columns, profile, rows, preview]);
 
-  const dataPreviewQualityNotes = useMemo(
+  const dataPreviewQualityInsights = useMemo(
     () =>
       activeTab === "preview" && columns.length > 0
-        ? buildDataPreviewQualityNotes({ columns, profile, preview })
+        ? buildDataPreviewQualityInsights({
+            columns,
+            profile,
+            preview,
+            totalRows: rows,
+          })
         : [],
-    [activeTab, columns, profile, preview]
+    [activeTab, columns, profile, preview, rows]
   );
 
   const dataPreviewSuggestedQuestions = useMemo(
     () =>
       activeTab === "preview" && columns.length > 0
-        ? buildDataPreviewSuggestedQuestions({
-            columns,
-            profile,
-            datasetKind: datasetKind || "",
-            primaryMetric: effectiveSales,
-            primaryDate: effectiveDate,
-            primaryBreakdown: effectiveProduct,
+        ? resolveDataPreviewSuggestedQuestions({
+            apiSuggestions: suggestedQuestions,
+            buildArgs: {
+              columns,
+              profile,
+              datasetKind: datasetKind || "",
+              primaryMetric: effectiveSales,
+              primaryDate: effectiveDate,
+              primaryBreakdown: effectiveProduct,
+            },
           })
         : [],
     [
@@ -8563,6 +8388,7 @@ function HomeInner() {
       effectiveSales,
       effectiveDate,
       effectiveProduct,
+      suggestedQuestions,
     ]
   );
 
@@ -8676,7 +8502,13 @@ function HomeInner() {
     ) {
       scheduleEffectUpdate(() => setDataPreviewProfileOpen(null));
     }
-  }, [columns, dataPreviewProfileOpen]);
+    if (
+      dataPreviewSelectedSchemaCol &&
+      !columns.includes(dataPreviewSelectedSchemaCol)
+    ) {
+      scheduleEffectUpdate(() => setDataPreviewSelectedSchemaCol(null));
+    }
+  }, [columns, dataPreviewProfileOpen, dataPreviewSelectedSchemaCol]);
 
   useEffect(() => {
     if (!dataPreviewProfileOpen) return;
@@ -12000,95 +11832,96 @@ function HomeInner() {
         {activeTab === "preview" && columns.length > 0 && (
           <section className="mb-6 min-w-0 w-full">
             <div className="mb-5 flex min-w-0 flex-col gap-4">
-              <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className={dpPreviewHeaderIntro}>
-                  <h2 className={dpSectionTitle}>Data Preview</h2>
-                  <p className={dpSectionDesc}>
-                    Showing first {preview.length} of {rows} rows in this window. Missing
-                    values are highlighted. AI highlights important column quality signals
-                    automatically.
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2.5">
-                  <label className="text-sm font-medium text-[color:var(--text-muted)]" htmlFor="preview-row-limit">
-                    Rows
-                  </label>
-                  <select
-                    id="preview-row-limit"
-                    value={String(previewRowLimit)}
-                    onChange={async (e) => {
-                      const val = e.target.value === "all" ? "all" : Number(e.target.value);
-                      setPreviewRowLimit(val);
-                      setDataPreviewPageIndex(0);
-                      await fetchPreviewRows(val);
-                    }}
-                    className={dpControl}
-                  >
-                    {previewRowSelectOptions.map((opt) => (
-                      <option key={String(opt)} value={String(opt)}>
-                        {opt === "all" ? "All rows" : `${opt} rows`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className={dpPreviewHeaderIntro}>
+                <h2 className={dpSectionTitle}>Data Preview</h2>
+                <p className={dpSectionDesc}>
+                  Showing first {preview.length} of {rows} rows in this window. Missing
+                  values are highlighted. AI highlights important column quality signals
+                  automatically.
+                </p>
               </div>
               <DataPreviewDatasetContext
                 fileName={uploadMeta?.name}
                 fileSizeBytes={uploadMeta?.size_bytes}
+                sheetLabel={selectedSheet.trim() || null}
                 rows={rows}
                 columnCount={columns.length}
-                sheetLabel={selectedSheet.trim() || null}
               />
-              <div className={`${dpToolbarRow} min-w-0 w-full`}>
-                <div className={dpSearchWrap}>
-                  <div className="relative min-w-0 flex-1">
-                    <span
-                      className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[color:var(--text-subtle)]"
-                      aria-hidden
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <circle cx="11" cy="11" r="7" />
-                        <path d="m20 20-3.2-3.2" />
-                      </svg>
-                    </span>
-                    <input
-                      type="search"
-                      value={dataPreviewSearchQuery}
-                      onChange={(e) => setDataPreviewSearchQuery(e.target.value)}
-                      placeholder="Search loaded rows (all columns)…"
-                      className={dpSearchInput}
-                      aria-label="Search data preview across all columns"
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </div>
-                  {dataPreviewSearchQuery.trim() ? (
-                    <button
-                      type="button"
-                      onClick={() => setDataPreviewSearchQuery("")}
-                      className={dpBtnGhost}
-                    >
-                      Clear
-                    </button>
-                  ) : null}
-                </div>
-                {deferredDataPreviewSearch ? (
-                  <p className={dpToolbarMatchMeta} aria-live="polite">
-                    {dataPreviewFilteredRows.length} of {preview.length} loaded row
-                    {preview.length === 1 ? "" : "s"} match
-                  </p>
-                ) : null}
-              </div>
+              <DataPreviewQualitySummary
+                rows={rows}
+                columns={columns}
+                profile={profile}
+                preview={preview}
+                mapping={dataPreviewColumnMapping}
+              />
+              <DataPreviewDatasetInsightsSummary
+                rows={rows}
+                columns={columns}
+                profile={profile}
+                preview={preview}
+                mapping={dataPreviewColumnMapping}
+              />
+              <DataPreviewSchemaPanel
+                columns={columns}
+                profile={profile}
+                preview={preview}
+                totalRows={rows}
+                mapping={dataPreviewColumnMapping}
+                searchQuery={dataPreviewSchemaSearch}
+                onSearchChange={setDataPreviewSchemaSearch}
+                selectedColumn={dataPreviewSelectedSchemaCol}
+                onSelectColumn={setDataPreviewSelectedSchemaCol}
+              />
+              <DataPreviewColumnDetails
+                column={dataPreviewSelectedSchemaCol}
+                profile={profile}
+                preview={preview}
+                totalRows={rows}
+                mapping={dataPreviewColumnMapping}
+                onClose={() => setDataPreviewSelectedSchemaCol(null)}
+              />
             </div>
+
+            {dataPreviewQualityInsights.length > 0 ? (
+              <div className={dpInsightsPanel} role="note" aria-label="Data quality alerts">
+                <span className="data-preview-insights__icon" aria-hidden>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Data quality alerts
+                  </h3>
+                  <p className="mt-0.5 text-[11px] text-[color:var(--text-muted)]">
+                    Quality issues and column warnings from upload profile.
+                  </p>
+                  <ul className="mt-2 space-y-2 text-xs leading-relaxed text-[color:var(--text-muted)]">
+                    {dataPreviewQualityInsights.map((insight) => (
+                      <li key={insight.message} className="flex items-center gap-2.5">
+                        <span
+                          className={
+                            insight.severity === "info"
+                              ? dpInsightSeverityInfo
+                              : insight.severity === "warning"
+                                ? dpInsightSeverityWarning
+                                : dpInsightSeverityAttention
+                          }
+                        >
+                          {insight.severity === "info"
+                            ? "Info"
+                            : insight.severity === "warning"
+                              ? "Warning"
+                              : "Attention"}
+                        </span>
+                        <span className="min-w-0">{insight.message}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : null}
 
             {dataPreviewSuggestedQuestions.length > 0 ? (
               <div className={dpSuggestionsPanel}>
@@ -12132,29 +11965,80 @@ function HomeInner() {
               </div>
             ) : null}
 
-            {dataPreviewQualityNotes.length > 0 ? (
-              <div className={dpInsightsPanel} role="note">
-                <span className="data-preview-insights__icon" aria-hidden>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
-                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-900/90 dark:text-amber-100/90">
-                    AI Dataset Insights
-                  </h3>
-                  <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-[color:var(--text-muted)]">
-                    {dataPreviewQualityNotes.map((note) => (
-                      <li key={note} className="flex gap-2">
-                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500/65 dark:bg-amber-400/50" aria-hidden />
-                        <span>{note}</span>
-                      </li>
-                    ))}
-                  </ul>
+            <div className={`${dpTableToolbarRow} min-w-0 w-full`}>
+              <div className={dpSearchWrap}>
+                <div className="relative min-w-0 flex-1">
+                  <span
+                    className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[color:var(--text-subtle)]"
+                    aria-hidden
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m20 20-3.2-3.2" />
+                    </svg>
+                  </span>
+                  <input
+                    type="search"
+                    value={dataPreviewSearchQuery}
+                    onChange={(e) => setDataPreviewSearchQuery(e.target.value)}
+                    placeholder="Search loaded rows (all columns)…"
+                    className={dpSearchInput}
+                    aria-label="Search data preview across all columns"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
                 </div>
+                {dataPreviewSearchQuery.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => setDataPreviewSearchQuery("")}
+                    className={dpBtnGhost}
+                  >
+                    Clear
+                  </button>
+                ) : null}
               </div>
-            ) : null}
+              <div className={dpTableToolbarControls}>
+                {deferredDataPreviewSearch ? (
+                  <p className={dpToolbarMatchMeta} aria-live="polite">
+                    {dataPreviewFilteredRows.length} of {preview.length} loaded row
+                    {preview.length === 1 ? "" : "s"} match
+                  </p>
+                ) : null}
+                <label
+                  className="text-sm font-medium text-[color:var(--text-muted)]"
+                  htmlFor="preview-row-limit"
+                >
+                  Rows
+                </label>
+                <select
+                  id="preview-row-limit"
+                  value={String(previewRowLimit)}
+                  onChange={async (e) => {
+                    const val = e.target.value === "all" ? "all" : Number(e.target.value);
+                    setPreviewRowLimit(val);
+                    setDataPreviewPageIndex(0);
+                    await fetchPreviewRows(val);
+                  }}
+                  className={dpControl}
+                >
+                  {previewRowSelectOptions.map((opt) => (
+                    <option key={String(opt)} value={String(opt)}>
+                      {opt === "all" ? "All rows" : `${opt} rows`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             <div
               ref={dataPreviewTableSurfaceRef}
