@@ -11209,8 +11209,7 @@ function HomeInner() {
         )}
 
         <div>
-          {(activeTab === "overview" || activeTab === "insights") &&
-          columns.length > 0 ? (
+          {activeTab === "insights" && columns.length > 0 ? (
             <div className="mb-4">
               <FilterPanel
                 dashboardFilters={dashboardFilters}
@@ -11273,50 +11272,51 @@ function HomeInner() {
               className={`grid w-full min-w-0 grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] ${
                 columns.length === 0
                   ? "overview-landing-grid gap-3 sm:gap-4"
-                  : "gap-5 lg:gap-6"
+                  : "gap-4 lg:gap-5"
               }`}
             >
               {columns.length > 0 && !overviewUploadExpanded ? (
-                <section className={`overview-dataset-info-card col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-1 ${ovCard}`}>
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
+                <section
+                  className={`overview-dataset-status-bar overview-dataset-info-card col-span-1 min-w-0 lg:col-span-2 order-1 ${ovCard}`}
+                  aria-label="Dataset status"
+                >
+                  <div className="overview-dataset-status-bar__inner flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                    <div className="min-w-0 flex flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-1.5">
                       <div className="flex items-center gap-2 shrink-0">
                         <span
-                          className="overview-dataset-status-dot h-2.5 w-2.5 rounded-full bg-emerald-500"
+                          className="overview-dataset-status-dot h-2 w-2 rounded-full bg-emerald-500"
                           aria-hidden
                         />
-                        <span className="overview-dataset-status-label text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                        <span className="overview-dataset-status-label text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
                           Dataset ready
                         </span>
                       </div>
-                      <dl className="grid min-w-0 gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-6">
-                        <div className="min-w-0 sm:col-span-2 lg:col-span-2">
-                          <dt className={ovMuted}>File</dt>
+                      <dl className="overview-dataset-status-bar__meta flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1 text-xs sm:text-sm">
+                        <div className="flex min-w-0 max-w-full items-baseline gap-1.5">
+                          <dt className={`shrink-0 ${ovMuted}`}>File</dt>
                           <dd
-                            className="min-w-0 font-medium text-foreground"
+                            className="min-w-0 truncate font-medium text-foreground"
                             title={uploadMeta?.name || undefined}
                           >
-                            <span className="block min-w-0">
-                              {uploadMeta?.name
-                                ? formatOverviewFilenameMiddle(uploadMeta.name, 56)
-                                : "—"}
-                            </span>
+                            {uploadMeta?.name
+                              ? formatOverviewFilenameMiddle(uploadMeta.name, 48)
+                              : "—"}
                             {uploadMeta?.size_bytes != null ? (
-                              <span className={`mt-0.5 block text-xs font-normal ${ovMuted}`}>
-                                {formatBytes(uploadMeta.size_bytes)}
+                              <span className={`ml-1.5 font-normal ${ovMuted}`}>
+                                ({formatBytes(uploadMeta.size_bytes)})
                               </span>
                             ) : null}
                           </dd>
                         </div>
-                        <div>
+                        <div className="flex items-baseline gap-1.5">
                           <dt className={ovDataLabel}>Rows</dt>
                           <dd className={ovDataValue}>{rows}</dd>
                         </div>
-                        <div>
+                        <div className="flex items-baseline gap-1.5">
                           <dt className={ovDataLabel}>Columns</dt>
                           <dd className={ovDataValue}>{columns.length}</dd>
                         </div>
-                        <div className="min-w-0">
+                        <div className="flex min-w-0 items-baseline gap-1.5">
                           <dt className={ovDataLabel}>Sheet</dt>
                           <dd className={`truncate ${ovDataValue}`}>
                             {selectedSheet.trim() ||
@@ -11327,16 +11327,14 @@ function HomeInner() {
                         </div>
                       </dl>
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={openOverviewReplaceUpload}
-                        title="Upload a new CSV or Excel file (replaces the dataset in this session)"
-                        className={ovOverviewSecondaryBtn}
-                      >
-                        Replace file
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={openOverviewReplaceUpload}
+                      title="Upload a new CSV or Excel file (replaces the dataset in this session)"
+                      className={`${ovOverviewSecondaryBtn} overview-dataset-status-bar__replace shrink-0`}
+                    >
+                      Replace file
+                    </button>
                   </div>
                 </section>
               ) : (
@@ -11551,10 +11549,10 @@ function HomeInner() {
               ) : null}
 
               {columns.length > 0 && (
-                <section className={`col-span-1 min-w-0 lg:col-span-2 p-5 sm:p-6 order-5 ${ovCardElevated}`}>
+                <section className={`overview-data-setup-card col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-6 ${ovCardElevated}`}>
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div>
-                      <h2 className={ovSectionTitle}>Data setup</h2>
+                      <h2 className={`${ovSectionTitle} text-base`}>Data setup</h2>
                       <p className={`mt-1 ${ovSectionDesc}`}>
                         Column mapping drives KPIs, charts, AI answers, and PDF
                         export.
@@ -11739,9 +11737,9 @@ function HomeInner() {
               )}
 
               {autoDashboardKpiRows.length > 0 && (
-                <section className="col-span-1 min-w-0 lg:col-span-2 pt-1 order-3">
+                <section className="overview-kpi-section col-span-1 min-w-0 lg:col-span-2 pt-0.5 order-3">
                   <h2 className={`${ovSectionTitle} mb-1`}>Auto Dashboard</h2>
-                  <p className={`${ovSectionDesc} mb-5`}>
+                  <p className={`${ovSectionDesc} mb-4`}>
                     Detected dataset type:{" "}
                     <span className="font-medium text-foreground">
                       {autoDashboard?.type_label ?? "Dashboard"}
@@ -11852,6 +11850,26 @@ function HomeInner() {
                   )}
                 </section>
               )}
+
+              {columns.length > 0 ? (
+                <section className="col-span-1 min-w-0 lg:col-span-2 order-5 overview-post-upload-filters">
+                  <FilterPanel
+                    dashboardFilters={dashboardFilters}
+                    dimensionOptions={dimensionOptions}
+                    filterBreadcrumb={filterBreadcrumb}
+                    dashboardEmpty={dashboardEmpty}
+                    dateStart={dashDateStart}
+                    dateEnd={dashDateEnd}
+                    onPickDimension={upsertExplorerFilter}
+                    onRemoveFilter={removeExplorerFilter}
+                    onClearAll={clearExplorerFilters}
+                    onDateStart={setDashDateStart}
+                    onDateEnd={setDashDateEnd}
+                    appearance="dashboard"
+                    overviewFilterCompact
+                  />
+                </section>
+              ) : null}
             </div>
             {columns.length === 0 ? (
               <>

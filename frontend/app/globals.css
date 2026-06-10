@@ -1625,11 +1625,49 @@ body {
   margin-top: 0 !important;
 }
 
+/* —— Overview post-upload: compact dataset status strip —— */
+.overview-dataset-status-bar {
+  padding: 0.65rem 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .overview-dataset-status-bar {
+    padding: 0.7rem 1rem;
+  }
+}
+
+.overview-dataset-status-bar__replace {
+  height: 2.25rem !important;
+  min-height: 2.25rem !important;
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+  font-size: 0.75rem !important;
+}
+
+.overview-post-upload-filters {
+  margin-top: 0.25rem;
+}
+
+.overview-filters-card--post-upload {
+  border-radius: 0.875rem;
+}
+
+.overview-data-setup-card {
+  margin-top: 0.25rem;
+}
+
 /* —— Overview uploaded-state visual hierarchy (dark mode) —— */
-.dark .overview-filters-card {
-  background: color-mix(in srgb, var(--surface-inset) 72%, var(--card));
-  border-color: color-mix(in srgb, var(--border-default) 90%, transparent);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+.dark .overview-filters-card,
+.dark .overview-filters-card--post-upload {
+  background: color-mix(in srgb, var(--surface-inset) 62%, var(--card));
+  border-color: color-mix(in srgb, var(--border-default) 78%, transparent);
+  box-shadow: none;
+}
+
+.overview-filters-card--post-upload {
+  background: color-mix(in srgb, var(--accent-wash) 6%, var(--card));
+  border-color: color-mix(in srgb, var(--border-default) 82%, transparent);
+  box-shadow: none;
 }
 
 .dark .overview-filters-card .overview-filter-date-bar {
@@ -1657,9 +1695,16 @@ body {
   transform: none;
 }
 
-.dark .overview-dataset-info-card {
-  background: color-mix(in srgb, var(--surface-inset) 68%, var(--card));
-  border-color: color-mix(in srgb, var(--border-default) 92%, transparent);
+.dark .overview-dataset-info-card,
+.dark .overview-dataset-status-bar {
+  background: rgba(15, 23, 42, 0.35);
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: none;
+}
+
+.overview-dataset-status-bar {
+  background: color-mix(in srgb, var(--accent-wash) 8%, var(--card));
+  border-color: color-mix(in srgb, var(--border-default) 80%, transparent);
   box-shadow: none;
 }
 
@@ -1674,17 +1719,29 @@ body {
 .dark .overview-ai-summary-card {
   background: linear-gradient(
     165deg,
-    color-mix(in srgb, var(--surface-elevated-card) 82%, var(--accent-wash)) 0%,
-    color-mix(in srgb, var(--card) 94%, var(--surface-inset)) 100%
+    color-mix(in srgb, var(--surface-elevated-card) 76%, var(--accent-wash)) 0%,
+    color-mix(in srgb, var(--card) 96%, var(--surface-inset)) 100%
   );
-  border-color: color-mix(in srgb, var(--accent) 14%, var(--card-border));
+  border-color: color-mix(in srgb, var(--accent) 12%, var(--card-border));
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.28),
-    0 16px 36px -24px color-mix(in srgb, var(--accent) 22%, transparent);
+    0 1px 2px rgba(0, 0, 0, 0.22),
+    0 12px 28px -22px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .dark .overview-ai-summary-card__glow {
-  opacity: 0.42;
+  opacity: 0.32;
+}
+
+.dark .overview-ai-summary-card__insight.saas-btn-premium {
+  border-color: color-mix(in srgb, var(--border-default) 82%, transparent);
+  background: color-mix(in srgb, var(--surface-inset) 48%, var(--surface-elevated));
+  box-shadow: none;
+}
+
+.dark .overview-data-setup-card {
+  background: color-mix(in srgb, var(--surface-inset) 55%, var(--card));
+  border-color: color-mix(in srgb, var(--border-default) 82%, transparent);
+  box-shadow: none;
 }
 
 .dark .overview-ai-summary-card .saas-btn-premium {
@@ -1792,6 +1849,15 @@ body {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
+.overview-filters-card--post-upload .overview-filter-control,
+.overview-filters-card--post-upload select.overview-filter-control,
+.overview-filters-card--post-upload .overview-filter-date-bar {
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  box-shadow: none;
+}
+
 .overview-interactive-filters .overview-filter-date-bar {
   box-sizing: border-box;
   height: 43px !important;
@@ -1800,6 +1866,10 @@ body {
   padding: 0 !important;
   border-radius: 0.4375rem;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.overview-filters-card--post-upload .overview-filter-date-bar {
+  box-shadow: none;
 }
 
 .overview-interactive-filters .overview-filter-date-bar:focus-within {

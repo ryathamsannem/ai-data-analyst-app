@@ -157,7 +157,7 @@ function FilterPanelInner({
       : "";
 
   const shellCls = isDashboard
-    ? `${filterShellClass} ${useOverviewCompact ? "space-y-2.5" : "space-y-3"} p-4 sm:p-5 ${ovCard}`
+    ? `${filterShellClass} ${useOverviewCompact ? "overview-filters-card--post-upload space-y-2" : "space-y-3"} ${useOverviewCompact ? "p-3 sm:p-3.5" : "p-4 sm:p-5"} ${ovCard}`
     : "space-y-4 rounded-2xl border border-slate-200/55 bg-white/95 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.045)] backdrop-blur-[2px] sm:p-5";
 
   const dateBarCls = isDashboard
@@ -176,15 +176,15 @@ function FilterPanelInner({
 
   return (
     <div className={shellCls}>
-      <div className="flex flex-col gap-1">
+      <div className={`flex flex-col ${useOverviewCompact ? "gap-0.5" : "gap-1"}`}>
         <h3
           className={
             isDashboard
-              ? `${ovSectionTitle} text-base`
+              ? `${ovSectionTitle} ${useOverviewCompact ? "text-sm" : "text-base"}`
               : "text-sm font-semibold tracking-tight text-slate-900"
           }
         >
-          Interactive filters
+          {useOverviewCompact ? "Filters" : "Interactive filters"}
         </h3>
         <p
           className={
@@ -193,7 +193,9 @@ function FilterPanelInner({
               : "text-xs leading-relaxed text-slate-500"
           }
         >
-          Slice KPIs and charts; filters apply to AI analysis for this session.
+          {useOverviewCompact
+            ? "Applied to this session — slice KPIs, charts, and AI analysis."
+            : "Slice KPIs and charts; filters apply to AI analysis for this session."}
         </p>
       </div>
 
