@@ -23,6 +23,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
+# Windows/Anaconda hosts often fail TLS to api.anthropic.com without OS trust store.
+try:
+    import truststore  # type: ignore
+
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
 BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
 FIXTURES = REPO / "test-fixtures" / "domains"
@@ -46,6 +54,7 @@ import main as m  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from main import ConversationContextPayload  # noqa: E402
 
+from qa_wave_specs import build_wave2_specs, build_wave3_specs  # noqa: E402
 from wave1_qa_execution import (  # noqa: E402
     ChainSpec,
     EvalResult,
@@ -73,6 +82,15 @@ DOMAIN_ALIASES: Dict[str, str] = {
     "banking": "Banking & Financial Services",
     "banking_financial_services": "Banking & Financial Services",
     "banking & financial services": "Banking & Financial Services",
+    "finance": "Finance & FP&A",
+    "finance_fpa": "Finance & FP&A",
+    "finance & fp&a": "Finance & FP&A",
+    "operations": "Operations",
+    "customer_support": "Customer Support",
+    "customer support": "Customer Support",
+    "support": "Customer Support",
+    "hr": "HR",
+    "healthcare": "Healthcare",
 }
 
 FALLBACK_ANSWER_MARKERS: Tuple[str, ...] = (
@@ -161,9 +179,108 @@ LIVE_SUITE: Dict[str, Dict[str, Any]] = {
     },
 }
 
+WAVE2_LIVE_SUITE: Dict[str, Dict[str, Any]] = {
+    "Finance & FP&A": {
+        "question_ids": [
+            "F2-B01",
+            "F2-B02",
+            "F2-B03",
+            "F2-I01",
+            "F2-I02",
+            "F2-E01",
+            "F2-E02",
+            "F2-E03",
+            "F2-NEG",
+        ],
+        "chain_id": "F2-C1",
+        "chain_followups": 3,
+    },
+    "Operations": {
+        "question_ids": [
+            "O2-B01",
+            "O2-B02",
+            "O2-B03",
+            "O2-I01",
+            "O2-I02",
+            "O2-E01",
+            "O2-E02",
+            "O2-NEG",
+        ],
+        "chain_id": "O2-C1",
+        "chain_followups": 3,
+    },
+    "Customer Support": {
+        "question_ids": [
+            "C2-B01",
+            "C2-B02",
+            "C2-B03",
+            "C2-I02",
+            "C2-E01",
+            "C2-E02",
+            "C2-NEG",
+        ],
+        "chain_id": "C2-C1",
+        "chain_followups": 3,
+    },
+}
+
+WAVE3_LIVE_SUITE: Dict[str, Dict[str, Any]] = {
+    "HR": {
+        "question_ids": [
+            "H3-B01",
+            "H3-B02",
+            "H3-B03",
+            "H3-I01",
+            "H3-I02",
+            "H3-E01",
+            "H3-E02",
+            "H3-NEG",
+        ],
+        "chain_id": "H3-C1",
+        "chain_followups": 3,
+    },
+    "Healthcare": {
+        "question_ids": [
+            "HC3-B01",
+            "HC3-B02",
+            "HC3-B03",
+            "HC3-I01",
+            "HC3-I02",
+            "HC3-E01",
+            "HC3-E02",
+            "HC3-NEG",
+        ],
+        "chain_id": "HC3-C1",
+        "chain_followups": 3,
+    },
+}
+
+LIVE_SUITE_BY_WAVE: Dict[int, Dict[str, Dict[str, Any]]] = {
+    1: LIVE_SUITE,
+    2: WAVE2_LIVE_SUITE,
+    3: WAVE3_LIVE_SUITE,
+}
+
+DEFAULT_OUTPUT_BY_WAVE: Dict[int, Path] = {
+    1: REPO / "docs" / "ai-insights-wave1-live-narrative",
+    2: REPO / "docs" / "ai-insights-wave2-live-narrative",
+    3: REPO / "docs" / "ai-insights-wave3-live-narrative",
+}
+
+
+def build_specs_for_wave(wave: int) -> Dict[str, Dict[str, Any]]:
+    if wave == 1:
+        return build_domain_specs()
+    if wave == 2:
+        return build_wave2_specs()
+    if wave == 3:
+        return build_wave3_specs()
+    raise ValueError(f"Unsupported wave: {wave}")
+
 
 @dataclass
 class RunConfig:
+    wave: int
     domains: List[str]
     limit: Optional[int]
     out_json: Path
@@ -189,18 +306,26 @@ def _resolve_output_paths(output: Optional[str]) -> Tuple[Path, Path]:
     return Path(f"{p}-results.json"), Path(f"{p}-report.md")
 
 
-def _resolve_domains(domain_arg: Optional[str]) -> List[str]:
+def _resolve_domains(domain_arg: Optional[str], wave: int) -> List[str]:
+    suite = LIVE_SUITE_BY_WAVE[wave]
     if not domain_arg:
-        return list(LIVE_SUITE.keys())
+        return list(suite.keys())
     key = domain_arg.strip().lower().replace("-", "_")
     if key in DOMAIN_ALIASES:
-        return [DOMAIN_ALIASES[key]]
-    for canonical in LIVE_SUITE:
+        canonical = DOMAIN_ALIASES[key]
+        if canonical not in suite:
+            print(
+                f"ERROR: Domain {canonical!r} is not in Wave {wave} suite.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        return [canonical]
+    for canonical in suite:
         if canonical.lower() == domain_arg.strip().lower():
             return [canonical]
-    known = ", ".join(sorted(DOMAIN_ALIASES))
+    known = ", ".join(sorted(suite.keys()))
     print(
-        f"ERROR: Unknown --domain {domain_arg!r}. Use one of: {known}",
+        f"ERROR: Unknown --domain {domain_arg!r}. Wave {wave} domains: {known}",
         file=sys.stderr,
     )
     sys.exit(2)
@@ -540,13 +665,15 @@ def write_report(
     payload: Dict[str, Any],
     results: List[NarrativeEval],
     out_md: Path,
+    *,
+    wave: int = 1,
 ) -> None:
     by_domain: Dict[str, List[NarrativeEval]] = defaultdict(list)
     for r in results:
         by_domain[r.domain].append(r)
 
     lines: List[str] = []
-    lines.append("# AI Insights Wave 1 — Live Narrative QA Report")
+    lines.append(f"# AI Insights Wave {wave} — Live Narrative QA Report")
     lines.append("")
     lines.append("**Status:** Evaluation only — no fixes implemented.")
     lines.append("")
@@ -588,7 +715,8 @@ def write_report(
     conf_weak: List[NarrativeEval] = []
     hall_fails: List[NarrativeEval] = []
 
-    for domain in payload.get("domains_run", list(LIVE_SUITE.keys())):
+    suite_keys = list(LIVE_SUITE_BY_WAVE.get(wave, LIVE_SUITE).keys())
+    for domain in payload.get("domains_run", suite_keys):
         rs = by_domain.get(domain, [])
         if not rs:
             continue
@@ -676,12 +804,19 @@ def write_report(
 
 def parse_args() -> RunConfig:
     parser = argparse.ArgumentParser(
-        description="Wave 1 live narrative QA (full /ask + Claude). See docs/ai-insights-live-narrative-staging-runbook.md",
+        description="Live narrative QA (full /ask + Claude). See docs/ai-insights-live-narrative-staging-runbook.md",
+    )
+    parser.add_argument(
+        "--wave",
+        type=int,
+        default=1,
+        choices=(1, 2, 3),
+        help="QA wave: 1 (default), 2, or 3",
     )
     parser.add_argument(
         "--domain",
         metavar="NAME",
-        help="Run one domain only: retail, marketing, sales, geography, banking",
+        help="Run one domain only (see DOMAIN_ALIASES / wave suite)",
     )
     parser.add_argument(
         "--limit",
@@ -710,9 +845,15 @@ def parse_args() -> RunConfig:
         help="Skip follow-up chain per domain (faster smoke)",
     )
     args = parser.parse_args()
-    out_json, out_md = _resolve_output_paths(args.output)
+    wave = int(args.wave)
+    if args.output:
+        out_json, out_md = _resolve_output_paths(args.output)
+    else:
+        stem = DEFAULT_OUTPUT_BY_WAVE[wave]
+        out_json, out_md = Path(f"{stem}-results.json"), Path(f"{stem}-report.md")
     return RunConfig(
-        domains=_resolve_domains(args.domain),
+        wave=wave,
+        domains=_resolve_domains(args.domain, wave),
         limit=args.limit,
         out_json=out_json,
         out_md=out_md,
@@ -729,7 +870,8 @@ def main() -> None:
         print("Preflight-only mode: exiting without QA matrix.", flush=True)
         sys.exit(0)
 
-    all_specs = build_domain_specs()
+    live_suite = LIVE_SUITE_BY_WAVE[run_cfg.wave]
+    all_specs = build_specs_for_wave(run_cfg.wave)
     by_id, chains = _index_specs(all_specs)
     results: List[NarrativeEval] = []
     api_errors = 0
@@ -741,10 +883,10 @@ def main() -> None:
 
     started = time.time()
     for domain in run_cfg.domains:
-        if domain not in LIVE_SUITE:
+        if domain not in live_suite:
             print(f"SKIP unknown domain {domain}", flush=True)
             continue
-        suite = LIVE_SUITE[domain]
+        suite = live_suite[domain]
         cfg = all_specs[domain]
         print(f"=== Domain: {domain} ===", flush=True)
         run_domain_live(
@@ -770,6 +912,7 @@ def main() -> None:
         "mode": "full_ask_live_narrative",
         "api_key_present": True,
         "preflight": preflight,
+        "wave": run_cfg.wave,
         "domains_run": run_cfg.domains,
         "limit_per_domain": run_cfg.limit,
         "skip_chain": run_cfg.skip_chain,
@@ -808,7 +951,7 @@ def main() -> None:
     run_cfg.out_json.parent.mkdir(parents=True, exist_ok=True)
     run_cfg.out_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"Wrote {run_cfg.out_json}", flush=True)
-    write_report(payload, results, run_cfg.out_md)
+    write_report(payload, results, run_cfg.out_md, wave=run_cfg.wave)
 
     if fallback_n > 0:
         print(

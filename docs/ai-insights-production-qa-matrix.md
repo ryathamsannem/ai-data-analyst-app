@@ -34,11 +34,11 @@ Validate end-to-end AI Insights quality before production sign-off:
 | **Marketing** | 1 | `domain_quality_generic.csv` | same | ✅ Ready (proxy) |
 | **Geography** | 1 | `geographic_performance.csv` | `city`, `state`, `zone`, `revenue`, `profit`, `customers`, `growth_rate` | ✅ Ready (no date) |
 | **Banking & Financial Services** | 1 | *Proposed:* `banking_financial_services.csv` | `report_date`, `branch`, `region`, `customer_segment`, `product_type`, `loan_balance`, `deposit_balance`, `interest_income`, `npl_amount`, `delinquency_rate`, `credit_utilization`, `spend_category` | ⚠️ **Gap — Wave 1 blocker** |
-| **Finance / FP&A** | 2 | `domain_quality_generic.csv` | revenue, cost, units, department, category, report_date | ✅ Ready (proxy) |
-| **Operations** | 2 | `domain_quality_generic.csv` | units as throughput proxy | ✅ Ready (proxy) |
-| **Customer Support** | 2 | `domain_quality_generic.csv` | satisfaction_score, department | ✅ Ready (proxy) |
-| **HR** | 3 | `domain_quality_generic.csv` | units as headcount proxy | ✅ Ready (proxy) |
-| **Healthcare** | 3 | `domain_quality_generic.csv` | units as patient volume; department as ward/clinical | ✅ Ready (proxy) |
+| **Finance / FP&A** | 2 | `test-fixtures/domains/finance_fpa.csv` | `budget`, `actual`, `variance`, `revenue`, `cost`, `department`, `cost_center`, `category` | ✅ Ready |
+| **Operations** | 2 | `test-fixtures/domains/operations.csv` | `facility`, `production_line`, `shift`, `units_produced`, `downtime_hours`, `defect_rate`, `sla_score` | ✅ Ready |
+| **Customer Support** | 2 | `test-fixtures/domains/customer_support.csv` | `ticket_category`, `channel`, `priority`, `avg_resolution_hours`, `satisfaction_score`, `escalations` | ✅ Ready |
+| **HR** | 3 | `test-fixtures/domains/hr.csv` | `headcount`, `hires`, `terminations`, `attrition_rate`, `personnel_cost`, `job_family`, `location` | ✅ Ready |
+| **Healthcare** | 3 | `test-fixtures/domains/healthcare.csv` | `patient_volume`, `admissions`, `readmissions`, `length_of_stay_days`, `ward`, `region` | ✅ Ready |
 
 **Proxy rule:** When domain vocabulary (territory, campaign, branch, ticket) does not exist as a column, pass if engine maps to the documented synonym (`units`→headcount, `category`→product/campaign, `department`→team/ward) **and** provenance states the mapping. Fail if answer treats proxy as literal without disclosure.
 

@@ -35,8 +35,8 @@ DIMENSION_PHRASE_ALIASES: Dict[str, Tuple[str, ...]] = {
     "regions": ("region", "zone", "territory"),
     "product": ("product", "category"),
     "products": ("product", "category"),
-    "ward": ("category", "department"),
-    "wards": ("category", "department"),
+    "ward": ("ward", "category", "department"),
+    "wards": ("ward", "category", "department"),
     "team": ("department",),
     "teams": ("department",),
     "division": ("department",),
@@ -75,10 +75,10 @@ def dimension_tokens_for_phrase(phrase: str) -> List[str]:
         tokens.append(t)
 
     for key in (raw, singular):
+        _add(key)
         if key in DIMENSION_PHRASE_ALIASES:
             for alias in DIMENSION_PHRASE_ALIASES[key]:
                 _add(alias)
-        _add(key)
 
     return tokens
 
@@ -95,6 +95,12 @@ def resolve_dimension_phrase_to_column(
     pool = categorical_columns(columns, profile or {})
     if not pool:
         pool = list(columns)
+
+    phrase_norm = _singularize_dimension_phrase(_norm_col(phrase))
+    if phrase_norm:
+        for col in pool:
+            if _norm_col(str(col)) == phrase_norm:
+                return str(col)
 
     for token in dimension_tokens_for_phrase(phrase):
         hit = find_column_for_token(token, pool, profile=profile)
@@ -198,6 +204,17 @@ def find_column_for_token(
                 if prefer in _norm_col(c):
                     return str(c)
 
+    if token_l in ("ward", "wards"):
+        for c in pool:
+            cn = _norm_col(c)
+            if cn == "ward" or cn.startswith("ward "):
+                return str(c)
+
+    if token_l in ("department", "departments"):
+        for c in pool:
+            if _norm_col(c) == "department":
+                return str(c)
+
     if re.search(r"customer", token_l):
         for c in pool:
             if "customer" in _norm_col(c):
@@ -225,7 +242,35 @@ def find_column_for_token(
                 return str(c)
         return None
 
-    if token_l in ("satisfaction", "satisfaction score", "csat", "resolution", "resolution rate"):
+    if token_l in ("satisfaction", "satisfaction score", "csat"):
+        for c in pool:
+            if "satisfaction" in _norm_col(c):
+                return str(c)
+
+    if token_l in (
+        "resolution",
+        "resolution rate",
+        "resolution time",
+        "resolution hours",
+        "avg resolution",
+        "average resolution",
+        "response time",
+        "wait time",
+        "handling time",
+        "time to resolve",
+        "time to resolution",
+    ):
+        for prefer in ("resolution", "response", "wait", "handling"):
+            for c in pool:
+                cn = _norm_col(c)
+                if prefer in cn and any(
+                    k in cn for k in ("hour", "minute", "time", "duration", "resolution")
+                ):
+                    return str(c)
+        for c in pool:
+            cn = _norm_col(c)
+            if "resolution" in cn and "satisfaction" not in cn:
+                return str(c)
         for c in pool:
             if "satisfaction" in _norm_col(c):
                 return str(c)
@@ -275,6 +320,16 @@ _METRIC_SYNONYM_PATTERNS: Tuple[Tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bheadcount\b", re.I), "headcount"),
     (re.compile(r"\bpatient\s+volumes?\b", re.I), "patient volume"),
     (re.compile(r"\bfte\b", re.I), "headcount"),
+    (
+        re.compile(
+            r"\b(?:resolution\s+time|(?:longest|shortest|highest|lowest|slowest|fastest)"
+            r"\s+resolution(?:\s+time)?|average\s+resolution(?:\s+hours?)?|"
+            r"avg\s+resolution|response\s+time|handling\s+time|wait\s+time|"
+            r"time\s+to\s+(?:resolve|resolution))\b",
+            re.I,
+        ),
+        "resolution time",
+    ),
 )
 
 _SCORE_RATING_SUBSTRINGS: Tuple[str, ...] = (
@@ -332,6 +387,12 @@ def column_prefers_mean_aggregation(col_name: Optional[str]) -> bool:
     if any(sub in cn for sub in _RATE_PCT_SUBSTRINGS):
         return True
     if re.search(r"(_rate|_pct|_percent|_percentage|_ratio)(?:_|$)", cn):
+        return True
+    if "resolution" in cn and any(k in cn for k in ("hour", "minute", "time", "duration")):
+        return True
+    if re.search(r"\b(?:avg|average)\b", cn) and any(
+        k in cn for k in ("hour", "minute", "duration", "latency")
+    ):
         return True
     return False
 

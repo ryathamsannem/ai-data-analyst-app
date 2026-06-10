@@ -27,6 +27,11 @@ PHRASE_COLUMN_ALLOWLIST: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("salesperson", ("sales_rep", "salesperson")),
     ("sales person", ("sales_rep", "salesperson")),
     ("net interest margin", ("nim", "interest_margin", "net_interest")),
+    ("ebitda margin", ("ebitda",)),
+    ("ebitda", ("ebitda",)),
+    ("operating margin", ("operating", "margin")),
+    ("gross margin", ("gross", "margin")),
+    ("net margin", ("net", "margin")),
 )
 
 _SAFE_REPLACEMENTS: Dict[str, str] = {
@@ -40,6 +45,11 @@ _SAFE_REPLACEMENTS: Dict[str, str] = {
     "salesperson": "the requested sales-rep field",
     "sales person": "the requested sales-rep field",
     "net interest margin": "the requested margin metric",
+    "ebitda margin": "the requested EBITDA margin metric",
+    "ebitda": "the requested EBITDA metric",
+    "operating margin": "the requested operating-margin metric",
+    "gross margin": "the requested gross-margin metric",
+    "net margin": "the requested net-margin metric",
 }
 
 _REQUESTED_METRIC_CHECKS: Tuple[Dict[str, Any], ...] = (
@@ -47,13 +57,13 @@ _REQUESTED_METRIC_CHECKS: Tuple[Dict[str, Any], ...] = (
         "id": "conversion_rate",
         "pattern": re.compile(r"conversion\s+rate", re.I),
         "supported": lambda df, _profile: _has_conversion_rate_column(df),
-        "label": "a conversion-rate column",
+        "label": "the requested conversion-rate column",
     },
     {
         "id": "nps",
         "pattern": re.compile(r"\bnps\b|net\s+promoter", re.I),
         "supported": lambda df, _profile: _column_contains(df, "nps"),
-        "label": "an NPS column",
+        "label": "the requested NPS column",
     },
     {
         "id": "clv",
@@ -61,43 +71,96 @@ _REQUESTED_METRIC_CHECKS: Tuple[Dict[str, Any], ...] = (
         "supported": lambda df, _profile: _column_contains_any(
             df, ("lifetime", "clv")
         ),
-        "label": "a customer-lifetime-value column",
+        "label": "the requested customer-lifetime-value column",
     },
     {
         "id": "churn",
         "pattern": re.compile(r"\bchurn(?:\s+rate)?\b", re.I),
         "supported": lambda df, _profile: _column_contains(df, "churn"),
-        "label": "a churn column",
+        "label": "the requested churn column",
     },
     {
         "id": "salesperson",
         "pattern": re.compile(r"\bsalesperson\b|\bsales\s+person\b|\bsales\s+by\s+sales", re.I),
         "supported": lambda df, profile: _has_salesperson_dimension(df, profile),
-        "label": "a salesperson / sales-rep column",
+        "label": "the requested salesperson column",
     },
     {
         "id": "nim",
         "pattern": re.compile(r"net\s+interest\s+margin|\bnim\b", re.I),
         "supported": lambda df, _profile: _has_nim_column(df),
-        "label": "a net-interest-margin column",
+        "label": "the requested net-interest-margin column",
+    },
+    {
+        "id": "ebitda_margin",
+        "pattern": re.compile(r"\bebitda(?:\s+margin)?\b", re.I),
+        "supported": lambda df, _profile: _has_ebitda_column(df),
+        "label": "the requested EBITDA margin column",
+    },
+    {
+        "id": "operating_margin",
+        "pattern": re.compile(r"\boperating\s+margin\b", re.I),
+        "supported": lambda df, _profile: _has_typed_margin_column(df, "operating"),
+        "label": "the requested operating-margin column",
+    },
+    {
+        "id": "gross_margin",
+        "pattern": re.compile(r"\bgross\s+margin\b", re.I),
+        "supported": lambda df, _profile: _has_typed_margin_column(df, "gross"),
+        "label": "the requested gross-margin column",
+    },
+    {
+        "id": "net_margin",
+        "pattern": re.compile(r"\bnet\s+margin\b", re.I),
+        "supported": lambda df, _profile: _has_typed_margin_column(df, "net"),
+        "label": "the requested net-margin column",
+    },
+    {
+        "id": "profit_margin",
+        "pattern": re.compile(r"\bprofit\s+margin\b", re.I),
+        "supported": lambda df, profile: _profit_margin_derivable(df, profile),
+        "label": "the requested profit-margin column",
+    },
+    {
+        "id": "margin_pct",
+        "pattern": re.compile(r"\bmargin\s*%|\bmargin\s+percent", re.I),
+        "supported": lambda df, profile: (
+            _has_ebitda_column(df)
+            or _has_typed_margin_column(df, "operating")
+            or _has_typed_margin_column(df, "gross")
+            or _has_typed_margin_column(df, "net")
+            or _profit_margin_derivable(df, profile)
+        ),
+        "label": "the requested margin-percent column",
     },
     {
         "id": "win_rate",
         "pattern": re.compile(r"win\s+rate", re.I),
         "supported": lambda df, _profile: _has_win_rate_column(df),
-        "label": "a win-rate column",
+        "label": "the requested win-rate column",
     },
     {
         "id": "quarter",
         "pattern": re.compile(r"\bquarter\b", re.I),
         "supported": lambda df, _profile: _column_contains(df, "quarter"),
-        "label": "a quarter column",
+        "label": "the requested fiscal-period column",
     },
     {
         "id": "market_penetration",
         "pattern": re.compile(r"market\s+penetration", re.I),
         "supported": lambda df, _profile: _column_contains(df, "penetration"),
-        "label": "a market-penetration column",
+        "label": "the requested market-penetration column",
+    },
+    {
+        "id": "patient_risk_score",
+        "pattern": re.compile(
+            r"\bpatient\s+risk\s+score\b|\bclinical\s+risk\s+score\b|"
+            r"\brisk\s+index\b|\bpatient\s+risk\b|"
+            r"\b(?:compare|rank)\b.{0,48}\brisk\s+score\b",
+            re.I,
+        ),
+        "supported": lambda df, _profile: _has_risk_score_column(df),
+        "label": "the requested patient-risk-score column",
     },
 )
 
@@ -111,9 +174,10 @@ _CONCENTRATION_RISK_RE = re.compile(
 
 _EXECUTIVE_RE = re.compile(
     r"\b("
-    r"executive\s+summary|biggest\s+(?:risk|opportunit|marketing)|"
-    r"summarize\s+business|management\s+priority|concentration\s+risk|"
-    r"portfolio\s+opportunity|credit\s+risk"
+    r"executive\s+summary|biggest\s+risks?|biggest\s+opportunit(?:y|ies)|"
+    r"biggest\s+marketing|summarize\s+business|management\s+priority|"
+    r"concentration\s+risk|portfolio\s+opportunit(?:y|ies)|credit\s+risk|"
+    r"what\s+are\s+the\s+biggest"
     r")\b",
     re.I,
 )
@@ -138,6 +202,25 @@ def _has_conversion_rate_column(df: pd.DataFrame) -> bool:
     return False
 
 
+def _has_risk_score_column(df: pd.DataFrame) -> bool:
+    for c in df.columns:
+        cn = _norm_col(str(c))
+        if cn in (
+            "patient risk score",
+            "patient_risk_score",
+            "clinical risk score",
+            "clinical_risk_score",
+            "risk score",
+            "risk_score",
+            "risk index",
+            "risk_index",
+        ):
+            return True
+        if "risk" in cn and ("score" in cn or "index" in cn):
+            return True
+    return False
+
+
 def _has_win_rate_column(df: pd.DataFrame) -> bool:
     for c in df.columns:
         cn = _norm_col(str(c))
@@ -156,6 +239,44 @@ def _has_nim_column(df: pd.DataFrame) -> bool:
         if "net_interest" in cn.replace(" ", "_"):
             return True
     return False
+
+
+def _has_ebitda_column(df: pd.DataFrame) -> bool:
+    return _column_contains(df, "ebitda")
+
+
+def _has_typed_margin_column(df: pd.DataFrame, margin_kind: str) -> bool:
+    kind = _norm_col(margin_kind)
+    for c in df.columns:
+        cn = _norm_col(str(c))
+        if kind in cn and "margin" in cn:
+            return True
+    return False
+
+
+def _profit_margin_derivable(df: pd.DataFrame, profile: Optional[Dict[str, Any]]) -> bool:
+    try:
+        from intent_engine.legacy import find_profit_and_revenue_columns
+
+        col_types = (profile or {}).get("column_types", {})
+        nums = [
+            str(c)
+            for c in df.columns
+            if col_types.get(c) == "number" or pd.api.types.is_numeric_dtype(df[c])
+        ]
+        profit_c, rev_c = find_profit_and_revenue_columns(df.columns.tolist(), nums)
+        return bool(profit_c and rev_c)
+    except Exception:
+        return False
+
+
+def _profit_margin_request_supported(
+    question: str, df: pd.DataFrame, profile: Optional[Dict[str, Any]]
+) -> bool:
+    ql = str(question or "").lower()
+    if not re.search(r"\bprofit\s+margin\b", ql):
+        return True
+    return _profit_margin_derivable(df, profile)
 
 
 def _has_salesperson_dimension(
@@ -214,6 +335,28 @@ def detect_missing_requested_metrics(
     return missing
 
 
+def build_unsupported_requested_metric_exact_context(
+    payload: Dict[str, Any],
+) -> str:
+    """Deterministic limitation-first text for routing-only QA."""
+    if not payload or not payload.get("active"):
+        return ""
+    lines = [str(payload.get("leadSentence") or "").strip()]
+    labels = payload.get("missingLabels") or []
+    if labels:
+        lines.append(
+            "Available columns do not include the requested metric(s): "
+            + "; ".join(str(x) for x in labels)
+            + "."
+        )
+    sub = payload.get("substituteMetricColumn")
+    if sub:
+        lines.append(
+            f"Do not treat {sub} as a substitute for the requested metric."
+        )
+    return "\n".join(ln for ln in lines if ln)
+
+
 def assess_unsupported_requested_metric(
     *,
     question: str,
@@ -238,8 +381,8 @@ def assess_unsupported_requested_metric(
     else:
         lead = (
             "This dataset does not include "
-            + ", ".join(labels[:-1])
-            + f", or {labels[-1]}, so the requested comparison cannot be answered directly."
+            + " or ".join(labels)
+            + ", so the requested comparison cannot be answered directly."
         )
 
     forbidden = forbidden_narrative_phrases(df, profile)
@@ -327,19 +470,20 @@ def narrative_guardrails_prompt_block(
             )
 
     if _is_executive_question(question, analysis_ctx):
-        lines.extend(
-            [
-                "",
-                "Executive narrative structure (mandatory):",
-                "1) Executive takeaway — one direct sentence.",
-                "2) Top evidence — up to 3 bullets with chart numbers only.",
-                "3) Recommended action — one hedged next step.",
-                "4) Details — optional, brief.",
-                "- Lead with the takeaway; avoid process narration (do not open with "
-                '"I will" or "Let me").',
-                "- Keep sections 1–3 under ~180 words.",
-            ]
-        )
+        try:
+            from intent_engine.narrative_polish import executive_narrative_prompt_block
+
+            exec_polish = executive_narrative_prompt_block(question, analysis_ctx)
+            if exec_polish:
+                lines.extend(["", exec_polish])
+        except Exception:
+            lines.extend(
+                [
+                    "",
+                    "Executive narrative structure (mandatory):",
+                    "Use labels Executive takeaway / Evidence / Recommended action.",
+                ]
+            )
 
     if _is_concentration_risk_question(question, analysis_ctx):
         lines.extend(
@@ -404,6 +548,7 @@ def sanitize_narrative_answer(
     profile: Optional[Dict[str, Any]] = None,
     question: str = "",
     unsupported_requested: Optional[Dict[str, Any]] = None,
+    analysis_ctx: Optional[Dict[str, Any]] = None,
 ) -> str:
     if not answer or df is None or df.empty:
         return answer
@@ -422,9 +567,17 @@ def sanitize_narrative_answer(
     if not phrase_allowed_in_dataset("nps", df):
         text = re.sub(r"\bnps\b", _SAFE_REPLACEMENTS["nps"], text, flags=re.IGNORECASE)
 
-    # Quarter mention without quarter column.
-    if "quarter" in text.lower() and not _column_contains(df, "quarter"):
-        text = re.sub(r"\bquarter\b", "time period", text, flags=re.IGNORECASE)
+    try:
+        from intent_engine.narrative_polish import apply_micro_polish
+
+        text = apply_micro_polish(text, df, profile, analysis_ctx)
+    except Exception:
+        try:
+            from intent_engine.narrative_polish import fix_limitation_wording
+
+            text = fix_limitation_wording(text)
+        except Exception:
+            pass
 
     return text.strip()
 

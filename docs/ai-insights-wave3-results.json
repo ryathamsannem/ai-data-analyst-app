@@ -1,0 +1,1479 @@
+{
+  "executed_at": "2026-06-10T11:10:02Z",
+  "duration_sec": 1.9,
+  "wave": "3",
+  "waves": [
+    3
+  ],
+  "domains": [
+    "HR",
+    "Healthcare"
+  ],
+  "mode": "routing_deterministic_no_llm",
+  "note": "Narrative dimensions scored from chart/analysis payloads (routing-only mode).",
+  "results": [
+    {
+      "domain": "HR",
+      "qid": "H3-B01",
+      "question": "Which department has the highest personnel cost?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "personnel_cost",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Engineering",
+          "top_value": 5031761.67
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total personnel cost by department. Engineering leads with 5031762.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 7 chart group(s). Top Department: Engineering.",
+        "chart_labels_sample": [
+          "Engineering",
+          "Support",
+          "Operations"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-B02",
+      "question": "Compare attrition rate across locations",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "attrition_rate",
+        "categoryColumn": "location",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Remote-EMEA",
+          "top_value": 1.3045
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average attrition rate by location. Remote-EMEA leads with 0.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s).",
+        "chart_labels_sample": [
+          "Remote-EMEA",
+          "Remote-US",
+          "Bengaluru"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-B03",
+      "question": "Show headcount trend over report date",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.5,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "headcount",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "trend"
+        ],
+        "chart": [
+          "line"
+        ],
+        "ground": {
+          "periods": 8,
+          "last_value": 324.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total headcount trend (monthly). 2024-01 leads with 2860.0. Score 65/100 (medium) from 5 evidence factor(s); 300 row(s), 8 chart group(s). Recent Change: 87%. Headcount Gap: 2,692. Top Report Date: 2024-02.",
+        "chart_labels_sample": [
+          "2024-01",
+          "2024-02",
+          "2024-03"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-B04",
+      "question": "Rank job families by satisfaction score",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 5.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.25,
+      "severity": "low",
+      "notes": [
+        "Chart top 'Individual Contributor' vs pandas top 'Manager'",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "job_family",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Manager",
+          "top_value": 331.74
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average satisfaction score by job family. Individual Contributor leads with 4.1. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 4 chart group(s). Satisfaction Score Share: 25%.",
+        "chart_labels_sample": [
+          "Individual Contributor",
+          "Director",
+          "VP"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-I01",
+      "question": "Compare hires vs terminations by department",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "hires",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Marketing",
+          "top_value": 119.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Hires and Terminations by Department. Marketing leads with 201.0. Score 79/100 (high) from 7 evidence factor(s); 300 row(s), 7 chart group(s). Hires And Terminations Gap: 66.0. Top Department: Marketing.",
+        "chart_labels_sample": [
+          "Marketing",
+          "Finance",
+          "Engineering"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-I02",
+      "question": "Is attrition correlated with satisfaction score?",
+      "pattern": "relationship",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "severity": "low",
+      "notes": [
+        "Metric hint attrition not in satisfaction_score",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "relationship",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "attrition_rate",
+        "chartType": "scatter",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "relationship"
+        ],
+        "chart": [
+          "scatter"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Attrition Rate vs Satisfaction Score. Point 1 leads with 3.7. Score 93/100 (high): scatter correlation on 284 joint pair(s) from 300 filtered row(s).",
+        "chart_labels_sample": [
+          "Point 1",
+          "Point 2",
+          "Point 3"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-E01",
+      "question": "What are the biggest workforce risks?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.75,
+      "severity": "low",
+      "notes": [
+        "Metric hint attrition not in headcount",
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "headcount",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total headcount by department. Finance leads with 3101.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 7 chart group(s). Primary concern: Underperformer: HR. Top Department: Finance.",
+        "chart_labels_sample": [
+          "Finance",
+          "Engineering",
+          "Marketing"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-E02",
+      "question": "Biggest HR opportunity for leadership",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.25,
+      "severity": "low",
+      "notes": [
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "headcount",
+        "categoryColumn": "location",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total headcount by location. Remote-EMEA leads with 3463.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Headcount Gap: 593. Headcount Gap: 593.0. Top Location: Remote-EMEA.",
+        "chart_labels_sample": [
+          "Remote-EMEA",
+          "Bengaluru",
+          "London"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-E03",
+      "question": "Executive summary of workforce performance",
+      "pattern": "summary",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "severity": "low",
+      "notes": [
+        "Metric hint personnel_cost not in headcount"
+      ],
+      "routing": {
+        "intent": "summary",
+        "metricColumn": "headcount",
+        "categoryColumn": "location",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "summary"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total headcount by location. Remote-EMEA leads with 3463.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Location: Remote-EMEA. Headcount Gap: 17%. Trend direction: Directional.",
+        "chart_labels_sample": [
+          "Remote-EMEA",
+          "Bengaluru",
+          "London"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-NEG",
+      "question": "Compare employee engagement score by quarter",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 9.0,
+        "chart_selection": 8.0,
+        "data_grounding": 9.0,
+        "executive_summary_quality": 8.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 7.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.06,
+      "severity": "low",
+      "notes": [
+        "Negative test: unsupported/limitation routing",
+        "Chart optional for negative test",
+        "Stated limitation",
+        "N/A \u2014 not recommendation-focused question",
+        "Thin confidence rationale",
+        "Limitation-first response names absent metric"
+      ],
+      "routing": {
+        "intent": "fallback",
+        "metricColumn": null,
+        "categoryColumn": null,
+        "chartType": null,
+        "confidence": "low",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "fallback"
+        ],
+        "chart": [
+          "none"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Score 21/100 (low) from 8 evidence factor(s); 300 row(s), 0 chart group(s). This dataset does not include the requested fiscal-period column, so the requested comparison cannot be answered directly.",
+        "chart_labels_sample": []
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-D01",
+      "question": "Which location has the highest attrition rate?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "attrition_rate",
+        "categoryColumn": "location",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Remote-EMEA",
+          "top_value": 1.3045
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average attrition rate by location. Remote-EMEA leads with 0.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s).",
+        "chart_labels_sample": [
+          "Remote-EMEA",
+          "Remote-US",
+          "Bengaluru"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-C1-Q",
+      "question": "Which department has the highest personnel cost?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "personnel_cost",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Engineering",
+          "top_value": 5031761.67
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total personnel cost by department. Engineering leads with 5031762.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 7 chart group(s). Top Department: Engineering.",
+        "chart_labels_sample": [
+          "Engineering",
+          "Support",
+          "Operations"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-C1-F1",
+      "question": "Why is Engineering highest?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.75,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "personnel_cost",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total personnel cost by department. Engineering leads with 5031762.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 7 chart group(s). Top Department: Engineering.",
+        "chart_labels_sample": [
+          "Engineering",
+          "Support",
+          "Operations"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-C1-F2",
+      "question": "Which columns were used for this analysis?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.75,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "personnel_cost",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total personnel cost by department. Engineering leads with 5031762.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 7 chart group(s). Top Department: Engineering.",
+        "chart_labels_sample": [
+          "Engineering",
+          "Support",
+          "Operations"
+        ]
+      }
+    },
+    {
+      "domain": "HR",
+      "qid": "H3-C1-F3",
+      "question": "Show the calculations behind this answer.",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.75,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "personnel_cost",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total personnel cost by department. Engineering leads with 5031762.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 7 chart group(s). Top Department: Engineering.",
+        "chart_labels_sample": [
+          "Engineering",
+          "Support",
+          "Operations"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-B01",
+      "question": "Which ward has the highest patient volume?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "ward",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Ward-B",
+          "top_value": 74188.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total patient volume by ward. Ward-B leads with 74188.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 5 chart group(s). Patient Volume Share: 22%. Patient Volume Gap: 11,317.",
+        "chart_labels_sample": [
+          "Ward-B",
+          "Outpatient",
+          "Ward-C"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-B02",
+      "question": "Compare readmissions across departments",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.44,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Cardiology",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "readmissions",
+        "categoryColumn": "department",
+        "chartType": "bar",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Cardiology",
+          "top_value": 4360.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Readmissions and Admissions by Department. Pediatrics leads with 885.0. Score 79/100 (high) from 7 evidence factor(s); 340 row(s), 6 chart group(s). Readmissions And Admissions Share: 19%. Readmissions And Admissions Gap: 219.0.",
+        "chart_labels_sample": [
+          "Pediatrics",
+          "Oncology",
+          "Cardiology"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-B03",
+      "question": "Show admissions trend over report date",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.5,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "admissions",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "trend"
+        ],
+        "chart": [
+          "line"
+        ],
+        "ground": {
+          "periods": 12,
+          "last_value": 5084.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total admissions trend (monthly). 2024-01 leads with 22226.0. Score 65/100 (medium) from 5 evidence factor(s); 340 row(s), 12 chart group(s). Recent Change: 71%. Admissions Gap: 18,353. Top Report Date: 2024-05.",
+        "chart_labels_sample": [
+          "2024-01",
+          "2024-02",
+          "2024-03"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-B04",
+      "question": "Rank regions by average length of stay",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.19,
+      "severity": "low",
+      "notes": [
+        "Metric hint length_of_stay not in patient_volume",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Rural",
+          "top_value": 674.43
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average patient volume by region. Rural leads with 1034.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 3 chart group(s). Patient Volume Share: 35%.",
+        "chart_labels_sample": [
+          "Rural",
+          "Metro",
+          "Suburban"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-I01",
+      "question": "Is cost correlated with patient volume?",
+      "pattern": "relationship",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "severity": "low",
+      "notes": [
+        "Metric hint cost not in patient_volume",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "relationship",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "cost",
+        "chartType": "scatter",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "relationship"
+        ],
+        "chart": [
+          "scatter"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Cost vs Patient Volume. Point 1 leads with 429.0. Score 93/100 (high): scatter correlation on 340 joint pair(s) from 340 filtered row(s).",
+        "chart_labels_sample": [
+          "Point 1",
+          "Point 2",
+          "Point 3"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-I02",
+      "question": "Which department has the lowest satisfaction score?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 5.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.25,
+      "severity": "low",
+      "notes": [
+        "Chart top 'Radiology' vs pandas top 'Emergency'",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Emergency",
+          "top_value": 233.19
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average satisfaction score by department. Radiology leads with 4.2. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 6 chart group(s). Top Department: Radiology.",
+        "chart_labels_sample": [
+          "Radiology",
+          "Pediatrics",
+          "Oncology"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-E01",
+      "question": "What are the biggest clinical operational risks?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.75,
+      "severity": "low",
+      "notes": [
+        "Metric hint readmissions not in patient_volume",
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total patient volume by region. Rural leads with 129282.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 3 chart group(s). Primary concern: Patient Volume Concentration: 38%. Patient Volume Share: 38%. Secondary concern: Underperformer: Suburban.",
+        "chart_labels_sample": [
+          "Rural",
+          "Metro",
+          "Suburban"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-E02",
+      "question": "Where is patient volume overly concentrated?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.25,
+      "severity": "low",
+      "notes": [
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total patient volume by region. Rural leads with 129282.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 3 chart group(s). Primary concern: Patient Volume Concentration: 38%. Patient Volume Share: 38%. Secondary concern: Underperformer: Suburban.",
+        "chart_labels_sample": [
+          "Rural",
+          "Metro",
+          "Suburban"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-E03",
+      "question": "Executive summary of regional performance",
+      "pattern": "summary",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "severity": "low",
+      "notes": [
+        "Metric hint cost not in patient_volume"
+      ],
+      "routing": {
+        "intent": "summary",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "summary"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total patient volume by region. Rural leads with 129282.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 3 chart group(s). Patient Volume Share: 38%. Top Region: Rural. Patient Volume Concentration: 38%.",
+        "chart_labels_sample": [
+          "Rural",
+          "Metro",
+          "Suburban"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-NEG",
+      "question": "Compare patient risk score across wards",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 9.0,
+        "chart_selection": 8.0,
+        "data_grounding": 9.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 7.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "severity": "low",
+      "notes": [
+        "Negative test: unsupported/limitation routing",
+        "Chart optional for negative test",
+        "Stated limitation",
+        "N/A \u2014 not recommendation-focused question",
+        "Thin confidence rationale",
+        "Limitation-first response names absent metric"
+      ],
+      "routing": {
+        "intent": "fallback",
+        "metricColumn": null,
+        "categoryColumn": null,
+        "chartType": null,
+        "confidence": "low",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "fallback"
+        ],
+        "chart": [
+          "none"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Score 21/100 (low) from 8 evidence factor(s); 340 row(s), 0 chart group(s). This dataset does not include the requested patient-risk-score column, so the requested comparison cannot be answered directly.",
+        "chart_labels_sample": []
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-D01",
+      "question": "Compare satisfaction score across regions",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.44,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Rural",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Rural",
+          "top_value": 478.79
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average satisfaction score by region. Metro leads with 4.1. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 3 chart group(s). Satisfaction Score Share: 34%.",
+        "chart_labels_sample": [
+          "Metro",
+          "Rural",
+          "Suburban"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-C1-Q",
+      "question": "Which ward has the highest patient volume?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "ward",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Ward-B",
+          "top_value": 74188.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total patient volume by ward. Ward-B leads with 74188.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 5 chart group(s). Patient Volume Share: 22%. Patient Volume Gap: 11,317.",
+        "chart_labels_sample": [
+          "Ward-B",
+          "Outpatient",
+          "Ward-C"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-C1-F1",
+      "question": "Why is Ward-B highest?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.75,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "ward",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total patient volume by ward. Ward-B leads with 74188.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 5 chart group(s). Patient Volume Share: 22%. Patient Volume Gap: 11,317.",
+        "chart_labels_sample": [
+          "Ward-B",
+          "Outpatient",
+          "Ward-C"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-C1-F2",
+      "question": "What evidence supports this conclusion?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.75,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "ward",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total patient volume by ward. Ward-B leads with 74188.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 5 chart group(s). Patient Volume Share: 22%. Patient Volume Gap: 11,317.",
+        "chart_labels_sample": [
+          "Ward-B",
+          "Outpatient",
+          "Ward-C"
+        ]
+      }
+    },
+    {
+      "domain": "Healthcare",
+      "qid": "HC3-C1-F3",
+      "question": "Which columns were used for this analysis?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.75,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "patient_volume",
+        "categoryColumn": "ward",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total patient volume by ward. Ward-B leads with 74188.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 5 chart group(s). Patient Volume Share: 22%. Patient Volume Gap: 11,317.",
+        "chart_labels_sample": [
+          "Ward-B",
+          "Outpatient",
+          "Ward-C"
+        ]
+      }
+    }
+  ]
+}

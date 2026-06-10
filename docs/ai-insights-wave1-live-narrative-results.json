@@ -1,13 +1,26 @@
 {
-  "executed_at": "2026-06-10T06:13:17Z",
-  "duration_sec": 964.6,
+  "executed_at": "2026-06-10T09:11:30Z",
+  "duration_sec": 397.6,
   "mode": "full_ask_live_narrative",
   "api_key_present": true,
+  "preflight": {
+    "ok": true,
+    "app_env": "development",
+    "sample_excerpt": "PREFLIGHT_OK"
+  },
+  "domains_run": [
+    "Retail",
+    "Marketing",
+    "Sales",
+    "Geography",
+    "Banking & Financial Services"
+  ],
+  "limit_per_domain": null,
+  "skip_chain": false,
   "api_errors": 0,
-  "claude_narrative_success": 0,
-  "claude_narrative_fallback": 63,
-  "claude_failure_reason": "SSL: CERTIFICATE_VERIFY_FAILED (api.anthropic.com)",
-  "note": "Full /ask executed but ALL 63 Claude calls failed TLS; answers are connection fallback text. Narrative scores are NOT valid for sign-off. Re-run in staging.",
+  "claude_narrative_success": 63,
+  "claude_narrative_fallback": 0,
+  "note": "Live Claude narrative via /ask.",
   "results": [
     {
       "domain": "Retail",
@@ -18,23 +31,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Delhi",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -48,16 +60,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Delhi generates the highest total revenue at 6,327,280, followed by Jaipur at 4,767,697 and Mumbai at 4,758,053. The top three cities account for a substantial concentration of revenue. The gap between the highest-ranking city (Delhi) and the lowest in the ranking (",
         "chart_labels_sample": [
           "Delhi",
           "Jaipur",
           "Mumbai"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1671,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nDelhi generates the highest total revenue at 6,327,280, followed by Jaipur at 4,767,697 and Mumbai at 4,758,053. The top three cities account for a substantial concentration of revenue. The gap between the highest-ranking city (Delhi) and the lowest in the ranking (Bhubaneswar at 2,950,469) is approximately 3,376,811, representing a 53% spread across the city portfolio. All 12 cities in the dataset show material revenue generation, with the second-tier cities (Bengaluru, Chandigarh"
     },
     {
       "domain": "Retail",
@@ -68,23 +81,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Delhi",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -98,16 +110,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Delhi leads all cities on total revenue at 6,327,280, followed by Jaipur (4,767,697) and Mumbai (4,758,053). The top three cities account for roughly 40% of measured revenue across the dataset. The bottom five cities\u2014Pune, Hyderabad, Kolkata, Ahmedabad, Patna, and B",
         "chart_labels_sample": [
           "Delhi",
           "Jaipur",
           "Mumbai"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1673,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nDelhi leads all cities on total revenue at 6,327,280, followed by Jaipur (4,767,697) and Mumbai (4,758,053). The top three cities account for roughly 40% of measured revenue across the dataset. The bottom five cities\u2014Pune, Hyderabad, Kolkata, Ahmedabad, Patna, and Bhubaneswar\u2014each recorded total revenue between 2,950,469 and 3,466,898. Delhi's total revenue exceeds Bhubaneswar's (the lowest city) by approximately 3.4 million, a 53% spread from minimum to maximum.\n\nWhat this may ind"
     },
     {
       "domain": "Retail",
@@ -119,21 +132,21 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.19,
-      "narrative_avg": 7.58,
+      "avg": 8.5,
+      "narrative_avg": 8.0,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -147,16 +160,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  Revenue totals across the three periods show a rise-and-fall pattern. The period 2024-01-30/2024-02-05 generated the highest total revenue at 21,227,496, representing approximately 45% of the combined revenue across all three periods. The opening period 2023-12-26/",
         "chart_labels_sample": [
           "2023-12-26/2024-01-01",
           "2024-01-30/2024-02-05",
           "2024-02-27/2024-03-04"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1589,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nRevenue totals across the three periods show a rise-and-fall pattern. The period 2024-01-30/2024-02-05 generated the highest total revenue at 21,227,496, representing approximately 45% of the combined revenue across all three periods. The opening period 2023-12-26/2024-01-01 delivered 19,465,480 in total revenue. The latest period 2024-02-27/2024-03-04 dropped significantly to 6,704,234, a 66% decline from the prior bucket.\n\nThe gap between the peak period (2024-01-30/2024-02-05) "
     },
     {
       "domain": "Retail",
@@ -168,25 +182,25 @@
         "intent_detection": 6.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.69,
-      "narrative_avg": 7.58,
-      "correlation_narrative": 5.0,
+      "avg": 7.94,
+      "narrative_avg": 7.92,
+      "narrative_source": "live",
+      "correlation_narrative": 9.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
         "Metric hint revenue not in customers",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A",
-        "Correlation narrative score: 5.0"
+        "Correlation narrative score: 9.0"
       ],
       "routing": {
         "intent": "relationship",
@@ -197,16 +211,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  The scatter analysis of 351 rows with both revenue and customers populated shows virtually no correlation between revenue and customer count. Pearson correlation is -0.03 and Spearman correlation is -0.05, both indicating a very weak relationship. The sample size of",
         "chart_labels_sample": [
           "Point 1",
           "Point 2",
           "Point 3"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1768,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nThe scatter analysis of 351 rows with both revenue and customers populated shows virtually no correlation between revenue and customer count. Pearson correlation is -0.03 and Spearman correlation is -0.05, both indicating a very weak relationship. The sample size of 351 joint pairs from 360 filtered rows provides high confidence in this result (confidence score 94/100). One notable outlier appears at revenue of 284,326 with 732 customers, but even this point does not materially str"
     },
     {
       "domain": "Retail",
@@ -218,22 +233,21 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -246,16 +260,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: East region underperforms by 40% versus North, presenting the clearest geographic uplift opportunity in this sample.  Evidence: - North generates 15.52M in total revenue, while East contributes 9.02M\u2014a 6.5M gap representing 42% spread across the four regions. ",
         "chart_labels_sample": [
           "North",
           "South",
           "West"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 783,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nEast region underperforms by 40% versus North, presenting the clearest geographic uplift opportunity in this sample.\n\nEvidence:\n- North generates 15.52M in total revenue, while East contributes 9.02M\u2014a 6.5M gap representing 42% spread across the four regions.\n- East ranks last among regions; South and West each exceed East by 2.3M to 2.6M, suggesting systematic underperformance rather than marginal variance.\n\nRecommended action:\nConduct a diagnostic review of East operations "
     },
     {
       "domain": "Retail",
@@ -268,13 +283,14 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.44,
-      "narrative_avg": 7.25,
+      "avg": 7.88,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
@@ -282,8 +298,7 @@
       "severity": "low",
       "notes": [
         "Metric hint profit not in revenue",
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -296,16 +311,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: Geographic revenue concentration represents the primary business risk, with Delhi generating 6.3M in total revenue\u2014nearly double Bhubaneswar's 2.95M\u2014suggesting heavy dependency on a single city and elevated vulnerability to localized disruptions.  Evidence: - ",
         "chart_labels_sample": [
           "Delhi",
           "Jaipur",
           "Mumbai"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1126,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nGeographic revenue concentration represents the primary business risk, with Delhi generating 6.3M in total revenue\u2014nearly double Bhubaneswar's 2.95M\u2014suggesting heavy dependency on a single city and elevated vulnerability to localized disruptions.\n\nEvidence:\n- Delhi accounts for 6,327,280 in revenue while the bottom three cities (Bhubaneswar, Patna, Ahmedabad) each contribute under 3.1M, indicating uneven portfolio concentration across the 12 cities tracked in this sample.\n- B"
     },
     {
       "domain": "Retail",
@@ -318,20 +334,21 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 7.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.19,
-      "narrative_avg": 7.58,
+      "avg": 8.38,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -344,16 +361,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: North region dominates revenue performance, capturing one-third of total business revenue while East lags significantly behind.  Evidence: - North generated 15.5M in total revenue, 34% of the four-region total, and leads East by 42% on absolute revenue. - East",
         "chart_labels_sample": [
           "North",
           "South",
           "West"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 826,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nNorth region dominates revenue performance, capturing one-third of total business revenue while East lags significantly behind.\n\nEvidence:\n- North generated 15.5M in total revenue, 34% of the four-region total, and leads East by 42% on absolute revenue.\n- East contributed the lowest revenue at 9.0M, while South and West are closer to parity at 11.6M and 11.3M respectively.\n\nRecommended action:\nConsider analyzing North's operational model, customer density, product mix, and or"
     },
     {
       "domain": "Retail",
@@ -364,23 +382,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity North",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -394,16 +411,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  East region generated 9.02 million in total revenue, placing it fourth among the four regions. West region produced 11.28 million, South generated 11.58 million, and North led all regions with 15.52 million in total revenue. The gap between East and West is 2.26 mil",
         "chart_labels_sample": [
           "North",
           "South",
           "West"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1446,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nEast region generated 9.02 million in total revenue, placing it fourth among the four regions. West region produced 11.28 million, South generated 11.58 million, and North led all regions with 15.52 million in total revenue. The gap between East and West is 2.26 million (20% lower for East), while North's revenue exceeds East by 6.51 million (42% higher than East).\n\nWhat this may indicate\n\nEast's lower revenue relative to other regions could reflect differences in customer base siz"
     },
     {
       "domain": "Retail",
@@ -416,21 +434,21 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.38,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -443,16 +461,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: Revenue concentration in Delhi creates geographic dependency risk, with the top city generating 26% of total revenue while the bottom four cities each contribute under 3%, leaving the portfolio vulnerable to localized disruption.  Evidence: - Delhi dominates a",
         "chart_labels_sample": [
           "Delhi",
           "Jaipur",
           "Mumbai"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1015,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nRevenue concentration in Delhi creates geographic dependency risk, with the top city generating 26% of total revenue while the bottom four cities each contribute under 3%, leaving the portfolio vulnerable to localized disruption.\n\nEvidence:\n- Delhi dominates at 6,327,280 in revenue, nearly 1.3\u00d7 the second-ranked Jaipur (4,767,697), indicating heavy reliance on a single geography.\n- Bhubaneswar ranks lowest at 2,950,469 with the weakest growth rate among all cities, suggesting"
     },
     {
       "domain": "Retail",
@@ -463,29 +482,30 @@
       "scores": {
         "intent_detection": 7.0,
         "chart_selection": 8.0,
-        "data_grounding": 6.0,
+        "data_grounding": 9.0,
         "executive_summary_quality": 6.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.44,
-      "narrative_avg": 7.42,
+      "avg": 7.81,
+      "narrative_avg": 7.92,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
-      "limitation_first": 5.0,
+      "limitation_first": 9.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
         "Did not hard-fail unsupported question",
         "Chart optional for negative test",
-        "Negative test without clear limitation wording",
+        "Stated limitation",
         "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
-        "Negative test without clear limitation",
-        "Limitation-first score: 5.0"
+        "Limitation-first wording",
+        "Limitation-first score: 9.0"
       ],
       "routing": {
         "intent": "compare",
@@ -496,16 +516,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "This dataset does not include a conversion-rate column, so the requested comparison cannot be answered directly.  The data contains order volume, customer counts, revenue, and profit by city, but no metric that measures the proportion of visitors, prospects, or attempts that resu",
         "chart_labels_sample": [
           "Delhi",
           "Jaipur",
           "Mumbai"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1149,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "This dataset does not include a conversion-rate column, so the requested comparison cannot be answered directly.\n\nThe data contains order volume, customer counts, revenue, and profit by city, but no metric that measures the proportion of visitors, prospects, or attempts that resulted in transactions. Without such a column, city-level conversion performance cannot be calculated or compared.\n\nAvailable-data context (fallback only): The chart shows total revenue by city, where Delhi leads at 6,327,"
     },
     {
       "domain": "Retail",
@@ -516,23 +537,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Delhi",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -546,16 +566,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  Delhi generates the highest total revenue at 6,327,280, followed by Jaipur (4,767,697) and Mumbai (4,758,053). Delhi's revenue exceeds the lowest-ranked city, Bhubaneswar (2,950,469), by approximately 3.4 million or 53%. The top three cities account for a significa",
         "chart_labels_sample": [
           "Delhi",
           "Jaipur",
           "Mumbai"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1391,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nDelhi generates the highest total revenue at 6,327,280, followed by Jaipur (4,767,697) and Mumbai (4,758,053). Delhi's revenue exceeds the lowest-ranked city, Bhubaneswar (2,950,469), by approximately 3.4 million or 53%. The top three cities account for a significant concentration of revenue, with the remaining nine cities ranging between 2.95 million and 4.43 million. The dataset covers 360 rows across 12 cities.\n\nWhat this may indicate:\n\nThe wide spread between Delhi's revenue a"
     },
     {
       "domain": "Retail",
@@ -567,23 +588,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Which city generates the highest revenue?' != root 'Why is Delhi highest?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -596,16 +616,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Based on the previous revenue-by-city result, here is why Delhi is highest:  Key findings:  Delhi generates the highest total revenue at 6,327,280, substantially ahead of the second-ranked city, Jaipur (4,767,697). Delhi's revenue exceeds the lowest-ranked city, Bhubaneswar (2,95",
         "chart_labels_sample": [
           "Delhi",
           "Jaipur",
           "Mumbai"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1555,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Based on the previous revenue-by-city result, here is why Delhi is highest:\n\nKey findings:\n\nDelhi generates the highest total revenue at 6,327,280, substantially ahead of the second-ranked city, Jaipur (4,767,697). Delhi's revenue exceeds the lowest-ranked city, Bhubaneswar (2,950,469), by approximately 3.4 million or 53 percent. The dataset covers 360 rows across 12 cities, with Delhi accounting for a material share of the overall revenue concentration.\n\nWhat this may indicate:\n\nDelhi's revenue"
     },
     {
       "domain": "Retail",
@@ -617,23 +638,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Which city generates the highest revenue?' != root 'What evidence supports this conclusion?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -646,16 +666,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "For the prior chart, the evidence is:  Key findings:  Delhi's total revenue of 6,327,280 is supported by the dataset showing 13,415 customers and 7,218 orders in that city\u2014both the highest counts among the 12 cities. Jaipur, the second-ranked city, generated 4,767,697 in revenue ",
         "chart_labels_sample": [
           "Delhi",
           "Jaipur",
           "Mumbai"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1553,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "For the prior chart, the evidence is:\n\nKey findings:\n\nDelhi's total revenue of 6,327,280 is supported by the dataset showing 13,415 customers and 7,218 orders in that city\u2014both the highest counts among the 12 cities. Jaipur, the second-ranked city, generated 4,767,697 in revenue with 12,052 customers and 6,924 orders. Mumbai (4,758,053 revenue) has fewer customers (8,649) than Jaipur despite similar revenue, suggesting potential differences in transaction scale or product mix. The dataset contai"
     },
     {
       "domain": "Retail",
@@ -667,23 +688,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Which city generates the highest revenue?' != root 'Which columns were used for this analysis?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -696,16 +716,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "For the prior chart, the calculation used:  Metric column: revenue Breakdown column: city Aggregation: sum (total revenue per city)  The analysis grouped all 360 rows by city and summed revenue within each of the 12 cities. No other columns were filtered or excluded from the grou",
         "chart_labels_sample": [
           "Delhi",
           "Jaipur",
           "Mumbai"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 366,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "For the prior chart, the calculation used:\n\nMetric column: revenue\nBreakdown column: city\nAggregation: sum (total revenue per city)\n\nThe analysis grouped all 360 rows by city and summed revenue within each of the 12 cities. No other columns were filtered or excluded from the grouping; the entire dataset was included in the totals shown in the horizontal bar chart."
     },
     {
       "domain": "Marketing",
@@ -716,23 +737,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Paid Social",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -746,16 +766,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Paid Search leads on average satisfaction score at 4.0, followed closely by Paid Social (4.0), Affiliate (4.0), and Organic (4.0). Email averages 3.9, while Display trails at 3.7. The spread across channels is modest\u20140.3 points separates the highest from lowest. All",
         "chart_labels_sample": [
           "Paid Search",
           "Paid Social",
           "Affiliate"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1760,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nPaid Search leads on average satisfaction score at 4.0, followed closely by Paid Social (4.0), Affiliate (4.0), and Organic (4.0). Email averages 3.9, while Display trails at 3.7. The spread across channels is modest\u20140.3 points separates the highest from lowest. All six channels cluster in the 3.7\u20134.0 range. The dataset includes 320 rows across 6 channel groups (approximately 53 rows per channel), with 13 missing satisfaction scores.\n\nWhat this may indicate\n\nThe narrow margin betwe"
     },
     {
       "domain": "Marketing",
@@ -766,23 +787,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Affiliate",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -796,16 +816,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  Affiliate generates the highest total revenue at 115,252,428, representing approximately 22% of combined channel revenue across the dataset. Paid Social ranks second with 104,317,867, followed by Display at 89,312,517. Paid Search and Email are nearly tied in the m",
         "chart_labels_sample": [
           "Affiliate",
           "Paid Social",
           "Display"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 2077,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nAffiliate generates the highest total revenue at 115,252,428, representing approximately 22% of combined channel revenue across the dataset. Paid Social ranks second with 104,317,867, followed by Display at 89,312,517. Paid Search and Email are nearly tied in the mid-range at 75,839,143 and 75,716,540 respectively. Organic contributes the least at 69,804,852.\n\nThe spread between the top and bottom channel is substantial: Affiliate outpaces Organic by 45,447,576 (65% higher). This "
     },
     {
       "domain": "Marketing",
@@ -817,21 +838,21 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.19,
-      "narrative_avg": 7.58,
+      "avg": 8.5,
+      "narrative_avg": 8.0,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -845,16 +866,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  Average satisfaction score across the dataset is 3.92 (calculated from 307 non-null records). Monthly trends show relative stability with a notable dip in June. March and April both reached 4.0, the highest point in the seven-month span. June dropped to 3.8, the lo",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
           "2024-03"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1633,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nAverage satisfaction score across the dataset is 3.92 (calculated from 307 non-null records). Monthly trends show relative stability with a notable dip in June. March and April both reached 4.0, the highest point in the seven-month span. June dropped to 3.8, the lowest month observed. July recovered to 3.9. The month-to-month swings are modest\u2014the range spans only 0.2 points (3.8 to 4.0).\n\nWhat this may indicate:\n\nThe flatness of the trend suggests satisfaction score has remained "
     },
     {
       "domain": "Marketing",
@@ -866,25 +888,26 @@
         "intent_detection": 6.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.69,
-      "narrative_avg": 7.58,
-      "correlation_narrative": 5.0,
+      "avg": 7.94,
+      "narrative_avg": 7.92,
+      "narrative_source": "live",
+      "correlation_narrative": 10.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
         "Metric hint revenue not in satisfaction_score",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
+        "Mentions causation limits",
         "N/A",
-        "Correlation narrative score: 5.0"
+        "Correlation narrative score: 10.0"
       ],
       "routing": {
         "intent": "relationship",
@@ -895,16 +918,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Based on analysis of 307 rows with both revenue and satisfaction_score populated, the correlation between revenue and satisfaction_score is very weak. Both the Pearson correlation coefficient (r = -0.04) and Spearman correlation coefficient (\u03c1 = -0.04) point to negl",
         "chart_labels_sample": [
           "Point 1",
           "Point 2",
           "Point 3"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1894,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nBased on analysis of 307 rows with both revenue and satisfaction_score populated, the correlation between revenue and satisfaction_score is very weak. Both the Pearson correlation coefficient (r = -0.04) and Spearman correlation coefficient (\u03c1 = -0.04) point to negligible linear and rank-order association. The near-zero coefficients indicate that higher or lower revenue does not consistently track with higher or lower satisfaction scores in this dataset.\n\nWhat this may indicate\n\nTh"
     },
     {
       "domain": "Marketing",
@@ -917,21 +941,21 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.38,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -944,16 +968,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: Central region presents the clearest growth opportunity, trailing the leader South by 73 million in total revenue despite operating in the same market landscape.  Evidence: - South leads with 146.8 million in total revenue (28% of the five-region total), while",
         "chart_labels_sample": [
           "South",
           "West",
           "East"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 998,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nCentral region presents the clearest growth opportunity, trailing the leader South by 73 million in total revenue despite operating in the same market landscape.\n\nEvidence:\n- South leads with 146.8 million in total revenue (28% of the five-region total), while Central trails at 73.9 million\u2014a 50% gap suggesting material underperformance relative to peer regions.\n- The gap between second-place West (132.4 million) and fifth-place Central (73.9 million) spans 58.6 million, indi"
     },
     {
       "domain": "Marketing",
@@ -966,13 +991,14 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.44,
-      "narrative_avg": 7.25,
+      "avg": 7.88,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
@@ -980,8 +1006,7 @@
       "severity": "low",
       "notes": [
         "Metric hint satisfaction not in revenue",
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -994,16 +1019,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: Channel dependency on Affiliate creates material revenue concentration risk, while Organic underperformance suggests portfolio imbalance across marketing vehicles.  Evidence: - Affiliate generates 115.3M in total revenue (22% of channel portfolio), nearly 65% ",
         "chart_labels_sample": [
           "Affiliate",
           "Paid Social",
           "Display"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1013,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nChannel dependency on Affiliate creates material revenue concentration risk, while Organic underperformance suggests portfolio imbalance across marketing vehicles.\n\nEvidence:\n- Affiliate generates 115.3M in total revenue (22% of channel portfolio), nearly 65% more than the lowest-performing channel (Organic at 69.8M). This concentration narrows revenue stability if Affiliate performance declines.\n- Organic ranks lowest at 69.8M despite equal measurement visibility, indicating"
     },
     {
       "domain": "Marketing",
@@ -1015,21 +1041,21 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.19,
-      "narrative_avg": 7.58,
+      "avg": 8.5,
+      "narrative_avg": 8.0,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1043,16 +1069,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: Retargeting Cart stands out as the highest-spend campaign at 1.64M, creating an 18% gap versus the lowest-spend outlier Mobile App Install at 1.35M, suggesting uneven resource allocation across the campaign portfolio.  Evidence: - Retargeting Cart commands 1,6",
         "chart_labels_sample": [
           "Retargeting Cart",
           "Product Demo Webinar",
           "Brand Awareness Q1"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 911,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nRetargeting Cart stands out as the highest-spend campaign at 1.64M, creating an 18% gap versus the lowest-spend outlier Mobile App Install at 1.35M, suggesting uneven resource allocation across the campaign portfolio.\n\nEvidence:\n- Retargeting Cart commands 1,640,138 in total spend, while Mobile App Install trails at 1,346,720\u2014a differential of 293,418.\n- The top three campaigns (Retargeting Cart, Product Demo Webinar, Brand Awareness Q1) account for 4.65M combined spend acros"
     },
     {
       "domain": "Marketing",
@@ -1063,23 +1090,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Retargeting Cart",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1093,16 +1119,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Retargeting Cart ranks highest with an average of 7,733 conversions per report period, followed by Referral Boost at 7,099. The gap between the top performer (Retargeting Cart) and the lowest-ranked campaign (Spring Launch at 4,938) spans 2,795 conversions, or a 36%",
         "chart_labels_sample": [
           "Retargeting Cart",
           "Referral Boost",
           "Product Demo Webinar"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1984,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nRetargeting Cart ranks highest with an average of 7,733 conversions per report period, followed by Referral Boost at 7,099. The gap between the top performer (Retargeting Cart) and the lowest-ranked campaign (Spring Launch at 4,938) spans 2,795 conversions, or a 36% spread. The middle tier\u2014Product Demo Webinar, Holiday Promo, and Mobile App Install\u2014all cluster between 6,712 and 6,926 conversions. Brand Awareness Q1 and Enterprise ABM sit in the lower half at 5,760 and 5,735 convers"
     },
     {
       "domain": "Marketing",
@@ -1113,29 +1140,29 @@
       "scores": {
         "intent_detection": 7.0,
         "chart_selection": 8.0,
-        "data_grounding": 6.0,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 9.0,
+        "executive_summary_quality": 8.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.44,
-      "narrative_avg": 7.42,
+      "avg": 8.06,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
-      "limitation_first": 5.0,
-      "chart_ok_answer_weak": true,
+      "limitation_first": 9.0,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
         "Did not hard-fail unsupported question",
         "Chart optional for negative test",
-        "Negative test without clear limitation wording",
-        "Lead sentence unclear",
+        "Stated limitation",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
-        "Negative test without clear limitation",
-        "Limitation-first score: 5.0"
+        "Limitation-first wording",
+        "Limitation-first score: 9.0"
       ],
       "routing": {
         "intent": "compare",
@@ -1146,16 +1173,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "This dataset does not include the requested satisfaction index column, so the requested comparison cannot be answered directly.  The dataset contains a satisfaction_score column (mean 3.93, range 2.91\u20134.8 across 307 non-null rows), but this is distinct from the metric you asked f",
         "chart_labels_sample": [
           "Affiliate",
           "Paid Social",
           "Display"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 904,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "This dataset does not include the requested satisfaction index column, so the requested comparison cannot be answered directly.\n\nThe dataset contains a satisfaction_score column (mean 3.93, range 2.91\u20134.8 across 307 non-null rows), but this is distinct from the metric you asked for. No the requested satisfaction index-equivalent calculation or column exists in the available data.\n\nAvailable-data context (fallback only): A revenue breakdown by channel shows Affiliate leading at 115.3M (22% of tot"
     },
     {
       "domain": "Marketing",
@@ -1166,23 +1194,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Paid Social",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1196,16 +1223,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  Paid Search ranks highest on average satisfaction score at 4.0, followed closely by Paid Social at 4.0 and Affiliate at 4.0. Organic scores 4.0, Email scores 3.9, and Display scores 3.7 \u2014 the lowest among the six channels. The spread between the top performer (Paid",
         "chart_labels_sample": [
           "Paid Search",
           "Paid Social",
           "Affiliate"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1485,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nPaid Search ranks highest on average satisfaction score at 4.0, followed closely by Paid Social at 4.0 and Affiliate at 4.0. Organic scores 4.0, Email scores 3.9, and Display scores 3.7 \u2014 the lowest among the six channels. The spread between the top performer (Paid Search) and the lowest (Display) is 0.3 points. All channels fall within a narrow range of 3.7 to 4.0 on the satisfaction scale.\n\nWhat this may indicate:\n\nThe tight clustering of scores across most channels suggests tha"
     },
     {
       "domain": "Marketing",
@@ -1217,23 +1245,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Compare satisfaction_score by channel' != root 'Why is Paid Social highest?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -1246,16 +1273,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Based on the previous satisfaction score-by-channel result, Paid Social is not actually highest \u2014 it ties with three other channels.  Key findings:  Paid Search leads at an average satisfaction score of 4.0, but Paid Social, Affiliate, and Organic all match that same 4.0 level wh",
         "chart_labels_sample": [
           "Paid Search",
           "Paid Social",
           "Affiliate"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1744,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Based on the previous satisfaction score-by-channel result, Paid Social is not actually highest \u2014 it ties with three other channels.\n\nKey findings:\n\nPaid Search leads at an average satisfaction score of 4.0, but Paid Social, Affiliate, and Organic all match that same 4.0 level when rounded to one decimal place. Email follows at 3.9, and Display scores lowest at 3.7. The raw calculated averages show Paid Search at 4.03, Paid Social at 3.99, Affiliate at 3.98, and Organic at 3.96 \u2014 a spread of onl"
     },
     {
       "domain": "Marketing",
@@ -1267,23 +1295,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Compare satisfaction_score by channel' != root 'Which columns were used for this analysis?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -1296,16 +1323,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "For the prior chart, the calculation used the following columns:  Metric column: satisfaction_score (aggregated as Average/Mean) Breakdown column: channel Aggregation: Mean  The dataset contains 320 rows across 6 channel categories (Paid Search, Paid Social, Affiliate, Organic, E",
         "chart_labels_sample": [
           "Paid Search",
           "Paid Social",
           "Affiliate"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 393,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "For the prior chart, the calculation used the following columns:\n\nMetric column: satisfaction_score (aggregated as Average/Mean)\nBreakdown column: channel\nAggregation: Mean\n\nThe dataset contains 320 rows across 6 channel categories (Paid Search, Paid Social, Affiliate, Organic, Email, and Display). The satisfaction_score column has 13 null values, leaving 307 valid records for the analysis."
     },
     {
       "domain": "Marketing",
@@ -1317,23 +1345,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Compare satisfaction_score by channel' != root 'Show the calculations behind this answer.'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -1346,16 +1373,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "For the prior chart, the calculation used the metric column satisfaction_score aggregated as average (mean) across the breakdown column channel. The dataset contained 320 rows distributed across 6 channel categories (Paid Search, Paid Social, Affiliate, Organic, Email, Display), ",
         "chart_labels_sample": [
           "Paid Search",
           "Paid Social",
           "Affiliate"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1726,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "For the prior chart, the calculation used the metric column satisfaction_score aggregated as average (mean) across the breakdown column channel. The dataset contained 320 rows distributed across 6 channel categories (Paid Search, Paid Social, Affiliate, Organic, Email, Display), with 13 null values in satisfaction_score, leaving 307 valid records for the analysis.\n\nKey findings:\n\nThe average satisfaction scores by channel are:\n- Paid Search: 4.0\n- Paid Social: 4.0\n- Affiliate: 4.0\n- Organic: 4.0"
     },
     {
       "domain": "Sales",
@@ -1366,23 +1394,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Field Sales",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1396,16 +1423,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Field Sales generated 36,237,995 in total revenue, commanding the largest share across the three departments. Channel Sales contributed 31,865,921, placing it second. Inside Sales produced 23,628,431, trailing both peers.  Field Sales leads Inside Sales by approxima",
         "chart_labels_sample": [
           "Field Sales",
           "Channel Sales",
           "Inside Sales"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1882,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nField Sales generated 36,237,995 in total revenue, commanding the largest share across the three departments. Channel Sales contributed 31,865,921, placing it second. Inside Sales produced 23,628,431, trailing both peers.\n\nField Sales leads Inside Sales by approximately 12.6 million in revenue (a 35% spread between top and third). The gap between Field Sales and Channel Sales is narrower at roughly 4.4 million (about 12% difference). Across all 340 rows and three department groups,"
     },
     {
       "domain": "Sales",
@@ -1416,23 +1444,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity North",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1446,16 +1473,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  North is the top-performing region with total revenue of 25,473,805, representing approximately 28% of combined regional revenue. West and South follow closely, each generating roughly 27% of total revenue (24,839,648 and 24,518,731 respectively). East lags signifi",
         "chart_labels_sample": [
           "North",
           "West",
           "South"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1545,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nNorth is the top-performing region with total revenue of 25,473,805, representing approximately 28% of combined regional revenue. West and South follow closely, each generating roughly 27% of total revenue (24,839,648 and 24,518,731 respectively). East lags significantly behind at 16,900,162, contributing only 18% of total revenue. The spread between the top region (North) and bottom region (East) is 8,573,643, or roughly 51% higher revenue in North.\n\nWhat this may indicate:\n\nThe "
     },
     {
       "domain": "Sales",
@@ -1467,21 +1495,21 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.19,
-      "narrative_avg": 7.58,
+      "avg": 8.5,
+      "narrative_avg": 8.0,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1495,16 +1523,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Revenue Trend Over Time  Key findings:  Total revenue across the dataset spans eight months from January through August 2024, with monthly totals ranging from 8.66M to 13.22M. July 2024 ranks highest at 13,215,085, while August 2024 shows the lowest total at 8,663,032. The most r",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
           "2024-03"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1562,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Revenue Trend Over Time\n\nKey findings:\n\nTotal revenue across the dataset spans eight months from January through August 2024, with monthly totals ranging from 8.66M to 13.22M. July 2024 ranks highest at 13,215,085, while August 2024 shows the lowest total at 8,663,032. The most recent period (August) declined 21% from the prior month (July), dropping 4,552,053. July and August show the widest spread in the dataset\u2014a 34% difference of 4.55M between them. The first half of the year (January throug"
     },
     {
       "domain": "Sales",
@@ -1516,25 +1545,25 @@
         "intent_detection": 6.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.69,
-      "narrative_avg": 7.58,
-      "correlation_narrative": 5.0,
+      "avg": 7.94,
+      "narrative_avg": 7.92,
+      "narrative_source": "live",
+      "correlation_narrative": 9.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
         "Metric hint revenue not in units",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A",
-        "Correlation narrative score: 5.0"
+        "Correlation narrative score: 9.0"
       ],
       "routing": {
         "intent": "relationship",
@@ -1545,16 +1574,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  Revenue and units show a strong positive correlation across 330 joint observations from your 340 rows of sales data. The Pearson correlation coefficient is +0.64 and the Spearman correlation coefficient is +0.68, both indicating that higher revenue tends to move to",
         "chart_labels_sample": [
           "Point 1",
           "Point 2",
           "Point 3"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1657,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nRevenue and units show a strong positive correlation across 330 joint observations from your 340 rows of sales data. The Pearson correlation coefficient is +0.64 and the Spearman correlation coefficient is +0.68, both indicating that higher revenue tends to move together with higher unit volume. This relationship is consistent whether measured by linear (Pearson) or rank-based (Spearman) methods. Ten rows lacked unit data and were excluded from this analysis.\n\nWhat this may indica"
     },
     {
       "domain": "Sales",
@@ -1567,21 +1597,21 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.38,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -1594,16 +1624,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: East represents the largest sales opportunity, trailing the North region by 8.6 million in total revenue and showing a 34% performance gap that may indicate capacity for growth.  Evidence: - North leads with 25.5M in total revenue, while East generated 16.9M \u2014",
         "chart_labels_sample": [
           "North",
           "West",
           "South"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 865,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nEast represents the largest sales opportunity, trailing the North region by 8.6 million in total revenue and showing a 34% performance gap that may indicate capacity for growth.\n\nEvidence:\n- North leads with 25.5M in total revenue, while East generated 16.9M \u2014 a gap of 8.6M across the sample of 340 rows.\n- East's 16.9M reflects roughly 19% of combined regional revenue, versus North's 28%, suggesting potential underutilization or untapped market in the eastern geography.\n\nReco"
     },
     {
       "domain": "Sales",
@@ -1616,21 +1647,21 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.38,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -1643,16 +1674,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: East region presents the primary sales risk, contributing only 16.9 million in revenue\u201437% below North's total\u2014signaling material geographic dependency and potential underperformance that warrants immediate attention.  Evidence: - East generated 16.9 million i",
         "chart_labels_sample": [
           "North",
           "West",
           "South"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1042,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nEast region presents the primary sales risk, contributing only 16.9 million in revenue\u201437% below North's total\u2014signaling material geographic dependency and potential underperformance that warrants immediate attention.\n\nEvidence:\n- East generated 16.9 million in total revenue versus North's 25.5 million, the widest gap among the four regions and representing a shortfall of 8.6 million.\n- North, West, and South cluster tightly between 24.5\u201325.5 million, while East trails meanin"
     },
     {
       "domain": "Sales",
@@ -1663,23 +1695,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Field Sales",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1693,16 +1724,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Total revenue across all departments is approximately 91.7 million. Field Sales generated 36.2 million, Channel Sales generated 31.9 million, and Inside Sales generated 23.6 million. Field Sales accounts for roughly 40% of total departmental revenue, while Channel S",
         "chart_labels_sample": [
           "Field Sales",
           "Channel Sales",
           "Inside Sales"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1478,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nTotal revenue across all departments is approximately 91.7 million. Field Sales generated 36.2 million, Channel Sales generated 31.9 million, and Inside Sales generated 23.6 million. Field Sales accounts for roughly 40% of total departmental revenue, while Channel Sales represents 35% and Inside Sales represents 26%. Field Sales outperforms Inside Sales by 12.6 million on an absolute basis, a difference of approximately 53%.\n\nWhat this may indicate\n\nThe revenue concentration in Fie"
     },
     {
       "domain": "Sales",
@@ -1714,14 +1746,15 @@
         "intent_detection": 10.0,
         "chart_selection": 4.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 7.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.19,
-      "narrative_avg": 7.25,
+      "avg": 7.5,
+      "narrative_avg": 7.67,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": false,
@@ -1729,7 +1762,6 @@
       "severity": "low",
       "notes": [
         "Chart family 'histogram' vs expected {'bar'}",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "Thin confidence rationale",
         "N/A \u2014 not correlation question",
@@ -1744,16 +1776,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  The calculated result shows total revenue by department across 340 rows: - Field Sales: 36.238 million - Channel Sales: 31.867 million - Inside Sales: 23.628 million  Field Sales ranks highest and contributes approximately 37% of total revenue. The revenue distribu",
         "chart_labels_sample": [
           "[62742.028, 158381.24)",
           "[158381.24, 252886.39)",
           "[252886.39, 347391.54)"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1830,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nThe calculated result shows total revenue by department across 340 rows:\n- Field Sales: 36.238 million\n- Channel Sales: 31.867 million\n- Inside Sales: 23.628 million\n\nField Sales ranks highest and contributes approximately 37% of total revenue. The revenue distribution across the three departments is relatively concentrated, with Field Sales leading Channel Sales by roughly 4.4 million (12% spread). No single department appears to be a severe statistical outlier; the differences r"
     },
     {
       "domain": "Sales",
@@ -1764,29 +1797,30 @@
       "scores": {
         "intent_detection": 7.0,
         "chart_selection": 8.0,
-        "data_grounding": 6.0,
+        "data_grounding": 9.0,
         "executive_summary_quality": 6.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.44,
-      "narrative_avg": 7.42,
+      "avg": 7.81,
+      "narrative_avg": 7.92,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
-      "limitation_first": 5.0,
+      "limitation_first": 9.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
         "Did not hard-fail unsupported question",
         "Chart optional for negative test",
-        "Negative test without clear limitation wording",
+        "Stated limitation",
         "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
-        "Negative test without clear limitation",
-        "Limitation-first score: 5.0"
+        "Limitation-first wording",
+        "Limitation-first score: 9.0"
       ],
       "routing": {
         "intent": "compare",
@@ -1797,16 +1831,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "This dataset does not include the requested win-rate column, so the requested comparison cannot be answered directly.  The data contains sales activity records with dimensions like region, territory, sales representative, and product line, along with metrics such as revenue, unit",
         "chart_labels_sample": [
           "Rep-14",
           "Rep-03",
           "Rep-13"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1160,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "This dataset does not include the requested win-rate column, so the requested comparison cannot be answered directly.\n\nThe data contains sales activity records with dimensions like region, territory, sales representative, and product line, along with metrics such as revenue, units, cost, quota, and attainment percentage. No column capturing deal outcomes, pipeline stages, or win/loss status is present.\n\nAvailable-data context (fallback only): The table shows total revenue by sales representative"
     },
     {
       "domain": "Sales",
@@ -1817,23 +1852,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Field Sales",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1847,16 +1881,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Total revenue across the three departments is approximately 91.7 million. Field Sales generates 36.2 million, representing about 40% of total revenue and leading the other two departments. Channel Sales contributes 31.9 million (35% of total), while Inside Sales acc",
         "chart_labels_sample": [
           "Field Sales",
           "Channel Sales",
           "Inside Sales"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1788,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nTotal revenue across the three departments is approximately 91.7 million. Field Sales generates 36.2 million, representing about 40% of total revenue and leading the other two departments. Channel Sales contributes 31.9 million (35% of total), while Inside Sales accounts for 23.6 million (26% of total).\n\nField Sales outpaces Inside Sales by 12.6 million on an absolute basis. The spread between the top performer (Field Sales) and the third-ranked department (Inside Sales) is roughly"
     },
     {
       "domain": "Sales",
@@ -1868,21 +1903,21 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.44,
-      "narrative_avg": 7.92,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1896,16 +1931,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Based on the previous result showing Inside Sales as the lowest-performing department by total revenue, here is guidance for management action.  Key findings  Inside Sales generated 80,784 in total revenue, trailing Channel Sales by approximately 4,489 (5% gap). The span between ",
         "chart_labels_sample": [
           "Channel Sales",
           "Inside Sales",
           "Field Sales"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1861,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Based on the previous result showing Inside Sales as the lowest-performing department by total revenue, here is guidance for management action.\n\nKey findings\n\nInside Sales generated 80,784 in total revenue, trailing Channel Sales by approximately 4,489 (5% gap). The span between the top performer (Channel Sales at 84,965) and the lowest (Inside Sales) is relatively narrow\u2014only about 5% of the highest department's revenue. This suggests the three departments operate within a similar overall reven"
     },
     {
       "domain": "Sales",
@@ -1917,23 +1953,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Rank departments by revenue' != root 'Show the calculations behind this answer.'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -1946,16 +1981,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "For the prior chart, the calculation used total (sum) revenue aggregated by department across 340 rows of data.  Calculation method  Each row in the dataset contains a revenue value and a department assignment (Field Sales, Channel Sales, or Inside Sales). The sum aggregation add",
         "chart_labels_sample": [
           "Field Sales",
           "Channel Sales",
           "Inside Sales"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1255,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "For the prior chart, the calculation used total (sum) revenue aggregated by department across 340 rows of data.\n\nCalculation method\n\nEach row in the dataset contains a revenue value and a department assignment (Field Sales, Channel Sales, or Inside Sales). The sum aggregation added all revenue entries within each department group:\n\nField Sales: 36,237,995 (sum of all Field Sales revenue rows)\nChannel Sales: 31,865,921 (sum of all Channel Sales revenue rows)\nInside Sales: 23,628,431 (sum of all I"
     },
     {
       "domain": "Geography",
@@ -1966,23 +2002,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Amritsar",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -1996,16 +2031,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  Amritsar generates the highest total revenue at 4,331,281, followed by Chandigarh at 4,097,302 and Coimbatore at 3,997,433. The top 10 named cities account for approximately 38.8 million in revenue, while the remaining cities grouped as Others contribute 30,109,182",
         "chart_labels_sample": [
           "Amritsar",
           "Chandigarh",
           "Coimbatore"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1606,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nAmritsar generates the highest total revenue at 4,331,281, followed by Chandigarh at 4,097,302 and Coimbatore at 3,997,433. The top 10 named cities account for approximately 38.8 million in revenue, while the remaining cities grouped as Others contribute 30,109,182, representing a significant concentration of business across the portfolio. Amritsar leads the second-place city (Chandigarh) by 233,979 on revenue.\n\nWhat this may indicate:\n\nThe high revenue performance in Amritsar, Ch"
     },
     {
       "domain": "Geography",
@@ -2016,23 +2052,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity North",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -2046,16 +2081,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  North zone leads revenue performance at 19,998,526, followed by South at 17,345,157 and West at 17,322,680. East trails significantly at 14,496,781. North's revenue exceeds East by approximately 5.5 million (38% spread), representing the largest performance gap amo",
         "chart_labels_sample": [
           "North",
           "South",
           "West"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1483,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nNorth zone leads revenue performance at 19,998,526, followed by South at 17,345,157 and West at 17,322,680. East trails significantly at 14,496,781. North's revenue exceeds East by approximately 5.5 million (38% spread), representing the largest performance gap among zones. North accounts for roughly 29% of total revenue across all four zones, while East represents approximately 21%.\n\nWhat this may indicate:\n\nThe North zone's outperformance could reflect differences in store densi"
     },
     {
       "domain": "Geography",
@@ -2067,21 +2103,21 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.19,
-      "narrative_avg": 7.58,
+      "avg": 8.5,
+      "narrative_avg": 8.0,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -2095,16 +2131,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Total revenue across the dataset spans 12.6 million (2024-01) to 15.1 million (2024-03), with a sharp contraction in 2024-06 to 3.6 million. The period 2024-03 leads the trend at 15,050,700, representing peak revenue performance. The latest month (2024-06) dropped 6",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
           "2024-03"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1655,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nTotal revenue across the dataset spans 12.6 million (2024-01) to 15.1 million (2024-03), with a sharp contraction in 2024-06 to 3.6 million. The period 2024-03 leads the trend at 15,050,700, representing peak revenue performance. The latest month (2024-06) dropped 68% versus the prior period (2024-05: 13,176,350), falling to 3,587,866. Across all six months, 2024-03 accounts for the largest single-month concentration at roughly 22% of total revenue, while 2024-06 represents the sma"
     },
     {
       "domain": "Geography",
@@ -2116,25 +2153,26 @@
         "intent_detection": 6.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.69,
-      "narrative_avg": 7.58,
-      "correlation_narrative": 5.0,
+      "avg": 7.94,
+      "narrative_avg": 7.92,
+      "narrative_source": "live",
+      "correlation_narrative": 10.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
         "Metric hint revenue not in customers",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
+        "Mentions causation limits",
         "N/A",
-        "Correlation narrative score: 5.0"
+        "Correlation narrative score: 10.0"
       ],
       "routing": {
         "intent": "relationship",
@@ -2145,16 +2183,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  Revenue and customers show a very strong positive correlation across the 285 observations with both metrics populated. The Pearson correlation coefficient is +0.88 and the Spearman correlation coefficient is +0.89, both indicating that as revenue increases, customer",
         "chart_labels_sample": [
           "Point 1",
           "Point 2",
           "Point 3"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1861,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nRevenue and customers show a very strong positive correlation across the 285 observations with both metrics populated. The Pearson correlation coefficient is +0.88 and the Spearman correlation coefficient is +0.89, both indicating that as revenue increases, customer count tends to increase in a consistent and predictable manner. The relationship is robust across the dataset: customers range from 93 to 1,046, while revenue ranges from approximately 65k to 592k. One notable outlier a"
     },
     {
       "domain": "Geography",
@@ -2166,14 +2205,15 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 5.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.25,
+      "narrative_avg": 7.67,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
@@ -2181,7 +2221,6 @@
       "severity": "low",
       "notes": [
         "Chart top 'Mumbai' vs pandas top 'Amritsar'",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -2195,15 +2234,16 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  The dataset contains 30 filtered rows across 2 cities. Mumbai's total revenue stands at 3,703,299, while Bengaluru's total revenue is 2,982,879. Mumbai leads by 720,420 in absolute terms, representing a 19% higher revenue total. Mumbai accounts for approximately 55%",
         "chart_labels_sample": [
           "Mumbai",
           "Bengaluru"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1524,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nThe dataset contains 30 filtered rows across 2 cities. Mumbai's total revenue stands at 3,703,299, while Bengaluru's total revenue is 2,982,879. Mumbai leads by 720,420 in absolute terms, representing a 19% higher revenue total. Mumbai accounts for approximately 55% of combined revenue in this cohort, compared to Bengaluru's 45%.\n\nWhat this may indicate\n\nThe revenue gap could reflect differences in store count, customer volume, or market conditions between the two cities, but the c"
     },
     {
       "domain": "Geography",
@@ -2216,21 +2256,21 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.38,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -2243,16 +2283,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: Revenue concentration among top cities is moderate, but growth stagnation in Chennai and margin pressure in Kolkata present the primary business risks.  Evidence: - Amritsar and Chandigarh lead with 4.33M and 4.10M in total revenue respectively, while the rema",
         "chart_labels_sample": [
           "Amritsar",
           "Chandigarh",
           "Coimbatore"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1093,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nRevenue concentration among top cities is moderate, but growth stagnation in Chennai and margin pressure in Kolkata present the primary business risks.\n\nEvidence:\n- Amritsar and Chandigarh lead with 4.33M and 4.10M in total revenue respectively, while the remaining nine named cities cluster between 2.98M and 3.93M, indicating relatively balanced geographic distribution with Others contributing 30.1M (42% of total).\n- The data suggests Chennai has the weakest growth rate among"
     },
     {
       "domain": "Geography",
@@ -2265,20 +2306,21 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 7.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.19,
-      "narrative_avg": 7.58,
+      "avg": 8.38,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -2291,16 +2333,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: North zone significantly outperforms other regions, generating nearly 20 million in revenue and representing approximately 29% of total zone revenue, while East lags with 14.5 million.  Evidence: - North leads with 19,998,526 in total revenue, ahead of South (",
         "chart_labels_sample": [
           "North",
           "South",
           "West"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 855,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nNorth zone significantly outperforms other regions, generating nearly 20 million in revenue and representing approximately 29% of total zone revenue, while East lags with 14.5 million.\n\nEvidence:\n- North leads with 19,998,526 in total revenue, ahead of South (17,345,157) and West (17,322,680), outpacing East by 28%.\n- The data suggests geographic concentration risk, with the top zone contributing nearly one-third of aggregate revenue across the 300-row sample spanning four zo"
     },
     {
       "domain": "Geography",
@@ -2311,29 +2354,29 @@
       "scores": {
         "intent_detection": 7.0,
         "chart_selection": 8.0,
-        "data_grounding": 6.0,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 9.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.44,
-      "narrative_avg": 7.42,
+      "avg": 8.12,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
-      "limitation_first": 5.0,
-      "chart_ok_answer_weak": true,
+      "limitation_first": 9.0,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
         "Did not hard-fail unsupported question",
         "Chart optional for negative test",
-        "Negative test without clear limitation wording",
-        "Lead sentence unclear",
+        "Stated limitation",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
-        "Negative test without clear limitation",
-        "Limitation-first score: 5.0"
+        "Limitation-first wording",
+        "Limitation-first score: 9.0"
       ],
       "routing": {
         "intent": "compare",
@@ -2344,16 +2387,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "This dataset does not include the requested sales-rep field column, so the requested comparison cannot be answered directly.  Available-data context (fallback only): The dataset tracks revenue by city rather than by individual contributors, so a city-level revenue view is shown i",
         "chart_labels_sample": [
           "Amritsar",
           "Chandigarh",
           "Coimbatore"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1620,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "This dataset does not include the requested sales-rep field column, so the requested comparison cannot be answered directly.\n\nAvailable-data context (fallback only): The dataset tracks revenue by city rather than by individual contributors, so a city-level revenue view is shown instead.\n\nKey findings:\n\nTotal revenue across 20 cities is approximately 69.5 million. Amritsar leads at 4,331,281, followed by Chandigarh at 4,097,302 and Coimbatore at 3,997,433. The remaining seven ranked cities (Delhi"
     },
     {
       "domain": "Geography",
@@ -2364,23 +2408,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Amritsar",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -2394,16 +2437,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  Amritsar generates the highest total revenue at 4,331,281, followed by Chandigarh at 4,097,302 and Coimbatore at 3,997,433. The top 10 cities account for approximately 70% of measured revenue, while the remaining cities grouped as \"Others\" contribute 30,109,182, re",
         "chart_labels_sample": [
           "Amritsar",
           "Chandigarh",
           "Coimbatore"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1829,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nAmritsar generates the highest total revenue at 4,331,281, followed by Chandigarh at 4,097,302 and Coimbatore at 3,997,433. The top 10 cities account for approximately 70% of measured revenue, while the remaining cities grouped as \"Others\" contribute 30,109,182, representing roughly 30% of total revenue. This indicates that revenue is somewhat dispersed: no single city dominates overwhelmingly, but the top performers do represent a meaningful concentration. Amritsar leads the seco"
     },
     {
       "domain": "Geography",
@@ -2415,23 +2459,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Which city generates the highest revenue?' != root 'Why is Amritsar highest?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -2444,16 +2487,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Based on the previous revenue-by-city result, Amritsar generates 4,331,281 in total revenue\u2014the highest among all cities shown. Here's why it leads:  Key findings:  Amritsar leads because it combines two factors present in the dataset: it operates 186 stores (the highest store co",
         "chart_labels_sample": [
           "Amritsar",
           "Chandigarh",
           "Coimbatore"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1758,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Based on the previous revenue-by-city result, Amritsar generates 4,331,281 in total revenue\u2014the highest among all cities shown. Here's why it leads:\n\nKey findings:\n\nAmritsar leads because it combines two factors present in the dataset: it operates 186 stores (the highest store count among the top performers) and generates 6,162 customers. This combination yields the highest per-store revenue efficiency relative to its peers. Chandigarh, ranked second at 4,097,302, operates only 161 stores but ge"
     },
     {
       "domain": "Geography",
@@ -2465,23 +2509,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Which city generates the highest revenue?' != root 'What evidence supports this conclusion?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -2494,16 +2537,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "For the prior chart, the evidence is:  Key findings:  Amritsar's revenue lead of 4,331,281 rests on two observable facts from the dataset:  1. Store count: Amritsar operates 186 stores\u2014the highest among all named cities. Chandigarh (second place, 4,097,302 revenue) operates only ",
         "chart_labels_sample": [
           "Amritsar",
           "Chandigarh",
           "Coimbatore"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1726,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "For the prior chart, the evidence is:\n\nKey findings:\n\nAmritsar's revenue lead of 4,331,281 rests on two observable facts from the dataset:\n\n1. Store count: Amritsar operates 186 stores\u2014the highest among all named cities. Chandigarh (second place, 4,097,302 revenue) operates only 161 stores. That 25-store difference corresponds to a revenue gap of 233,979.\n\n2. Customer base: Amritsar serves 6,162 customers versus Chandigarh's 6,469. Despite a slightly smaller customer count, Amritsar's larger sto"
     },
     {
       "domain": "Geography",
@@ -2515,23 +2559,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Which city generates the highest revenue?' != root 'Which columns were used for this analysis?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -2544,16 +2587,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "For the prior chart, the calculation used:  Metric column: revenue Breakdown column: city Aggregation: sum (total revenue per city)",
         "chart_labels_sample": [
           "Amritsar",
           "Chandigarh",
           "Coimbatore"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 131,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "For the prior chart, the calculation used:\n\nMetric column: revenue\nBreakdown column: city\nAggregation: sum (total revenue per city)"
     },
     {
       "domain": "Banking & Financial Services",
@@ -2564,23 +2608,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity BR-003",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -2594,16 +2637,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  BR-003 has the highest total loan balance at 41,979,951 across all report dates and customer segments in the dataset. The top five branches (BR-003, BR-021, BR-012, BR-009, and BR-020) collectively hold 195,093,726 in loan balance. However, the aggregated \"Others\" ",
         "chart_labels_sample": [
           "BR-003",
           "BR-021",
           "BR-012"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1785,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nBR-003 has the highest total loan balance at 41,979,951 across all report dates and customer segments in the dataset. The top five branches (BR-003, BR-021, BR-012, BR-009, and BR-020) collectively hold 195,093,726 in loan balance. However, the aggregated \"Others\" category\u2014representing the combined loan balance of BR-002, BR-014, BR-016, BR-006, BR-008, BR-005, BR-011, BR-010, BR-017, BR-018, BR-013, BR-022, BR-007, BR-015, and BR-023\u2014totals 441,332,976, which accounts for 53% of "
     },
     {
       "domain": "Banking & Financial Services",
@@ -2614,23 +2658,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity Central",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -2644,22 +2687,175 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings:  Central region has the highest average deposit balance at 2,281,395, outpacing West (the lowest) by 470,306, or roughly 26%. The five regions cluster in a relatively narrow band: Central leads, followed by North at 2,085,571, South at 2,073,974, and East at 2,066,7",
         "chart_labels_sample": [
           "Central",
           "North",
           "South"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1576,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings:\n\nCentral region has the highest average deposit balance at 2,281,395, outpacing West (the lowest) by 470,306, or roughly 26%. The five regions cluster in a relatively narrow band: Central leads, followed by North at 2,085,571, South at 2,073,974, and East at 2,066,794. West trails at 1,811,089. Central represents approximately 22% of the total average deposit balance across all five regions, indicating some concentration of deposit activity in that region, though the spread across "
     },
     {
       "domain": "Banking & Financial Services",
       "qid": "B-B04",
       "question": "Show deposit trend over time",
       "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "narrative_avg": 8.0,
+      "narrative_source": "live",
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": false,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint deposit_balance not in npl_amount",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "npl_amount",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Key findings:  Total npl amount across the dataset shows modest volatility over the three periods. The 2023-12-26/2024-01-01 period recorded 6,544,212 in npl amount. This dipped slightly to 6,435,955 in 2024-01-30/2024-02-05, representing a minor decline of approximately 1.7%. Th",
+        "chart_labels_sample": [
+          "2023-12-26/2024-01-01",
+          "2024-01-30/2024-02-05",
+          "2024-02-27/2024-03-04"
+        ],
+        "answer_length": 1655,
+        "has_chart": true,
+        "narrative_source": "live"
+      },
+      "answer_excerpt": "Key findings:\n\nTotal npl amount across the dataset shows modest volatility over the three periods. The 2023-12-26/2024-01-01 period recorded 6,544,212 in npl amount. This dipped slightly to 6,435,955 in 2024-01-30/2024-02-05, representing a minor decline of approximately 1.7%. The most recent period, 2024-02-27/2024-03-04, reversed this trend with npl amount rising to 7,628,130, an increase of 18.5% from the prior period and the highest value across all three reporting windows. The 2024-02-27/20"
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-I01",
+      "question": "Loan portfolio concentration by region",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 8.5,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.88,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint loan_balance not in spend_amount",
+        "Verbose executive block",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "spend_amount",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Executive takeaway: Loan portfolio spend amount exhibits moderate geographic concentration, with West underperforming significantly and North anchoring the largest share.  Evidence: - North leads at 4,375,219 in total spend amount (23% of regional total), while West ranks lowest ",
+        "chart_labels_sample": [
+          "North",
+          "South",
+          "Central"
+        ],
+        "answer_length": 1068,
+        "has_chart": true,
+        "narrative_source": "live"
+      },
+      "answer_excerpt": "Executive takeaway:\nLoan portfolio spend amount exhibits moderate geographic concentration, with West underperforming significantly and North anchoring the largest share.\n\nEvidence:\n- North leads at 4,375,219 in total spend amount (23% of regional total), while West ranks lowest at 3,194,178 (17%), representing a 27% gap between strongest and weakest regions.\n- Central, East, and South cluster in the middle range (4,157,044 to 4,333,360), suggesting relatively balanced concentration across three"
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-I07",
+      "question": "Credit utilization risk concentration",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 8.5,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.38,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Verbose executive block",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "credit_utilization",
+        "categoryColumn": "customer_segment",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Executive takeaway: Mass Affluent customers represent a concentration risk, showing the lowest total credit utilization at 36.6 against a portfolio where Retail leads at 41.3, signaling potential underdeployed credit capacity in a high-value segment.  Evidence: - Retail accounts ",
+        "chart_labels_sample": [
+          "Retail",
+          "SME",
+          "Corporate"
+        ],
+        "answer_length": 1077,
+        "has_chart": true,
+        "narrative_source": "live"
+      },
+      "answer_excerpt": "Executive takeaway:\nMass Affluent customers represent a concentration risk, showing the lowest total credit utilization at 36.6 against a portfolio where Retail leads at 41.3, signaling potential underdeployed credit capacity in a high-value segment.\n\nEvidence:\n- Retail accounts for 41.3 total credit utilization, the highest across segments; Mass Affluent lags at 36.6, a 4.7-point gap that may indicate weaker credit demand or lower product uptake within that segment.\n- The three mid-tier segment"
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-E01",
+      "question": "Biggest portfolio opportunity",
+      "pattern": "executive",
       "is_follow_up": false,
       "scores": {
         "intent_detection": 6.0,
@@ -2673,155 +2869,7 @@
       },
       "avg": 7.69,
       "narrative_avg": 7.58,
-      "correlation_narrative": 7.0,
-      "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
-      "answer_ok_conf_weak": false,
-      "severity": "low",
-      "notes": [
-        "Metric hint deposit_balance not in npl_amount",
-        "Lead sentence unclear",
-        "N/A \u2014 not recommendation-focused question",
-        "N/A \u2014 not correlation question",
-        "N/A"
-      ],
-      "routing": {
-        "intent": "trend",
-        "metricColumn": "npl_amount",
-        "categoryColumn": "report_date",
-        "chartType": "line",
-        "confidence": "medium",
-        "supportStatus": null
-      },
-      "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
-        "chart_labels_sample": [
-          "2023-12-26/2024-01-01",
-          "2024-01-30/2024-02-05",
-          "2024-02-27/2024-03-04"
-        ],
-        "answer_length": 137,
-        "has_chart": true
-      },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
-    },
-    {
-      "domain": "Banking & Financial Services",
-      "qid": "B-I01",
-      "question": "Loan portfolio concentration by region",
-      "pattern": "executive",
-      "is_follow_up": false,
-      "scores": {
-        "intent_detection": 6.0,
-        "chart_selection": 10.0,
-        "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
-        "confidence_explanation": 9.0,
-        "follow_up_continuity": 7.0,
-        "hallucination_resistance": 9.5
-      },
-      "avg": 7.44,
-      "narrative_avg": 7.25,
-      "correlation_narrative": 7.0,
-      "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
-      "answer_ok_conf_weak": false,
-      "severity": "low",
-      "notes": [
-        "Metric hint loan_balance not in spend_amount",
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
-        "N/A \u2014 not correlation question",
-        "N/A"
-      ],
-      "routing": {
-        "intent": "executive",
-        "metricColumn": "spend_amount",
-        "categoryColumn": "region",
-        "chartType": "bar",
-        "confidence": "medium",
-        "supportStatus": null
-      },
-      "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
-        "chart_labels_sample": [
-          "North",
-          "South",
-          "Central"
-        ],
-        "answer_length": 137,
-        "has_chart": true
-      },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
-    },
-    {
-      "domain": "Banking & Financial Services",
-      "qid": "B-I07",
-      "question": "Credit utilization risk concentration",
-      "pattern": "executive",
-      "is_follow_up": false,
-      "scores": {
-        "intent_detection": 10.0,
-        "chart_selection": 10.0,
-        "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
-        "confidence_explanation": 9.0,
-        "follow_up_continuity": 7.0,
-        "hallucination_resistance": 9.5
-      },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
-      "correlation_narrative": 7.0,
-      "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
-      "answer_ok_conf_weak": false,
-      "severity": "low",
-      "notes": [
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
-        "N/A \u2014 not correlation question",
-        "N/A"
-      ],
-      "routing": {
-        "intent": "executive",
-        "metricColumn": "credit_utilization",
-        "categoryColumn": "customer_segment",
-        "chartType": "bar",
-        "confidence": "medium",
-        "supportStatus": null
-      },
-      "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
-        "chart_labels_sample": [
-          "Retail",
-          "SME",
-          "Corporate"
-        ],
-        "answer_length": 137,
-        "has_chart": true
-      },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
-    },
-    {
-      "domain": "Banking & Financial Services",
-      "qid": "B-E01",
-      "question": "Biggest portfolio opportunity",
-      "pattern": "executive",
-      "is_follow_up": false,
-      "scores": {
-        "intent_detection": 6.0,
-        "chart_selection": 10.0,
-        "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
-        "confidence_explanation": 9.0,
-        "follow_up_continuity": 7.0,
-        "hallucination_resistance": 9.5
-      },
-      "avg": 7.44,
-      "narrative_avg": 7.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
@@ -2829,8 +2877,8 @@
       "severity": "low",
       "notes": [
         "Metric hint interest_income not in spend_amount",
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
+        "Verbose executive block",
+        "Recommendation without much hedging",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -2843,16 +2891,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: North and South regions dominate total spend amount, representing 53% of the portfolio, while West lags by 27% versus the leader\u2014signaling a potential geographic concentration risk and an uplift opportunity in underperforming regions.  Evidence: - North leads ",
         "chart_labels_sample": [
           "North",
           "South",
           "Central"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 897,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nNorth and South regions dominate total spend amount, representing 53% of the portfolio, while West lags by 27% versus the leader\u2014signaling a potential geographic concentration risk and an uplift opportunity in underperforming regions.\n\nEvidence:\n- North leads at 4,375,219 in total spend amount; South is nearly tied at 4,333,360, together accounting for over half of all spend across the five regions.\n- West totals 3,194,178, a gap of 1.18 million (27%) behind North, with East "
     },
     {
       "domain": "Banking & Financial Services",
@@ -2865,13 +2914,14 @@
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 6.0,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 8.5,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.44,
-      "narrative_avg": 7.25,
+      "avg": 7.88,
+      "narrative_avg": 7.83,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
       "chart_ok_answer_weak": true,
@@ -2879,8 +2929,7 @@
       "severity": "low",
       "notes": [
         "Metric hint npl not in spend_amount",
-        "Lead sentence unclear",
-        "Executive question lacks actionable recommendation",
+        "Verbose executive block",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -2893,16 +2942,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Executive takeaway: Mass Affluent segment presents the lowest spend amount concentration at 3.7 million, representing a potential portfolio weakness relative to Retail's 4.2 million leadership.  Evidence: - Retail dominates spend amount at 4,223,900, while Mass Affluent trails at",
         "chart_labels_sample": [
           "Retail",
           "Corporate",
           "SME"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 935,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Executive takeaway:\nMass Affluent segment presents the lowest spend amount concentration at 3.7 million, representing a potential portfolio weakness relative to Retail's 4.2 million leadership.\n\nEvidence:\n- Retail dominates spend amount at 4,223,900, while Mass Affluent trails at 3,705,831\u2014an 12% gap that suggests uneven segment dependency and exposure concentration in higher-performing cohorts.\n- The top three segments (Retail, Corporate, SME) account for approximately 58% of total spend, indic"
     },
     {
       "domain": "Banking & Financial Services",
@@ -2913,29 +2963,30 @@
       "scores": {
         "intent_detection": 7.0,
         "chart_selection": 8.0,
-        "data_grounding": 6.0,
+        "data_grounding": 9.0,
         "executive_summary_quality": 6.0,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.44,
-      "narrative_avg": 7.42,
+      "avg": 7.81,
+      "narrative_avg": 7.92,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
-      "limitation_first": 5.0,
+      "limitation_first": 9.0,
       "chart_ok_answer_weak": true,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
         "Did not hard-fail unsupported question",
         "Chart optional for negative test",
-        "Negative test without clear limitation wording",
+        "Stated limitation",
         "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
-        "Negative test without clear limitation",
-        "Limitation-first score: 5.0"
+        "Limitation-first wording",
+        "Limitation-first score: 9.0"
       ],
       "routing": {
         "intent": "trend",
@@ -2946,16 +2997,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "This dataset does not include the requested net-interest-margin column or the requested time period column, so the requested comparison cannot be answered directly.  The dataset contains interest_income and loan_balance fields but lacks a pre-calculated net-interest-margin metric",
         "chart_labels_sample": [
           "2024-01-01 00:00",
           "2024-02-01 00:00",
           "2024-03-01 00:00"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1201,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "This dataset does not include the requested net-interest-margin column or the requested time period column, so the requested comparison cannot be answered directly.\n\nThe dataset contains interest_income and loan_balance fields but lacks a pre-calculated net-interest-margin metric. Additionally, report_date is recorded at monthly granularity (not over time), so over time grouping would require date transformation not reflected in the provided calculated result.\n\nAvailable-data context (fallback o"
     },
     {
       "domain": "Banking & Financial Services",
@@ -2966,23 +3018,22 @@
       "scores": {
         "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 6.5,
-        "executive_summary_quality": 6.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
-      "narrative_avg": 7.5,
+      "avg": 8.69,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Answer may omit top entity BR-003",
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
         "N/A \u2014 not correlation question",
         "N/A"
@@ -2996,16 +3047,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Key findings  BR-003 has the highest total loan balance at 41,979,951 across all its records in the dataset. The top five branches (BR-003, BR-021, BR-012, BR-009, BR-020) collectively hold approximately 190.0 million in loan balance. The remaining 19 branches account for the bal",
         "chart_labels_sample": [
           "BR-003",
           "BR-021",
           "BR-012"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1762,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Key findings\n\nBR-003 has the highest total loan balance at 41,979,951 across all its records in the dataset. The top five branches (BR-003, BR-021, BR-012, BR-009, BR-020) collectively hold approximately 190.0 million in loan balance. The remaining 19 branches account for the balance of the measured portfolio. When aggregated across all 24 branches, the \"Others\" grouping (which represents the combined tail of lower-balance branches) totals 441,332,976, indicating that loan balance is moderately "
     },
     {
       "domain": "Banking & Financial Services",
@@ -3017,23 +3069,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Which branch has the highest loan balance?' != root 'Why is BR-003 highest?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -3046,16 +3097,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "Based on the previous loan balance-by-branch result, BR-003 leads with a total loan balance of 41,979,951 \u2014 roughly 1.97 million ahead of the second-place BR-021 at 40,010,763.  Key findings  BR-003's 41.98 million represents approximately 9.5% of the measured loan balance portfo",
         "chart_labels_sample": [
           "BR-003",
           "BR-021",
           "BR-012"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1884,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "Based on the previous loan balance-by-branch result, BR-003 leads with a total loan balance of 41,979,951 \u2014 roughly 1.97 million ahead of the second-place BR-021 at 40,010,763.\n\nKey findings\n\nBR-003's 41.98 million represents approximately 9.5% of the measured loan balance portfolio across all 24 branches. The margin over BR-021 is modest at 1.97 million (4.9% difference), indicating that the top-ranked branch holds a narrow lead rather than a dominant position. The top five branches (BR-003, BR"
     },
     {
       "domain": "Banking & Financial Services",
@@ -3067,23 +3119,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Which branch has the highest loan balance?' != root 'Which columns were used for this analysis?'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -3096,16 +3147,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "For the prior chart, the calculation used three components:  Metric column: loan_balance Breakdown column: branch Aggregation: sum (Total)  The analysis summed all loan_balance values within the dataset and grouped them by branch identifier, then ranked branches by their total lo",
         "chart_labels_sample": [
           "BR-003",
           "BR-021",
           "BR-012"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 314,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "For the prior chart, the calculation used three components:\n\nMetric column: loan_balance\nBreakdown column: branch\nAggregation: sum (Total)\n\nThe analysis summed all loan_balance values within the dataset and grouped them by branch identifier, then ranked branches by their total loan balance from highest to lowest."
     },
     {
       "domain": "Banking & Financial Services",
@@ -3117,23 +3169,22 @@
         "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
-        "executive_summary_quality": 6.0,
+        "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
-        "follow_up_continuity": 5.0,
+        "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
-      "narrative_avg": 7.25,
+      "avg": 8.75,
+      "narrative_avg": 8.33,
+      "narrative_source": "live",
       "correlation_narrative": 7.0,
       "limitation_first": 7.0,
-      "chart_ok_answer_weak": true,
+      "chart_ok_answer_weak": false,
       "answer_ok_conf_weak": false,
       "severity": "low",
       "notes": [
-        "Lead sentence unclear",
         "N/A \u2014 not recommendation-focused question",
-        "Effective question 'Which branch has the highest loan balance?' != root 'Show the calculations behind this answer.'",
         "N/A \u2014 not correlation question",
         "N/A"
       ],
@@ -3146,16 +3197,17 @@
         "supportStatus": null
       },
       "actual": {
-        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "answer_excerpt": "For the prior chart, the calculation used three components:  Metric column: loan_balance Breakdown column: branch Aggregation: Total (sum)  The analysis summed all loan_balance values in the dataset (360 rows across 11 branch groups) and ranked branches by their total loan balanc",
         "chart_labels_sample": [
           "BR-003",
           "BR-021",
           "BR-012"
         ],
-        "answer_length": 137,
-        "has_chart": true
+        "answer_length": 1818,
+        "has_chart": true,
+        "narrative_source": "live"
       },
-      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+      "answer_excerpt": "For the prior chart, the calculation used three components:\n\nMetric column: loan_balance\nBreakdown column: branch\nAggregation: Total (sum)\n\nThe analysis summed all loan_balance values in the dataset (360 rows across 11 branch groups) and ranked branches by their total loan balance from highest to lowest.\n\nKey findings:\n\nBR-003 holds the highest total loan balance at 41,979,951, followed by BR-021 at 40,010,763 and BR-012 at 39,910,984. The top three branches account for approximately 29% of the "
     }
   ]
 }

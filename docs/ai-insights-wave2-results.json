@@ -1,0 +1,2277 @@
+{
+  "executed_at": "2026-06-10T11:09:57Z",
+  "duration_sec": 3.2,
+  "wave": "2",
+  "waves": [
+    2
+  ],
+  "domains": [
+    "Finance & FP&A",
+    "Operations",
+    "Customer Support"
+  ],
+  "mode": "routing_deterministic_no_llm",
+  "note": "Narrative dimensions scored from chart/analysis payloads (routing-only mode).",
+  "results": [
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-B01",
+      "question": "Which department has the largest budget variance?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "variance",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking",
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Finance",
+          "top_value": 455922.66
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total variance by department. Finance leads with 455923.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 7 chart group(s). Variance Share: 31%. Variance Gap: 446,616.",
+        "chart_labels_sample": [
+          "Finance",
+          "HR",
+          "Engineering"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-B02",
+      "question": "Compare actual spend across cost centers",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 5.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.25,
+      "severity": "low",
+      "notes": [
+        "Chart top 'CC-HR-2' vs pandas top 'CC-SAL-2'",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "actual",
+        "categoryColumn": "cost_center",
+        "chartType": "horizontalBar",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "CC-SAL-2",
+          "top_value": 3752345.25
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Actual and Cost by Cost Center. CC-HR-2 leads with 292754.0. Score 79/100 (high) from 7 evidence factor(s); 330 row(s), 14 chart group(s). Actual And Cost Gap: 63,912. Top Cost Center: CC-HR-2.",
+        "chart_labels_sample": [
+          "CC-HR-2",
+          "CC-OPE-1",
+          "CC-SAL-1"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-B03",
+      "question": "Show revenue trend over report date",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.5,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "revenue",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "trend"
+        ],
+        "chart": [
+          "line",
+          "area"
+        ],
+        "ground": {
+          "periods": 10,
+          "last_value": 2809419.2399999998
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total revenue trend (monthly). 2024-01 leads with 3585220.0. Score 65/100 (medium) from 5 evidence factor(s); 330 row(s), 10 chart group(s). Recent Change: 14%. Revenue Gap: 2M. Top Report Date: 2024-03.",
+        "chart_labels_sample": [
+          "2024-01",
+          "2024-02",
+          "2024-03"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-B04",
+      "question": "Rank categories by actual cost",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.19,
+      "severity": "low",
+      "notes": [
+        "Metric hint cost not in actual",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "actual",
+        "categoryColumn": "category",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Facilities",
+          "top_value": 9523200.73
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total actual by category. Facilities leads with 9523201.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 5 chart group(s). Actual Share: 22%. Actual Gap: 1.8M.",
+        "chart_labels_sample": [
+          "Facilities",
+          "Personnel",
+          "Contractors"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-I01",
+      "question": "Compare budget vs actual by department",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "budget",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar",
+          "groupedbar"
+        ],
+        "ground": {
+          "top_entity": "Sales",
+          "top_value": 6864420.33
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Budget and Actual by Department. Sales leads with 13877380.0. Score 79/100 (high) from 7 evidence factor(s); 330 row(s), 7 chart group(s). Budget And Actual Gap: 2.7M. Top Department: Sales.",
+        "chart_labels_sample": [
+          "Sales",
+          "Operations",
+          "HR"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-I02",
+      "question": "Is revenue correlated with units?",
+      "pattern": "relationship",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "severity": "low",
+      "notes": [
+        "Metric hint revenue not in units",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "relationship",
+        "metricColumn": "units",
+        "categoryColumn": "revenue",
+        "chartType": "scatter",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "relationship"
+        ],
+        "chart": [
+          "scatter"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Revenue vs Units. Point 1 leads with 168.0. Score 93/100 (high): scatter correlation on 320 joint pair(s) from 330 filtered row(s).",
+        "chart_labels_sample": [
+          "Point 1",
+          "Point 2",
+          "Point 3"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-E01",
+      "question": "What are the biggest FP&A risks?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.75,
+      "severity": "low",
+      "notes": [
+        "Metric hint variance not in revenue",
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "revenue",
+        "categoryColumn": "category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total revenue by category. Contractors leads with 8423133.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 5 chart group(s). Primary concern: Underperformer: Travel. Revenue Share: 22%.",
+        "chart_labels_sample": [
+          "Contractors",
+          "Software",
+          "Personnel"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-E02",
+      "question": "Where is cost overrun concentrated?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.75,
+      "severity": "low",
+      "notes": [
+        "Metric hint actual not in cost",
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "cost",
+        "categoryColumn": "category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total cost by category. Facilities leads with 9523201.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 5 chart group(s). Primary concern: Underperformer: Travel. Cost Share: 22%.",
+        "chart_labels_sample": [
+          "Facilities",
+          "Personnel",
+          "Contractors"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-E03",
+      "question": "Executive summary of department performance",
+      "pattern": "summary",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.5,
+      "severity": "low",
+      "notes": [],
+      "routing": {
+        "intent": "summary",
+        "metricColumn": "revenue",
+        "categoryColumn": "category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "summary",
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total revenue by category. Contractors leads with 8423133.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 5 chart group(s). Top Category: Contractors. Revenue Share: 22%. Revenue Gap: 16%.",
+        "chart_labels_sample": [
+          "Contractors",
+          "Software",
+          "Personnel"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-NEG",
+      "question": "Compare EBITDA margin trend by quarter",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 9.0,
+        "chart_selection": 8.0,
+        "data_grounding": 9.0,
+        "executive_summary_quality": 8.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 7.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.06,
+      "severity": "low",
+      "notes": [
+        "Negative test: unsupported/limitation routing",
+        "Chart optional for negative test",
+        "Stated limitation",
+        "N/A \u2014 not recommendation-focused question",
+        "Thin confidence rationale",
+        "Limitation-first response names absent metric"
+      ],
+      "routing": {
+        "intent": "fallback",
+        "metricColumn": null,
+        "categoryColumn": null,
+        "chartType": null,
+        "confidence": "low",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "fallback",
+          "unsupported"
+        ],
+        "chart": [
+          "none"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Score 21/100 (low) from 8 evidence factor(s); 330 row(s), 0 chart group(s). This dataset does not include the requested EBITDA margin column or the requested fiscal-period column, so the requested comparison cannot be answered directly.",
+        "chart_labels_sample": []
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-I03",
+      "question": "Which cost center exceeds budget the most?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 5.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.75,
+      "severity": "low",
+      "notes": [
+        "Intent 'compare' acceptable fallback for ranking",
+        "Metric hint variance not in budget",
+        "Chart top 'CC-SAL-2' vs pandas top 'CC-FIN-1'",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "budget",
+        "categoryColumn": "cost_center",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "CC-FIN-1",
+          "top_value": 243971.68
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total budget by cost center. CC-SAL-2 leads with 3655926.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 14 chart group(s). Budget Gap: 1.4M. Top Cost Center: CC-SAL-2.",
+        "chart_labels_sample": [
+          "CC-SAL-2",
+          "CC-MAR-1",
+          "CC-OPE-1"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-D01",
+      "question": "Variance analysis by category",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "variance",
+        "categoryColumn": "category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Facilities",
+          "top_value": 438191.1
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total variance by category. Facilities leads with 438191.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 5 chart group(s). Variance Share: 30%. Variance Gap: 295,872.",
+        "chart_labels_sample": [
+          "Facilities",
+          "Contractors",
+          "Travel"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-C1-Q",
+      "question": "Which department has the largest budget variance?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.31,
+      "severity": "low",
+      "notes": [
+        "Intent 'compare' acceptable fallback for ranking",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "variance",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Finance",
+          "top_value": 455922.66
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total variance by department. Finance leads with 455923.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 7 chart group(s). Variance Share: 31%. Variance Gap: 446,616.",
+        "chart_labels_sample": [
+          "Finance",
+          "HR",
+          "Engineering"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-C1-F1",
+      "question": "Why is Finance highest?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 5.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "severity": "low",
+      "notes": [
+        "Intent mismatch: got 'compare', expected ('ranking',)",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "variance",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total variance by department. Finance leads with 455923.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 7 chart group(s). Variance Share: 31%. Variance Gap: 446,616.",
+        "chart_labels_sample": [
+          "Finance",
+          "HR",
+          "Engineering"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-C1-F2",
+      "question": "Which columns were used for this analysis?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 5.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "severity": "low",
+      "notes": [
+        "Intent mismatch: got 'compare', expected ('ranking',)",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "variance",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total variance by department. Finance leads with 455923.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 7 chart group(s). Variance Share: 31%. Variance Gap: 446,616.",
+        "chart_labels_sample": [
+          "Finance",
+          "HR",
+          "Engineering"
+        ]
+      }
+    },
+    {
+      "domain": "Finance & FP&A",
+      "qid": "F2-C1-F3",
+      "question": "Show the calculations behind this answer.",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 5.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "severity": "low",
+      "notes": [
+        "Intent mismatch: got 'compare', expected ('ranking',)",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "variance",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total variance by department. Finance leads with 455923.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 7 chart group(s). Variance Share: 31%. Variance Gap: 446,616.",
+        "chart_labels_sample": [
+          "Finance",
+          "HR",
+          "Engineering"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-B01",
+      "question": "Which facility has the highest downtime hours?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "downtime_hours",
+        "categoryColumn": "facility",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Plant-A",
+          "top_value": 512.5571298855536
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total downtime hours by facility. Plant-A leads with 513.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Downtime Hours Share: 23%. Downtime Hours Gap: 117.0.",
+        "chart_labels_sample": [
+          "Plant-A",
+          "Warehouse-2",
+          "Plant-C"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-B02",
+      "question": "Compare defect rate across production lines",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.44,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Line-2",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "defect_rate",
+        "categoryColumn": "production_line",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Line-2",
+          "top_value": 1.7195
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average defect rate by production line. Line-4 leads with 0.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 4 chart group(s).",
+        "chart_labels_sample": [
+          "Line-4",
+          "Line-2",
+          "Line-3"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-B03",
+      "question": "Show units produced trend over time",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.5,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "units_produced",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "trend"
+        ],
+        "chart": [
+          "line",
+          "area"
+        ],
+        "ground": {
+          "periods": 4,
+          "last_value": 59570.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total units produced trend (monthly). 2024-01 leads with 490429.0. Score 65/100 (medium) from 5 evidence factor(s); 310 row(s), 4 chart group(s). Units Produced Share: 32%. Recent Change: 87%. Units Produced Gap: 432,588.",
+        "chart_labels_sample": [
+          "2024-01",
+          "2024-02",
+          "2024-03"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-B04",
+      "question": "Rank shifts by SLA score",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "sla_score",
+        "categoryColumn": "shift",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Night",
+          "top_value": 406.77
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average sla score by shift. Night leads with 3.8. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 3 chart group(s). Sla Score Share: 34%.",
+        "chart_labels_sample": [
+          "Night",
+          "Day",
+          "Swing"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-I01",
+      "question": "Is downtime correlated with defect rate?",
+      "pattern": "relationship",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "severity": "low",
+      "notes": [
+        "Metric hint downtime not in defect_rate",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "relationship",
+        "metricColumn": "defect_rate",
+        "categoryColumn": "downtime_hours",
+        "chartType": "scatter",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "relationship"
+        ],
+        "chart": [
+          "scatter"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Downtime Hours vs Defect Rate. Point 1 leads with 0.0. Score 93/100 (high): scatter correlation on 290 joint pair(s) from 310 filtered row(s).",
+        "chart_labels_sample": [
+          "Point 1",
+          "Point 2",
+          "Point 3"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-I02",
+      "question": "Which department has the lowest SLA score?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "sla_score",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Packaging",
+          "top_value": 239.92
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average sla score by department. Packaging leads with 3.9. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Sla Score Share: 21%.",
+        "chart_labels_sample": [
+          "Packaging",
+          "Maintenance",
+          "Logistics"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-E01",
+      "question": "What are the biggest operational risks?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.25,
+      "severity": "low",
+      "notes": [
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "downtime_hours",
+        "categoryColumn": "department",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total downtime hours by department. Quality leads with 495.4. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Primary concern: Underperformer: Packaging. Downtime Hours Share: 22%.",
+        "chart_labels_sample": [
+          "Quality",
+          "Assembly",
+          "Logistics"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-E02",
+      "question": "Where is production loss concentrated?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.75,
+      "severity": "low",
+      "notes": [
+        "Metric hint cost not in units_produced",
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "units_produced",
+        "categoryColumn": "department",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total units produced by department. Maintenance leads with 322227.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Primary concern: Underperformer: Packaging. Units Produced Share: 21%.",
+        "chart_labels_sample": [
+          "Maintenance",
+          "Assembly",
+          "Logistics"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-E03",
+      "question": "Executive summary of plant performance",
+      "pattern": "summary",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "severity": "low",
+      "notes": [
+        "Metric hint units_produced not in downtime_hours"
+      ],
+      "routing": {
+        "intent": "summary",
+        "metricColumn": "downtime_hours",
+        "categoryColumn": "production_line",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "summary"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Average downtime hours by production line. Line-1 leads with 7.8. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 4 chart group(s). Top Production Line: Line-1. Downtime Hours Concentration: 26%. Downtime Hours Share: 26%.",
+        "chart_labels_sample": [
+          "Line-1",
+          "Line-2",
+          "Line-4"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-NEG",
+      "question": "Compare OEE trend by quarter",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 9.0,
+        "chart_selection": 8.0,
+        "data_grounding": 9.0,
+        "executive_summary_quality": 8.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 7.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.06,
+      "severity": "low",
+      "notes": [
+        "Negative test: unsupported/limitation routing",
+        "Chart optional for negative test",
+        "Stated limitation",
+        "N/A \u2014 not recommendation-focused question",
+        "Thin confidence rationale",
+        "Limitation-first response names absent metric"
+      ],
+      "routing": {
+        "intent": "fallback",
+        "metricColumn": null,
+        "categoryColumn": null,
+        "chartType": null,
+        "confidence": "low",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "fallback"
+        ],
+        "chart": [
+          "none"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Score 21/100 (low) from 8 evidence factor(s); 310 row(s), 0 chart group(s). This dataset does not include the requested fiscal-period column, so the requested comparison cannot be answered directly.",
+        "chart_labels_sample": []
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-D01",
+      "question": "Compare cost across facilities",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "cost",
+        "categoryColumn": "facility",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Plant-A",
+          "top_value": 6377135.03
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total cost by facility. Plant-A leads with 6377135.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Cost Share: 25%. Cost Gap: 1.7M.",
+        "chart_labels_sample": [
+          "Plant-A",
+          "Plant-C",
+          "Warehouse-2"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-C1-Q",
+      "question": "Which facility has the highest downtime hours?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "downtime_hours",
+        "categoryColumn": "facility",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Plant-A",
+          "top_value": 512.5571298855536
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total downtime hours by facility. Plant-A leads with 513.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Downtime Hours Share: 23%. Downtime Hours Gap: 117.0.",
+        "chart_labels_sample": [
+          "Plant-A",
+          "Warehouse-2",
+          "Plant-C"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-C1-F1",
+      "question": "Why is Plant-A highest?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.75,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "downtime_hours",
+        "categoryColumn": "facility",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total downtime hours by facility. Plant-A leads with 513.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Downtime Hours Share: 23%. Downtime Hours Gap: 117.0.",
+        "chart_labels_sample": [
+          "Plant-A",
+          "Warehouse-2",
+          "Plant-C"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-C1-F2",
+      "question": "What evidence supports this conclusion?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.75,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "downtime_hours",
+        "categoryColumn": "facility",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total downtime hours by facility. Plant-A leads with 513.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Downtime Hours Share: 23%. Downtime Hours Gap: 117.0.",
+        "chart_labels_sample": [
+          "Plant-A",
+          "Warehouse-2",
+          "Plant-C"
+        ]
+      }
+    },
+    {
+      "domain": "Operations",
+      "qid": "O2-C1-F3",
+      "question": "Which columns were used for this analysis?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.75,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "downtime_hours",
+        "categoryColumn": "facility",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total downtime hours by facility. Plant-A leads with 513.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Downtime Hours Share: 23%. Downtime Hours Gap: 117.0.",
+        "chart_labels_sample": [
+          "Plant-A",
+          "Warehouse-2",
+          "Plant-C"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-B01",
+      "question": "Which ticket category has the longest resolution time?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.31,
+      "severity": "low",
+      "notes": [
+        "Intent 'compare' acceptable fallback for ranking",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "avg_resolution_hours",
+        "categoryColumn": "ticket_category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Billing",
+          "top_value": 841.09
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average avg resolution hours by ticket category. Billing leads with 16.8. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Ticket Category: Billing.",
+        "chart_labels_sample": [
+          "Billing",
+          "Account",
+          "Feature Request"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-B02",
+      "question": "Compare satisfaction score across channels",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.44,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Portal",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "channel",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Portal",
+          "top_value": 359.92
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average satisfaction score by channel. Phone leads with 3.9. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 4 chart group(s). Satisfaction Score Share: 25%.",
+        "chart_labels_sample": [
+          "Phone",
+          "Portal",
+          "Chat"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-B03",
+      "question": "Show tickets opened trend over report date",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.5,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "tickets_opened",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "trend"
+        ],
+        "chart": [
+          "line"
+        ],
+        "ground": {
+          "periods": 10,
+          "last_value": 8413.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total tickets opened trend (monthly). 2024-01 leads with 7375.0. Score 65/100 (medium) from 5 evidence factor(s); 300 row(s), 10 chart group(s). Tickets Opened Gap: 1,684. Top Report Date: 2024-07.",
+        "chart_labels_sample": [
+          "2024-01",
+          "2024-02",
+          "2024-03"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-B04",
+      "question": "Rank departments by escalation count",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "escalations",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Tier-1",
+          "top_value": 1684.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total escalations by department. Tier-1 leads with 1684.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 5 chart group(s). Escalations Share: 23%. Escalations Gap: 354.0.",
+        "chart_labels_sample": [
+          "Tier-1",
+          "Tier-2",
+          "Technical"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-I01",
+      "question": "Compare tickets resolved vs opened by priority",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.69,
+      "severity": "low",
+      "notes": [
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "tickets_resolved",
+        "categoryColumn": "priority",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "compare"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "High",
+          "top_value": 21271.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total tickets resolved by priority. High leads with 21271.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 4 chart group(s). Tickets Resolved Share: 29%. Tickets Resolved Gap: 5,953.",
+        "chart_labels_sample": [
+          "High",
+          "Medium",
+          "Critical"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-I02",
+      "question": "Is satisfaction correlated with resolution time?",
+      "pattern": "relationship",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "severity": "low",
+      "notes": [
+        "Metric hint satisfaction not in avg_resolution_hours",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "relationship",
+        "metricColumn": "avg_resolution_hours",
+        "categoryColumn": "satisfaction_score",
+        "chartType": "scatter",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "relationship"
+        ],
+        "chart": [
+          "scatter"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Satisfaction Score vs Avg Resolution Hours. Point 1 leads with 23.3. Score 93/100 (high): scatter correlation on 292 joint pair(s) from 300 filtered row(s).",
+        "chart_labels_sample": [
+          "Point 1",
+          "Point 2",
+          "Point 3"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-E01",
+      "question": "What are the biggest support risks?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.75,
+      "severity": "low",
+      "notes": [
+        "Metric hint escalations not in tickets_opened",
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "tickets_opened",
+        "categoryColumn": "ticket_category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Total tickets opened by ticket category. Onboarding leads with 15705.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Primary concern: Underperformer: Account. Tickets Opened Share: 19%.",
+        "chart_labels_sample": [
+          "Onboarding",
+          "Feature Request",
+          "Bug"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-E02",
+      "question": "Biggest support opportunity for leadership",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.75,
+      "severity": "low",
+      "notes": [
+        "Metric hint satisfaction not in tickets_opened",
+        "Executive question lacks actionable recommendation"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "tickets_opened",
+        "categoryColumn": "ticket_category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "executive"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Average tickets opened by ticket category. Onboarding leads with 314.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Tickets Opened Gap: 2,637. Tickets Opened Gap: 53.0. Tickets Opened Share: 19%.",
+        "chart_labels_sample": [
+          "Onboarding",
+          "Feature Request",
+          "Bug"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-E03",
+      "question": "Executive summary of support performance",
+      "pattern": "summary",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.0,
+      "severity": "low",
+      "notes": [
+        "Metric hint tickets_resolved not in tickets_opened"
+      ],
+      "routing": {
+        "intent": "summary",
+        "metricColumn": "tickets_opened",
+        "categoryColumn": "ticket_category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "summary"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Average tickets opened by ticket category. Onboarding leads with 314.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Ticket Category: Onboarding. Tickets Opened Share: 19%. Tickets Opened Gap: 17%.",
+        "chart_labels_sample": [
+          "Onboarding",
+          "Feature Request",
+          "Bug"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-NEG",
+      "question": "Compare NPS across ticket categories",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 9.0,
+        "chart_selection": 8.0,
+        "data_grounding": 2.0,
+        "executive_summary_quality": 8.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 7.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.19,
+      "severity": "medium",
+      "notes": [
+        "Negative test: unsupported/limitation routing",
+        "Chart optional for negative test",
+        "Answer asserted missing metric",
+        "N/A \u2014 not recommendation-focused question",
+        "Thin confidence rationale",
+        "Limitation-first response names absent metric"
+      ],
+      "routing": {
+        "intent": "fallback",
+        "metricColumn": null,
+        "categoryColumn": null,
+        "chartType": null,
+        "confidence": "low",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "fallback"
+        ],
+        "chart": [
+          "none"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Score 21/100 (low) from 8 evidence factor(s); 300 row(s), 0 chart group(s). This dataset does not include the requested NPS column, so the requested comparison cannot be answered directly.",
+        "chart_labels_sample": []
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-D01",
+      "question": "Which priority level drives the most escalations?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.31,
+      "severity": "low",
+      "notes": [
+        "Intent 'compare' acceptable fallback for ranking",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "escalations",
+        "categoryColumn": "priority",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "High",
+          "top_value": 2232.0
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Total escalations by priority. High leads with 2232.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 4 chart group(s). Escalations Share: 30%. Escalations Gap: 661.0.",
+        "chart_labels_sample": [
+          "High",
+          "Medium",
+          "Critical"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-C1-Q",
+      "question": "Which ticket category has the longest resolution time?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.31,
+      "severity": "low",
+      "notes": [
+        "Intent 'compare' acceptable fallback for ranking",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "avg_resolution_hours",
+        "categoryColumn": "ticket_category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {
+          "top_entity": "Billing",
+          "top_value": 841.09
+        }
+      },
+      "actual": {
+        "answer_excerpt": "Average avg resolution hours by ticket category. Billing leads with 16.8. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Ticket Category: Billing.",
+        "chart_labels_sample": [
+          "Billing",
+          "Account",
+          "Feature Request"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-C1-F1",
+      "question": "Why is Billing highest?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 5.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "severity": "low",
+      "notes": [
+        "Intent mismatch: got 'compare', expected ('ranking',)",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "avg_resolution_hours",
+        "categoryColumn": "ticket_category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Average avg resolution hours by ticket category. Billing leads with 16.8. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Ticket Category: Billing.",
+        "chart_labels_sample": [
+          "Billing",
+          "Account",
+          "Feature Request"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-C1-F2",
+      "question": "Which columns were used for this analysis?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 5.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "severity": "low",
+      "notes": [
+        "Intent mismatch: got 'compare', expected ('ranking',)",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "avg_resolution_hours",
+        "categoryColumn": "ticket_category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Average avg resolution hours by ticket category. Billing leads with 16.8. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Ticket Category: Billing.",
+        "chart_labels_sample": [
+          "Billing",
+          "Account",
+          "Feature Request"
+        ]
+      }
+    },
+    {
+      "domain": "Customer Support",
+      "qid": "C2-C1-F3",
+      "question": "Show the calculations behind this answer.",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 5.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "severity": "low",
+      "notes": [
+        "Intent mismatch: got 'compare', expected ('ranking',)",
+        "N/A \u2014 not recommendation-focused question"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "avg_resolution_hours",
+        "categoryColumn": "ticket_category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "expected": {
+        "intent": [
+          "ranking"
+        ],
+        "chart": [
+          "bar"
+        ],
+        "ground": {}
+      },
+      "actual": {
+        "answer_excerpt": "Average avg resolution hours by ticket category. Billing leads with 16.8. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Ticket Category: Billing.",
+        "chart_labels_sample": [
+          "Billing",
+          "Account",
+          "Feature Request"
+        ]
+      }
+    }
+  ]
+}

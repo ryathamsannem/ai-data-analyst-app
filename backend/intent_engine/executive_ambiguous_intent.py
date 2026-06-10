@@ -95,9 +95,22 @@ def _is_explicit_outlier_identification(question: str) -> bool:
     return False
 
 
+def _is_named_risk_metric_question(question: str) -> bool:
+    """Explicit risk-score metric compare — not broad executive risk analysis."""
+    return bool(
+        re.search(
+            r"\b(?:patient\s+)?risk\s+(?:score|index)\b|\bclinical\s+risk\s+score\b",
+            question or "",
+            re.I,
+        )
+    )
+
+
 def classify_executive_ambiguous_bucket(question: str) -> ExecutiveAmbiguousBucket:
     q = (question or "").replace("\n", " ").strip()
     if len(q) < 8:
+        return None
+    if _is_named_risk_metric_question(q):
         return None
     if _OTHER_INTENT_RE.search(q):
         return None
@@ -364,6 +377,13 @@ def apply_executive_ambiguous_routing(
     Override aggregate intent (metric, dimension, lens) for ambiguous executive questions.
     Returns True when routing was applied.
     """
+    try:
+        from intent_engine.narrative_guardrails import detect_missing_requested_metrics
+
+        if detect_missing_requested_metrics(question, df, profile):
+            return False
+    except Exception:
+        pass
     bucket = classify_executive_ambiguous_bucket(question)
     if not bucket or df is None or df.empty:
         return False

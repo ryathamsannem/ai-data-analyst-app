@@ -4693,6 +4693,30 @@ def build_suggested_questions() -> List[str]:
     row_n = int(len(df))
     conf = _dataset_suggestion_confidence(domain, len(numeric_cols), len(category_cols), row_n)
 
+    date_col = get_mapped_or_detected_column(
+        "date", ["date", "order date", "transaction date", "invoice date", "month", "period"]
+    )
+    date_for_trend = _pick_date_column_for_suggestions(date_col, date_cols, columns, ct)
+
+    try:
+        from intent_engine.suggested_questions_engine import compose_suggested_questions
+
+        engine_qs = compose_suggested_questions(
+            df=df,
+            profile=profile,
+            ranked_dims=ranked_dims,
+            ranked_metrics=ranked_metrics,
+            date_cols=date_cols,
+            columns=columns,
+            dashboard_kind=domain,
+            date_col=date_for_trend,
+        )
+        deduped = _dedup_question_list(engine_qs, max_n=6)
+        if len(deduped) >= 5:
+            return deduped[:6]
+    except Exception:
+        pass
+
     product_col = _mapped_col_safe(
         get_mapped_or_detected_column("product", ["product", "item", "sku", "category"])
     )
@@ -4714,11 +4738,7 @@ def build_suggested_questions() -> List[str]:
     profit_col = _mapped_col_safe(
         get_mapped_or_detected_column("profit", ["profit", "margin", "net profit", "earnings", "gp"])
     )
-    date_col = get_mapped_or_detected_column(
-        "date", ["date", "order date", "transaction date", "invoice date", "month", "period"]
-    )
     kpi_domain = infer_kpi_domain()
-    date_for_trend = _pick_date_column_for_suggestions(date_col, date_cols, columns, ct)
 
     qs: List[str] = []
 
@@ -7190,6 +7210,27 @@ def _best_numeric_column_for_question(q: str, numeric_cols: List[str]) -> Option
                 score -= 420
             elif any(k in cn for k in ("revenue", "sales")) and "profit" not in cn:
                 score -= 200
+        if re.search(
+            r"\b(?:resolution|response|handling)\s+time\b|"
+            r"\b(?:longest|shortest)\s+resolution\b",
+            ql_raw,
+        ):
+            if "resolution" in cn and any(
+                k in cn for k in ("hour", "minute", "time", "duration")
+            ):
+                score += 480
+            if "tickets" in cn and "opened" in cn:
+                score -= 420
+            if cn.endswith(" opened") or "tickets opened" in cn:
+                score -= 420
+        if re.search(
+            r"\b(?:patient\s+)?risk\s+(?:score|index)\b|\bclinical\s+risk\s+score\b",
+            ql_raw,
+        ):
+            if "patient" in cn and "volume" in cn:
+                score -= 520
+            if "risk" in cn and ("score" in cn or "index" in cn):
+                score += 460
         if score > best_score:
             best_score = score
             best = c
@@ -8052,6 +8093,27 @@ def _trend_metric_column_for_question(
         vc = metric_spec.get("value_col")
         if vc and str(vc) in df_in.columns:
             return str(vc)
+    try:
+        from intent_engine.narrative_guardrails import detect_missing_requested_metrics
+
+        finance_margin_ids = {
+            "ebitda_margin",
+            "operating_margin",
+            "gross_margin",
+            "net_margin",
+            "nim",
+            "margin_pct",
+        }
+        missing = detect_missing_requested_metrics(question, df_in, profile)
+        if any(m.get("id") in finance_margin_ids for m in missing):
+            return None
+    except Exception:
+        pass
+    ql_guard = (question or "").lower()
+    if re.search(r"\bebitda\b", ql_guard) and not any(
+        "ebitda" in str(c).lower() for c in df_in.columns
+    ):
+        return None
     ct = profile.get("column_types", {}) if profile else {}
     numeric_cols = [c for c in df_in.columns if ct.get(c) == "number"]
     try:
@@ -12250,16 +12312,35 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
     level = str(conf.get("insightConfidenceLevel") or "low")
     score_disp = int(conf.get("insightConfidenceScore") or 0)
     reason_lines = conf.get("insightConfidenceReasons")
+    executive_narrative = bool(conf.get("executiveNarrative"))
     lines: List[str] = [
         "Confidence-aware reasoning (mandatory):",
         f"- Engine sample: **{n:,} filtered rows**; chart series: **{cp}** point(s). "
         f"Insight confidence: **{level}** (score **{score_disp}/100**).",
         "- Ground every numeric claim in the exact calculated result and/or authoritative chart-values block. "
         "If a claim is not supported there, do not state it.",
-        "- Separate your reply into labeled sections (use plain text labels with a colon, no markdown heading symbols):",
-        "  1) Key findings — only facts visible from the numbers/table.",
-        "  2) What this may indicate — clearly marked as not proven, tentative, and tied to what would falsify them.",
-        "  3) Suggested next steps — optional, conservative, and framed as next data to collect or validate (not as facts).",
+    ]
+    if executive_narrative:
+        lines.extend(
+            [
+                "- Use these labeled sections only (plain text labels with a colon, no markdown #):",
+                "  Executive takeaway: — one direct sentence.",
+                "  Evidence: — up to 2 bullets with chart numbers.",
+                "  Recommended action: — one hedged action from available data only.",
+                "- Total answer 120–180 words. Do NOT use Key findings / What this may indicate.",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "- Separate your reply into labeled sections (use plain text labels with a colon, no markdown heading symbols):",
+                "  1) Key findings — only facts visible from the numbers/table.",
+                "  2) What this may indicate — clearly marked as not proven, tentative, and tied to what would falsify them.",
+                "  3) Suggested next steps — optional, conservative, and framed as next data to collect or validate (not as facts).",
+            ]
+        )
+    lines.extend(
+        [
         "- Do not diagnose data quality, customer dissatisfaction, churn, loyalty, or operational failure "
         "unless the calculated result explicitly quantifies those constructs with defined columns. "
         "If unsupported, say there is insufficient evidence in this sample.",
@@ -12269,7 +12350,8 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
         "Additional analysis is required.\"",
         "- Avoid words like proves, definitively, clearly indicates, obviously, must be, always when the sample is small "
         "or when no statistical test output is provided.",
-    ]
+        ]
+    )
     if isinstance(reason_lines, list) and reason_lines:
         lines.append("- Confidence factors:")
         for r in reason_lines[:6]:
@@ -12352,12 +12434,12 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
         "executive_risk",
         "executive_opportunity",
         "executive_outlier_standout",
-    ):
+    ) or executive_narrative:
         lines.extend(
             [
-                "- **Executive structure** — Start with one direct takeaway, then top evidence "
-                "(≤3 bullets), then one hedged recommended action; details last.",
+                "- **Executive structure** — Labels: Executive takeaway / Evidence / Recommended action.",
                 "- Do not open with process narration (avoid I will / Let me / To answer).",
+                "- Keep under ~180 words; avoid generic strategy language.",
             ]
         )
     if exec_amb == "executive_risk" or bool(conf.get("concentrationRiskQuestion")):
@@ -12637,6 +12719,8 @@ def _build_unified_analysis_payload(
     unsupported_decline_analysis: Optional[Dict[str, Any]] = None,
     multi_metric_request_unsatisfied: bool = False,
     unsupported_multi_metric_analysis: Optional[Dict[str, Any]] = None,
+    unsupported_requested_metric_unsatisfied: bool = False,
+    unsupported_requested_metric_analysis: Optional[Dict[str, Any]] = None,
     df_for_intent: Optional[pd.DataFrame] = None,
     profile_for_intent: Optional[Dict[str, Any]] = None,
     time_series_analysis_for_intent: Optional[Dict[str, Any]] = None,
@@ -12879,6 +12963,15 @@ def _build_unified_analysis_payload(
     if unsupported_multi_metric_analysis:
         out["unsupportedMultiMetricAnalysis"] = unsupported_multi_metric_analysis
         out["multiMetricRequestUnsatisfied"] = True
+    if unsupported_requested_metric_analysis:
+        out["unsupportedRequestedMetricAnalysis"] = unsupported_requested_metric_analysis
+        out["unsupportedRequestedMetric"] = True
+    if unsupported_requested_metric_unsatisfied:
+        out["requestedMetricUnsatisfied"] = True
+        out["metricColumn"] = None
+        out["metricColumnDisplay"] = None
+        out["categoryColumn"] = None
+        out["categoryColumnDisplay"] = None
     if intent_debug and intent_debug.get("derived_profit_margin"):
         out["derivedProfitMargin"] = True
     elif _question_requests_profit_margin(question) and not (
@@ -13435,9 +13528,19 @@ def resolve_follow_up_turn(
     )
     if thread_meta and re.search(r"columns?\s+(?:were\s+)?used", rq, re.I):
         ai_block += (
-            "\nThread meta (columns): List only the metric and breakdown columns "
-            "from the prior analysis above. Do not invent columns that are not in "
-            "the dataset context or prior analysis metadata.\n"
+            "\nThread meta (columns): Answer briefly. List metric column, breakdown "
+            "column, and aggregation from the prior analysis above. Open with "
+            '"For the prior chart, the calculation used …". Do not invent columns.\n'
+        )
+    if thread_meta and re.search(
+        r"show\s+(?:the\s+)?calculations?\s+behind|how\s+(?:was|were)\s+(?:this|these)\s+(?:calculated|computed)",
+        rq,
+        re.I,
+    ):
+        ai_block += (
+            "\nThread meta (calculations): State metric, dimension, aggregation, and "
+            "top result from the prior chart. Open with "
+            '"Based on the previous result, the calculation used …".\n'
         )
     out["ai_context_block"] = ai_block
     out["conversation_sidecar"] = {
@@ -13695,20 +13798,58 @@ def _compute_visualization_for_question_body(
             or "Required metric column missing — comparison chart suppressed."
         )
 
+    unsupported_requested_metric_routing: Optional[Dict[str, Any]] = None
+    unsupported_requested_metric_unsatisfied = False
+    try:
+        from intent_engine.narrative_guardrails import (
+            assess_unsupported_requested_metric,
+            build_unsupported_requested_metric_exact_context,
+        )
+
+        unsupported_requested_metric_routing = assess_unsupported_requested_metric(
+            question=question,
+            df=df,
+            profile=profile_live,
+            analysis_ctx=intent_debug,
+        )
+    except Exception:
+        unsupported_requested_metric_routing = None
+    unsupported_requested_metric_unsatisfied = bool(
+        unsupported_requested_metric_routing
+        and unsupported_requested_metric_routing.get("active")
+    )
     exact_result = ""
     chart_data: List[Any] = []
     chart_type = ""
     chart_title = ""
     chart_subtitle = "Generated from AI analysis"
+    chart_path_handled = False
+
+    if unsupported_requested_metric_unsatisfied:
+        suppress_auto_charts = True
+        chart_suppressed_misleading = True
+        partial_visualization_warning = (
+            str(unsupported_requested_metric_routing.get("leadSentence") or "").strip()
+            or "Requested metric not available in this dataset."
+        )
+        exact_result = build_unsupported_requested_metric_exact_context(
+            unsupported_requested_metric_routing
+        )
+        chart_data = []
+        chart_type = ""
+        chart_title = ""
+        chart_path_handled = True
+        if intent_debug is None:
+            intent_debug = {}
+        intent_debug["unsupported_requested_metric"] = True
+        intent_debug["normalized_question"] = ql
 
     fallback_used = False
     smart_trace: Dict[str, Any] = {}
     smart_routing_used = False
     alignment_repaired = False
 
-    chart_path_handled = False
-
-    if _question_requests_correlation_routing(question):
+    if not chart_path_handled and _question_requests_correlation_routing(question):
         exact_result, chart_data, chart_type, chart_title, intent_debug, smart_trace = (
             _try_correlation_routing_pack(question, df, profile_live)
         )
@@ -14165,6 +14306,30 @@ def _compute_visualization_for_question_body(
             or "Required metric column missing — comparison chart suppressed."
         )
 
+    if unsupported_requested_metric_unsatisfied:
+        chart_data = []
+        chart_type = ""
+        chart_title = ""
+        suppress_auto_charts = True
+        chart_suppressed_misleading = True
+        if unsupported_requested_metric_routing:
+            partial_visualization_warning = (
+                partial_visualization_warning
+                or str(unsupported_requested_metric_routing.get("leadSentence") or "").strip()
+                or "Requested metric not available in this dataset."
+            )
+            if not (exact_result or "").strip():
+                try:
+                    from intent_engine.narrative_guardrails import (
+                        build_unsupported_requested_metric_exact_context,
+                    )
+
+                    exact_result = build_unsupported_requested_metric_exact_context(
+                        unsupported_requested_metric_routing
+                    )
+                except Exception:
+                    pass
+
     if (
         chart_data
         and _question_requests_trend_intent(ql)
@@ -14508,6 +14673,8 @@ def _compute_visualization_for_question_body(
             unsupported_decline_analysis=unsupported_decline,
             multi_metric_request_unsatisfied=multi_metric_request_unsatisfied,
             unsupported_multi_metric_analysis=unsupported_multi_metric,
+            unsupported_requested_metric_unsatisfied=unsupported_requested_metric_unsatisfied,
+            unsupported_requested_metric_analysis=unsupported_requested_metric_routing,
             df_for_intent=df,
             profile_for_intent=profile_live,
             time_series_analysis_for_intent=ts_meta_pre_viz,
@@ -14518,6 +14685,16 @@ def _compute_visualization_for_question_body(
                 str(analysis_empty.get("insightSummary") or "").strip() + tail
             ).strip()
             exact_result = (str(exact_result or "").strip() + tail).strip()
+        try:
+            from intent_engine.routing_consistency import attach_routing_backbone
+
+            attach_routing_backbone(
+                question=question,
+                analysis=analysis_empty,
+                visualization=None,
+            )
+        except Exception:
+            pass
         return exact_result, None, fin(analysis_empty)
 
     chart_type_pre_sl = str(chart_type or "").strip().lower().replace("-", "_")
@@ -14840,10 +15017,22 @@ def _compute_visualization_for_question_body(
             partial_visualization_warning=partial_visualization_warning,
             trend_request_unsatisfied=trend_unsat_empty,
             unsupported_trend_analysis=unsupported_trend_empty,
+            unsupported_requested_metric_unsatisfied=unsupported_requested_metric_unsatisfied,
+            unsupported_requested_metric_analysis=unsupported_requested_metric_routing,
             df_for_intent=df,
             profile_for_intent=profile_live,
             time_series_analysis_for_intent=ts_meta_empty,
         )
+        try:
+            from intent_engine.routing_consistency import attach_routing_backbone
+
+            attach_routing_backbone(
+                question=question,
+                analysis=analysis_empty,
+                visualization=None,
+            )
+        except Exception:
+            pass
         return exact_result, None, fin(analysis_empty)
 
     ncol_guess = None
@@ -15296,6 +15485,8 @@ def _compute_visualization_for_question_body(
         unsupported_decline_analysis=unsupported_decline,
         multi_metric_request_unsatisfied=multi_metric_request_unsatisfied,
         unsupported_multi_metric_analysis=unsupported_multi_metric,
+        unsupported_requested_metric_unsatisfied=unsupported_requested_metric_unsatisfied,
+        unsupported_requested_metric_analysis=unsupported_requested_metric_routing,
         df_for_intent=df,
         profile_for_intent=profile_live,
         time_series_analysis_for_intent=ts_meta,
@@ -15743,6 +15934,32 @@ def ask_question(data: QuestionRequest, request: Request):
         except Exception:
             pass
 
+        polish_block = ""
+        executive_narrative = False
+        try:
+            from intent_engine.narrative_polish import (
+                executive_narrative_prompt_block,
+                follow_up_narrative_prompt_block,
+                is_executive_narrative_question,
+            )
+
+            executive_narrative = is_executive_narrative_question(
+                data.question, analysis_ctx
+            )
+            exec_polish = executive_narrative_prompt_block(
+                data.question, analysis_ctx
+            )
+            fu_polish = follow_up_narrative_prompt_block(
+                data.question,
+                sidecar=sidecar if isinstance(sidecar, dict) else None,
+                analysis_ctx=analysis_ctx,
+            )
+            parts = [p for p in (exec_polish, fu_polish) if p]
+            if parts:
+                polish_block = "\n\n" + "\n\n".join(parts) + "\n"
+        except Exception:
+            pass
+
         conf_prompt = _confidence_answer_prompt_block(
             {
                 "analysisRowCount": int(analysis_ctx.get("analysisRowCount") or 0),
@@ -15783,6 +16000,7 @@ def ask_question(data: QuestionRequest, request: Request):
                 "executiveAmbiguousBucket": analysis_ctx.get(
                     "executiveAmbiguousBucket"
                 ),
+                "executiveNarrative": executive_narrative,
                 "relationshipScatter": bool(
                     str(analysis_ctx.get("chartTypeInternal") or "").lower() == "scatter"
                     or (
@@ -15908,6 +16126,7 @@ Exact calculated result (ground truth metrics / table):
 {forecast_block}
 {exec_rank_block}
 {guard_block}
+{polish_block}
 {viz_anchor}
 {evidence_line}{rationale_line}
 Rules:
@@ -15930,6 +16149,18 @@ Rules:
                     dataset_profile,
                     data.question,
                     unsupported_requested_metric,
+                    analysis_ctx,
+                )
+                from intent_engine.narrative_polish import polish_narrative_answer
+
+                answer_text = polish_narrative_answer(
+                    answer_text,
+                    question=data.question,
+                    analysis_ctx=analysis_ctx,
+                    sidecar=sidecar if isinstance(sidecar, dict) else None,
+                    executive=executive_narrative,
+                    df=df,
+                    profile=dataset_profile,
                 )
             except Exception:
                 pass

@@ -175,6 +175,9 @@ def score_intent(analysis: Optional[Dict], spec: QuestionSpec) -> Tuple[float, L
         unsup = analysis and (
             analysis.get("growthRequestUnsatisfied")
             or (analysis.get("unsupportedGrowthAnalysis") or {}).get("active")
+            or (analysis.get("unsupportedRequestedMetricAnalysis") or {}).get("active")
+            or analysis.get("unsupportedRequestedMetric")
+            or analysis.get("requestedMetricUnsatisfied")
             or str((analysis.get("routingPlan") or {}).get("supportStatus") or "").lower() == "unsupported"
         )
         ans_limit = False  # checked in grounding/hallucination
@@ -317,9 +320,19 @@ def score_confidence(analysis: Optional[Dict]) -> Tuple[float, List[str]]:
     return 4.0, ["Missing confidence band"]
 
 
-def score_hallucination(answer: str, df: pd.DataFrame) -> Tuple[float, List[str]]:
+def score_hallucination(
+    answer: str,
+    df: pd.DataFrame,
+    spec: Optional[QuestionSpec] = None,
+) -> Tuple[float, List[str]]:
     low = answer.lower()
     cols = {c.lower() for c in df.columns}
+    if spec and spec.negative and re.search(
+        r"does not include|cannot be answered|not available|unsupported|"
+        r"required columns not found|limitation",
+        low,
+    ):
+        return 9.5, ["Limitation-first response names absent metric"]
     hits = [mk for mk in HALLUCINATION_MARKERS if mk in low]
     if hits:
         return 1.0, [f"Hallucination markers: {hits}"]
@@ -334,18 +347,29 @@ def score_follow_up(
     analysis: Optional[Dict],
     parent_metric: str,
     parent_cat: str,
-    root_q: str,
+    follow_up_question: str,
 ) -> Tuple[float, List[str]]:
     notes: List[str] = []
     sidecar = plan.get("conversation_sidecar") or {}
     if not sidecar.get("wasFollowUp"):
         return 3.0, ["Follow-up not detected"]
-    eff = str(plan.get("effective_question") or "")
-    if root_q.strip().lower() not in eff.strip().lower() and eff != root_q:
-        notes.append(f"Effective question {eff!r} != root {root_q!r}")
-        score = 5.0
-    else:
+    eff = str(plan.get("effective_question") or "").strip()
+    scope_q = str(
+        plan.get("scope_question")
+        or sidecar.get("rootQuestion")
+        or ""
+    ).strip()
+    fu_q = str(follow_up_question or "").strip()
+    # Scoped explanation/meta follow-ups reuse root analysis scope (by design).
+    if scope_q and (eff == scope_q or scope_q.lower() in eff.lower()):
         score = 9.0
+    elif fu_q and (fu_q.lower() in eff.lower() or eff == fu_q):
+        score = 9.0
+    else:
+        notes.append(
+            f"Effective question {eff!r} != scope {scope_q!r} / follow-up {fu_q!r}"
+        )
+        score = 5.0
     if analysis:
         if parent_metric and parent_metric not in _metric_col(analysis):
             score = min(score, 6.0)
@@ -441,7 +465,7 @@ def evaluate_question(
     else:
         scores["follow_up_continuity"] = 7.0 if not is_follow_up else 5.0
 
-    s, n = score_hallucination(answer, df)
+    s, n = score_hallucination(answer, df, spec)
     scores["hallucination_resistance"] = s
     all_notes.extend(n)
 
@@ -854,6 +878,9 @@ def _routing_body(analysis: Optional[Dict], viz: Optional[Dict]) -> Dict[str, An
         parts.append(str(ug.get("leadSentence") or ug.get("reason") or ""))
     if (analysis or {}).get("growthRequestUnsatisfied"):
         parts.append("This metric or view is not fully supported by the loaded dataset.")
+    urm = (analysis or {}).get("unsupportedRequestedMetricAnalysis") or {}
+    if urm.get("active"):
+        parts.append(str(urm.get("leadSentence") or ""))
     answer = " ".join(p for p in parts if p) or "Analysis complete for the requested view."
     return {"answer": answer, "visualization": viz, "analysis": analysis}
 

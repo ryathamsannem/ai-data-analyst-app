@@ -264,3 +264,48 @@ These remain **open by design** for Phase 10B. Accept only for **controlled pilo
 ### Post-deploy smoke (Section 4)
 
 - [ ] Upload → AI → Follow-up → PDF → Usage limits on **Vercel URL**
+
+---
+
+## 10. Production QA gates (AI Insights + PDF)
+
+Complete before promoting staging to production. See [`ai-insights-production-qa-roadmap.md`](ai-insights-production-qa-roadmap.md).
+
+### Wave completion
+
+| Wave | Domains | Routing QA | Live narrative (staging) |
+|------|---------|------------|--------------------------|
+| 1 | Retail, Marketing, Sales, Geography, Banking | [ ] `wave1_qa_execution.py --routing-only` | [ ] Complete |
+| 2 | Finance/FP&A, Operations, Customer Support | [ ] `wave_qa_runner.py --wave 2 --routing-only` | [ ] Complete |
+| 3 | HR, Healthcare | [ ] `wave_qa_runner.py --wave 3 --routing-only` | [ ] Complete |
+
+### Cross-domain regression
+
+```bash
+cd backend
+python scripts/cross_domain_regression.py
+```
+
+- [ ] Exit code 0 — all 10 domains pass gates
+- [ ] Report: `docs/ai-insights-cross-domain-regression-report.md`
+
+**Gates:** domain avg ≥7.5 · ≥90% questions ≥7.0 · zero hallucination fails · zero critical · negative tests limitation-first
+
+### PDF export
+
+- [ ] Phase 7 automated matrix pass (`npx vitest run --config vitest.phase7.config.ts`)
+- [ ] If Export tab changed: manual P7-005 on ≥1 dataset
+- [ ] See [`pdf-export-final-validation-runbook.md`](pdf-export-final-validation-runbook.md)
+
+### Production go / no-go
+
+| Criterion | Required |
+|-----------|----------|
+| Cross-domain regression | **PASS** |
+| Wave 1–3 live narrative | Hallucination **0**; domain avg ≥ **7.8** |
+| PDF automated matrix | **18/18** pass |
+| Backend tests | `python run_tests.py` green |
+| Frontend tests | `npm run test` green |
+| Pilot constraints (§1) | Still apply — not public SaaS |
+
+**GO** for controlled production pilot when all boxes checked. **NO-GO** for public multi-user until C1–C3 resolved (§7).

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 import pandas as pd
 
@@ -93,6 +94,19 @@ class NarrativeGuardrailsTests(unittest.TestCase):
         ids = {m["id"] for m in missing}
         self.assertIn("nim", ids)
         self.assertIn("quarter", ids)
+
+    def test_finance_ebitda_margin_missing(self):
+        path = (
+            Path(__file__).resolve().parents[3]
+            / "test-fixtures"
+            / "domains"
+            / "finance_fpa.csv"
+        )
+        df = pd.read_csv(path)
+        q = "Compare EBITDA margin trend by quarter"
+        missing = detect_missing_requested_metrics(q, df, {})
+        ids = {m["id"] for m in missing}
+        self.assertIn("ebitda_margin", ids)
         gap = assess_unsupported_requested_metric(
             question=q, df=df, profile={}, analysis_ctx={"metricColumn": "deposit_balance"}
         )
@@ -128,12 +142,15 @@ class NarrativeGuardrailsTests(unittest.TestCase):
             profile={},
             analysis_ctx={"metricColumn": "revenue"},
         )
+        self.assertIn("the requested conversion-rate column", gap["leadSentence"])
+        self.assertNotIn("an the", gap["leadSentence"].lower())
         raw = "Delhi leads on revenue in the fallback chart."
         out = sanitize_narrative_answer(
             raw, df, {}, "Compare conversion rate across cities", gap
         )
         self.assertIn("does not include", out.lower())
         self.assertNotIn("conversion rate", out.lower())
+        self.assertNotIn("an the", out.lower())
 
 
 if __name__ == "__main__":
