@@ -248,6 +248,8 @@ import {
   aiInsightsAskActionsRow,
   aiInsightsAskAssumptionNote,
   aiInsightsAskComposer,
+  aiInsightsAskError,
+  aiInsightsAskLoading,
   aiInsightsAskHeading,
   aiInsightsAskHeaderRow,
   aiInsightsAskInputBlock,
@@ -273,6 +275,7 @@ import {
   aiInsightsPage,
   aiInsightsPanelShell,
   aiInsightsSuggestedScrollBody,
+  aiInsightsResultsStack,
   aiInsightsProvenanceBody,
   aiInsightsProvenanceDivider,
   aiInsightsProvenanceMetaLabel,
@@ -407,6 +410,8 @@ import {
 } from "@/lib/saas-session";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
 import { OverviewLandingHero } from "./components/home/overview-landing-hero";
+import { OverviewLandingTrustRow } from "./components/home/overview-landing-trust-row";
+import { OverviewLandingScrollCue } from "./components/home/overview-landing-scroll-cue";
 import { PilotInfoModal } from "./components/home/pilot-info-modal";
 import { PilotInfoSections } from "./components/home/pilot-info-sections";
 import { OverviewUploadSelectedState } from "./components/home/overview-upload-selected-state";
@@ -426,7 +431,9 @@ import {
   ovBtnSecondarySm,
   ovOverviewSecondaryBtn,
   OVERVIEW_UPLOAD_ACCEPT,
-  OVERVIEW_UPLOAD_FORMAT_HINT,
+  OVERVIEW_UPLOAD_LANDING_HELPER,
+  OVERVIEW_UPLOAD_LANDING_SUBTITLE,
+  OVERVIEW_UPLOAD_LANDING_TITLE,
   ovUploadDropzone,
   ovUploadDropzoneActive,
   ovUploadDropzoneIdle,
@@ -11177,18 +11184,18 @@ function HomeInner() {
       onPilotNav={handlePilotNav}
       pilotNavActive={pilotNavActive}
     >
-        {error && (
-          <div className="mb-4 mt-6 flex items-start justify-between gap-3 rounded-xl border border-red-200/70 bg-red-50/90 p-3.5 text-red-800 shadow-[0_1px_2px_rgba(185,28,28,0.06)]">
+        {error && activeTab !== "insights" ? (
+          <div className="mb-4 mt-6 flex items-start justify-between gap-3 rounded-xl border border-red-200/70 bg-red-50/90 p-3.5 text-red-800 shadow-[0_1px_2px_rgba(185,28,28,0.06)] dark:border-rose-500/30 dark:bg-rose-950/35 dark:text-rose-100">
             <p className="min-w-0 flex-1 text-sm leading-relaxed">{error}</p>
             <button
               type="button"
               onClick={() => setError("")}
-              className="shrink-0 text-xs font-semibold uppercase tracking-wide text-red-800/90 underline-offset-2 transition hover:text-red-950 hover:underline"
+              className="shrink-0 text-xs font-semibold uppercase tracking-wide text-red-800/90 underline-offset-2 transition hover:text-red-950 hover:underline dark:text-rose-200/90 dark:hover:text-rose-50"
             >
               Dismiss
             </button>
           </div>
-        )}
+        ) : null}
 
         {uploadMessage && (
           <div className="mb-4 mt-6 rounded-xl border border-emerald-200/70 bg-emerald-50/90 p-3.5 text-sm text-emerald-900 shadow-[0_1px_2px_rgba(16,185,129,0.06)]">
@@ -11256,19 +11263,29 @@ function HomeInner() {
           )}
 
           {activeTab === "overview" && (
-            <>
+            <div
+              className={
+                columns.length === 0 ? "overview-first-load min-w-0" : "min-w-0"
+              }
+            >
             {columns.length === 0 ? <OverviewLandingHero /> : null}
-            <div className="grid w-full min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-6">
+            <div
+              className={`grid w-full min-w-0 grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] ${
+                columns.length === 0
+                  ? "overview-landing-grid gap-3 sm:gap-4"
+                  : "gap-5 lg:gap-6"
+              }`}
+            >
               {columns.length > 0 && !overviewUploadExpanded ? (
-                <section className={`col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-1 ${ovCard}`}>
+                <section className={`overview-dataset-info-card col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-1 ${ovCard}`}>
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
                       <div className="flex items-center gap-2 shrink-0">
                         <span
-                          className="h-2.5 w-2.5 rounded-full bg-emerald-500"
+                          className="overview-dataset-status-dot h-2.5 w-2.5 rounded-full bg-emerald-500"
                           aria-hidden
                         />
-                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                        <span className="overview-dataset-status-label text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                           Dataset ready
                         </span>
                       </div>
@@ -11325,26 +11342,25 @@ function HomeInner() {
               ) : (
                 <>
                   <section
-                    className={`overview-landing-upload-card min-w-0 p-5 sm:p-6 order-1 ${
+                    className={`overview-landing-upload-card min-w-0 order-1 ${
                       columns.length === 0
-                        ? "lg:col-span-2 mx-auto w-full max-w-4xl"
-                        : ""
+                        ? "overview-landing-upload-card--empty overview-landing-column lg:col-span-2 p-3 sm:p-4"
+                        : "overview-upload-hero--replace p-5 sm:p-6"
                     } ${ovCard}`}
                   >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h2 className={ovSectionTitle}>
-                          {columns.length > 0 ? "Upload a new file" : "Upload your dataset"}
-                        </h2>
-                        <p className={`mt-1 ${ovSectionDesc}`}>
-                          {columns.length > 0
-                            ? "CSV, Excel, JSON, or Parquet — replaces the dataset in this session."
-                            : "Drop a file or browse — upload starts automatically."}
-                        </p>
+                    {columns.length > 0 ? (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h2 className={ovSectionTitle}>Upload a new file</h2>
+                          <p className={`mt-1 ${ovSectionDesc}`}>
+                            CSV, Excel, JSON, or Parquet — replaces the dataset in this
+                            session.
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
 
-                    <div className="mt-4">
+                    <div className={columns.length > 0 ? "mt-4" : ""}>
                       <input
                         ref={overviewFileInputRef}
                         type="file"
@@ -11362,7 +11378,7 @@ function HomeInner() {
                         aria-label={
                           file
                             ? `Selected file ${file.name}. Click to choose a different file.`
-                            : "Choose a dataset file. Drag and drop or click to browse."
+                            : `${OVERVIEW_UPLOAD_LANDING_TITLE}. ${OVERVIEW_UPLOAD_LANDING_SUBTITLE}`
                         }
                         onClick={() => overviewFileInputRef.current?.click()}
                         onKeyDown={(e) => {
@@ -11406,10 +11422,10 @@ function HomeInner() {
                         className={`${ovUploadDropzone} rounded-xl border-2 border-dashed transition-colors ${
                           file
                             ? "p-3 sm:p-4"
-                            : "overview-landing-dropzone-empty p-6 sm:p-10 text-center"
+                            : "overview-landing-dropzone-empty p-5 sm:p-7 text-center"
                         } ${
                           overviewDropActive
-                            ? ovUploadDropzoneActive
+                            ? `${ovUploadDropzoneActive} overview-landing-dropzone--active`
                             : ovUploadDropzoneIdle
                         }`}
                       >
@@ -11421,33 +11437,43 @@ function HomeInner() {
                           />
                         ) : (
                           <>
-                            <div className="overview-upload-dropzone__icon" aria-hidden>
-                              <svg
-                                width="17"
-                                height="17"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.75"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="17 8 12 3 7 8" />
-                                <line x1="12" y1="3" x2="12" y2="15" />
-                              </svg>
+                            <div className="overview-upload-dropzone__icon-wrap" aria-hidden>
+                              <div className="overview-upload-dropzone__icon-glow" />
+                              <div className="overview-upload-dropzone__icon">
+                                <svg
+                                  width="40"
+                                  height="40"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                  <polyline points="17 8 12 3 7 8" />
+                                  <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                              </div>
                             </div>
-                            <p className="text-sm font-medium text-foreground">
-                              Drag and drop a file here
+                            <p className="text-base font-semibold text-foreground sm:text-lg">
+                              {OVERVIEW_UPLOAD_LANDING_TITLE}
                             </p>
-                            <p className={`mt-1 text-xs ${ovMuted}`}>
-                              {OVERVIEW_UPLOAD_FORMAT_HINT}
+                            <p className="mt-1 text-sm text-foreground">
+                              {OVERVIEW_UPLOAD_LANDING_SUBTITLE}
+                            </p>
+                            <p className={`mt-1.5 text-xs ${ovMuted}`}>
+                              {OVERVIEW_UPLOAD_LANDING_HELPER}
                             </p>
                           </>
                         )}
                       </div>
 
-                      <div className="overview-upload-actions mt-3 flex flex-wrap items-center gap-3">
+                      <div
+                        className={`overview-upload-actions flex flex-wrap items-center gap-3 ${
+                          file || loading || columns.length > 0 ? "mt-3" : "sr-only"
+                        }`}
+                      >
                         {file && !loading ? (
                           <button
                             type="button"
@@ -11476,6 +11502,8 @@ function HomeInner() {
                       </div>
                     </div>
                   </section>
+
+                  {columns.length === 0 ? <OverviewLandingTrustRow /> : null}
 
                   {columns.length > 0 ? (
                   <section className={`min-w-0 p-5 order-1 ${ovCardElevated}`}>
@@ -11825,8 +11853,15 @@ function HomeInner() {
                 </section>
               )}
             </div>
-            {columns.length === 0 ? <PilotInfoSections /> : null}
-            </>
+            {columns.length === 0 ? (
+              <>
+                <OverviewLandingScrollCue />
+                <div className="overview-landing-below-fold">
+                  <PilotInfoSections />
+                </div>
+              </>
+            ) : null}
+            </div>
           )}
 
         {activeTab === "preview" && columns.length > 0 && (
@@ -12576,8 +12611,8 @@ function HomeInner() {
                     <span className="rounded-full border border-emerald-200/60 bg-emerald-50/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-emerald-500/25 dark:bg-emerald-950/40 dark:text-emerald-100">
                       Using previous insight context
                     </span>
-                    <span className="rounded-full border border-violet-200/60 bg-violet-50/90 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-violet-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-violet-400/25 dark:bg-violet-950/40 dark:text-violet-100">
-                      Follow-up detected
+                    <span className="rounded-full border border-violet-200/60 bg-violet-50/90 px-2.5 py-1 text-[10px] font-semibold text-violet-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-violet-400/25 dark:bg-violet-950/40 dark:text-violet-100">
+                      Follow-up question
                     </span>
                     {lastConversationMeta.usingContextSummary.trim() ? (
                       <span className="text-xs text-slate-600 dark:text-[color:var(--insights-text-muted)]">
@@ -12594,14 +12629,28 @@ function HomeInner() {
                     {lastConversationMeta?.inheritedAssumptionNote ?? ""}
                   </p>
                 ) : null}
-                <div className={aiInsightsAskInputBlock}>
-                  <label className={aiInsightsAskQuestionLabel}>Your question</label>
+                <div
+                  className={aiInsightsAskInputBlock}
+                  aria-busy={loading || undefined}
+                >
+                  <label className={aiInsightsAskQuestionLabel} htmlFor="ai-insights-question">
+                    Your question
+                  </label>
                   <div className={aiInsightsAskComposer}>
                     <textarea
+                      id="ai-insights-question"
                       value={question}
                       onChange={(e) => setQuestionAndResetInsightState(e.target.value)}
                       className={aiInsightsAskTextarea}
-                      placeholder="Example: Show sales by product"
+                      placeholder="Ask about trends, rankings, or comparisons in your data…"
+                      disabled={loading}
+                      aria-describedby={
+                        error && activeTab === "insights"
+                          ? "ai-insights-ask-error"
+                          : loading
+                            ? "ai-insights-ask-loading"
+                            : undefined
+                      }
                     />
                     <div className={aiInsightsAskActionsRow}>
                       <button
@@ -12609,23 +12658,48 @@ function HomeInner() {
                         onClick={() => void askAI()}
                         disabled={!canAskAi}
                         className={aiInsightsAskSubmitBtn}
+                        aria-label={loading ? "Generating AI insight" : "Ask AI"}
                       >
-                        {loading ? "Thinking..." : "Ask AI"}
+                        {loading ? "Thinking…" : "Ask AI"}
                       </button>
                       {loading ? (
-                        <div className="text-sm text-slate-600 space-y-0.5 dark:text-[color:var(--insights-text-muted)]">
-                          <span className="block">Generating answer…</span>
-                          <span className="block text-xs text-slate-500 dark:text-[color:var(--insights-text-muted)]">
-                            Generating visualization…
-                          </span>
+                        <div
+                          id="ai-insights-ask-loading"
+                          className={aiInsightsAskLoading}
+                          role="status"
+                          aria-live="polite"
+                        >
+                          <span
+                            className="inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-[color:var(--accent)]/25 border-t-[color:var(--accent)]"
+                            aria-hidden
+                          />
+                          <span>Generating answer and chart…</span>
                         </div>
                       ) : null}
                     </div>
+                    {error && activeTab === "insights" ? (
+                      <div
+                        id="ai-insights-ask-error"
+                        className={aiInsightsAskError}
+                        role="alert"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 flex-1">{error}</p>
+                          <button
+                            type="button"
+                            onClick={() => setError("")}
+                            className="shrink-0 text-xs font-semibold underline-offset-2 hover:underline"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
                 {alignedAnalysis?.alignmentRepaired ? (
-                  <div className="mt-4 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-950 dark:border-amber-500/22 dark:bg-amber-950/35 dark:text-amber-100/90">
+                  <div className="mt-3 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-950 dark:border-amber-500/22 dark:bg-amber-950/35 dark:text-amber-100/90">
                     Chart was rebuilt so the series matches the metric detected from
                     your question (pandas alignment check).
                   </div>
@@ -12633,7 +12707,7 @@ function HomeInner() {
 
                 {insightVisualization?.partialVisualizationWarning &&
                 !insightExecutiveSummaryMode ? (
-                  <p className="mt-4 text-xs text-amber-950 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-2 leading-snug dark:border-amber-500/22 dark:bg-amber-950/30 dark:text-amber-100/90">
+                  <p className="mt-3 text-xs text-amber-950 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-2 leading-snug dark:border-amber-500/22 dark:bg-amber-950/30 dark:text-amber-100/90">
                     <span className="font-semibold">Visualization caution:</span> full
                     statistical note is under{" "}
                     <span className="font-medium">How this insight was generated</span>.
@@ -12651,80 +12725,7 @@ function HomeInner() {
                   </div>
                 ) : null}
 
-                {hasValidAIAnswer &&
-                insightExecutiveVizInsights.length > 0 &&
-                (insightVisualization ||
-                  insightUnsupportedGrowth ||
-                  insightUnsupportedTrend ||
-                  insightUnsupportedDecline ||
-                  insightUnsupportedMultiMetric) ? (
-                  <AiExecutiveInsightsPanel
-                    cards={insightExecutiveVizInsights}
-                    narrativeBrief={insightExecutiveBrief}
-                  />
-                ) : null}
-
-                {hasValidAIAnswer &&
-                alignedAnalysis &&
-                !insightExecutiveSummaryMode ? (
-                  <div
-                    className={`${aiInsightsConfidenceShell} ${
-                      alignedAnalysis.smallSampleCohort ||
-                      isCautiousNarrativeTone(insightNarrativeTone)
-                        ? aiInsightsConfidenceCaution
-                        : aiInsightsConfidenceNormal
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className={aiInsightsMutedLabel}>
-                          Insight confidence (sample-aware)
-                        </p>
-                        <p className={`${aiInsightsBodyText} mt-1.5`}>
-                          {insightUnifiedConfidence?.rationale ||
-                            alignedAnalysis.evidenceSummaryLine ||
-                            `Chart uses ${alignedAnalysis.chartSeriesPointCount.toLocaleString()} series point(s).`}
-                        </p>
-                        {insightNarrativeDisclaimer ? (
-                          <p className={aiInsightsConfidenceDisclaimer}>
-                            {insightNarrativeDisclaimer}
-                          </p>
-                        ) : null}
-                        {(alignedAnalysis.insightConfidenceRationale ||
-                          alignedAnalysis.smallSampleCohort ||
-                          isCautiousNarrativeTone(insightNarrativeTone)) && (
-                          <p className={`${aiInsightsSubtleText} mt-1.5`}>
-                            Details on scoring and sample cautions are under{" "}
-                            <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
-                              How this insight was generated
-                            </span>
-                            .
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span
-                          className={insightEngineConfidenceBadgeClass(
-                            insightUnifiedConfidence?.level ??
-                              alignedAnalysis.insightConfidenceLevel
-                          )}
-                        >
-                          {confidenceBadgeLabel(
-                            insightUnifiedConfidence?.level ??
-                              (alignedAnalysis.insightConfidenceLevel as InsightConfidenceLevel)
-                          )}
-                        </span>
-                        <span className="text-[11px] tabular-nums text-slate-600 dark:text-[color:var(--insights-text-muted)]">
-                          Score{" "}
-                          {insightUnifiedConfidence?.score ??
-                            alignedAnalysis.insightConfidenceScore}
-                          /100
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
+                <div className={aiInsightsResultsStack}>
                 {(hasValidAIAnswer || loading || answer.trim()) ? (
                 <div className={aiInsightsAnswerCard}>
                   <div className={aiInsightsAnswerHeader}>
@@ -12849,13 +12850,185 @@ function HomeInner() {
                       </div>
                     </div>
                   ) : loading ? (
-                    <p className={`${aiInsightsBodyText} mt-4`}>Generating insight…</p>
+                    <p className={`${aiInsightsBodyText} mt-2`} role="status">
+                      Generating insight…
+                    </p>
                   ) : (
-                    <p className={`${aiInsightsBodyText} mt-4`}>
-                      AI answer will appear here.
+                    <p className={`${aiInsightsBodyText} mt-2 text-[var(--text-muted)] dark:text-[color:var(--insights-text-muted)]`}>
+                      Your answer will appear here after you ask a question.
                     </p>
                   )}
                 </div>
+                ) : null}
+
+                {loading && !insightHasRenderableVisualization && !hasValidAIAnswer ? (
+                  <div
+                    className="w-full min-w-0 overflow-hidden rounded-2xl border border-[color:var(--border-default)]/60 bg-[color:var(--surface-subtle)] p-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)]"
+                    aria-hidden
+                  >
+                    <div className="mb-3 h-3 w-28 animate-pulse rounded bg-slate-200/80 dark:bg-white/10" />
+                    <div
+                      className="animate-pulse rounded-xl border border-[color:var(--border-default)]/40 bg-slate-100/80 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)]"
+                      style={{ minHeight: `${Math.max(insightShellPlotHeight, 220)}px` }}
+                    />
+                  </div>
+                ) : null}
+
+                {insightHasRenderableVisualization ? (
+                  <div className={aiInsightsVizCard}>
+                    <div className="mb-1 w-full min-w-0 text-center">
+                      <p className={aiInsightsVizKicker}>Visualization</p>
+                    </div>
+                    <div className={aiInsightsVizHeaderZone}>
+                      {insightChartHeadingBlock}
+                      <div
+                        title={insightChartMetadataLine}
+                        className={aiInsightsVizChipsWrap}
+                      >
+                        <ChartContextSummary
+                          renderedKind={insightRenderedChartKind}
+                          metricLabel={insightChartMeasureLabel}
+                          semanticHeader={insightChartSemanticHeader}
+                          badgeCompact={insightChartMetadataBadgeCompact}
+                          leadInsight={insightChartInsightBadge ?? undefined}
+                          qualityWarning={insightChartRateWarning ?? undefined}
+                          compactChips
+                        />
+                    </div>
+                    </div>
+                    <div className={aiInsightsVizChartStage}>
+                      <AiInsightChartShell
+                        chartKind={insightPresentationChartKind}
+                        plotHeight={insightShellPlotHeight}
+                      >
+                        <div
+                          key={`${insightChartId ?? "ic"}-${insightSnapshot?.createdAt ?? 0}-${insightChartData.length}`}
+                          className={aiInsightsVizPlotSurface}
+                        >
+                          {renderDatasetChart(
+                            insightShellPlotHeight,
+                            false,
+                            true
+                          )}
+                        </div>
+                      </AiInsightChartShell>
+                      {insightChartMatchesCurrentQuestion &&
+                      insightSmartChartIntel?.active &&
+                      !insightExecutiveSummaryMode ? (
+                        <div className={aiInsightsSmartPanelDivider}>
+                          <SmartChartInsightPanel
+                            intel={insightSmartChartIntel}
+                            cards={insightExecutiveVizInsights.slice(0, 3)}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : hasValidAIAnswer && insightUnsupportedTrend ? (
+                  <div className="rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
+                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
+                      {insightUnsupportedTrend.title}
+                    </p>
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
+                        Reason:
+                      </span>{" "}
+                      {insightUnsupportedTrend.reason}
+                    </p>
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
+                        Required:
+                      </span>{" "}
+                      {insightUnsupportedTrend.requiredAction}
+                    </p>
+                  </div>
+                ) : hasValidAIAnswer && !insightHasRenderableVisualization ? (
+                  <div className="rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
+                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
+                      No dedicated visualization for this answer
+                    </p>
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      {!insightChartMatchesCurrentQuestion &&
+                      insightSnapshot &&
+                      insightSnapshot.chartData.length > 0
+                        ? "The chart from your previous question does not match this one. The narrative above reflects your latest ask."
+                        : "The assistant did not return chart data for this question. The narrative above still reflects the latest response."}
+                    </p>
+                  </div>
+                ) : null}
+
+                {hasValidAIAnswer &&
+                insightExecutiveVizInsights.length > 0 &&
+                (insightVisualization ||
+                  insightUnsupportedGrowth ||
+                  insightUnsupportedTrend ||
+                  insightUnsupportedDecline ||
+                  insightUnsupportedMultiMetric) ? (
+                  <AiExecutiveInsightsPanel
+                    cards={insightExecutiveVizInsights}
+                    narrativeBrief={insightExecutiveBrief}
+                  />
+                ) : null}
+
+                {hasValidAIAnswer &&
+                alignedAnalysis &&
+                !insightExecutiveSummaryMode ? (
+                  <div
+                    className={`${aiInsightsConfidenceShell} ${
+                      alignedAnalysis.smallSampleCohort ||
+                      isCautiousNarrativeTone(insightNarrativeTone)
+                        ? aiInsightsConfidenceCaution
+                        : aiInsightsConfidenceNormal
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className={aiInsightsMutedLabel}>
+                          Insight confidence (sample-aware)
+                        </p>
+                        <p className={`${aiInsightsBodyText} mt-1.5`}>
+                          {insightUnifiedConfidence?.rationale ||
+                            alignedAnalysis.evidenceSummaryLine ||
+                            `Chart uses ${alignedAnalysis.chartSeriesPointCount.toLocaleString()} series point(s).`}
+                        </p>
+                        {insightNarrativeDisclaimer ? (
+                          <p className={aiInsightsConfidenceDisclaimer}>
+                            {insightNarrativeDisclaimer}
+                          </p>
+                        ) : null}
+                        {(alignedAnalysis.insightConfidenceRationale ||
+                          alignedAnalysis.smallSampleCohort ||
+                          isCautiousNarrativeTone(insightNarrativeTone)) && (
+                          <p className={`${aiInsightsSubtleText} mt-1.5`}>
+                            Details on scoring and sample cautions are under{" "}
+                            <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
+                              How this insight was generated
+                            </span>
+                            .
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span
+                          className={insightEngineConfidenceBadgeClass(
+                            insightUnifiedConfidence?.level ??
+                              alignedAnalysis.insightConfidenceLevel
+                          )}
+                        >
+                          {confidenceBadgeLabel(
+                            insightUnifiedConfidence?.level ??
+                              (alignedAnalysis.insightConfidenceLevel as InsightConfidenceLevel)
+                          )}
+                        </span>
+                        <span className="text-[11px] tabular-nums text-slate-600 dark:text-[color:var(--insights-text-muted)]">
+                          Score{" "}
+                          {insightUnifiedConfidence?.score ??
+                            alignedAnalysis.insightConfidenceScore}
+                          /100
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
 
                 {hasValidAIAnswer && insightFollowUpChips.length > 0 ? (
@@ -12871,6 +13044,8 @@ function HomeInner() {
                             void askAI(chip, { fromFollowUpChip: true });
                           }}
                           className={aiInsightsFollowupChip}
+                          title={`Ask follow-up: ${chip}`}
+                          aria-label={`Ask follow-up: ${chip}`}
                         >
                           {chip}
                         </button>
@@ -13382,89 +13557,7 @@ function HomeInner() {
                     ) : null}
                   </div>
                 ) : null}
-
-                {insightHasRenderableVisualization ? (
-                  <div className={aiInsightsVizCard}>
-                    <div className="mb-1 w-full min-w-0 text-center">
-                      <p className={aiInsightsVizKicker}>Visualization</p>
-                    </div>
-                    <div className={aiInsightsVizHeaderZone}>
-                      {insightChartHeadingBlock}
-                      <div
-                        title={insightChartMetadataLine}
-                        className={aiInsightsVizChipsWrap}
-                      >
-                        <ChartContextSummary
-                          renderedKind={insightRenderedChartKind}
-                          metricLabel={insightChartMeasureLabel}
-                          semanticHeader={insightChartSemanticHeader}
-                          badgeCompact={insightChartMetadataBadgeCompact}
-                          leadInsight={insightChartInsightBadge ?? undefined}
-                          qualityWarning={insightChartRateWarning ?? undefined}
-                          compactChips
-                        />
-                    </div>
-                    </div>
-                    <div className={aiInsightsVizChartStage}>
-                      <AiInsightChartShell
-                        chartKind={insightPresentationChartKind}
-                        plotHeight={insightShellPlotHeight}
-                      >
-                        <div
-                          key={`${insightChartId ?? "ic"}-${insightSnapshot?.createdAt ?? 0}-${insightChartData.length}`}
-                          className={aiInsightsVizPlotSurface}
-                        >
-                          {renderDatasetChart(
-                            insightShellPlotHeight,
-                            false,
-                            true
-                          )}
-                        </div>
-                      </AiInsightChartShell>
-                      {insightChartMatchesCurrentQuestion &&
-                      insightSmartChartIntel?.active &&
-                      !insightExecutiveSummaryMode ? (
-                        <div className={aiInsightsSmartPanelDivider}>
-                          <SmartChartInsightPanel
-                            intel={insightSmartChartIntel}
-                            cards={insightExecutiveVizInsights.slice(0, 3)}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : hasValidAIAnswer && insightUnsupportedTrend ? (
-                  <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
-                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
-                      {insightUnsupportedTrend.title}
-                    </p>
-                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
-                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
-                        Reason:
-                      </span>{" "}
-                      {insightUnsupportedTrend.reason}
-                    </p>
-                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
-                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
-                        Required:
-                      </span>{" "}
-                      {insightUnsupportedTrend.requiredAction}
-                    </p>
-                  </div>
-                ) : hasValidAIAnswer && !insightHasRenderableVisualization ? (
-                  <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
-                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
-                      No dedicated visualization for this answer
-                    </p>
-                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
-                      {!insightChartMatchesCurrentQuestion &&
-                      insightSnapshot &&
-                      insightSnapshot.chartData.length > 0
-                        ? "The chart from your previous question does not match this one. The narrative above reflects your latest ask."
-                        : "The assistant did not return chart data for this question. The narrative and KPI context above still reflect the latest response."}
-                    </p>
-                  </div>
-                ) : null}
+                </div>
 
                 {showInsightExportButton ? (
                   <div className="mt-3 flex flex-wrap gap-2">

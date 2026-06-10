@@ -1,0 +1,301 @@
+report_date,zone,state,city,market_type,store_count,revenue,profit,customers,growth_rate
+2024-01-01,North,Delhi,Delhi,Flagship,15,267942.85,60708.55,529,0.093
+2024-01-01,North,Delhi,Delhi,Standard,8,288004.62,49112.45,,0.1705
+2024-01-01,North,Delhi,Delhi,Express,22,153772.96,34703.21,305,0.3203
+2024-01-01,North,Punjab,Chandigarh,Flagship,2,279870.92,32629.06,461,0.4123
+2024-01-01,North,Punjab,Chandigarh,Standard,11,252004.32,48918.2,521,0.1271
+2024-01-01,North,Punjab,Chandigarh,Express,3,173864.03,23543.81,367,0.3684
+2024-01-01,North,Uttar Pradesh,Lucknow,Flagship,7,198101.42,25665.69,288,0.1996
+2024-01-01,North,Uttar Pradesh,Lucknow,Standard,21,315251.0,55812.64,441,0.1184
+2024-01-01,North,Uttar Pradesh,Lucknow,Express,2,126567.3,27908.73,220,0.069
+2024-01-01,North,Punjab,Amritsar,Flagship,10,280733.11,54820.07,372,0.1214
+2024-01-01,North,Punjab,Amritsar,Standard,6,192523.81,43078.18,305,0.0582
+2024-01-01,North,Punjab,Amritsar,Express,15,240882.69,44326.46,320,0.352
+2024-01-01,North,Uttarakhand,Dehradun,Flagship,10,302675.76,57085.97,514,0.3285
+2024-01-01,North,Uttarakhand,Dehradun,Standard,9,131373.71,19649.51,186,0.1066
+2024-01-01,North,Uttarakhand,Dehradun,Express,8,91437.69,21335.37,146,0.4178
+2024-01-01,South,Karnataka,Bengaluru,Flagship,4,231635.57,50209.33,362,0.1036
+2024-01-01,South,Karnataka,Bengaluru,Standard,14,253875.6,45924.46,375,0.2577
+2024-01-01,South,Karnataka,Bengaluru,Express,9,172001.5,39321.93,289,0.1433
+2024-01-01,South,Tamil Nadu,Chennai,Flagship,7,241734.0,34392.5,520,0.3193
+2024-01-01,South,Tamil Nadu,Chennai,Standard,2,147412.12,33096.42,,0.1408
+2024-01-01,South,Tamil Nadu,Chennai,Express,18,301201.99,54999.54,350,0.1696
+2024-01-01,South,Telangana,Hyderabad,Flagship,8,400821.13,90036.71,534,0.283
+2024-01-01,South,Telangana,Hyderabad,Standard,9,211099.01,23595.23,251,0.0685
+2024-01-01,South,Telangana,Hyderabad,Express,17,189460.08,35513.08,327,0.3129
+2024-01-01,South,Kerala,Kochi,Flagship,13,294980.3,50035.0,371,0.1529
+2024-01-01,South,Kerala,Kochi,Standard,21,185330.44,29514.15,257,0.2567
+2024-01-01,South,Kerala,Kochi,Express,9,111600.42,14959.41,193,0.311
+2024-01-01,South,Tamil Nadu,Coimbatore,Flagship,5,228425.98,48346.0,336,0.4005
+2024-01-01,South,Tamil Nadu,Coimbatore,Standard,3,112455.78,24694.88,238,0.3788
+2024-01-01,South,Tamil Nadu,Coimbatore,Express,10,161388.46,22209.64,249,0.0579
+2024-01-01,East,West Bengal,Kolkata,Flagship,21,343431.51,53435.55,362,0.1491
+2024-01-01,East,West Bengal,Kolkata,Standard,10,170024.21,39087.54,278,0.1698
+2024-01-01,East,West Bengal,Kolkata,Express,1,184742.18,22307.4,369,0.0607
+2024-01-01,East,Bihar,Patna,Flagship,22,251308.87,29006.02,463,0.3252
+2024-01-01,East,Bihar,Patna,Standard,14,168752.83,36299.63,241,0.1329
+2024-01-01,East,Bihar,Patna,Express,3,205455.86,41376.15,333,0.0667
+2024-01-01,East,Assam,Guwahati,Flagship,6,294920.65,67670.67,349,0.3396
+2024-01-01,East,Assam,Guwahati,Standard,1,155475.43,30946.48,257,0.2737
+2024-01-01,East,Assam,Guwahati,Express,4,78135.49,15057.45,93,0.4049
+2024-01-01,East,Jharkhand,Ranchi,Flagship,7,271966.16,59427.68,416,0.0864
+2024-01-01,East,Jharkhand,Ranchi,Standard,3,177486.58,34635.28,320,0.0632
+2024-01-01,East,Jharkhand,Ranchi,Express,9,113846.71,27011.97,229,0.1502
+2024-01-01,West,Maharashtra,Mumbai,Flagship,8,295286.33,40780.69,393,0.2331
+2024-01-01,West,Maharashtra,Mumbai,Standard,9,315128.65,68926.9,445,0.0823
+2024-01-01,West,Maharashtra,Mumbai,Express,13,187959.31,23913.48,269,0.3877
+2024-01-01,West,Maharashtra,Pune,Flagship,9,158588.23,21957.1,296,0.2405
+2024-01-01,West,Maharashtra,Pune,Standard,7,130691.45,21704.37,158,0.2981
+2024-01-01,West,Maharashtra,Pune,Express,15,246423.75,57036.67,377,
+2024-01-01,West,Gujarat,Ahmedabad,Flagship,9,298935.78,51091.7,391,0.1436
+2024-01-01,West,Gujarat,Ahmedabad,Standard,16,256720.62,28822.66,554,0.1464
+2024-01-01,West,Gujarat,Ahmedabad,Express,8,184671.3,40805.62,323,0.2692
+2024-01-01,West,Gujarat,Surat,Flagship,4,405113.5,96938.8,609,0.3443
+2024-01-01,West,Gujarat,Surat,Standard,13,178016.5,26375.79,275,0.0888
+2024-01-01,West,Gujarat,Surat,Express,17,196260.67,40383.33,380,0.0775
+2024-01-01,West,Rajasthan,Jaipur,Flagship,12,440847.96,88367.29,499,0.3307
+2024-01-01,West,Rajasthan,Jaipur,Standard,11,236313.14,52853.18,504,0.1243
+2024-01-01,West,Rajasthan,Jaipur,Express,2,93270.24,14345.77,104,0.1378
+2024-02-01,North,Delhi,Delhi,Flagship,11,203106.46,38952.79,234,0.2932
+2024-02-01,North,Delhi,Delhi,Standard,14,329228.84,59138.81,611,0.38
+2024-02-01,North,Delhi,Delhi,Express,9,220143.49,29536.8,269,0.3123
+2024-02-01,North,Punjab,Chandigarh,Flagship,18,350508.23,62053.42,446,0.269
+2024-02-01,North,Punjab,Chandigarh,Standard,13,316385.2,51386.23,405,0.2615
+2024-02-01,North,Punjab,Chandigarh,Express,4,155148.13,23572.0,183,0.3575
+2024-02-01,North,Uttar Pradesh,Lucknow,Flagship,15,201011.3,40081.89,225,0.2522
+2024-02-01,North,Uttar Pradesh,Lucknow,Standard,6,124428.15,28341.9,151,0.25
+2024-02-01,North,Uttar Pradesh,Lucknow,Express,6,109298.22,20847.28,135,0.3698
+2024-02-01,North,Punjab,Amritsar,Flagship,2,232439.66,55279.3,342,0.1195
+2024-02-01,North,Punjab,Amritsar,Standard,1,214726.58,24922.86,316,0.1675
+2024-02-01,North,Punjab,Amritsar,Express,9,125553.59,18716.66,216,0.0771
+2024-02-01,North,Uttarakhand,Dehradun,Flagship,18,332507.79,64136.14,399,0.3804
+2024-02-01,North,Uttarakhand,Dehradun,Standard,4,157730.71,25910.4,194,0.0788
+2024-02-01,North,Uttarakhand,Dehradun,Express,12,129414.43,22334.21,211,0.3799
+2024-02-01,South,Karnataka,Bengaluru,Flagship,19,298543.35,39347.76,516,0.3255
+2024-02-01,South,Karnataka,Bengaluru,Standard,19,327987.17,47551.36,459,0.2365
+2024-02-01,South,Karnataka,Bengaluru,Express,12,142953.54,30300.43,151,0.3914
+2024-02-01,South,Tamil Nadu,Chennai,Flagship,14,287353.69,60453.3,467,0.0668
+2024-02-01,South,Tamil Nadu,Chennai,Standard,20,389021.81,58197.58,500,0.1228
+2024-02-01,South,Tamil Nadu,Chennai,Express,19,262465.55,52946.85,290,0.1468
+2024-02-01,South,Telangana,Hyderabad,Flagship,8,146303.33,18666.2,162,0.0991
+2024-02-01,South,Telangana,Hyderabad,Standard,19,343904.71,43049.64,751,0.3277
+2024-02-01,South,Telangana,Hyderabad,Express,7,198592.17,41144.11,268,0.3086
+2024-02-01,South,Kerala,Kochi,Flagship,17,314678.33,52496.2,622,0.3101
+2024-02-01,South,Kerala,Kochi,Standard,12,162292.57,29307.01,347,0.0525
+2024-02-01,South,Kerala,Kochi,Express,12,97452.31,15032.76,110,0.3946
+2024-02-01,South,Tamil Nadu,Coimbatore,Flagship,1,262424.78,38436.02,,0.2784
+2024-02-01,South,Tamil Nadu,Coimbatore,Standard,9,152999.4,21362.53,168,0.3785
+2024-02-01,South,Tamil Nadu,Coimbatore,Express,14,202006.11,34467.75,348,0.3988
+2024-02-01,East,West Bengal,Kolkata,Flagship,4,204765.68,42323.76,279,0.272
+2024-02-01,East,West Bengal,Kolkata,Standard,6,166798.45,27771.19,229,0.3162
+2024-02-01,East,West Bengal,Kolkata,Express,19,138747.78,17028.46,152,0.4
+2024-02-01,East,Bihar,Patna,Flagship,1,337302.45,55016.45,523,0.1125
+2024-02-01,East,Bihar,Patna,Standard,18,198024.21,23447.55,243,0.073
+2024-02-01,East,Bihar,Patna,Express,5,199431.01,29305.58,293,0.4004
+2024-02-01,East,Assam,Guwahati,Flagship,9,292161.84,43014.91,361,0.4039
+2024-02-01,East,Assam,Guwahati,Standard,19,338847.96,66277.7,471,0.2813
+2024-02-01,East,Assam,Guwahati,Express,4,165223.68,30950.33,178,0.2303
+2024-02-01,East,Jharkhand,Ranchi,Flagship,18,592218.87,99410.97,,0.0821
+2024-02-01,East,Jharkhand,Ranchi,Standard,6,104146.43,21211.72,119,0.2007
+2024-02-01,East,Jharkhand,Ranchi,Express,20,190955.61,30555.22,306,0.1081
+2024-02-01,West,Maharashtra,Mumbai,Flagship,11,281562.06,33963.49,,0.3437
+2024-02-01,West,Maharashtra,Mumbai,Standard,6,169098.76,21855.88,198,0.2323
+2024-02-01,West,Maharashtra,Mumbai,Express,8,164998.78,25479.65,230,0.3587
+2024-02-01,West,Maharashtra,Pune,Flagship,7,361017.16,69849.49,597,0.2906
+2024-02-01,West,Maharashtra,Pune,Standard,7,221811.02,48048.79,418,0.3403
+2024-02-01,West,Maharashtra,Pune,Express,12,251799.07,47535.87,361,
+2024-02-01,West,Gujarat,Ahmedabad,Flagship,16,548065.58,123449.75,934,0.1996
+2024-02-01,West,Gujarat,Ahmedabad,Standard,20,227841.61,31903.4,298,0.3226
+2024-02-01,West,Gujarat,Ahmedabad,Express,8,101803.47,15910.79,,0.3544
+2024-02-01,West,Gujarat,Surat,Flagship,3,357133.28,52495.94,394,0.2942
+2024-02-01,West,Gujarat,Surat,Standard,5,285435.73,53915.35,309,0.2993
+2024-02-01,West,Gujarat,Surat,Express,18,226653.76,34241.59,347,0.1617
+2024-02-01,West,Rajasthan,Jaipur,Flagship,11,355872.76,58971.62,,0.2241
+2024-02-01,West,Rajasthan,Jaipur,Standard,10,128503.58,28291.19,279,0.3668
+2024-02-01,West,Rajasthan,Jaipur,Express,14,123041.01,23031.02,,0.2227
+2024-03-01,North,Delhi,Delhi,Flagship,1,332321.61,76449.76,532,0.0595
+2024-03-01,North,Delhi,Delhi,Standard,11,171905.31,39622.27,277,0.1761
+2024-03-01,North,Delhi,Delhi,Express,5,270296.99,62384.27,327,0.2213
+2024-03-01,North,Punjab,Chandigarh,Flagship,8,270220.57,37270.02,348,0.2362
+2024-03-01,North,Punjab,Chandigarh,Standard,6,284791.26,42000.04,421,0.3798
+2024-03-01,North,Punjab,Chandigarh,Express,4,169784.06,18829.01,353,0.0788
+2024-03-01,North,Uttar Pradesh,Lucknow,Flagship,21,364862.02,57690.94,,0.2128
+2024-03-01,North,Uttar Pradesh,Lucknow,Standard,21,256684.5,57102.63,546,0.3061
+2024-03-01,North,Uttar Pradesh,Lucknow,Express,11,241431.41,35576.61,344,0.357
+2024-03-01,North,Punjab,Amritsar,Flagship,5,425794.1,86798.48,777,0.2003
+2024-03-01,North,Punjab,Amritsar,Standard,14,292125.73,50699.96,590,0.2204
+2024-03-01,North,Punjab,Amritsar,Express,15,203421.54,24201.74,230,0.1143
+2024-03-01,North,Uttarakhand,Dehradun,Flagship,17,250408.4,38090.58,290,0.3824
+2024-03-01,North,Uttarakhand,Dehradun,Standard,11,325230.13,68248.27,677,0.2532
+2024-03-01,North,Uttarakhand,Dehradun,Express,20,262676.4,32909.14,339,0.2199
+2024-03-01,South,Karnataka,Bengaluru,Flagship,22,204777.6,26632.02,382,0.2202
+2024-03-01,South,Karnataka,Bengaluru,Standard,12,326854.11,58177.53,499,0.418
+2024-03-01,South,Karnataka,Bengaluru,Express,2,64938.32,14465.83,140,0.3577
+2024-03-01,South,Tamil Nadu,Chennai,Flagship,13,195608.55,44932.84,342,0.2678
+2024-03-01,South,Tamil Nadu,Chennai,Standard,21,155364.34,23567.63,167,0.2074
+2024-03-01,South,Tamil Nadu,Chennai,Express,16,309742.2,73403.33,519,0.2553
+2024-03-01,South,Telangana,Hyderabad,Flagship,3,242958.98,39380.93,311,0.2753
+2024-03-01,South,Telangana,Hyderabad,Standard,14,141591.38,20708.47,203,0.2938
+2024-03-01,South,Telangana,Hyderabad,Express,13,210578.27,30930.68,433,0.1986
+2024-03-01,South,Kerala,Kochi,Flagship,18,360605.65,58970.37,406,0.165
+2024-03-01,South,Kerala,Kochi,Standard,13,235982.85,52186.48,431,0.2807
+2024-03-01,South,Kerala,Kochi,Express,12,253685.71,41940.52,412,0.135
+2024-03-01,South,Tamil Nadu,Coimbatore,Flagship,19,435282.56,66237.31,735,0.0885
+2024-03-01,South,Tamil Nadu,Coimbatore,Standard,13,135621.16,18323.1,173,0.34
+2024-03-01,South,Tamil Nadu,Coimbatore,Express,9,555555.1,104816.16,1046,0.0595
+2024-03-01,East,West Bengal,Kolkata,Flagship,8,478522.22,61167.45,735,0.1525
+2024-03-01,East,West Bengal,Kolkata,Standard,22,224147.91,36329.51,376,0.2697
+2024-03-01,East,West Bengal,Kolkata,Express,5,129301.33,19984.03,275,0.2464
+2024-03-01,East,Bihar,Patna,Flagship,19,491522.38,72167.1,708,0.232
+2024-03-01,East,Bihar,Patna,Standard,9,304396.94,40797.23,643,0.3554
+2024-03-01,East,Bihar,Patna,Express,7,285587.48,59490.83,391,0.1892
+2024-03-01,East,Assam,Guwahati,Flagship,5,306748.71,65635.53,506,0.4196
+2024-03-01,East,Assam,Guwahati,Standard,13,325572.21,67744.86,658,0.2018
+2024-03-01,East,Assam,Guwahati,Express,12,187417.82,35929.82,209,0.0592
+2024-03-01,East,Jharkhand,Ranchi,Flagship,1,182300.43,41054.7,211,0.1595
+2024-03-01,East,Jharkhand,Ranchi,Standard,6,226014.02,32593.98,327,0.2165
+2024-03-01,East,Jharkhand,Ranchi,Express,7,184084.87,21742.45,224,0.2084
+2024-03-01,West,Maharashtra,Mumbai,Flagship,19,489656.09,85001.98,815,0.2349
+2024-03-01,West,Maharashtra,Mumbai,Standard,7,263234.17,49619.01,562,0.1197
+2024-03-01,West,Maharashtra,Mumbai,Express,16,209665.22,45040.75,278,0.0553
+2024-03-01,West,Maharashtra,Pune,Flagship,4,221663.69,26348.64,326,0.3163
+2024-03-01,West,Maharashtra,Pune,Standard,17,375078.25,57817.9,504,0.2616
+2024-03-01,West,Maharashtra,Pune,Express,12,103511.92,13896.39,121,0.1208
+2024-03-01,West,Gujarat,Ahmedabad,Flagship,9,326087.95,62981.26,649,0.4129
+2024-03-01,West,Gujarat,Ahmedabad,Standard,8,232906.3,45325.11,316,0.2655
+2024-03-01,West,Gujarat,Ahmedabad,Express,7,190461.78,21853.27,201,0.2216
+2024-03-01,West,Gujarat,Surat,Flagship,12,378675.17,75386.98,419,0.3568
+2024-03-01,West,Gujarat,Surat,Standard,15,196297.35,45287.15,218,
+2024-03-01,West,Gujarat,Surat,Express,2,94909.61,17678.61,174,0.4173
+2024-03-01,West,Rajasthan,Jaipur,Flagship,17,329149.29,75438.92,537,0.2803
+2024-03-01,West,Rajasthan,Jaipur,Standard,8,176445.15,24254.86,285,0.1058
+2024-03-01,West,Rajasthan,Jaipur,Express,3,186240.84,27269.98,244,0.1501
+2024-04-01,North,Delhi,Delhi,Flagship,8,248096.26,44946.79,,0.275
+2024-04-01,North,Delhi,Delhi,Standard,4,165212.74,28131.31,183,0.3439
+2024-04-01,North,Delhi,Delhi,Express,17,128039.17,21678.71,145,0.3096
+2024-04-01,North,Punjab,Chandigarh,Flagship,20,163641.18,32615.44,267,0.3079
+2024-04-01,North,Punjab,Chandigarh,Standard,8,228729.76,25834.53,351,0.3302
+2024-04-01,North,Punjab,Chandigarh,Express,8,166458.74,30246.29,176,0.2365
+2024-04-01,North,Uttar Pradesh,Lucknow,Flagship,4,248730.62,32868.29,269,0.1541
+2024-04-01,North,Uttar Pradesh,Lucknow,Standard,6,109486.01,18406.11,126,0.2868
+2024-04-01,North,Uttar Pradesh,Lucknow,Express,20,196269.84,28962.75,340,0.3719
+2024-04-01,North,Punjab,Amritsar,Flagship,18,257120.35,52989.72,308,0.2177
+2024-04-01,North,Punjab,Amritsar,Standard,14,282258.75,51797.0,325,0.0848
+2024-04-01,North,Punjab,Amritsar,Express,8,222968.95,50353.28,302,0.3608
+2024-04-01,North,Uttarakhand,Dehradun,Flagship,9,124641.94,29219.05,227,0.2093
+2024-04-01,North,Uttarakhand,Dehradun,Standard,1,191244.59,26584.59,279,0.2405
+2024-04-01,North,Uttarakhand,Dehradun,Express,13,164290.53,36256.71,233,0.2312
+2024-04-01,South,Karnataka,Bengaluru,Flagship,7,148869.32,34664.34,203,0.4107
+2024-04-01,South,Karnataka,Bengaluru,Standard,17,155788.51,29318.32,,0.0563
+2024-04-01,South,Karnataka,Bengaluru,Express,7,173192.25,30395.26,189,0.2659
+2024-04-01,South,Tamil Nadu,Chennai,Flagship,12,372693.27,55813.08,755,
+2024-04-01,South,Tamil Nadu,Chennai,Standard,4,198449.28,37619.56,232,0.2179
+2024-04-01,South,Tamil Nadu,Chennai,Express,4,204317.06,26606.43,432,0.3902
+2024-04-01,South,Telangana,Hyderabad,Flagship,5,258228.18,61365.7,339,0.2995
+2024-04-01,South,Telangana,Hyderabad,Standard,2,194488.99,39042.71,239,0.3495
+2024-04-01,South,Telangana,Hyderabad,Express,12,165630.61,30384.16,208,0.2733
+2024-04-01,South,Kerala,Kochi,Flagship,2,112145.58,26147.96,148,0.2243
+2024-04-01,South,Kerala,Kochi,Standard,17,226752.72,40589.06,444,0.2588
+2024-04-01,South,Kerala,Kochi,Express,15,142871.12,20037.95,174,0.3663
+2024-04-01,South,Tamil Nadu,Coimbatore,Flagship,21,434028.69,77381.3,491,0.1561
+2024-04-01,South,Tamil Nadu,Coimbatore,Standard,15,236435.99,45061.05,360,0.2552
+2024-04-01,South,Tamil Nadu,Coimbatore,Express,4,220069.87,27473.64,420,0.3067
+2024-04-01,East,West Bengal,Kolkata,Flagship,4,348997.7,44730.05,496,0.3348
+2024-04-01,East,West Bengal,Kolkata,Standard,20,272391.32,35021.72,604,0.1949
+2024-04-01,East,West Bengal,Kolkata,Express,11,128093.22,15208.32,249,0.2021
+2024-04-01,East,Bihar,Patna,Flagship,17,312905.71,74848.21,405,0.0983
+2024-04-01,East,Bihar,Patna,Standard,21,142791.37,25941.26,247,0.1371
+2024-04-01,East,Bihar,Patna,Express,5,131157.33,20864.04,,0.2996
+2024-04-01,East,Assam,Guwahati,Flagship,7,201144.58,28069.08,269,0.2207
+2024-04-01,East,Assam,Guwahati,Standard,3,438683.59,84653.81,,0.2764
+2024-04-01,East,Assam,Guwahati,Express,14,142428.17,24607.54,276,0.1037
+2024-04-01,East,Jharkhand,Ranchi,Flagship,15,296037.73,39628.22,366,0.1613
+2024-04-01,East,Jharkhand,Ranchi,Standard,1,82703.81,14659.39,,0.372
+2024-04-01,East,Jharkhand,Ranchi,Express,18,97261.63,12154.13,147,0.3273
+2024-04-01,West,Maharashtra,Mumbai,Flagship,1,115717.36,17387.56,131,0.3681
+2024-04-01,West,Maharashtra,Mumbai,Standard,4,231742.94,44418.88,262,0.3259
+2024-04-01,West,Maharashtra,Mumbai,Express,11,183442.85,22197.25,233,0.3618
+2024-04-01,West,Maharashtra,Pune,Flagship,8,109658.63,15792.58,121,0.1685
+2024-04-01,West,Maharashtra,Pune,Standard,1,124435.43,14355.5,201,0.3706
+2024-04-01,West,Maharashtra,Pune,Express,12,153258.49,33372.02,306,0.07
+2024-04-01,West,Gujarat,Ahmedabad,Flagship,14,177856.41,38856.86,232,0.1815
+2024-04-01,West,Gujarat,Ahmedabad,Standard,6,146186.98,27063.27,163,0.2254
+2024-04-01,West,Gujarat,Ahmedabad,Express,18,125973.33,28507.18,208,0.1876
+2024-04-01,West,Gujarat,Surat,Flagship,11,346841.78,59246.24,519,0.063
+2024-04-01,West,Gujarat,Surat,Standard,22,202491.02,25855.4,248,0.3669
+2024-04-01,West,Gujarat,Surat,Express,18,194568.48,40979.43,252,0.2236
+2024-04-01,West,Rajasthan,Jaipur,Flagship,3,183650.84,28999.86,336,0.0754
+2024-04-01,West,Rajasthan,Jaipur,Standard,11,138440.48,15338.92,177,0.2072
+2024-04-01,West,Rajasthan,Jaipur,Express,2,76143.41,8659.86,97,0.3481
+2024-05-01,North,Delhi,Delhi,Flagship,9,144716.11,30695.22,168,0.2275
+2024-05-01,North,Delhi,Delhi,Standard,19,204898.4,34587.64,227,0.0717
+2024-05-01,North,Delhi,Delhi,Express,9,148840.23,18393.58,253,0.2832
+2024-05-01,North,Punjab,Chandigarh,Flagship,6,246856.35,46592.45,329,0.1141
+2024-05-01,North,Punjab,Chandigarh,Standard,2,170922.47,23432.29,257,0.1243
+2024-05-01,North,Punjab,Chandigarh,Express,16,86998.21,17378.17,111,0.3693
+2024-05-01,North,Uttar Pradesh,Lucknow,Flagship,11,312831.22,57851.09,537,0.1795
+2024-05-01,North,Uttar Pradesh,Lucknow,Standard,13,165435.58,21272.18,185,0.3643
+2024-05-01,North,Uttar Pradesh,Lucknow,Express,10,94427.91,10572.44,147,0.3858
+2024-05-01,North,Punjab,Amritsar,Flagship,1,241925.39,26885.22,256,0.0705
+2024-05-01,North,Punjab,Amritsar,Standard,13,258088.22,44546.66,350,0.3963
+2024-05-01,North,Punjab,Amritsar,Express,18,187947.11,35947.58,348,0.3738
+2024-05-01,North,Uttarakhand,Dehradun,Flagship,4,241089.52,29487.95,361,0.4178
+2024-05-01,North,Uttarakhand,Dehradun,Standard,5,174675.56,21033.02,359,0.3987
+2024-05-01,North,Uttarakhand,Dehradun,Express,7,215227.62,46452.81,454,0.2365
+2024-05-01,South,Karnataka,Bengaluru,Flagship,4,151358.03,24022.16,287,0.402
+2024-05-01,South,Karnataka,Bengaluru,Standard,12,183047.0,34446.1,249,0.1206
+2024-05-01,South,Karnataka,Bengaluru,Express,22,147057.36,17093.16,184,0.3466
+2024-05-01,South,Tamil Nadu,Chennai,Flagship,21,373777.98,80880.38,396,
+2024-05-01,South,Tamil Nadu,Chennai,Standard,8,137886.89,23028.51,174,0.2096
+2024-05-01,South,Tamil Nadu,Chennai,Express,1,121101.0,21190.26,230,0.2554
+2024-05-01,South,Telangana,Hyderabad,Flagship,9,262462.02,49643.96,521,0.2412
+2024-05-01,South,Telangana,Hyderabad,Standard,6,314376.67,60052.79,406,0.1496
+2024-05-01,South,Telangana,Hyderabad,Express,5,187673.39,41313.77,200,0.3589
+2024-05-01,South,Kerala,Kochi,Flagship,15,346589.04,82469.97,719,0.1483
+2024-05-01,South,Kerala,Kochi,Standard,21,146782.12,26056.13,318,0.1362
+2024-05-01,South,Kerala,Kochi,Express,21,206797.1,39825.83,311,0.0785
+2024-05-01,South,Tamil Nadu,Coimbatore,Flagship,9,364408.96,74557.35,612,0.2402
+2024-05-01,South,Tamil Nadu,Coimbatore,Standard,8,218628.22,33655.27,455,0.2495
+2024-05-01,South,Tamil Nadu,Coimbatore,Express,17,277701.85,31634.79,604,0.2625
+2024-05-01,East,West Bengal,Kolkata,Flagship,13,512945.45,84564.41,747,0.3141
+2024-05-01,East,West Bengal,Kolkata,Standard,20,343982.41,56912.83,382,0.0589
+2024-05-01,East,West Bengal,Kolkata,Express,5,249843.21,54542.71,279,0.3062
+2024-05-01,East,Bihar,Patna,Flagship,1,261342.36,44183.55,348,0.2656
+2024-05-01,East,Bihar,Patna,Standard,11,320853.07,66921.99,675,0.219
+2024-05-01,East,Bihar,Patna,Express,16,106961.78,18288.44,118,0.2565
+2024-05-01,East,Assam,Guwahati,Flagship,8,400863.21,52148.19,663,0.3931
+2024-05-01,East,Assam,Guwahati,Standard,18,195814.95,21888.93,223,0.339
+2024-05-01,East,Assam,Guwahati,Express,20,214753.39,26770.75,228,0.3397
+2024-05-01,East,Jharkhand,Ranchi,Flagship,12,186417.88,36652.12,388,0.3187
+2024-05-01,East,Jharkhand,Ranchi,Standard,14,293832.18,42905.91,437,0.2994
+2024-05-01,East,Jharkhand,Ranchi,Express,21,144788.54,30118.2,267,0.3291
+2024-05-01,West,Maharashtra,Mumbai,Flagship,12,357022.34,83363.37,791,0.1927
+2024-05-01,West,Maharashtra,Mumbai,Standard,13,264981.41,47989.44,377,0.3978
+2024-05-01,West,Maharashtra,Mumbai,Express,12,173802.46,23272.18,286,0.2303
+2024-05-01,West,Maharashtra,Pune,Flagship,11,286992.52,63092.96,,0.2398
+2024-05-01,West,Maharashtra,Pune,Standard,3,252382.94,42469.05,369,0.2953
+2024-05-01,West,Maharashtra,Pune,Express,19,180564.73,42738.02,285,0.1768
+2024-05-01,West,Gujarat,Ahmedabad,Flagship,15,415900.35,58706.76,557,0.3829
+2024-05-01,West,Gujarat,Ahmedabad,Standard,10,270688.11,64114.29,370,0.271
+2024-05-01,West,Gujarat,Ahmedabad,Express,3,107828.19,18895.05,115,0.0843
+2024-05-01,West,Gujarat,Surat,Flagship,14,251566.64,38877.98,386,0.2484
+2024-05-01,West,Gujarat,Surat,Standard,18,166399.02,23316.88,217,0.2089
+2024-05-01,West,Gujarat,Surat,Express,10,224921.4,28327.51,273,0.1157
+2024-05-01,West,Rajasthan,Jaipur,Flagship,22,333244.98,47789.6,362,0.0897
+2024-05-01,West,Rajasthan,Jaipur,Standard,4,191870.57,41303.34,248,0.0987
+2024-05-01,West,Rajasthan,Jaipur,Express,14,131258.04,30192.52,227,0.1947
+2024-06-01,North,Delhi,Delhi,Flagship,15,164023.33,36058.35,197,0.273
+2024-06-01,North,Delhi,Delhi,Standard,22,397914.53,90743.46,544,0.0871
+2024-06-01,North,Delhi,Delhi,Express,1,90258.95,15735.6,128,0.3276
+2024-06-01,North,Punjab,Chandigarh,Flagship,16,379413.49,67387.5,710,0.2507
+2024-06-01,North,Punjab,Chandigarh,Standard,15,312309.05,71754.65,645,0.3697
+2024-06-01,North,Punjab,Chandigarh,Express,1,89395.8,17070.78,118,0.3569
+2024-06-01,North,Uttar Pradesh,Lucknow,Flagship,15,210264.25,32192.61,295,0.1132
+2024-06-01,North,Uttar Pradesh,Lucknow,Standard,15,380059.53,86105.92,671,0.329
+2024-06-01,North,Uttar Pradesh,Lucknow,Express,17,257687.17,53512.15,294,0.12
+2024-06-01,North,Punjab,Amritsar,Flagship,14,244778.64,44109.7,269,0.2357
+2024-06-01,North,Punjab,Amritsar,Standard,5,212377.94,44771.81,291,0.3409
+2024-06-01,North,Punjab,Amritsar,Express,18,215615.06,28413.66,245,0.1279
+2024-06-01,North,Uttarakhand,Dehradun,Flagship,15,322372.18,50955.51,490,0.0579
+2024-06-01,North,Uttarakhand,Dehradun,Standard,11,217930.81,32736.12,406,0.118
+2024-06-01,North,Uttarakhand,Dehradun,Express,7,93464.8,21788.04,105,0.2378

@@ -39,6 +39,21 @@ _FREQUENCY_RE = re.compile(r"\b(?:frequency|occurrences?)\b", re.I)
 
 _HEADCOUNT_RE = re.compile(r"\bheadcount\b", re.I)
 
+_TIME_METRIC_PHRASE_RE = re.compile(
+    r"\b("
+    r"resolution\s+time|resolution\s+hours?|response\s+time|handling\s+time|"
+    r"wait\s+time|average\s+resolution|avg\s+resolution|"
+    r"time\s+to\s+resolve|time\s+to\s+resolution"
+    r")\b",
+    re.I,
+)
+
+_SUPERLATIVE_METRIC_RE = re.compile(
+    r"\b(?:longest|shortest|highest|lowest|slowest|fastest)\s+(.+?)"
+    r"(?:\s+time)?(?=\s+(?:by|across|for|among|per)\b|[?.!]|$)",
+    re.I,
+)
+
 _BY_METRIC_SUFFIX_RE = re.compile(
     r"\bby\s+(headcount|patient\s+volumes?|fte)\b",
     re.I,
@@ -114,6 +129,12 @@ def extract_explicit_metric_phrases(question: str) -> List[str]:
         _add(m.group(1))
     if _HEADCOUNT_RE.search(ql):
         _add("headcount")
+
+    for m in _TIME_METRIC_PHRASE_RE.finditer(ql):
+        _add(m.group(1))
+
+    for m in _SUPERLATIVE_METRIC_RE.finditer(ql):
+        _add(m.group(1))
 
     return sorted(phrases, key=lambda x: (-len(x), x))
 

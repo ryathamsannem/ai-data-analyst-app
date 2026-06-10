@@ -46,10 +46,10 @@ export const OverviewAiSummaryPanel = memo(function OverviewAiSummaryPanel({
 }) {
   return (
     <section
-      className={`relative overflow-hidden p-5 sm:p-6 ${ovCardElevated} ring-1 ring-[color:var(--accent)]/10`}
+      className={`overview-ai-summary-card relative overflow-hidden p-5 sm:p-6 ${ovCardElevated} ring-1 ring-[color:var(--accent)]/10`}
     >
       <div
-        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[color:var(--accent-wash)] blur-3xl"
+        className="overview-ai-summary-card__glow pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[color:var(--accent-wash)] blur-3xl"
         aria-hidden
       />
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

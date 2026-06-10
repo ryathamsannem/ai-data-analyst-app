@@ -149,9 +149,9 @@ export const OverviewKpiCard = memo(function OverviewKpiCard({
 
   return (
     <article
-      className={`group relative flex min-h-[140px] flex-col overflow-hidden p-4 sm:p-[1.125rem] ${ovCardInteractive}`}
+      className={`overview-kpi-card group relative flex min-h-[140px] flex-col overflow-hidden p-4 sm:p-[1.125rem] ${ovCardInteractive}`}
     >
-      <span className={ovKpiGradientTop} aria-hidden />
+      <span className={`overview-kpi-card__accent ${ovKpiGradientTop}`} aria-hidden />
       <div className="flex items-start justify-between gap-2">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color:var(--accent-wash)] text-[color:var(--accent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition duration-200 group-hover:scale-[1.02]">
           <KpiIcon kind={iconKind} />

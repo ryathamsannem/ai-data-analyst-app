@@ -1,0 +1,74 @@
+{
+  "executed_at": "2026-06-10T11:10:38Z",
+  "duration_sec": 5.9,
+  "mode": "full_ask_live_narrative",
+  "api_key_present": true,
+  "preflight": {
+    "ok": true,
+    "app_env": "development",
+    "sample_excerpt": "PREFLIGHT_OK"
+  },
+  "wave": 2,
+  "domains_run": [
+    "Customer Support"
+  ],
+  "limit_per_domain": 1,
+  "skip_chain": true,
+  "api_errors": 0,
+  "claude_narrative_success": 1,
+  "claude_narrative_fallback": 0,
+  "note": "Live Claude narrative via /ask.",
+  "results": [
+    {
+      "domain": "Customer Support",
+      "qid": "C2-B01",
+      "question": "Which ticket category has the longest resolution time?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 10.0,
+        "data_grounding": 8.5,
+        "executive_summary_quality": 8.5,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.31,
+      "narrative_avg": 8.25,
+      "narrative_source": "live",
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": false,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Intent 'compare' acceptable fallback for ranking",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "avg_resolution_hours",
+        "categoryColumn": "ticket_category",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Key findings:  Billing has the longest average resolution time at 16.8 hours, followed by Account and Feature Request, both at 16.5 hours. Onboarding and Outage have the shortest resolution times, both averaging 14.9 hours. Across the 300 rows analyzed and 6 ticket categories, th",
+        "chart_labels_sample": [
+          "Billing",
+          "Account",
+          "Feature Request"
+        ],
+        "answer_length": 1498,
+        "has_chart": true,
+        "narrative_source": "live"
+      },
+      "answer_excerpt": "Key findings:\n\nBilling has the longest average resolution time at 16.8 hours, followed by Account and Feature Request, both at 16.5 hours. Onboarding and Outage have the shortest resolution times, both averaging 14.9 hours. Across the 300 rows analyzed and 6 ticket categories, the spread between fastest and slowest is about 1.9 hours\u2014roughly 13% of the overall average resolution time of 15.9 hours.\n\nWhat this may indicate:\n\nBilling tickets may require more investigation, back-and-forth communica"
+    }
+  ]
+}

@@ -203,6 +203,7 @@ def _resolve_unsupported_reason(analysis: Dict[str, Any]) -> Optional[str]:
         "unsupportedTrendAnalysis",
         "unsupportedDeclineAnalysis",
         "unsupportedMultiMetricAnalysis",
+        "unsupportedRequestedMetricAnalysis",
     ):
         raw = analysis.get(key)
         if isinstance(raw, str) and raw.strip():

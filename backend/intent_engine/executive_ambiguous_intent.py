@@ -50,6 +50,14 @@ _IMPROVE_RE = re.compile(
     r")\b",
     re.I,
 )
+_CONCENTRATION_RE = re.compile(
+    r"\b("
+    r"concentrat(?:ed|ion)?|overly\s+concentrat|dominat(?:e|ion)?|"
+    r"revenue\s+share|share\s+by|dependency"
+    r")\b",
+    re.I,
+)
+
 _STRATEGY_RE = re.compile(
     r"\b("
     r"management\s+focus|leadership\s+focus|executive\s+priority|"
@@ -87,9 +95,22 @@ def _is_explicit_outlier_identification(question: str) -> bool:
     return False
 
 
+def _is_named_risk_metric_question(question: str) -> bool:
+    """Explicit risk-score metric compare — not broad executive risk analysis."""
+    return bool(
+        re.search(
+            r"\b(?:patient\s+)?risk\s+(?:score|index)\b|\bclinical\s+risk\s+score\b",
+            question or "",
+            re.I,
+        )
+    )
+
+
 def classify_executive_ambiguous_bucket(question: str) -> ExecutiveAmbiguousBucket:
     q = (question or "").replace("\n", " ").strip()
     if len(q) < 8:
+        return None
+    if _is_named_risk_metric_question(q):
         return None
     if _OTHER_INTENT_RE.search(q):
         return None
@@ -99,6 +120,8 @@ def classify_executive_ambiguous_bucket(question: str) -> ExecutiveAmbiguousBuck
         return "executive_loss_profitability"
     if _STANDOUT_RE.search(q) and not _is_explicit_outlier_identification(q):
         return "executive_outlier_standout"
+    if _CONCENTRATION_RE.search(q):
+        return "executive_risk"
     if _EXECUTIVE_RISK_RE.search(q) and not _IMPROVE_RE.search(q):
         return "executive_risk"
     if _IMPROVE_RE.search(q):
@@ -184,6 +207,20 @@ def pick_executive_breakdown_column(
         geo = resolve_geographic_group_column(question or "by region", df, profile)
         if geo and geo in df.columns:
             return str(geo)
+    except Exception:
+        pass
+
+    ql = (question or "").lower()
+    try:
+        from intent_engine.column_resolve import resolve_dimension_phrase_to_column
+
+        for token in ("campaigns", "campaign", "city", "cities", "zone", "region", "segment"):
+            if re.search(rf"\b{re.escape(token)}\b", ql):
+                hit = resolve_dimension_phrase_to_column(
+                    token, _categorical_cols(df, profile), profile
+                )
+                if hit and hit in df.columns:
+                    return str(hit)
     except Exception:
         pass
 
@@ -311,6 +348,25 @@ def build_executive_risk_context(
     }
 
 
+def _explicit_metric_from_question(
+    question: str,
+    intent: Dict[str, Any],
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+) -> Optional[str]:
+    try:
+        from intent_engine.resolve_explicit_metric import resolve_explicit_metric_column
+
+        explicit = resolve_explicit_metric_column(question, df, profile)
+        if explicit:
+            return str(explicit)
+    except Exception:
+        pass
+    if intent.get("explicit_metric") and intent.get("value_col"):
+        return str(intent["value_col"])
+    return None
+
+
 def apply_executive_ambiguous_routing(
     question: str,
     df: pd.DataFrame,
@@ -321,6 +377,13 @@ def apply_executive_ambiguous_routing(
     Override aggregate intent (metric, dimension, lens) for ambiguous executive questions.
     Returns True when routing was applied.
     """
+    try:
+        from intent_engine.narrative_guardrails import detect_missing_requested_metrics
+
+        if detect_missing_requested_metrics(question, df, profile):
+            return False
+    except Exception:
+        pass
     bucket = classify_executive_ambiguous_bucket(question)
     if not bucket or df is None or df.empty:
         return False
@@ -339,6 +402,7 @@ def apply_executive_ambiguous_routing(
 
     profit_col = _pick_profit_col(df, profile)
     revenue_col = _pick_revenue_col(df, profile)
+    explicit_metric = _explicit_metric_from_question(question, intent, df, profile)
 
     intent["executive_ambiguous_bucket"] = bucket
     intent["executive_lens"] = lens
@@ -357,10 +421,20 @@ def apply_executive_ambiguous_routing(
         intent["agg_label"] = "Total"
         intent["agg_key"] = "sum"
     elif bucket == "executive_risk":
-        metric_col = revenue_col or intent.get("value_col")
+        metric_col = explicit_metric or intent.get("value_col") or revenue_col
         intent["value_col"] = metric_col
-        intent["agg_label"] = "Total"
-        intent["agg_key"] = "sum"
+        if explicit_metric or intent.get("explicit_metric"):
+            from intent_engine.column_resolve import column_prefers_mean_aggregation
+
+            if column_prefers_mean_aggregation(str(metric_col)):
+                intent["agg_label"] = "Average"
+                intent["agg_key"] = "mean"
+            else:
+                intent["agg_label"] = "Total"
+                intent["agg_key"] = "sum"
+        else:
+            intent["agg_label"] = "Total"
+            intent["agg_key"] = "sum"
         if metric_col:
             intent["executiveRiskContext"] = build_executive_risk_context(
                 df,
@@ -374,7 +448,8 @@ def apply_executive_ambiguous_routing(
         intent["agg_label"] = "Total"
         intent["agg_key"] = "sum"
     elif bucket == "executive_outlier_standout":
-        intent["value_col"] = revenue_col or intent.get("value_col")
+        metric_col = explicit_metric or intent.get("value_col") or revenue_col
+        intent["value_col"] = metric_col
         intent["agg_label"] = "Total"
         intent["agg_key"] = "sum"
         intent["executive_standout_analysis"] = True

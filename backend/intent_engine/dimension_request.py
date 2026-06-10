@@ -303,3 +303,177 @@ def pick_entity_cohort_breakdown_column(
         return None
     scored.sort(key=lambda t: (-t[0], t[1]))
     return scored[0][1]
+
+
+_METRIC_TAIL_RE = re.compile(
+    r"\s+(?:"
+    r"revenue|sales|profit|spend|spending|cost|units|customers?|deposits?|"
+    r"balance|income|growth(?:\s+rate)?|utilization|conversions?|impressions?"
+    r")\s*$",
+    re.I,
+)
+
+_CONCENTRATION_RE = re.compile(
+    r"\b("
+    r"concentrat(?:ed|ion)?|overly\s+concentrat|dominat(?:e|ion)?|"
+    r"dependency|revenue\s+share|share\s+by"
+    r")\b",
+    re.I,
+)
+
+_RANK_DIM_RE = re.compile(
+    r"\brank(?:ing)?\s+([a-z0-9][a-z0-9_\s]{0,32}?)\s+by\b",
+    re.I,
+)
+
+
+def extract_rank_dimension_phrase(question: str) -> Optional[str]:
+    """Dimension token from 'rank {dim} by {metric}' phrasing."""
+    m = _RANK_DIM_RE.search(str(question or ""))
+    return m.group(1).strip() if m else None
+
+
+def question_requests_concentration_analysis(question: str) -> bool:
+    return bool(_CONCENTRATION_RE.search(str(question or "")))
+
+
+def phrase_is_metric_not_dimension(
+    phrase: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    *,
+    match_column,
+) -> bool:
+    """True when a breakdown phrase names a numeric metric column, not a grouping dimension."""
+    return _phrase_refers_to_metric_column(phrase, df, profile, match_column=match_column)
+
+
+def filter_dimension_request_phrases(
+    phrases: List[str],
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    *,
+    match_column,
+) -> List[str]:
+    """Drop metric-only phrases extracted from 'by revenue' style tails."""
+    out: List[str] = []
+    for phrase in phrases:
+        if phrase_is_metric_not_dimension(phrase, df, profile, match_column=match_column):
+            continue
+        out.append(phrase)
+    return out
+
+
+def _strip_trailing_metric_phrase(text: str) -> str:
+    return _METRIC_TAIL_RE.sub("", str(text or "").strip()).strip()
+
+
+_METRIC_SIDE_RE = re.compile(
+    r"\b("
+    r"revenue|sales|profit|spend(?:ing)?|cost|margin|balance|deposit|loan|"
+    r"income|utilization|conversion|impression|customer|unit|ad\s+spend|adspend"
+    r")\b",
+    re.I,
+)
+
+
+def _phrase_looks_like_metric_side(text: str) -> bool:
+    """True when a vs-clause side names a metric rather than a dimension value."""
+    t = str(text or "").strip()
+    if not t:
+        return True
+    return bool(_METRIC_SIDE_RE.search(t))
+
+
+def _value_in_column(df: pd.DataFrame, col: str, token: str) -> Optional[str]:
+    if df is None or df.empty or col not in df.columns or not token:
+        return None
+    want = str(token).strip().lower()
+    if len(want) < 2:
+        return None
+    try:
+        values = df[col].dropna().astype(str).str.strip()
+    except Exception:
+        return None
+    for val in values.unique():
+        if str(val).strip().lower() == want:
+            return str(val).strip()
+    return None
+
+
+def find_dimension_value_compare(
+    question: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """
+    When the user compares two categorical values (e.g. Mumbai vs Bengaluru),
+    return the shared dimension column and the matched values.
+    """
+    if df is None or df.empty:
+        return None
+    ql = str(question or "").strip()
+    if not ql:
+        return None
+    if not re.search(r"\bvs\.?\b|\bversus\b", ql, re.I):
+        return None
+
+    m = re.search(
+        r"\b(?:compare\s+)?(.+?)\s+vs\.?\s+(.+?)(?:\s*[\?\.]|$)",
+        ql,
+        re.I,
+    )
+    if not m:
+        return None
+
+    left = _strip_trailing_metric_phrase(m.group(1).strip())
+    right = _strip_trailing_metric_phrase(m.group(2).strip())
+    if not left or not right:
+        return None
+
+    if _phrase_looks_like_metric_side(left) or _phrase_looks_like_metric_side(right):
+        return None
+
+    ct = profile.get("column_types", {}) if profile else {}
+    best: Optional[Tuple[int, str, List[str]]] = None
+
+    for col in df.columns.tolist():
+        if ct.get(col) in ("number", "date"):
+            continue
+        v1 = _value_in_column(df, str(col), left)
+        v2 = _value_in_column(df, str(col), right)
+        if v1 and v2:
+            score = len(v1) + len(v2)
+            if best is None or score > best[0]:
+                best = (score, str(col), [v1, v2])
+
+    if not best:
+        return None
+    _, group_col, values = best
+    return {"group_col": group_col, "values": values}
+
+
+def question_requests_dimension_value_compare(
+    question: str,
+    df: Optional[pd.DataFrame] = None,
+    profile: Optional[Dict[str, Any]] = None,
+) -> bool:
+    if df is not None and profile is not None:
+        return find_dimension_value_compare(question, df, profile) is not None
+    ql = str(question or "").lower()
+    if not re.search(r"\bvs\.?\b|\bversus\b", ql):
+        return False
+    m = re.search(
+        r"\b(?:compare\s+)?(.+?)\s+vs\.?\s+(.+?)(?:\s*[\?\.]|$)",
+        ql,
+        re.I,
+    )
+    if not m:
+        return False
+    left = _strip_trailing_metric_phrase(m.group(1).strip()).lower()
+    right = _strip_trailing_metric_phrase(m.group(2).strip()).lower()
+    if not left or not right or len(left) < 2 or len(right) < 2:
+        return False
+    if _phrase_looks_like_metric_side(left) or _phrase_looks_like_metric_side(right):
+        return False
+    return True
