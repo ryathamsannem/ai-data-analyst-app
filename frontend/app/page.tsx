@@ -248,6 +248,8 @@ import {
   aiInsightsAskActionsRow,
   aiInsightsAskAssumptionNote,
   aiInsightsAskComposer,
+  aiInsightsAskError,
+  aiInsightsAskLoading,
   aiInsightsAskHeading,
   aiInsightsAskHeaderRow,
   aiInsightsAskInputBlock,
@@ -273,6 +275,7 @@ import {
   aiInsightsPage,
   aiInsightsPanelShell,
   aiInsightsSuggestedScrollBody,
+  aiInsightsResultsStack,
   aiInsightsProvenanceBody,
   aiInsightsProvenanceDivider,
   aiInsightsProvenanceMetaLabel,
@@ -11177,18 +11180,18 @@ function HomeInner() {
       onPilotNav={handlePilotNav}
       pilotNavActive={pilotNavActive}
     >
-        {error && (
-          <div className="mb-4 mt-6 flex items-start justify-between gap-3 rounded-xl border border-red-200/70 bg-red-50/90 p-3.5 text-red-800 shadow-[0_1px_2px_rgba(185,28,28,0.06)]">
+        {error && activeTab !== "insights" ? (
+          <div className="mb-4 mt-6 flex items-start justify-between gap-3 rounded-xl border border-red-200/70 bg-red-50/90 p-3.5 text-red-800 shadow-[0_1px_2px_rgba(185,28,28,0.06)] dark:border-rose-500/30 dark:bg-rose-950/35 dark:text-rose-100">
             <p className="min-w-0 flex-1 text-sm leading-relaxed">{error}</p>
             <button
               type="button"
               onClick={() => setError("")}
-              className="shrink-0 text-xs font-semibold uppercase tracking-wide text-red-800/90 underline-offset-2 transition hover:text-red-950 hover:underline"
+              className="shrink-0 text-xs font-semibold uppercase tracking-wide text-red-800/90 underline-offset-2 transition hover:text-red-950 hover:underline dark:text-rose-200/90 dark:hover:text-rose-50"
             >
               Dismiss
             </button>
           </div>
-        )}
+        ) : null}
 
         {uploadMessage && (
           <div className="mb-4 mt-6 rounded-xl border border-emerald-200/70 bg-emerald-50/90 p-3.5 text-sm text-emerald-900 shadow-[0_1px_2px_rgba(16,185,129,0.06)]">
@@ -12576,8 +12579,8 @@ function HomeInner() {
                     <span className="rounded-full border border-emerald-200/60 bg-emerald-50/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-emerald-500/25 dark:bg-emerald-950/40 dark:text-emerald-100">
                       Using previous insight context
                     </span>
-                    <span className="rounded-full border border-violet-200/60 bg-violet-50/90 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-violet-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-violet-400/25 dark:bg-violet-950/40 dark:text-violet-100">
-                      Follow-up detected
+                    <span className="rounded-full border border-violet-200/60 bg-violet-50/90 px-2.5 py-1 text-[10px] font-semibold text-violet-900 shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)] dark:border-violet-400/25 dark:bg-violet-950/40 dark:text-violet-100">
+                      Follow-up question
                     </span>
                     {lastConversationMeta.usingContextSummary.trim() ? (
                       <span className="text-xs text-slate-600 dark:text-[color:var(--insights-text-muted)]">
@@ -12594,14 +12597,28 @@ function HomeInner() {
                     {lastConversationMeta?.inheritedAssumptionNote ?? ""}
                   </p>
                 ) : null}
-                <div className={aiInsightsAskInputBlock}>
-                  <label className={aiInsightsAskQuestionLabel}>Your question</label>
+                <div
+                  className={aiInsightsAskInputBlock}
+                  aria-busy={loading || undefined}
+                >
+                  <label className={aiInsightsAskQuestionLabel} htmlFor="ai-insights-question">
+                    Your question
+                  </label>
                   <div className={aiInsightsAskComposer}>
                     <textarea
+                      id="ai-insights-question"
                       value={question}
                       onChange={(e) => setQuestionAndResetInsightState(e.target.value)}
                       className={aiInsightsAskTextarea}
-                      placeholder="Example: Show sales by product"
+                      placeholder="Ask about trends, rankings, or comparisons in your data…"
+                      disabled={loading}
+                      aria-describedby={
+                        error && activeTab === "insights"
+                          ? "ai-insights-ask-error"
+                          : loading
+                            ? "ai-insights-ask-loading"
+                            : undefined
+                      }
                     />
                     <div className={aiInsightsAskActionsRow}>
                       <button
@@ -12609,23 +12626,48 @@ function HomeInner() {
                         onClick={() => void askAI()}
                         disabled={!canAskAi}
                         className={aiInsightsAskSubmitBtn}
+                        aria-label={loading ? "Generating AI insight" : "Ask AI"}
                       >
-                        {loading ? "Thinking..." : "Ask AI"}
+                        {loading ? "Thinking…" : "Ask AI"}
                       </button>
                       {loading ? (
-                        <div className="text-sm text-slate-600 space-y-0.5 dark:text-[color:var(--insights-text-muted)]">
-                          <span className="block">Generating answer…</span>
-                          <span className="block text-xs text-slate-500 dark:text-[color:var(--insights-text-muted)]">
-                            Generating visualization…
-                          </span>
+                        <div
+                          id="ai-insights-ask-loading"
+                          className={aiInsightsAskLoading}
+                          role="status"
+                          aria-live="polite"
+                        >
+                          <span
+                            className="inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-[color:var(--accent)]/25 border-t-[color:var(--accent)]"
+                            aria-hidden
+                          />
+                          <span>Generating answer and chart…</span>
                         </div>
                       ) : null}
                     </div>
+                    {error && activeTab === "insights" ? (
+                      <div
+                        id="ai-insights-ask-error"
+                        className={aiInsightsAskError}
+                        role="alert"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 flex-1">{error}</p>
+                          <button
+                            type="button"
+                            onClick={() => setError("")}
+                            className="shrink-0 text-xs font-semibold underline-offset-2 hover:underline"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
                 {alignedAnalysis?.alignmentRepaired ? (
-                  <div className="mt-4 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-950 dark:border-amber-500/22 dark:bg-amber-950/35 dark:text-amber-100/90">
+                  <div className="mt-3 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs text-amber-950 dark:border-amber-500/22 dark:bg-amber-950/35 dark:text-amber-100/90">
                     Chart was rebuilt so the series matches the metric detected from
                     your question (pandas alignment check).
                   </div>
@@ -12633,7 +12675,7 @@ function HomeInner() {
 
                 {insightVisualization?.partialVisualizationWarning &&
                 !insightExecutiveSummaryMode ? (
-                  <p className="mt-4 text-xs text-amber-950 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-2 leading-snug dark:border-amber-500/22 dark:bg-amber-950/30 dark:text-amber-100/90">
+                  <p className="mt-3 text-xs text-amber-950 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-2 leading-snug dark:border-amber-500/22 dark:bg-amber-950/30 dark:text-amber-100/90">
                     <span className="font-semibold">Visualization caution:</span> full
                     statistical note is under{" "}
                     <span className="font-medium">How this insight was generated</span>.
@@ -12651,80 +12693,7 @@ function HomeInner() {
                   </div>
                 ) : null}
 
-                {hasValidAIAnswer &&
-                insightExecutiveVizInsights.length > 0 &&
-                (insightVisualization ||
-                  insightUnsupportedGrowth ||
-                  insightUnsupportedTrend ||
-                  insightUnsupportedDecline ||
-                  insightUnsupportedMultiMetric) ? (
-                  <AiExecutiveInsightsPanel
-                    cards={insightExecutiveVizInsights}
-                    narrativeBrief={insightExecutiveBrief}
-                  />
-                ) : null}
-
-                {hasValidAIAnswer &&
-                alignedAnalysis &&
-                !insightExecutiveSummaryMode ? (
-                  <div
-                    className={`${aiInsightsConfidenceShell} ${
-                      alignedAnalysis.smallSampleCohort ||
-                      isCautiousNarrativeTone(insightNarrativeTone)
-                        ? aiInsightsConfidenceCaution
-                        : aiInsightsConfidenceNormal
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className={aiInsightsMutedLabel}>
-                          Insight confidence (sample-aware)
-                        </p>
-                        <p className={`${aiInsightsBodyText} mt-1.5`}>
-                          {insightUnifiedConfidence?.rationale ||
-                            alignedAnalysis.evidenceSummaryLine ||
-                            `Chart uses ${alignedAnalysis.chartSeriesPointCount.toLocaleString()} series point(s).`}
-                        </p>
-                        {insightNarrativeDisclaimer ? (
-                          <p className={aiInsightsConfidenceDisclaimer}>
-                            {insightNarrativeDisclaimer}
-                          </p>
-                        ) : null}
-                        {(alignedAnalysis.insightConfidenceRationale ||
-                          alignedAnalysis.smallSampleCohort ||
-                          isCautiousNarrativeTone(insightNarrativeTone)) && (
-                          <p className={`${aiInsightsSubtleText} mt-1.5`}>
-                            Details on scoring and sample cautions are under{" "}
-                            <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
-                              How this insight was generated
-                            </span>
-                            .
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span
-                          className={insightEngineConfidenceBadgeClass(
-                            insightUnifiedConfidence?.level ??
-                              alignedAnalysis.insightConfidenceLevel
-                          )}
-                        >
-                          {confidenceBadgeLabel(
-                            insightUnifiedConfidence?.level ??
-                              (alignedAnalysis.insightConfidenceLevel as InsightConfidenceLevel)
-                          )}
-                        </span>
-                        <span className="text-[11px] tabular-nums text-slate-600 dark:text-[color:var(--insights-text-muted)]">
-                          Score{" "}
-                          {insightUnifiedConfidence?.score ??
-                            alignedAnalysis.insightConfidenceScore}
-                          /100
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
+                <div className={aiInsightsResultsStack}>
                 {(hasValidAIAnswer || loading || answer.trim()) ? (
                 <div className={aiInsightsAnswerCard}>
                   <div className={aiInsightsAnswerHeader}>
@@ -12849,13 +12818,185 @@ function HomeInner() {
                       </div>
                     </div>
                   ) : loading ? (
-                    <p className={`${aiInsightsBodyText} mt-4`}>Generating insight…</p>
+                    <p className={`${aiInsightsBodyText} mt-2`} role="status">
+                      Generating insight…
+                    </p>
                   ) : (
-                    <p className={`${aiInsightsBodyText} mt-4`}>
-                      AI answer will appear here.
+                    <p className={`${aiInsightsBodyText} mt-2 text-[var(--text-muted)] dark:text-[color:var(--insights-text-muted)]`}>
+                      Your answer will appear here after you ask a question.
                     </p>
                   )}
                 </div>
+                ) : null}
+
+                {loading && !insightHasRenderableVisualization && !hasValidAIAnswer ? (
+                  <div
+                    className="w-full min-w-0 overflow-hidden rounded-2xl border border-[color:var(--border-default)]/60 bg-[color:var(--surface-subtle)] p-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)]"
+                    aria-hidden
+                  >
+                    <div className="mb-3 h-3 w-28 animate-pulse rounded bg-slate-200/80 dark:bg-white/10" />
+                    <div
+                      className="animate-pulse rounded-xl border border-[color:var(--border-default)]/40 bg-slate-100/80 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)]"
+                      style={{ minHeight: `${Math.max(insightShellPlotHeight, 220)}px` }}
+                    />
+                  </div>
+                ) : null}
+
+                {insightHasRenderableVisualization ? (
+                  <div className={aiInsightsVizCard}>
+                    <div className="mb-1 w-full min-w-0 text-center">
+                      <p className={aiInsightsVizKicker}>Visualization</p>
+                    </div>
+                    <div className={aiInsightsVizHeaderZone}>
+                      {insightChartHeadingBlock}
+                      <div
+                        title={insightChartMetadataLine}
+                        className={aiInsightsVizChipsWrap}
+                      >
+                        <ChartContextSummary
+                          renderedKind={insightRenderedChartKind}
+                          metricLabel={insightChartMeasureLabel}
+                          semanticHeader={insightChartSemanticHeader}
+                          badgeCompact={insightChartMetadataBadgeCompact}
+                          leadInsight={insightChartInsightBadge ?? undefined}
+                          qualityWarning={insightChartRateWarning ?? undefined}
+                          compactChips
+                        />
+                    </div>
+                    </div>
+                    <div className={aiInsightsVizChartStage}>
+                      <AiInsightChartShell
+                        chartKind={insightPresentationChartKind}
+                        plotHeight={insightShellPlotHeight}
+                      >
+                        <div
+                          key={`${insightChartId ?? "ic"}-${insightSnapshot?.createdAt ?? 0}-${insightChartData.length}`}
+                          className={aiInsightsVizPlotSurface}
+                        >
+                          {renderDatasetChart(
+                            insightShellPlotHeight,
+                            false,
+                            true
+                          )}
+                        </div>
+                      </AiInsightChartShell>
+                      {insightChartMatchesCurrentQuestion &&
+                      insightSmartChartIntel?.active &&
+                      !insightExecutiveSummaryMode ? (
+                        <div className={aiInsightsSmartPanelDivider}>
+                          <SmartChartInsightPanel
+                            intel={insightSmartChartIntel}
+                            cards={insightExecutiveVizInsights.slice(0, 3)}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : hasValidAIAnswer && insightUnsupportedTrend ? (
+                  <div className="rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
+                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
+                      {insightUnsupportedTrend.title}
+                    </p>
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
+                        Reason:
+                      </span>{" "}
+                      {insightUnsupportedTrend.reason}
+                    </p>
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
+                        Required:
+                      </span>{" "}
+                      {insightUnsupportedTrend.requiredAction}
+                    </p>
+                  </div>
+                ) : hasValidAIAnswer && !insightHasRenderableVisualization ? (
+                  <div className="rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
+                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
+                      No dedicated visualization for this answer
+                    </p>
+                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
+                      {!insightChartMatchesCurrentQuestion &&
+                      insightSnapshot &&
+                      insightSnapshot.chartData.length > 0
+                        ? "The chart from your previous question does not match this one. The narrative above reflects your latest ask."
+                        : "The assistant did not return chart data for this question. The narrative above still reflects the latest response."}
+                    </p>
+                  </div>
+                ) : null}
+
+                {hasValidAIAnswer &&
+                insightExecutiveVizInsights.length > 0 &&
+                (insightVisualization ||
+                  insightUnsupportedGrowth ||
+                  insightUnsupportedTrend ||
+                  insightUnsupportedDecline ||
+                  insightUnsupportedMultiMetric) ? (
+                  <AiExecutiveInsightsPanel
+                    cards={insightExecutiveVizInsights}
+                    narrativeBrief={insightExecutiveBrief}
+                  />
+                ) : null}
+
+                {hasValidAIAnswer &&
+                alignedAnalysis &&
+                !insightExecutiveSummaryMode ? (
+                  <div
+                    className={`${aiInsightsConfidenceShell} ${
+                      alignedAnalysis.smallSampleCohort ||
+                      isCautiousNarrativeTone(insightNarrativeTone)
+                        ? aiInsightsConfidenceCaution
+                        : aiInsightsConfidenceNormal
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className={aiInsightsMutedLabel}>
+                          Insight confidence (sample-aware)
+                        </p>
+                        <p className={`${aiInsightsBodyText} mt-1.5`}>
+                          {insightUnifiedConfidence?.rationale ||
+                            alignedAnalysis.evidenceSummaryLine ||
+                            `Chart uses ${alignedAnalysis.chartSeriesPointCount.toLocaleString()} series point(s).`}
+                        </p>
+                        {insightNarrativeDisclaimer ? (
+                          <p className={aiInsightsConfidenceDisclaimer}>
+                            {insightNarrativeDisclaimer}
+                          </p>
+                        ) : null}
+                        {(alignedAnalysis.insightConfidenceRationale ||
+                          alignedAnalysis.smallSampleCohort ||
+                          isCautiousNarrativeTone(insightNarrativeTone)) && (
+                          <p className={`${aiInsightsSubtleText} mt-1.5`}>
+                            Details on scoring and sample cautions are under{" "}
+                            <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
+                              How this insight was generated
+                            </span>
+                            .
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span
+                          className={insightEngineConfidenceBadgeClass(
+                            insightUnifiedConfidence?.level ??
+                              alignedAnalysis.insightConfidenceLevel
+                          )}
+                        >
+                          {confidenceBadgeLabel(
+                            insightUnifiedConfidence?.level ??
+                              (alignedAnalysis.insightConfidenceLevel as InsightConfidenceLevel)
+                          )}
+                        </span>
+                        <span className="text-[11px] tabular-nums text-slate-600 dark:text-[color:var(--insights-text-muted)]">
+                          Score{" "}
+                          {insightUnifiedConfidence?.score ??
+                            alignedAnalysis.insightConfidenceScore}
+                          /100
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
 
                 {hasValidAIAnswer && insightFollowUpChips.length > 0 ? (
@@ -12871,6 +13012,8 @@ function HomeInner() {
                             void askAI(chip, { fromFollowUpChip: true });
                           }}
                           className={aiInsightsFollowupChip}
+                          title={`Ask follow-up: ${chip}`}
+                          aria-label={`Ask follow-up: ${chip}`}
                         >
                           {chip}
                         </button>
@@ -13382,89 +13525,7 @@ function HomeInner() {
                     ) : null}
                   </div>
                 ) : null}
-
-                {insightHasRenderableVisualization ? (
-                  <div className={aiInsightsVizCard}>
-                    <div className="mb-1 w-full min-w-0 text-center">
-                      <p className={aiInsightsVizKicker}>Visualization</p>
-                    </div>
-                    <div className={aiInsightsVizHeaderZone}>
-                      {insightChartHeadingBlock}
-                      <div
-                        title={insightChartMetadataLine}
-                        className={aiInsightsVizChipsWrap}
-                      >
-                        <ChartContextSummary
-                          renderedKind={insightRenderedChartKind}
-                          metricLabel={insightChartMeasureLabel}
-                          semanticHeader={insightChartSemanticHeader}
-                          badgeCompact={insightChartMetadataBadgeCompact}
-                          leadInsight={insightChartInsightBadge ?? undefined}
-                          qualityWarning={insightChartRateWarning ?? undefined}
-                          compactChips
-                        />
-                    </div>
-                    </div>
-                    <div className={aiInsightsVizChartStage}>
-                      <AiInsightChartShell
-                        chartKind={insightPresentationChartKind}
-                        plotHeight={insightShellPlotHeight}
-                      >
-                        <div
-                          key={`${insightChartId ?? "ic"}-${insightSnapshot?.createdAt ?? 0}-${insightChartData.length}`}
-                          className={aiInsightsVizPlotSurface}
-                        >
-                          {renderDatasetChart(
-                            insightShellPlotHeight,
-                            false,
-                            true
-                          )}
-                        </div>
-                      </AiInsightChartShell>
-                      {insightChartMatchesCurrentQuestion &&
-                      insightSmartChartIntel?.active &&
-                      !insightExecutiveSummaryMode ? (
-                        <div className={aiInsightsSmartPanelDivider}>
-                          <SmartChartInsightPanel
-                            intel={insightSmartChartIntel}
-                            cards={insightExecutiveVizInsights.slice(0, 3)}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : hasValidAIAnswer && insightUnsupportedTrend ? (
-                  <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
-                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
-                      {insightUnsupportedTrend.title}
-                    </p>
-                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
-                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
-                        Reason:
-                      </span>{" "}
-                      {insightUnsupportedTrend.reason}
-                    </p>
-                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
-                      <span className="font-medium text-slate-700 dark:text-[color:var(--insights-text-secondary)]">
-                        Required:
-                      </span>{" "}
-                      {insightUnsupportedTrend.requiredAction}
-                    </p>
-                  </div>
-                ) : hasValidAIAnswer && !insightHasRenderableVisualization ? (
-                  <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50 px-4 py-4 text-sm text-slate-800 dark:border-[color:var(--insights-border-soft)] dark:bg-gradient-to-br dark:from-[color:var(--insights-layer-card)] dark:to-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)]">
-                    <p className="font-semibold text-slate-900 dark:text-[var(--foreground)]">
-                      No dedicated visualization for this answer
-                    </p>
-                    <p className="mt-1.5 text-slate-600 leading-relaxed dark:text-[color:var(--insights-text-muted)]">
-                      {!insightChartMatchesCurrentQuestion &&
-                      insightSnapshot &&
-                      insightSnapshot.chartData.length > 0
-                        ? "The chart from your previous question does not match this one. The narrative above reflects your latest ask."
-                        : "The assistant did not return chart data for this question. The narrative and KPI context above still reflect the latest response."}
-                    </p>
-                  </div>
-                ) : null}
+                </div>
 
                 {showInsightExportButton ? (
                   <div className="mt-3 flex flex-wrap gap-2">

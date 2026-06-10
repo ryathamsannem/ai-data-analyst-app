@@ -1,0 +1,301 @@
+report_date,department,location,job_family,headcount,hires,terminations,attrition_rate,satisfaction_score,personnel_cost
+2024-01-01,Engineering,HQ,VP,82,3,3,0.0366,3.68,92797.73
+2024-01-01,Engineering,Remote-US,Manager,23,0,0,,3.64,99855.74
+2024-01-01,Engineering,Remote-EMEA,Director,107,5,2,0.0187,4.66,110815.61
+2024-01-01,Engineering,NYC,Manager,81,0,2,0.0247,4.48,108855.04
+2024-01-01,Engineering,London,Director,51,3,1,0.0196,4.15,98834.91
+2024-01-01,Engineering,Bengaluru,Manager,94,4,1,0.0106,4.03,125049.31
+2024-01-01,Sales,HQ,Manager,106,4,1,0.0094,3.84,81585.65
+2024-01-01,Sales,Remote-US,Individual Contributor,90,3,0,0.0,4.22,126954.57
+2024-01-01,Sales,Remote-EMEA,Director,125,7,6,0.048,4.07,130675.31
+2024-01-01,Sales,NYC,Director,18,0,0,0.0,4.31,101654.04
+2024-01-01,Sales,London,Director,91,4,2,0.022,4.55,139132.26
+2024-01-01,Sales,Bengaluru,Manager,46,0,1,0.0217,3.68,128608.14
+2024-01-01,Marketing,HQ,Manager,22,0,0,0.0,3.69,130631.74
+2024-01-01,Marketing,Remote-US,Manager,95,3,3,0.0316,4.01,98589.89
+2024-01-01,Marketing,Remote-EMEA,Individual Contributor,63,3,3,0.0476,3.9,70908.14
+2024-01-01,Marketing,NYC,Director,88,5,4,0.0455,4.59,127633.97
+2024-01-01,Marketing,London,VP,79,6,1,0.0127,4.26,85490.3
+2024-01-01,Marketing,Bengaluru,Individual Contributor,41,1,1,0.0244,4.48,80067.51
+2024-01-01,Operations,HQ,VP,42,2,1,0.0238,4.49,94996.6
+2024-01-01,Operations,Remote-US,Director,56,2,1,0.0179,4.15,90275.44
+2024-01-01,Operations,Remote-EMEA,VP,97,6,0,0.0,4.37,136344.6
+2024-01-01,Operations,NYC,Manager,98,2,4,0.0408,3.88,74033.01
+2024-01-01,Operations,London,Manager,87,1,2,0.023,4.04,98133.34
+2024-01-01,Operations,Bengaluru,VP,78,2,0,0.0,3.5,131790.16
+2024-01-01,Finance,HQ,Individual Contributor,74,2,3,0.0405,3.86,79145.25
+2024-01-01,Finance,Remote-US,Individual Contributor,75,3,4,0.0533,4.17,143786.39
+2024-01-01,Finance,Remote-EMEA,Individual Contributor,9,0,0,0.0,4.55,86069.45
+2024-01-01,Finance,NYC,Manager,34,2,1,0.0294,4.5,106800.72
+2024-01-01,Finance,London,VP,46,2,2,0.0435,4.36,97482.78
+2024-01-01,Finance,Bengaluru,Manager,102,2,2,0.0196,4.25,85158.7
+2024-01-01,HR,HQ,VP,24,1,0,0.0,4.68,92102.03
+2024-01-01,HR,Remote-US,Manager,92,4,2,0.0217,4.69,124022.03
+2024-01-01,HR,Remote-EMEA,Individual Contributor,23,1,0,0.0,3.8,116758.78
+2024-01-01,HR,NYC,VP,21,1,0,0.0,3.58,74265.76
+2024-01-01,HR,London,VP,88,1,1,0.0114,3.63,124152.7
+2024-01-01,HR,Bengaluru,Director,74,2,3,0.0405,4.44,112179.15
+2024-01-01,Support,HQ,Manager,82,3,1,0.0122,3.41,109760.69
+2024-01-01,Support,Remote-US,Director,37,0,1,0.027,4.09,141147.87
+2024-01-01,Support,Remote-EMEA,Manager,78,5,1,0.0128,4.15,89878.6
+2024-01-01,Support,NYC,Director,57,1,3,0.0526,3.42,84900.51
+2024-01-01,Support,London,Manager,60,2,1,0.0167,4.07,110311.33
+2024-01-01,Support,Bengaluru,Manager,124,3,1,0.0081,3.49,81371.84
+2024-02-01,Engineering,HQ,Individual Contributor,43,1,0,0.0,4.42,115907.47
+2024-02-01,Engineering,Remote-US,Individual Contributor,62,0,1,0.0161,3.83,66732.59
+2024-02-01,Engineering,Remote-EMEA,Director,111,5,2,0.018,4.48,100809.77
+2024-02-01,Engineering,NYC,Manager,78,0,1,0.0128,3.92,141777.43
+2024-02-01,Engineering,London,VP,103,2,4,0.0388,4.54,91744.4
+2024-02-01,Engineering,Bengaluru,Director,91,3,1,0.011,3.89,72837.23
+2024-02-01,Sales,HQ,Manager,73,1,3,0.0411,4.21,135795.76
+2024-02-01,Sales,Remote-US,Individual Contributor,22,1,0,0.0,4.59,98540.08
+2024-02-01,Sales,Remote-EMEA,Individual Contributor,24,1,1,0.0417,4.18,116400.49
+2024-02-01,Sales,NYC,Individual Contributor,17,0,0,0.0,4.67,129953.96
+2024-02-01,Sales,London,VP,96,6,1,0.0104,4.21,116788.06
+2024-02-01,Sales,Bengaluru,Individual Contributor,14,0,0,0.0,4.28,104737.63
+2024-02-01,Marketing,HQ,Director,28,1,1,0.0357,3.48,140819.56
+2024-02-01,Marketing,Remote-US,Director,94,5,2,0.0213,4.34,104205.4
+2024-02-01,Marketing,Remote-EMEA,Manager,104,6,3,0.0288,3.75,89611.11
+2024-02-01,Marketing,NYC,VP,15,1,0,0.0,3.78,144827.87
+2024-02-01,Marketing,London,Individual Contributor,46,2,0,0.0,4.39,77375.63
+2024-02-01,Marketing,Bengaluru,Manager,86,6,0,0.0,3.95,77854.14
+2024-02-01,Operations,HQ,VP,82,3,3,0.0366,4.54,113511.74
+2024-02-01,Operations,Remote-US,Manager,77,0,2,0.026,4.13,65441.83
+2024-02-01,Operations,Remote-EMEA,Individual Contributor,109,6,4,0.0367,3.61,102895.92
+2024-02-01,Operations,NYC,Individual Contributor,67,1,0,0.0,3.85,71466.63
+2024-02-01,Operations,London,Individual Contributor,81,1,4,0.0494,4.51,85166.84
+2024-02-01,Operations,Bengaluru,VP,42,0,2,0.0476,4.27,89448.36
+2024-02-01,Finance,HQ,Manager,85,6,1,0.0118,3.85,107377.76
+2024-02-01,Finance,Remote-US,Individual Contributor,91,5,3,0.033,,123475.64
+2024-02-01,Finance,Remote-EMEA,Individual Contributor,94,6,2,0.0213,4.31,78057.05
+2024-02-01,Finance,NYC,VP,67,4,1,0.0149,4.62,99561.41
+2024-02-01,Finance,London,Director,117,1,3,0.0256,3.47,138274.43
+2024-02-01,Finance,Bengaluru,Individual Contributor,127,6,5,0.0394,3.72,143268.56
+2024-02-01,HR,HQ,Director,80,4,1,0.0125,3.83,96963.75
+2024-02-01,HR,Remote-US,Manager,103,7,3,,3.89,108942.58
+2024-02-01,HR,Remote-EMEA,VP,84,2,4,0.0476,3.79,84243.03
+2024-02-01,HR,NYC,Individual Contributor,101,2,4,0.0396,3.72,108801.37
+2024-02-01,HR,London,VP,24,0,0,0.0,4.28,79355.01
+2024-02-01,HR,Bengaluru,Manager,74,4,0,0.0,3.42,116807.85
+2024-02-01,Support,HQ,Manager,43,3,1,0.0233,3.82,136390.66
+2024-02-01,Support,Remote-US,Manager,36,1,1,0.0278,3.88,133320.61
+2024-02-01,Support,Remote-EMEA,Manager,75,5,4,0.0533,4.38,144882.92
+2024-02-01,Support,NYC,Director,119,6,0,0.0,4.24,84594.87
+2024-02-01,Support,London,Manager,46,0,1,,4.12,104797.66
+2024-02-01,Support,Bengaluru,Individual Contributor,85,5,1,0.0118,4.41,102641.32
+2024-03-01,Engineering,HQ,Individual Contributor,87,3,4,0.046,4.37,98998.29
+2024-03-01,Engineering,Remote-US,Director,97,2,2,0.0206,3.81,101759.71
+2024-03-01,Engineering,Remote-EMEA,Manager,97,2,4,0.0412,3.6,118774.83
+2024-03-01,Engineering,NYC,Director,14,0,0,0.0,3.66,81092.67
+2024-03-01,Engineering,London,Director,109,8,5,0.0459,4.02,98370.03
+2024-03-01,Engineering,Bengaluru,Manager,37,2,0,0.0,4.53,82217.95
+2024-03-01,Sales,HQ,VP,47,0,0,0.0,3.45,129622.03
+2024-03-01,Sales,Remote-US,VP,62,4,2,0.0323,4.64,95714.01
+2024-03-01,Sales,Remote-EMEA,Director,63,1,3,0.0476,4.6,96569.3
+2024-03-01,Sales,NYC,VP,63,1,0,,4.13,115767.67
+2024-03-01,Sales,London,Director,81,4,,0.0,3.73,76849.83
+2024-03-01,Sales,Bengaluru,VP,40,3,1,0.025,3.86,114086.38
+2024-03-01,Marketing,HQ,VP,70,4,1,0.0143,3.92,93620.16
+2024-03-01,Marketing,Remote-US,VP,48,3,1,0.0208,3.75,70117.67
+2024-03-01,Marketing,Remote-EMEA,Director,97,1,4,0.0412,4.14,141202.18
+2024-03-01,Marketing,NYC,VP,107,8,5,0.0467,4.16,90655.4
+2024-03-01,Marketing,London,Individual Contributor,84,3,4,0.0476,3.94,68437.04
+2024-03-01,Marketing,Bengaluru,Manager,13,0,0,0.0,4.65,78351.44
+2024-03-01,Operations,HQ,VP,92,3,0,0.0,3.94,99244.33
+2024-03-01,Operations,Remote-US,Director,12,0,0,0.0,3.54,106738.48
+2024-03-01,Operations,Remote-EMEA,Manager,48,1,2,0.0417,4.58,144596.14
+2024-03-01,Operations,NYC,Manager,107,,3,0.028,3.75,126485.16
+2024-03-01,Operations,London,Director,20,1,0,0.0,3.64,138398.65
+2024-03-01,Operations,Bengaluru,VP,81,6,2,0.0247,3.65,109573.28
+2024-03-01,Finance,HQ,VP,82,1,0,0.0,4.67,86782.42
+2024-03-01,Finance,Remote-US,Manager,29,0,,0.0345,3.72,100380.68
+2024-03-01,Finance,Remote-EMEA,VP,279,3,11,0.0394,4.4,105927.54
+2024-03-01,Finance,NYC,Manager,33,2,1,0.0303,3.47,105533.68
+2024-03-01,Finance,London,Director,85,4,1,0.0118,3.73,115547.87
+2024-03-01,Finance,Bengaluru,Manager,108,1,5,0.0463,4.1,81085.55
+2024-03-01,HR,HQ,Manager,40,2,0,0.0,3.52,117002.44
+2024-03-01,HR,Remote-US,Manager,64,2,0,0.0,4.42,99714.15
+2024-03-01,HR,Remote-EMEA,VP,8,0,0,0.0,3.58,67379.68
+2024-03-01,HR,NYC,VP,10,0,0,0.0,3.77,104018.59
+2024-03-01,HR,London,Individual Contributor,49,1,1,0.0204,3.53,98595.24
+2024-03-01,HR,Bengaluru,VP,115,7,2,0.0174,4.0,139884.29
+2024-03-01,Support,HQ,Manager,70,4,2,0.0286,4.3,141307.07
+2024-03-01,Support,Remote-US,Manager,127,10,5,0.0394,4.48,97369.13
+2024-03-01,Support,Remote-EMEA,VP,34,0,1,0.0294,3.61,99303.79
+2024-03-01,Support,NYC,Individual Contributor,114,,5,0.0439,3.44,82111.88
+2024-03-01,Support,London,Individual Contributor,23,0,0,,3.91,113057.14
+2024-03-01,Support,Bengaluru,Individual Contributor,87,3,1,0.0115,4.55,109197.03
+2024-04-01,Engineering,HQ,Manager,18,0,0,0.0,3.54,80590.16
+2024-04-01,Engineering,Remote-US,VP,80,2,4,0.05,3.48,127917.64
+2024-04-01,Engineering,Remote-EMEA,Individual Contributor,30,1,1,0.0333,4.39,76882.55
+2024-04-01,Engineering,NYC,Manager,20,1,0,0.0,4.15,76042.16
+2024-04-01,Engineering,London,VP,10,0,0,0.0,4.53,138922.95
+2024-04-01,Engineering,Bengaluru,Director,39,0,1,0.0256,4.57,138644.4
+2024-04-01,Sales,HQ,Director,79,5,3,0.038,4.18,132921.57
+2024-04-01,Sales,Remote-US,Manager,23,0,1,0.0435,4.52,74667.51
+2024-04-01,Sales,Remote-EMEA,Individual Contributor,16,0,0,0.0,4.55,130691.15
+2024-04-01,Sales,NYC,Director,10,0,0,0.0,3.74,109592.3
+2024-04-01,Sales,London,Individual Contributor,18,0,0,0.0,4.6,67676.8
+2024-04-01,Sales,Bengaluru,VP,60,3,1,0.0167,3.91,69690.09
+2024-04-01,Marketing,HQ,VP,35,2,0,0.0,4.14,131243.44
+2024-04-01,Marketing,Remote-US,VP,44,1,2,0.0455,3.51,71849.13
+2024-04-01,Marketing,Remote-EMEA,Director,86,3,4,0.0465,4.09,113046.72
+2024-04-01,Marketing,NYC,Individual Contributor,106,6,1,0.0094,4.56,92669.91
+2024-04-01,Marketing,London,Individual Contributor,96,5,1,0.0104,4.55,127167.92
+2024-04-01,Marketing,Bengaluru,Manager,49,1,2,0.0408,4.46,97191.63
+2024-04-01,Operations,HQ,Manager,26,0,0,0.0,3.61,118010.39
+2024-04-01,Operations,Remote-US,Manager,57,1,1,0.0175,3.76,138240.84
+2024-04-01,Operations,Remote-EMEA,Individual Contributor,30,1,1,0.0333,4.56,121525.41
+2024-04-01,Operations,NYC,VP,15,1,0,0.0,,80460.95
+2024-04-01,Operations,London,VP,95,1,2,0.0211,4.44,119458.46
+2024-04-01,Operations,Bengaluru,Manager,36,1,2,0.0556,3.55,79747.18
+2024-04-01,Finance,HQ,Director,78,1,2,0.0256,4.28,86835.01
+2024-04-01,Finance,Remote-US,Director,115,1,1,0.0087,3.56,110880.32
+2024-04-01,Finance,Remote-EMEA,Manager,128,8,4,0.0312,4.26,135457.04
+2024-04-01,Finance,NYC,VP,98,4,1,0.0102,3.53,108966.09
+2024-04-01,Finance,London,Individual Contributor,56,3,1,0.0179,3.78,121951.59
+2024-04-01,Finance,Bengaluru,Individual Contributor,93,6,1,0.0108,4.01,119650.69
+2024-04-01,HR,HQ,Individual Contributor,61,2,1,0.0164,4.49,96783.23
+2024-04-01,HR,Remote-US,VP,92,6,0,0.0,4.2,86475.39
+2024-04-01,HR,Remote-EMEA,Director,9,0,0,0.0,3.53,106240.77
+2024-04-01,HR,NYC,VP,24,1,0,0.0,4.68,140776.33
+2024-04-01,HR,London,Manager,106,2,2,0.0189,4.58,144579.09
+2024-04-01,HR,Bengaluru,Director,60,1,1,0.0167,3.7,93898.09
+2024-04-01,Support,HQ,Individual Contributor,35,1,1,0.0286,4.29,111980.2
+2024-04-01,Support,Remote-US,Manager,104,6,4,0.0385,3.78,83322.52
+2024-04-01,Support,Remote-EMEA,VP,69,4,1,0.0145,3.92,115334.76
+2024-04-01,Support,NYC,Manager,95,3,4,0.0421,3.43,140353.08
+2024-04-01,Support,London,Manager,38,,1,0.0263,4.61,95362.71
+2024-04-01,Support,Bengaluru,VP,69,2,2,0.029,3.99,93863.63
+2024-05-01,Engineering,HQ,Manager,15,0,0,0.0,4.22,131086.83
+2024-05-01,Engineering,Remote-US,VP,60,1,3,0.05,4.03,139189.22
+2024-05-01,Engineering,Remote-EMEA,Individual Contributor,27,0,0,0.0,3.68,74792.62
+2024-05-01,Engineering,NYC,VP,33,1,1,0.0303,3.81,66182.91
+2024-05-01,Engineering,London,Manager,36,2,1,0.0278,3.81,103405.22
+2024-05-01,Engineering,Bengaluru,Individual Contributor,10,0,0,0.0,3.73,120807.31
+2024-05-01,Sales,HQ,Individual Contributor,68,4,2,0.0294,3.7,71411.74
+2024-05-01,Sales,Remote-US,Individual Contributor,99,7,4,0.0404,4.52,106845.68
+2024-05-01,Sales,Remote-EMEA,Individual Contributor,16,1,0,0.0,4.07,87744.32
+2024-05-01,Sales,NYC,Manager,25,0,0,0.0,4.1,97149.16
+2024-05-01,Sales,London,Director,91,3,1,0.011,3.97,86935.82
+2024-05-01,Sales,Bengaluru,Individual Contributor,52,3,2,0.0385,4.31,136791.33
+2024-05-01,Marketing,HQ,Director,115,6,3,0.0261,3.99,133657.88
+2024-05-01,Marketing,Remote-US,Individual Contributor,52,3,2,0.0385,4.24,137539.96
+2024-05-01,Marketing,Remote-EMEA,Individual Contributor,137,10,5,0.0365,,132350.17
+2024-05-01,Marketing,NYC,VP,10,0,0,0.0,4.39,120977.67
+2024-05-01,Marketing,London,Manager,32,0,1,0.0312,3.9,143874.14
+2024-05-01,Marketing,Bengaluru,Individual Contributor,20,1,0,,4.55,110720.36
+2024-05-01,Operations,HQ,Manager,110,6,1,0.0091,,97243.52
+2024-05-01,Operations,Remote-US,Individual Contributor,36,1,0,0.0,3.97,117900.28
+2024-05-01,Operations,Remote-EMEA,Director,97,4,5,0.0515,4.27,65678.41
+2024-05-01,Operations,NYC,Manager,124,9,5,0.0403,3.75,107296.6
+2024-05-01,Operations,London,VP,115,2,6,0.0522,3.73,78600.5
+2024-05-01,Operations,Bengaluru,VP,107,3,3,0.028,4.64,102231.64
+2024-05-01,Finance,HQ,Director,30,1,1,0.0333,4.19,98131.46
+2024-05-01,Finance,Remote-US,VP,75,2,1,0.0133,4.66,78266.63
+2024-05-01,Finance,Remote-EMEA,Director,16,,0,0.0,3.8,92988.0
+2024-05-01,Finance,NYC,Manager,64,2,2,0.0312,4.05,118132.61
+2024-05-01,Finance,London,Manager,127,8,2,0.0157,4.3,79002.67
+2024-05-01,Finance,Bengaluru,Individual Contributor,54,3,0,0.0,4.09,78236.77
+2024-05-01,HR,HQ,VP,15,0,0,0.0,4.65,143510.47
+2024-05-01,HR,Remote-US,Manager,16,0,0,0.0,4.06,99999.17
+2024-05-01,HR,Remote-EMEA,VP,46,2,2,0.0435,3.59,104319.24
+2024-05-01,HR,NYC,Director,36,2,1,0.0278,3.91,80908.48
+2024-05-01,HR,London,VP,44,2,0,0.0,4.3,138417.6
+2024-05-01,HR,Bengaluru,Director,98,7,5,0.051,3.92,141852.85
+2024-05-01,Support,HQ,Individual Contributor,48,2,2,0.0417,4.37,120310.48
+2024-05-01,Support,Remote-US,VP,150,6,4,0.0267,4.23,104451.0
+2024-05-01,Support,Remote-EMEA,VP,59,2,2,0.0339,4.26,110500.73
+2024-05-01,Support,NYC,Manager,58,0,0,0.0,4.62,134075.79
+2024-05-01,Support,London,Director,74,3,0,0.0,3.69,86371.52
+2024-05-01,Support,Bengaluru,Individual Contributor,62,3,0,0.0,3.66,110013.79
+2024-06-01,Engineering,HQ,Manager,105,6,2,0.019,4.25,143924.17
+2024-06-01,Engineering,Remote-US,VP,46,2,2,0.0435,4.18,114692.21
+2024-06-01,Engineering,Remote-EMEA,Director,130,8,1,0.0077,4.24,134914.31
+2024-06-01,Engineering,NYC,VP,80,3,3,0.0375,3.62,69062.51
+2024-06-01,Engineering,London,Manager,96,6,5,0.0521,,91794.06
+2024-06-01,Engineering,Bengaluru,Individual Contributor,90,,1,0.0111,4.09,93574.54
+2024-06-01,Sales,HQ,Individual Contributor,19,0,1,0.0526,3.52,111024.39
+2024-06-01,Sales,Remote-US,Individual Contributor,61,1,2,0.0328,4.54,101939.61
+2024-06-01,Sales,Remote-EMEA,Manager,100,5,5,0.05,4.26,94993.06
+2024-06-01,Sales,NYC,Manager,85,5,1,0.0118,4.31,110957.64
+2024-06-01,Sales,London,VP,15,0,0,0.0,4.14,93469.24
+2024-06-01,Sales,Bengaluru,VP,114,7,2,0.0175,4.61,132143.51
+2024-06-01,Marketing,HQ,Director,108,4,3,0.0278,4.26,120433.65
+2024-06-01,Marketing,Remote-US,Director,66,1,2,0.0303,4.46,92375.39
+2024-06-01,Marketing,Remote-EMEA,Manager,98,5,,0.0204,4.39,117438.86
+2024-06-01,Marketing,NYC,Manager,44,0,0,0.0,3.55,143997.1
+2024-06-01,Marketing,London,Manager,93,3,5,0.0538,4.63,140771.44
+2024-06-01,Marketing,Bengaluru,Director,108,1,3,0.0278,4.61,83518.03
+2024-06-01,Operations,HQ,Director,62,4,1,0.0161,4.32,136841.27
+2024-06-01,Operations,Remote-US,Director,80,4,0,0.0,,110030.71
+2024-06-01,Operations,Remote-EMEA,VP,53,1,0,0.0,4.56,98072.48
+2024-06-01,Operations,NYC,Manager,22,1,1,0.0455,4.47,132926.77
+2024-06-01,Operations,London,Individual Contributor,92,2,2,0.0217,4.27,104433.49
+2024-06-01,Operations,Bengaluru,VP,102,3,4,0.0392,4.29,78160.43
+2024-06-01,Finance,HQ,Director,106,7,,0.0189,3.73,78202.49
+2024-06-01,Finance,Remote-US,Individual Contributor,83,4,0,0.0,3.41,97294.48
+2024-06-01,Finance,Remote-EMEA,Director,16,1,0,0.0,4.08,131626.98
+2024-06-01,Finance,NYC,Manager,79,2,2,0.0253,4.06,123720.25
+2024-06-01,Finance,London,Manager,33,0,1,0.0303,4.16,120833.7
+2024-06-01,Finance,Bengaluru,Individual Contributor,124,6,2,,4.19,108117.86
+2024-06-01,HR,HQ,Director,52,2,1,,3.82,116144.85
+2024-06-01,HR,Remote-US,Director,48,3,2,0.0417,4.14,100163.05
+2024-06-01,HR,Remote-EMEA,Individual Contributor,35,1,0,0.0,4.08,115660.59
+2024-06-01,HR,NYC,Manager,68,2,1,0.0147,3.51,74557.78
+2024-06-01,HR,London,Director,22,1,0,0.0,3.99,83701.87
+2024-06-01,HR,Bengaluru,Director,69,1,3,0.0435,4.22,139760.22
+2024-06-01,Support,HQ,Director,27,0,1,0.037,4.68,108380.67
+2024-06-01,Support,Remote-US,VP,39,0,1,0.0256,3.46,129064.66
+2024-06-01,Support,Remote-EMEA,Individual Contributor,51,4,1,0.0196,4.23,143999.91
+2024-06-01,Support,NYC,Director,51,3,1,0.0196,4.43,100720.88
+2024-06-01,Support,London,Manager,21,1,0,0.0,4.09,140992.86
+2024-06-01,Support,Bengaluru,VP,46,2,2,0.0435,3.98,66927.62
+2024-07-01,Engineering,HQ,VP,117,6,1,0.0085,4.0,116093.86
+2024-07-01,Engineering,Remote-US,Director,26,0,0,0.0,3.61,85266.52
+2024-07-01,Engineering,Remote-EMEA,Director,74,1,3,0.0405,4.09,118728.91
+2024-07-01,Engineering,NYC,Individual Contributor,21,1,0,0.0,3.96,82401.71
+2024-07-01,Engineering,London,Director,61,1,2,0.0328,4.27,98891.8
+2024-07-01,Engineering,Bengaluru,Individual Contributor,100,5,1,0.01,3.78,119070.7
+2024-07-01,Sales,HQ,Manager,83,3,4,0.0482,3.97,79464.67
+2024-07-01,Sales,Remote-US,Director,50,1,0,0.0,3.97,110381.82
+2024-07-01,Sales,Remote-EMEA,Director,67,1,3,0.0448,4.23,80413.22
+2024-07-01,Sales,NYC,VP,101,2,4,0.0396,3.99,85861.2
+2024-07-01,Sales,London,Director,31,2,0,0.0,4.45,115748.57
+2024-07-01,Sales,Bengaluru,Individual Contributor,7,0,,0.0,4.06,89490.58
+2024-07-01,Marketing,HQ,Individual Contributor,96,1,0,0.0,3.58,129634.21
+2024-07-01,Marketing,Remote-US,Manager,77,3,4,0.0519,3.88,76157.85
+2024-07-01,Marketing,Remote-EMEA,Manager,82,2,3,0.0366,4.32,73389.52
+2024-07-01,Marketing,NYC,Director,101,3,3,0.0297,3.91,74676.17
+2024-07-01,Marketing,London,Individual Contributor,92,0,1,0.0109,3.65,103218.53
+2024-07-01,Marketing,Bengaluru,Manager,72,0,4,0.0556,3.62,97569.33
+2024-07-01,Operations,HQ,Director,68,4,3,0.0441,4.64,113812.09
+2024-07-01,Operations,Remote-US,Individual Contributor,14,0,0,0.0,3.8,137034.32
+2024-07-01,Operations,Remote-EMEA,Manager,39,2,1,0.0256,4.34,121563.75
+2024-07-01,Operations,NYC,Manager,87,1,3,0.0345,4.39,119421.22
+2024-07-01,Operations,London,Manager,117,5,1,0.0085,3.61,133346.82
+2024-07-01,Operations,Bengaluru,Director,40,2,1,0.025,,138909.34
+2024-07-01,Finance,HQ,VP,16,0,,0.0,3.73,83774.1
+2024-07-01,Finance,Remote-US,VP,20,1,0,0.0,3.67,135571.42
+2024-07-01,Finance,Remote-EMEA,Individual Contributor,20,0,0,0.0,4.11,133705.54
+2024-07-01,Finance,NYC,Director,24,1,0,0.0,3.54,125901.65
+2024-07-01,Finance,London,Director,77,4,3,0.039,4.14,92531.07
+2024-07-01,Finance,Bengaluru,VP,32,2,,0.0312,4.02,101929.94
+2024-07-01,HR,HQ,Individual Contributor,52,4,0,0.0,3.6,94198.81
+2024-07-01,HR,Remote-US,Individual Contributor,74,1,3,0.0405,3.65,123956.73
+2024-07-01,HR,Remote-EMEA,Director,122,6,4,0.0328,4.54,119213.3
+2024-07-01,HR,NYC,VP,10,0,0,0.0,4.55,107441.4
+2024-07-01,HR,London,Director,17,0,0,0.0,4.51,83655.85
+2024-07-01,HR,Bengaluru,VP,25,1,0,0.0,4.18,99090.39
+2024-07-01,Support,HQ,Manager,20,0,0,0.0,4.55,100106.34
+2024-07-01,Support,Remote-US,VP,89,4,2,0.0225,4.18,86020.11
+2024-07-01,Support,Remote-EMEA,Manager,63,3,2,0.0317,3.57,86145.66
+2024-07-01,Support,NYC,Director,46,0,2,0.0435,4.14,101404.45
+2024-07-01,Support,London,Director,104,1,3,0.0288,,136099.11
+2024-07-01,Support,Bengaluru,Director,79,1,3,0.038,4.21,126736.3
+2024-08-01,Engineering,HQ,Manager,83,3,4,0.0482,4.46,76640.99
+2024-08-01,Engineering,Remote-US,Director,49,1,1,0.0204,3.81,144862.25
+2024-08-01,Engineering,Remote-EMEA,VP,18,0,1,0.0556,4.43,131646.5
+2024-08-01,Engineering,NYC,VP,24,1,0,0.0,3.86,129013.79
+2024-08-01,Engineering,London,VP,87,3,3,0.0345,3.72,93298.62
+2024-08-01,Engineering,Bengaluru,VP,63,1,0,0.0,3.82,106189.54

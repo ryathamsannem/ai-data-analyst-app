@@ -59,7 +59,17 @@ export const aiInsightsAskQuestionLabel =
 export const aiInsightsAskInputBlock = "mt-2";
 
 export const aiInsightsAskComposer =
-  "ai-insights-ask-composer flex flex-col gap-4";
+  "ai-insights-ask-composer flex flex-col gap-3";
+
+/** Vertical rhythm between answer, chart, cards, and follow-ups (Insights ask column). */
+export const aiInsightsResultsStack =
+  "ai-insights-results-stack mt-3 flex w-full min-w-0 flex-col gap-3 sm:gap-3.5";
+
+export const aiInsightsAskError =
+  "rounded-xl border border-rose-500/25 bg-rose-50/90 px-3.5 py-2.5 text-sm leading-relaxed text-rose-900 dark:border-rose-500/30 dark:bg-rose-950/35 dark:text-rose-100";
+
+export const aiInsightsAskLoading =
+  "flex items-center gap-2 text-sm text-[var(--text-muted)] dark:text-[color:var(--insights-text-muted)]";
 
 export const aiInsightsAskTextarea =
   "ai-insights-ask-textarea w-full min-h-[5.75rem] resize-y rounded-xl border border-[color:var(--border-default)]/70 bg-[color:var(--surface-elevated)] px-3 py-2.5 text-sm leading-snug text-[var(--foreground)] shadow-[0_1px_2px_rgba(15,23,42,0.03)] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out placeholder:text-[var(--text-muted)] focus:outline-none dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:placeholder:text-[color:var(--insights-text-muted)] sm:min-h-[6rem]";
@@ -72,13 +82,13 @@ export const aiInsightsAskSubmitBtn =
 
 /** AI Answer — executive analysis panel (presentation only). */
 export const aiInsightsAnswerCard =
-  "ai-insights-answer mt-3 w-full min-w-0 rounded-2xl border border-[color:var(--border-default)]/80 bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-sm)] ring-1 ring-slate-900/[0.03] sm:p-5 lg:px-6 dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:ring-white/[0.04]";
+  "ai-insights-answer w-full min-w-0 rounded-2xl border border-[color:var(--border-default)]/80 bg-[color:var(--surface-elevated)] p-4 shadow-[var(--shadow-sm)] ring-1 ring-slate-900/[0.03] sm:p-5 lg:px-6 dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:ring-white/[0.04]";
 
 export const aiInsightsAnswerHeader =
   "flex flex-col gap-0.5 border-b border-[color:var(--border-default)]/50 pb-3 dark:border-[color:var(--insights-border-soft)]";
 
 export const aiInsightsAnswerKicker =
-  "text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-700/80 dark:text-indigo-300";
+  "text-[11px] font-semibold text-indigo-700/85 dark:text-indigo-300/95";
 
 export const aiInsightsAnswerTitle =
   "text-base font-semibold tracking-tight text-[var(--foreground)] sm:text-[17px]";
@@ -93,7 +103,7 @@ export const aiInsightsAnswerSummaryPanel =
   "ai-insights-answer-summary-panel rounded-xl border border-[color:var(--border-default)]/45 bg-[color:var(--surface-elevated)] px-3.5 py-2.5 shadow-[var(--shadow-sm)] dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-inset)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:px-4 sm:py-3";
 
 export const aiInsightsAnswerSummary =
-  "ai-insights-answer-summary m-0 text-[15px] leading-[1.65] text-slate-800 whitespace-pre-line sm:text-base dark:text-[color:var(--insights-answer-body)]";
+  "ai-insights-answer-summary m-0 text-[15px] leading-[1.72] text-slate-800 whitespace-pre-line sm:text-base dark:text-[color:var(--insights-answer-body)]";
 
 export const aiInsightsAnswerDetailsGroup =
   "ai-insights-answer-details space-y-0 rounded-xl border border-[color:var(--border-default)]/35 bg-[color:color-mix(in_srgb,var(--surface-subtle)_42%,var(--surface-elevated))] px-1 py-1 shadow-[var(--shadow-sm)] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:px-1.5 sm:py-1.5";
@@ -138,7 +148,7 @@ export const aiInsightsAnswerDetailBody =
 export const aiInsightsAnswerBodyWrap = "space-y-2.5";
 
 export const aiInsightsAnswerBodyPara =
-  "ai-insights-answer-body-para text-[14px] leading-[1.68] text-slate-600 dark:text-[color:var(--insights-answer-body)]";
+  "ai-insights-answer-body-para text-[14px] leading-[1.72] text-slate-600 dark:text-[color:var(--insights-answer-body)]";
 
 export const aiInsightsAnswerBodyEmphasis =
   "ai-insights-answer-body-emphasis font-semibold text-slate-900 dark:text-[color:var(--insights-answer-emphasis)]";
@@ -156,7 +166,7 @@ export const aiInsightsAnswerFindingItem =
   "ai-insights-answer-finding-item relative text-[14px] leading-[1.62] text-slate-700 before:absolute before:-left-3 before:top-[0.62em] before:h-1.5 before:w-1.5 before:-translate-x-1/2 before:rounded-full before:bg-indigo-500 before:content-[''] dark:text-[color:var(--insights-answer-body)] dark:before:bg-indigo-400";
 
 export const aiInsightsConfidenceShell =
-  "ai-insights-confidence mt-4 w-full min-w-0 rounded-xl border px-4 py-3.5 transition-shadow duration-300 sm:px-5 sm:py-4";
+  "ai-insights-confidence w-full min-w-0 rounded-xl border px-4 py-3 transition-shadow duration-300 sm:px-5 sm:py-3.5";
 
 export const aiInsightsConfidenceNormal =
   "ai-insights-confidence--normal border-[color:var(--border-default)]/60 bg-[color:color-mix(in_srgb,var(--surface-subtle)_80%,var(--surface-elevated))] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-nested)]";
@@ -168,7 +178,7 @@ export const aiInsightsConfidenceDisclaimer =
   "ai-insights-confidence__disclaimer mt-2.5 text-[13px] leading-[1.55] text-amber-950/90";
 
 export const aiInsightsExecutiveShell =
-  "ai-insights-executive mt-3.5 w-full min-w-0 rounded-2xl border border-[color:var(--border-default)]/60 bg-[color:var(--surface-subtle)] p-4 shadow-[var(--shadow-sm)] sm:p-5 dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]";
+  "ai-insights-executive w-full min-w-0 rounded-2xl border border-[color:var(--border-default)]/60 bg-[color:var(--surface-subtle)] p-4 shadow-[var(--shadow-sm)] sm:p-5 dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]";
 
 export const aiInsightsExecutiveTitle =
   "ai-insights-executive__title text-[11px] font-bold uppercase tracking-[0.1em] text-slate-600 dark:text-[#c8d4e8]";
@@ -221,19 +231,19 @@ export const aiInsightsSuggestedRecentItem =
 
 /** Suggested follow-ups (after AI answer). */
 export const aiInsightsFollowupSection =
-  "ai-insights-followup mt-3 w-full min-w-0 rounded-xl border border-[color:var(--border-default)]/45 bg-[color:color-mix(in_srgb,var(--surface-subtle)_65%,var(--surface-elevated))] p-3.5 sm:p-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)]";
+  "ai-insights-followup w-full min-w-0 rounded-xl border border-[color:var(--border-default)]/45 bg-[color:color-mix(in_srgb,var(--surface-subtle)_65%,var(--surface-elevated))] p-3.5 sm:p-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)]";
 
 export const aiInsightsFollowupTitle =
-  "mb-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-subtle)] dark:text-[color:var(--insights-text-muted)]";
+  "mb-2 text-[11px] font-semibold text-[var(--text-muted)] dark:text-[color:var(--insights-text-muted)]";
 
 export const aiInsightsFollowupList =
   "flex flex-wrap items-stretch gap-2 sm:gap-2.5";
 
 export const aiInsightsFollowupChip =
-  "ai-insights-followup-chip inline-flex max-w-full min-h-[2.125rem] items-center rounded-full border border-[color:var(--border-default)]/50 bg-[color:var(--surface-elevated)] px-3.5 py-2 text-left text-[12px] font-normal leading-[1.45] tracking-tight text-[var(--foreground)] shadow-[0_1px_2px_rgba(15,23,42,0.025)] hover:-translate-y-px hover:border-[color:color-mix(in_srgb,var(--accent)_16%,var(--border-default))] hover:bg-[color:color-mix(in_srgb,var(--accent-wash)_30%,var(--surface-elevated))] hover:shadow-[0_3px_10px_-6px_color-mix(in_srgb,var(--accent)_12%,transparent)] focus-visible:outline-none active:translate-y-0 disabled:pointer-events-none disabled:opacity-45 sm:max-w-[min(100%,22rem)] sm:px-4 sm:py-2 sm:text-[13px] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] dark:hover:border-[color:var(--insights-border-medium)] dark:hover:bg-[color:var(--insights-layer-nested)] dark:hover:text-[color:var(--insights-text-secondary)] dark:hover:shadow-[0_4px_14px_-10px_rgba(0,0,0,0.28)]";
+  "ai-insights-followup-chip inline-flex max-w-full min-h-[2.125rem] cursor-pointer items-center rounded-full border border-[color:var(--border-default)]/50 bg-[color:var(--surface-elevated)] px-3.5 py-2 text-left text-[12px] font-medium leading-[1.45] tracking-tight text-[var(--foreground)] shadow-[0_1px_2px_rgba(15,23,42,0.025)] transition-[transform,box-shadow,border-color,background-color] duration-200 hover:-translate-y-px hover:border-[color:color-mix(in_srgb,var(--accent)_16%,var(--border-default))] hover:bg-[color:color-mix(in_srgb,var(--accent-wash)_30%,var(--surface-elevated))] hover:shadow-[0_3px_10px_-6px_color-mix(in_srgb,var(--accent)_12%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/35 focus-visible:ring-offset-2 active:translate-y-0 disabled:pointer-events-none disabled:opacity-45 sm:max-w-[min(100%,22rem)] sm:px-4 sm:py-2 sm:text-[13px] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-secondary)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] dark:hover:border-[color:var(--insights-border-medium)] dark:hover:bg-[color:var(--insights-layer-nested)] dark:hover:text-[color:var(--insights-text-secondary)] dark:hover:shadow-[0_4px_14px_-10px_rgba(0,0,0,0.28)] dark:focus-visible:ring-offset-[color:var(--insights-layer-card)]";
 
 export const aiInsightsProvenanceShell =
-  "ai-insights-provenance mt-3 w-full min-w-0 overflow-hidden rounded-xl border border-[color:var(--border-default)]/60 bg-[color:color-mix(in_srgb,var(--surface-subtle)_75%,var(--surface-elevated))] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)]";
+  "ai-insights-provenance w-full min-w-0 overflow-hidden rounded-xl border border-[color:var(--border-default)]/60 bg-[color:color-mix(in_srgb,var(--surface-subtle)_75%,var(--surface-elevated))] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)]";
 
 export const aiInsightsProvenanceToggle =
   "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[color:color-mix(in_srgb,var(--surface-subtle)_80%,transparent)] sm:px-5 sm:py-3.5 dark:hover:bg-white/[0.03]";
@@ -278,7 +288,7 @@ export const chartsTabVizSessionFrame =
 
 /** Visualization card — AI Insights tab only (shell styled in globals `.ai-insights-viz-card`). */
 export const aiInsightsVizCard =
-  `${chartVizThemeScope} ai-insights-viz ai-insights-viz-card group/chart mt-3 w-full min-w-0 overflow-hidden`;
+  `${chartVizThemeScope} ai-insights-viz ai-insights-viz-card group/chart w-full min-w-0 overflow-hidden`;
 
 export const aiInsightsVizKicker =
   "text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)] dark:text-[color:var(--insights-text-muted)]";

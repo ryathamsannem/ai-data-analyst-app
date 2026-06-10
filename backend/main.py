@@ -6221,7 +6221,24 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
 
     cand_dims = _dimension_pool_columns(df, profile)
 
+    try:
+        from intent_engine.dimension_request import (
+            extract_rank_dimension_phrase,
+            filter_dimension_request_phrases,
+            resolve_phrase_to_column,
+        )
+        from intent_engine.column_resolve import resolve_dimension_phrase_to_column
+
+        rank_dim_phrase = extract_rank_dimension_phrase(ql)
+    except Exception:
+        rank_dim_phrase = None
+        filter_dimension_request_phrases = lambda phrases, *_a, **_k: phrases  # type: ignore
+        resolve_dimension_phrase_to_column = None  # type: ignore
+
     by_phrases = _extract_all_by_dimension_phrases(ql)
+    by_phrases = filter_dimension_request_phrases(
+        by_phrases, df, profile, match_column=_match_column_from_phrase
+    )
     by_cols_ordered: List[str] = []
     seen_b: set = set()
     for phrase in by_phrases:
@@ -6259,6 +6276,13 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
     secondary_col: Optional[str] = None
     gcol: Optional[str] = None
 
+    if rank_dim_phrase and resolve_dimension_phrase_to_column:
+        rank_hit = resolve_dimension_phrase_to_column(
+            rank_dim_phrase, cand_dims or cols, profile
+        )
+        if rank_hit:
+            gcol = str(rank_hit)
+
     if focus_col and by_cols_ordered:
         if focus_col != by_cols_ordered[-1]:
             gcol = focus_col
@@ -6269,11 +6293,18 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         gcol = by_cols_ordered[0]
         secondary_col = by_cols_ordered[1]
     else:
-        gcol = _resolve_by_column_from_question(ql, cols, profile)
+        if not gcol:
+            gcol = _resolve_by_column_from_question(ql, cols, profile)
         if not gcol and by_cols_ordered:
             gcol = by_cols_ordered[0]
         if not gcol:
-            for phrase in dim_request_phrases:
+            metric_filtered_phrases = filter_dimension_request_phrases(
+                dim_request_phrases,
+                df,
+                profile,
+                match_column=_match_column_from_phrase,
+            )
+            for phrase in metric_filtered_phrases:
                 if phrase_is_time_bucket(phrase):
                     dcol = _pick_date_column_for_trend(df, profile)
                     if dcol:
@@ -7448,6 +7479,13 @@ def _prefer_lower_cardinality_dimension(
             geo_col = resolve_geographic_group_column(question_lower, df, profile)
             if geo_col and str(geo_col) in df.columns:
                 return str(geo_col)
+    except Exception:
+        pass
+    try:
+        from intent_engine.dimension_request import question_requests_concentration_analysis
+
+        if question_requests_concentration_analysis(question_lower):
+            return current
     except Exception:
         pass
     if _question_explicitly_requests_dimension(question_lower, current):
@@ -10720,6 +10758,15 @@ def _chart_selection_question_bucket(ql: str) -> str:
     if _question_asks_outlier_analysis(q) and not _question_explicitly_groups_by_dimension(q):
         return "outlier"
     if re.search(r"\b(vs\.?|versus|against)\b", q):
+        try:
+            from intent_engine.dimension_request import (
+                question_requests_dimension_value_compare,
+            )
+
+            if question_requests_dimension_value_compare(q):
+                return "compare"
+        except Exception:
+            pass
         return "relationship"
     if _looks_like_ranking_question(q) or _extract_top_n(q) is not None:
         return "ranking"
@@ -13415,6 +13462,35 @@ def compute_visualization_for_question(
     cohort_df = df
     entity_filter_meta: Optional[Dict[str, str]] = None
     entity_explain_peer_compare = False
+    dimension_value_compare: Optional[Dict[str, Any]] = None
+    try:
+        from intent_engine.dimension_request import (
+            find_categorical_entity_filter,
+            find_dimension_value_compare,
+            question_requests_entity_performance_explanation,
+            resolve_entity_explain_chart_plan,
+        )
+
+        dimension_value_compare = find_dimension_value_compare(
+            question, df, profile_live
+        )
+        if dimension_value_compare:
+            gcol = str(dimension_value_compare["group_col"])
+            values = [str(v) for v in dimension_value_compare.get("values") or []]
+            if gcol in df.columns and values:
+                sub = df[
+                    df[gcol].astype(str).str.strip().isin(values)
+                ]
+                if not sub.empty:
+                    cohort_df = sub
+                    analysis_row_count = int(len(cohort_df))
+                    entity_filter_meta = {
+                        "column": gcol,
+                        "value": " vs ".join(values),
+                        "mode": "value_compare",
+                    }
+    except Exception:
+        pass
     try:
         from intent_engine.dimension_request import (
             find_categorical_entity_filter,
@@ -13448,6 +13524,10 @@ def compute_visualization_for_question(
     correlation_routing_locked = _question_requests_correlation_routing(question)
 
     intent_debug = _describe_aggregate_intent(question, cohort_df, profile_live)
+    if dimension_value_compare and intent_debug:
+        intent_debug["group_col"] = str(dimension_value_compare["group_col"])
+        intent_debug["dimension_value_compare"] = True
+        intent_debug.pop("secondary_group_col", None)
     if entity_filter_meta and intent_debug:
         intent_debug["entity_filter_column"] = entity_filter_meta["column"]
         intent_debug["entity_filter_value"] = entity_filter_meta["value"]

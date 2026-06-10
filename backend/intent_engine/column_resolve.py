@@ -47,6 +47,16 @@ DIMENSION_PHRASE_ALIASES: Dict[str, Tuple[str, ...]] = {
     "incidents": ("department", "category"),
     "clinical": ("department",),
     "support": ("department",),
+    "sales rep": ("sales_rep",),
+    "sales reps": ("sales_rep",),
+    "salesperson": ("sales_rep",),
+    "salespeople": ("sales_rep",),
+    "rep": ("sales_rep",),
+    "reps": ("sales_rep",),
+    "city": ("city", "metro", "location"),
+    "cities": ("city", "metro", "location"),
+    "campaign": ("campaign", "campaign_name", "category"),
+    "campaigns": ("campaign", "campaign_name", "category"),
 }
 
 
@@ -163,11 +173,23 @@ def find_column_for_token(
                 return str(c)
         return None
 
-    if token == "revenue":
+    if token == "revenue" and numeric_only:
         for prefer in ("revenue", "sales", "gross sales", "total revenue"):
             for c in pool:
                 if prefer in _norm_col(c):
                     return str(c)
+        return None
+
+    if token_l in (
+        "credit utilization",
+        "credit_utilization",
+        "utilization",
+        "utilization rate",
+    ):
+        for c in pool:
+            cn = _norm_col(c)
+            if "utilization" in cn:
+                return str(c)
         return None
 
     if token_l in ("region", "regions"):

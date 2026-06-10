@@ -1,0 +1,301 @@
+report_date,department,ticket_category,priority,channel,tickets_opened,tickets_resolved,avg_resolution_hours,satisfaction_score,escalations
+2024-01-01,Tier-1,Account,High,Email,395,376,23.28,3.46,63
+2024-01-01,Tier-1,Billing,Critical,Chat,303,297,16.88,3.87,12
+2024-01-01,Tier-1,Bug,Low,Portal,453,409,3.89,3.73,39
+2024-01-01,Tier-1,Feature Request,Low,Phone,145,133,27.25,3.95,13
+2024-01-01,Tier-1,Outage,Medium,Portal,246,209,6.31,4.09,20
+2024-01-01,Tier-1,Onboarding,Critical,Phone,75,66,14.03,4.38,11
+2024-01-01,Tier-2,Account,Critical,Phone,46,37,23.59,3.84,6
+2024-01-01,Tier-2,Billing,Low,Portal,174,155,18.59,3.73,16
+2024-01-01,Tier-2,Bug,Medium,Portal,270,264,4.73,4.61,32
+2024-01-01,Tier-2,Feature Request,High,Portal,399,348,13.03,4.31,26
+2024-01-01,Tier-2,Outage,Critical,Email,486,414,4.51,3.53,70
+2024-01-01,Tier-2,Onboarding,Medium,Phone,360,286,4.11,3.79,51
+2024-01-01,Tier-3,Account,Critical,Email,45,,4.69,4.37,1
+2024-01-01,Tier-3,Billing,Critical,Email,130,123,17.97,3.87,7
+2024-01-01,Tier-3,Bug,Medium,Phone,47,40,22.3,3.38,5
+2024-01-01,Tier-3,Feature Request,Medium,Chat,172,161,19.4,3.43,27
+2024-01-01,Tier-3,Outage,Low,Email,466,411,5.52,,63
+2024-01-01,Tier-3,Onboarding,Low,Phone,147,135,13.34,,4
+2024-01-01,Billing,Account,Medium,Chat,129,127,7.89,4.76,18
+2024-01-01,Billing,Billing,High,Email,468,424,21.51,3.67,49
+2024-01-01,Billing,Bug,Low,Email,494,453,21.46,3.63,24
+2024-01-01,Billing,Feature Request,Critical,Email,100,90,15.1,3.62,14
+2024-01-01,Billing,Outage,High,Chat,65,58,14.83,4.45,6
+2024-01-01,Billing,Onboarding,Critical,Portal,99,79,21.91,4.04,14
+2024-01-01,Technical,Account,High,Chat,474,408,3.19,3.33,43
+2024-01-01,Technical,Billing,High,Portal,259,220,13.55,4.36,37
+2024-01-01,Technical,Bug,Low,Email,197,182,9.88,4.23,25
+2024-01-01,Technical,Feature Request,High,Chat,467,436,14.23,3.81,62
+2024-01-01,Technical,Outage,Critical,Phone,75,64,23.79,4.04,10
+2024-01-01,Technical,Onboarding,Low,Portal,189,183,23.44,4.36,13
+2024-02-01,Tier-1,Account,Medium,Chat,307,268,26.24,3.01,36
+2024-02-01,Tier-1,Billing,Critical,Chat,359,296,20.45,4.0,51
+2024-02-01,Tier-1,Bug,High,Email,312,286,5.27,3.37,15
+2024-02-01,Tier-1,Feature Request,Low,Portal,364,302,23.27,4.0,47
+2024-02-01,Tier-1,Outage,Low,Chat,467,459,35.35,3.09,48
+2024-02-01,Tier-1,Onboarding,Medium,Phone,225,198,3.87,3.95,32
+2024-02-01,Tier-2,Account,High,Chat,326,264,21.77,3.84,45
+2024-02-01,Tier-2,Billing,High,Email,271,217,7.6,4.45,31
+2024-02-01,Tier-2,Bug,High,Chat,155,143,12.54,4.27,7
+2024-02-01,Tier-2,Feature Request,High,Portal,324,284,26.26,3.92,19
+2024-02-01,Tier-2,Outage,Low,Chat,309,263,14.73,3.05,16
+2024-02-01,Tier-2,Onboarding,High,Portal,370,,7.6,,28
+2024-02-01,Tier-3,Account,High,Phone,409,395,23.81,3.56,40
+2024-02-01,Tier-3,Billing,Medium,Chat,475,454,22.82,4.41,66
+2024-02-01,Tier-3,Bug,Low,Email,141,112,18.4,4.36,11
+2024-02-01,Tier-3,Feature Request,Medium,Phone,167,151,20.51,4.9,9
+2024-02-01,Tier-3,Outage,Low,Email,140,130,23.94,3.17,16
+2024-02-01,Tier-3,Onboarding,Medium,Chat,297,249,24.02,4.33,10
+2024-02-01,Billing,Account,Medium,Portal,452,384,24.99,4.43,48
+2024-02-01,Billing,Billing,Critical,Email,100,88,4.25,3.47,12
+2024-02-01,Billing,Bug,Medium,Email,284,238,12.94,4.18,17
+2024-02-01,Billing,Feature Request,Critical,Email,138,130,25.78,3.44,11
+2024-02-01,Billing,Outage,Critical,Phone,61,52,16.84,3.19,4
+2024-02-01,Billing,Onboarding,Critical,Email,430,,22.68,3.51,36
+2024-02-01,Technical,Account,Critical,Portal,414,389,3.32,3.63,32
+2024-02-01,Technical,Billing,Low,Chat,337,297,20.38,3.89,39
+2024-02-01,Technical,Bug,Low,Phone,130,107,11.28,4.6,15
+2024-02-01,Technical,Feature Request,Medium,Email,362,324,6.93,3.91,23
+2024-02-01,Technical,Outage,High,Chat,286,274,24.08,3.66,36
+2024-02-01,Technical,Onboarding,Low,Email,196,179,11.21,3.44,30
+2024-03-01,Tier-1,Account,Medium,Portal,348,291,18.19,3.16,45
+2024-03-01,Tier-1,Billing,Low,Email,434,406,23.78,3.59,18
+2024-03-01,Tier-1,Bug,Medium,Phone,210,200,21.58,3.68,9
+2024-03-01,Tier-1,Feature Request,Low,Portal,175,138,6.82,4.54,15
+2024-03-01,Tier-1,Outage,High,Phone,434,357,5.3,4.57,28
+2024-03-01,Tier-1,Onboarding,Medium,Phone,482,395,28.52,4.12,26
+2024-03-01,Tier-2,Account,Low,Chat,457,367,15.31,3.64,24
+2024-03-01,Tier-2,Billing,Medium,Email,436,402,9.78,3.97,16
+2024-03-01,Tier-2,Bug,Low,Portal,244,223,10.6,4.19,27
+2024-03-01,Tier-2,Feature Request,Medium,Phone,445,388,31.25,,48
+2024-03-01,Tier-2,Outage,Critical,Chat,248,219,23.74,2.86,24
+2024-03-01,Tier-2,Onboarding,Critical,Portal,167,160,8.29,3.8,13
+2024-03-01,Tier-3,Account,Medium,Chat,74,71,29.13,3.74,8
+2024-03-01,Tier-3,Billing,Low,Email,414,343,13.91,4.3,12
+2024-03-01,Tier-3,Bug,High,Chat,406,352,21.47,4.7,32
+2024-03-01,Tier-3,Feature Request,High,Email,391,325,5.7,3.48,32
+2024-03-01,Tier-3,Outage,Low,Chat,274,221,23.92,3.53,42
+2024-03-01,Tier-3,Onboarding,High,Chat,320,255,28.41,3.85,35
+2024-03-01,Billing,Account,High,Chat,254,238,27.75,3.98,8
+2024-03-01,Billing,Billing,High,Email,188,178,26.32,4.66,9
+2024-03-01,Billing,Bug,High,Email,488,396,18.08,3.6,55
+2024-03-01,Billing,Feature Request,High,Phone,237,196,12.09,3.43,19
+2024-03-01,Billing,Outage,High,Phone,313,292,5.68,4.5,8
+2024-03-01,Billing,Onboarding,High,Portal,473,385,23.98,4.55,14
+2024-03-01,Technical,Account,Medium,Phone,142,139,27.75,4.35,18
+2024-03-01,Technical,Billing,Critical,Portal,223,181,16.39,4.01,14
+2024-03-01,Technical,Bug,Medium,Chat,55,44,27.98,4.22,4
+2024-03-01,Technical,Feature Request,Critical,Portal,164,141,24.28,3.51,10
+2024-03-01,Technical,Outage,Medium,Portal,51,40,7.23,3.08,2
+2024-03-01,Technical,Onboarding,Medium,Portal,419,349,2.26,4.73,54
+2024-04-01,Tier-1,Account,Medium,Email,518,508,13.95,4.73,71
+2024-04-01,Tier-1,Billing,Critical,Chat,213,169,18.31,,20
+2024-04-01,Tier-1,Bug,High,Portal,491,414,18.97,4.81,33
+2024-04-01,Tier-1,Feature Request,Low,Phone,429,397,3.42,4.34,58
+2024-04-01,Tier-1,Outage,Critical,Chat,463,401,32.05,4.46,63
+2024-04-01,Tier-1,Onboarding,Low,Phone,344,,3.83,4.19,22
+2024-04-01,Tier-2,Account,Medium,Portal,73,71,9.72,3.9,6
+2024-04-01,Tier-2,Billing,Medium,Portal,394,338,21.2,3.44,56
+2024-04-01,Tier-2,Bug,Critical,Chat,197,165,13.2,2.81,16
+2024-04-01,Tier-2,Feature Request,Medium,Portal,137,110,19.29,4.33,11
+2024-04-01,Tier-2,Outage,High,Portal,437,408,3.66,3.15,66
+2024-04-01,Tier-2,Onboarding,Medium,Email,328,285,8.15,,49
+2024-04-01,Tier-3,Account,Medium,Portal,86,71,19.64,4.44,9
+2024-04-01,Tier-3,Billing,Critical,Email,43,39,8.97,2.82,3
+2024-04-01,Tier-3,Bug,Medium,Email,478,415,23.89,4.53,53
+2024-04-01,Tier-3,Feature Request,High,Chat,367,355,14.18,3.81,16
+2024-04-01,Tier-3,Outage,Low,Phone,135,123,13.79,3.94,2
+2024-04-01,Tier-3,Onboarding,Critical,Portal,346,270,4.2,3.81,23
+2024-04-01,Billing,Account,Critical,Email,364,344,4.04,4.33,49
+2024-04-01,Billing,Billing,High,Phone,385,354,10.58,3.06,16
+2024-04-01,Billing,Bug,Medium,Email,450,411,16.91,4.15,39
+2024-04-01,Billing,Feature Request,Low,Portal,124,104,10.83,4.21,8
+2024-04-01,Billing,Outage,Medium,Chat,176,137,8.86,3.9,9
+2024-04-01,Billing,Onboarding,Low,Portal,86,75,23.23,3.44,11
+2024-04-01,Technical,Account,Medium,Portal,359,339,29.99,3.89,24
+2024-04-01,Technical,Billing,Critical,Chat,148,135,23.31,4.09,22
+2024-04-01,Technical,Bug,High,Chat,179,170,20.96,3.95,16
+2024-04-01,Technical,Feature Request,High,Portal,486,406,24.14,4.49,70
+2024-04-01,Technical,Outage,Medium,Email,99,96,22.9,3.67,4
+2024-04-01,Technical,Onboarding,Low,Chat,182,155,3.42,3.35,20
+2024-05-01,Tier-1,Account,Medium,Email,90,74,21.83,3.06,4
+2024-05-01,Tier-1,Billing,High,Phone,475,398,18.64,3.48,61
+2024-05-01,Tier-1,Bug,Critical,Portal,438,368,19.59,4.08,11
+2024-05-01,Tier-1,Feature Request,Medium,Phone,149,132,10.22,4.2,18
+2024-05-01,Tier-1,Outage,High,Chat,205,177,26.15,4.04,5
+2024-05-01,Tier-1,Onboarding,Low,Chat,332,288,12.17,3.31,44
+2024-05-01,Tier-2,Account,Low,Chat,112,94,21.5,4.14,9
+2024-05-01,Tier-2,Billing,Medium,Phone,164,135,13.58,,4
+2024-05-01,Tier-2,Bug,Medium,Portal,145,118,28.23,3.77,15
+2024-05-01,Tier-2,Feature Request,High,Chat,113,,42.08,3.94,16
+2024-05-01,Tier-2,Outage,Critical,Email,444,433,17.16,2.99,20
+2024-05-01,Tier-2,Onboarding,Medium,Email,295,273,12.33,3.77,36
+2024-05-01,Tier-3,Account,High,Portal,291,232,19.65,3.18,20
+2024-05-01,Tier-3,Billing,Critical,Phone,108,102,10.24,2.92,10
+2024-05-01,Tier-3,Bug,High,Chat,266,210,14.85,4.71,30
+2024-05-01,Tier-3,Feature Request,High,Email,333,267,16.8,4.45,9
+2024-05-01,Tier-3,Outage,High,Portal,444,351,9.04,3.41,11
+2024-05-01,Tier-3,Onboarding,Critical,Phone,221,213,19.29,2.64,30
+2024-05-01,Billing,Account,Low,Portal,316,,8.86,3.83,28
+2024-05-01,Billing,Billing,Medium,Portal,195,172,14.08,3.02,22
+2024-05-01,Billing,Bug,Critical,Email,517,416,3.79,2.94,30
+2024-05-01,Billing,Feature Request,Low,Email,232,201,15.71,3.16,36
+2024-05-01,Billing,Outage,High,Phone,442,378,16.06,3.9,42
+2024-05-01,Billing,Onboarding,Low,Portal,457,359,6.07,4.48,18
+2024-05-01,Technical,Account,Critical,Phone,219,177,12.25,2.79,18
+2024-05-01,Technical,Billing,Low,Chat,393,359,17.03,4.16,26
+2024-05-01,Technical,Bug,Critical,Phone,147,114,12.52,3.56,22
+2024-05-01,Technical,Feature Request,Medium,Chat,148,127,3.11,3.92,15
+2024-05-01,Technical,Outage,Medium,Chat,201,187,17.94,3.47,14
+2024-05-01,Technical,Onboarding,Medium,Chat,240,220,3.43,3.31,36
+2024-06-01,Tier-1,Account,Low,Chat,425,335,17.45,4.48,34
+2024-06-01,Tier-1,Billing,Low,Phone,483,393,6.97,4.06,76
+2024-06-01,Tier-1,Bug,Medium,Email,48,47,9.68,3.27,6
+2024-06-01,Tier-1,Feature Request,High,Chat,349,293,5.88,3.19,53
+2024-06-01,Tier-1,Outage,Critical,Chat,176,159,9.23,3.21,17
+2024-06-01,Tier-1,Onboarding,Medium,Chat,155,150,17.99,3.85,17
+2024-06-01,Tier-2,Account,Critical,Chat,484,470,8.14,2.85,17
+2024-06-01,Tier-2,Billing,Medium,Phone,294,272,3.59,4.29,11
+2024-06-01,Tier-2,Bug,Medium,Email,72,60,22.01,3.16,7
+2024-06-01,Tier-2,Feature Request,Low,Chat,160,141,11.6,4.04,4
+2024-06-01,Tier-2,Outage,Medium,Phone,507,499,15.42,4.02,20
+2024-06-01,Tier-2,Onboarding,High,Phone,429,355,22.05,4.51,64
+2024-06-01,Tier-3,Account,Critical,Phone,183,153,18.31,4.32,6
+2024-06-01,Tier-3,Billing,Low,Portal,232,218,10.19,3.93,24
+2024-06-01,Tier-3,Bug,High,Email,517,450,28.66,3.51,68
+2024-06-01,Tier-3,Feature Request,Medium,Portal,313,277,32.15,4.67,6
+2024-06-01,Tier-3,Outage,High,Portal,319,266,4.13,3.61,21
+2024-06-01,Tier-3,Onboarding,Critical,Email,270,217,17.54,4.32,37
+2024-06-01,Billing,Account,Critical,Chat,342,271,13.06,4.31,28
+2024-06-01,Billing,Billing,Low,Portal,228,219,11.19,3.51,16
+2024-06-01,Billing,Bug,Low,Phone,302,273,5.24,4.25,15
+2024-06-01,Billing,Feature Request,High,Phone,250,218,19.29,4.9,18
+2024-06-01,Billing,Outage,Medium,Portal,212,193,6.84,3.41,10
+2024-06-01,Billing,Onboarding,Critical,Email,470,386,4.54,3.68,33
+2024-06-01,Technical,Account,High,Chat,68,64,5.28,3.39,2
+2024-06-01,Technical,Billing,High,Portal,499,445,20.68,3.38,31
+2024-06-01,Technical,Bug,Critical,Portal,508,477,9.59,3.13,55
+2024-06-01,Technical,Feature Request,High,Portal,106,90,20.36,3.73,6
+2024-06-01,Technical,Outage,Low,Phone,213,175,4.76,4.4,6
+2024-06-01,Technical,Onboarding,High,Chat,364,343,14.03,4.55,24
+2024-07-01,Tier-1,Account,Low,Portal,130,101,10.57,4.26,11
+2024-07-01,Tier-1,Billing,High,Phone,439,390,4.31,3.57,60
+2024-07-01,Tier-1,Bug,High,Phone,512,435,25.29,3.67,58
+2024-07-01,Tier-1,Feature Request,Low,Portal,73,67,7.08,4.52,2
+2024-07-01,Tier-1,Outage,Medium,Email,366,295,22.13,3.75,30
+2024-07-01,Tier-1,Onboarding,Medium,Chat,394,383,23.1,4.38,14
+2024-07-01,Tier-2,Account,Critical,Portal,491,387,23.05,2.95,68
+2024-07-01,Tier-2,Billing,Medium,Phone,314,273,12.26,4.72,14
+2024-07-01,Tier-2,Bug,High,Email,102,99,5.95,3.57,7
+2024-07-01,Tier-2,Feature Request,Critical,Email,503,457,21.44,2.62,44
+2024-07-01,Tier-2,Outage,High,Portal,111,101,20.45,4.65,8
+2024-07-01,Tier-2,Onboarding,Low,Chat,148,146,18.09,4.46,11
+2024-07-01,Tier-3,Account,Medium,Portal,509,411,18.27,4.7,49
+2024-07-01,Tier-3,Billing,Medium,Chat,76,68,8.78,3.82,5
+2024-07-01,Tier-3,Bug,High,Chat,302,291,23.38,,29
+2024-07-01,Tier-3,Feature Request,Critical,Portal,437,388,22.37,3.06,15
+2024-07-01,Tier-3,Outage,Medium,Email,416,368,20.21,3.75,24
+2024-07-01,Tier-3,Onboarding,Low,Email,483,442,18.03,3.42,46
+2024-07-01,Billing,Account,Critical,Portal,257,222,22.5,4.23,36
+2024-07-01,Billing,Billing,High,Portal,468,395,18.23,4.56,33
+2024-07-01,Billing,Bug,Low,Phone,131,113,14.11,3.34,6
+2024-07-01,Billing,Feature Request,High,Phone,151,127,5.59,4.08,7
+2024-07-01,Billing,Outage,Low,Chat,159,143,3.05,3.91,17
+2024-07-01,Billing,Onboarding,High,Portal,442,406,12.9,4.28,17
+2024-07-01,Technical,Account,Medium,Portal,56,45,18.21,3.93,7
+2024-07-01,Technical,Billing,High,Portal,184,173,23.63,4.17,27
+2024-07-01,Technical,Bug,High,Email,313,269,23.93,4.81,33
+2024-07-01,Technical,Feature Request,Low,Portal,492,426,24.86,4.05,61
+2024-07-01,Technical,Outage,Medium,Portal,481,434,13.85,4.1,62
+2024-07-01,Technical,Onboarding,High,Phone,119,104,5.27,4.15,12
+2024-08-01,Tier-1,Account,Medium,Portal,341,270,24.98,4.08,18
+2024-08-01,Tier-1,Billing,Low,Phone,86,76,23.02,4.32,2
+2024-08-01,Tier-1,Bug,High,Phone,80,73,25.84,4.8,11
+2024-08-01,Tier-1,Feature Request,High,Chat,133,114,12.96,4.17,21
+2024-08-01,Tier-1,Outage,Low,Chat,425,407,2.76,3.25,23
+2024-08-01,Tier-1,Onboarding,Low,Phone,262,,14.13,3.34,13
+2024-08-01,Tier-2,Account,Critical,Portal,305,255,13.96,3.98,34
+2024-08-01,Tier-2,Billing,Medium,Email,71,68,19.29,4.38,6
+2024-08-01,Tier-2,Bug,High,Phone,202,173,14.96,4.05,10
+2024-08-01,Tier-2,Feature Request,High,Chat,366,325,20.5,4.8,52
+2024-08-01,Tier-2,Outage,Low,Chat,95,90,19.1,4.36,10
+2024-08-01,Tier-2,Onboarding,Medium,Portal,343,276,25.29,4.07,28
+2024-08-01,Tier-3,Account,Low,Chat,123,101,7.32,3.68,19
+2024-08-01,Tier-3,Billing,High,Portal,240,197,24.56,3.52,22
+2024-08-01,Tier-3,Bug,High,Email,422,410,15.87,3.35,34
+2024-08-01,Tier-3,Feature Request,Critical,Phone,491,402,24.52,3.22,16
+2024-08-01,Tier-3,Outage,Low,Chat,244,207,4.11,3.37,10
+2024-08-01,Tier-3,Onboarding,Medium,Portal,474,436,25.56,3.65,36
+2024-08-01,Billing,Account,Critical,Chat,414,398,9.34,3.43,33
+2024-08-01,Billing,Billing,Medium,Chat,96,86,26.66,4.52,2
+2024-08-01,Billing,Bug,Low,Portal,421,367,10.69,4.43,65
+2024-08-01,Billing,Feature Request,Medium,Phone,150,141,10.06,4.83,23
+2024-08-01,Billing,Outage,Low,Phone,167,158,3.48,4.51,5
+2024-08-01,Billing,Onboarding,Low,Chat,483,475,10.14,3.21,25
+2024-08-01,Technical,Account,Critical,Portal,54,51,15.82,2.82,1
+2024-08-01,Technical,Billing,High,Email,145,136,13.18,3.25,18
+2024-08-01,Technical,Bug,Critical,Portal,436,340,12.14,3.37,29
+2024-08-01,Technical,Feature Request,Low,Chat,149,124,14.0,4.89,16
+2024-08-01,Technical,Outage,Medium,Portal,133,111,21.5,3.94,20
+2024-08-01,Technical,Onboarding,Medium,Portal,255,231,7.29,3.45,19
+2024-09-01,Tier-1,Account,Critical,Portal,246,197,21.66,4.1,27
+2024-09-01,Tier-1,Billing,High,Phone,437,401,19.12,3.21,15
+2024-09-01,Tier-1,Bug,Low,Phone,461,446,9.31,3.78,46
+2024-09-01,Tier-1,Feature Request,Low,Portal,156,150,16.4,4.47,20
+2024-09-01,Tier-1,Outage,High,Chat,308,302,7.12,4.72,7
+2024-09-01,Tier-1,Onboarding,Critical,Phone,348,326,27.71,2.93,12
+2024-09-01,Tier-2,Account,High,Email,55,45,12.05,4.8,5
+2024-09-01,Tier-2,Billing,Critical,Phone,352,330,28.96,4.43,19
+2024-09-01,Tier-2,Bug,Low,Portal,379,326,13.7,3.48,21
+2024-09-01,Tier-2,Feature Request,Medium,Portal,510,479,9.66,4.0,74
+2024-09-01,Tier-2,Outage,High,Email,80,77,22.5,3.44,9
+2024-09-01,Tier-2,Onboarding,Low,Chat,215,207,7.39,4.71,24
+2024-09-01,Tier-3,Account,Medium,Chat,235,185,20.93,3.05,8
+2024-09-01,Tier-3,Billing,Medium,Portal,384,307,15.66,4.59,37
+2024-09-01,Tier-3,Bug,High,Portal,453,368,31.03,3.06,46
+2024-09-01,Tier-3,Feature Request,Critical,Chat,104,88,7.71,4.46,2
+2024-09-01,Tier-3,Outage,Critical,Portal,256,244,25.49,2.74,27
+2024-09-01,Tier-3,Onboarding,Medium,Phone,390,326,24.87,3.89,32
+2024-09-01,Billing,Account,Medium,Phone,227,195,9.27,4.34,29
+2024-09-01,Billing,Billing,High,Portal,86,77,26.29,4.23,12
+2024-09-01,Billing,Bug,High,Portal,175,171,4.22,4.31,18
+2024-09-01,Billing,Feature Request,Critical,Portal,488,427,21.93,3.63,17
+2024-09-01,Billing,Outage,Critical,Portal,415,356,10.43,4.32,36
+2024-09-01,Billing,Onboarding,High,Email,441,386,10.76,3.69,19
+2024-09-01,Technical,Account,Critical,Email,170,133,8.24,3.17,11
+2024-09-01,Technical,Billing,Medium,Phone,90,82,22.79,3.93,9
+2024-09-01,Technical,Bug,Critical,Portal,213,189,9.44,3.29,20
+2024-09-01,Technical,Feature Request,Low,Phone,485,466,26.23,4.01,33
+2024-09-01,Technical,Outage,Critical,Chat,141,125,15.19,3.14,16
+2024-09-01,Technical,Onboarding,Medium,Chat,517,414,24.16,3.52,45
+2024-10-01,Tier-1,Account,Low,Email,382,,9.39,3.2,8
+2024-10-01,Tier-1,Billing,Low,Phone,309,271,24.39,3.14,18
+2024-10-01,Tier-1,Bug,Critical,Portal,268,257,17.1,2.81,17
+2024-10-01,Tier-1,Feature Request,High,Portal,346,324,2.47,4.69,43
+2024-10-01,Tier-1,Outage,Critical,Chat,389,317,23.81,3.76,8
+2024-10-01,Tier-1,Onboarding,High,Chat,429,385,16.95,3.24,59
+2024-10-01,Tier-2,Account,Critical,Portal,172,156,4.47,4.44,11
+2024-10-01,Tier-2,Billing,Critical,Portal,241,188,17.8,3.1,31
+2024-10-01,Tier-2,Bug,Critical,Phone,349,301,28.58,2.67,46
+2024-10-01,Tier-2,Feature Request,Critical,Phone,418,331,5.53,3.0,47
+2024-10-01,Tier-2,Outage,High,Email,326,315,14.85,3.12,32
+2024-10-01,Tier-2,Onboarding,Critical,Portal,53,49,13.61,2.76,7
+2024-10-01,Tier-3,Account,High,Portal,375,300,27.96,4.67,53
+2024-10-01,Tier-3,Billing,Critical,Chat,40,33,20.67,3.26,0
+2024-10-01,Tier-3,Bug,Medium,Email,154,130,19.73,3.8,15
+2024-10-01,Tier-3,Feature Request,Critical,Chat,504,470,26.79,4.24,44
+2024-10-01,Tier-3,Outage,Critical,Portal,324,284,10.9,4.06,12
+2024-10-01,Tier-3,Onboarding,Low,Portal,399,370,11.36,4.81,34
+2024-10-01,Billing,Account,Medium,Email,162,156,31.92,4.31,24
+2024-10-01,Billing,Billing,Critical,Chat,62,51,7.92,4.39,8
+2024-10-01,Billing,Bug,Critical,Portal,109,100,4.05,2.93,12
+2024-10-01,Billing,Feature Request,Medium,Chat,490,445,6.04,4.32,28
+2024-10-01,Billing,Outage,Medium,Portal,384,310,15.92,4.83,51
+2024-10-01,Billing,Onboarding,Medium,Phone,325,310,11.7,4.89,13
+2024-10-01,Technical,Account,High,Email,162,151,12.26,4.88,10
+2024-10-01,Technical,Billing,Medium,Email,238,218,20.83,3.13,22
+2024-10-01,Technical,Bug,Low,Email,43,36,11.94,3.35,2
+2024-10-01,Technical,Feature Request,Low,Phone,95,86,19.37,4.14,9
+2024-10-01,Technical,Outage,Critical,Email,448,356,26.89,3.63,54
+2024-10-01,Technical,Onboarding,Critical,Chat,417,405,25.15,4.47,8

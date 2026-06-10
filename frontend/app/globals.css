@@ -2048,6 +2048,15 @@ body {
   box-shadow: var(--shadow-md);
 }
 
+/* AI Insights — consistent vertical rhythm between answer, chart, cards, follow-ups */
+.ai-insights-page .ai-insights-results-stack > * {
+  min-width: 0;
+}
+
+.ai-insights-page .ai-insights-answer-summary-panel {
+  padding-block: 0.125rem;
+}
+
 /* AI Insights visualization card — Overview chart-card design language (full-size plot unchanged) */
 .ai-insights-page .ai-insights-viz-card {
   display: flex;
