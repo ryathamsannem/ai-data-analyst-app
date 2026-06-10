@@ -144,6 +144,15 @@ def question_requests_relationship_intent(question: str) -> bool:
     ):
         return False
     if re.search(r"\b(vs\.?|versus)\b", ql) and _METRIC_WORD_RE.search(ql):
+        try:
+            from intent_engine.dimension_request import (
+                question_requests_dimension_value_compare,
+            )
+
+            if question_requests_dimension_value_compare(q):
+                return False
+        except Exception:
+            pass
         if re.search(r"\bcompare\b", ql) and not re.search(
             r"\b(relationship|correlation|correlat|association|impact)\b", ql
         ):
@@ -170,6 +179,16 @@ def question_requests_multi_metric_comparison(question: str) -> bool:
         return False
     if question_requests_decline_intent(q):
         return False
+
+    try:
+        from intent_engine.dimension_request import (
+            question_requests_dimension_value_compare,
+        )
+
+        if question_requests_dimension_value_compare(q):
+            return False
+    except Exception:
+        pass
 
     has_compare = bool(re.search(r"\bcompare\b", ql))
     has_vs = bool(re.search(r"\bvs\.?\b|\bversus\b", ql))

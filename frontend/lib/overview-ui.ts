@@ -121,7 +121,15 @@ export const OVERVIEW_UPLOAD_EXT_PATTERN =
   /\.(csv|xlsx|xls|parquet|json|jsonl)$/i;
 
 export const OVERVIEW_UPLOAD_FORMAT_HINT =
-  "Supports CSV, Excel, JSON, and Parquet datasets";
+  "Supports CSV, Excel, JSON, and Parquet datasets.";
+
+/** Empty-state upload dropzone copy (Overview first load). */
+export const OVERVIEW_UPLOAD_LANDING_TITLE = "Upload your dataset";
+
+export const OVERVIEW_UPLOAD_LANDING_SUBTITLE =
+  "Drag & drop a dataset or click anywhere to upload";
+
+export const OVERVIEW_UPLOAD_LANDING_HELPER = OVERVIEW_UPLOAD_FORMAT_HINT;
 
 /** Selected-file kicker in Overview upload dropzone (muted label). */
 export const ovUploadSelectedKicker =

@@ -224,6 +224,25 @@ def _phrase_alias_tokens(phrase: str) -> List[str]:
         tokens.append("profit")
     if p in ("revenue",):
         tokens.extend(["revenue", "sales", "gross sales"])
+    if re.search(r"resolution\s*time", p) or p in (
+        "resolution time",
+        "resolution",
+        "response time",
+        "wait time",
+        "handling time",
+    ):
+        tokens.extend(
+            [
+                "avg_resolution_hours",
+                "resolution_time",
+                "resolution hours",
+                "response_time",
+                "wait_time",
+                "handling_time",
+            ]
+        )
+    if p in ("satisfaction", "satisfaction score", "csat"):
+        tokens.extend(["satisfaction_score", "satisfaction", "csat"])
     seen: set = set()
     out: List[str] = []
     for t in tokens:

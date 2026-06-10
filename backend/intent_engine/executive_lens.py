@@ -75,9 +75,13 @@ def detect_executive_lens(question: str) -> ExecutiveLens:
         return None
     try:
         from intent_engine.executive_ambiguous_intent import (
+            _is_named_risk_metric_question,
             bucket_to_executive_lens,
             classify_executive_ambiguous_bucket,
         )
+
+        if _is_named_risk_metric_question(q):
+            return None
 
         bucket = classify_executive_ambiguous_bucket(q)
         if bucket:
