@@ -12,15 +12,49 @@ import {
 export const PILOT_LANDING_HERO = {
   title: "AI Data Analyst for your business data",
   subtitle:
-    "Upload CSV, Excel, JSON, or Parquet files and ask questions, generate charts, and export executive PDFs.",
+    "Upload CSV, Excel, JSON, or Parquet files, ask questions, generate charts, and export executive PDFs.",
 } as const;
 
-export const PILOT_VALUE_CHIPS = [
-  "AI Insights",
-  "Follow-up Questions",
-  "Executive PDF",
-  "Data Preview",
-  "CSV / Excel / JSON / Parquet",
+export type PilotValueChip = {
+  id: string;
+  label: string;
+};
+
+export const PILOT_VALUE_CHIPS: readonly PilotValueChip[] = [
+  { id: "insights", label: "AI Insights" },
+  { id: "executive", label: "Executive Analysis" },
+  { id: "viz", label: "Smart Visualizations" },
+  { id: "followup", label: "Follow-up Questions" },
+  { id: "reports", label: "Executive Reports" },
+] as const;
+
+export type PilotTrustFeature = {
+  id: string;
+  title: string;
+  description: string;
+};
+
+export const PILOT_TRUST_FEATURES: readonly PilotTrustFeature[] = [
+  {
+    id: "secure",
+    title: "Private & Secure",
+    description: "Session-only, browser-tab processing.",
+  },
+  {
+    id: "insights",
+    title: "AI-Powered Insights",
+    description: "Natural language insights.",
+  },
+  {
+    id: "viz",
+    title: "Smart Visualizations",
+    description: "Automated visualizations.",
+  },
+  {
+    id: "export",
+    title: "Export Ready",
+    description: "Executive-ready reports.",
+  },
 ] as const;
 
 export type PilotNavTarget = "home" | "pricing" | "privacy" | "security" | "contact";

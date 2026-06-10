@@ -151,7 +151,7 @@ function FilterPanelInner({
       : "lg:grid-cols-4";
 
   const filterShellClass = useOverviewCompact
-    ? ovInteractiveFiltersShell
+    ? `${ovInteractiveFiltersShell} overview-filters-card`
     : useDashboardFilters
       ? "dashboard-interactive-filters"
       : "";

@@ -410,6 +410,8 @@ import {
 } from "@/lib/saas-session";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
 import { OverviewLandingHero } from "./components/home/overview-landing-hero";
+import { OverviewLandingTrustRow } from "./components/home/overview-landing-trust-row";
+import { OverviewLandingScrollCue } from "./components/home/overview-landing-scroll-cue";
 import { PilotInfoModal } from "./components/home/pilot-info-modal";
 import { PilotInfoSections } from "./components/home/pilot-info-sections";
 import { OverviewUploadSelectedState } from "./components/home/overview-upload-selected-state";
@@ -429,7 +431,9 @@ import {
   ovBtnSecondarySm,
   ovOverviewSecondaryBtn,
   OVERVIEW_UPLOAD_ACCEPT,
-  OVERVIEW_UPLOAD_FORMAT_HINT,
+  OVERVIEW_UPLOAD_LANDING_HELPER,
+  OVERVIEW_UPLOAD_LANDING_SUBTITLE,
+  OVERVIEW_UPLOAD_LANDING_TITLE,
   ovUploadDropzone,
   ovUploadDropzoneActive,
   ovUploadDropzoneIdle,
@@ -11259,19 +11263,29 @@ function HomeInner() {
           )}
 
           {activeTab === "overview" && (
-            <>
+            <div
+              className={
+                columns.length === 0 ? "overview-first-load min-w-0" : "min-w-0"
+              }
+            >
             {columns.length === 0 ? <OverviewLandingHero /> : null}
-            <div className="grid w-full min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-6">
+            <div
+              className={`grid w-full min-w-0 grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] ${
+                columns.length === 0
+                  ? "overview-landing-grid gap-3 sm:gap-4"
+                  : "gap-5 lg:gap-6"
+              }`}
+            >
               {columns.length > 0 && !overviewUploadExpanded ? (
-                <section className={`col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-1 ${ovCard}`}>
+                <section className={`overview-dataset-info-card col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-1 ${ovCard}`}>
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
                       <div className="flex items-center gap-2 shrink-0">
                         <span
-                          className="h-2.5 w-2.5 rounded-full bg-emerald-500"
+                          className="overview-dataset-status-dot h-2.5 w-2.5 rounded-full bg-emerald-500"
                           aria-hidden
                         />
-                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                        <span className="overview-dataset-status-label text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                           Dataset ready
                         </span>
                       </div>
@@ -11328,26 +11342,25 @@ function HomeInner() {
               ) : (
                 <>
                   <section
-                    className={`overview-landing-upload-card min-w-0 p-5 sm:p-6 order-1 ${
+                    className={`overview-landing-upload-card min-w-0 order-1 ${
                       columns.length === 0
-                        ? "lg:col-span-2 mx-auto w-full max-w-4xl"
-                        : ""
+                        ? "overview-landing-upload-card--empty overview-landing-column lg:col-span-2 p-3 sm:p-4"
+                        : "overview-upload-hero--replace p-5 sm:p-6"
                     } ${ovCard}`}
                   >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h2 className={ovSectionTitle}>
-                          {columns.length > 0 ? "Upload a new file" : "Upload your dataset"}
-                        </h2>
-                        <p className={`mt-1 ${ovSectionDesc}`}>
-                          {columns.length > 0
-                            ? "CSV, Excel, JSON, or Parquet — replaces the dataset in this session."
-                            : "Drop a file or browse — upload starts automatically."}
-                        </p>
+                    {columns.length > 0 ? (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h2 className={ovSectionTitle}>Upload a new file</h2>
+                          <p className={`mt-1 ${ovSectionDesc}`}>
+                            CSV, Excel, JSON, or Parquet — replaces the dataset in this
+                            session.
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
 
-                    <div className="mt-4">
+                    <div className={columns.length > 0 ? "mt-4" : ""}>
                       <input
                         ref={overviewFileInputRef}
                         type="file"
@@ -11365,7 +11378,7 @@ function HomeInner() {
                         aria-label={
                           file
                             ? `Selected file ${file.name}. Click to choose a different file.`
-                            : "Choose a dataset file. Drag and drop or click to browse."
+                            : `${OVERVIEW_UPLOAD_LANDING_TITLE}. ${OVERVIEW_UPLOAD_LANDING_SUBTITLE}`
                         }
                         onClick={() => overviewFileInputRef.current?.click()}
                         onKeyDown={(e) => {
@@ -11409,10 +11422,10 @@ function HomeInner() {
                         className={`${ovUploadDropzone} rounded-xl border-2 border-dashed transition-colors ${
                           file
                             ? "p-3 sm:p-4"
-                            : "overview-landing-dropzone-empty p-6 sm:p-10 text-center"
+                            : "overview-landing-dropzone-empty p-5 sm:p-7 text-center"
                         } ${
                           overviewDropActive
-                            ? ovUploadDropzoneActive
+                            ? `${ovUploadDropzoneActive} overview-landing-dropzone--active`
                             : ovUploadDropzoneIdle
                         }`}
                       >
@@ -11424,33 +11437,43 @@ function HomeInner() {
                           />
                         ) : (
                           <>
-                            <div className="overview-upload-dropzone__icon" aria-hidden>
-                              <svg
-                                width="17"
-                                height="17"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.75"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="17 8 12 3 7 8" />
-                                <line x1="12" y1="3" x2="12" y2="15" />
-                              </svg>
+                            <div className="overview-upload-dropzone__icon-wrap" aria-hidden>
+                              <div className="overview-upload-dropzone__icon-glow" />
+                              <div className="overview-upload-dropzone__icon">
+                                <svg
+                                  width="40"
+                                  height="40"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                  <polyline points="17 8 12 3 7 8" />
+                                  <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                              </div>
                             </div>
-                            <p className="text-sm font-medium text-foreground">
-                              Drag and drop a file here
+                            <p className="text-base font-semibold text-foreground sm:text-lg">
+                              {OVERVIEW_UPLOAD_LANDING_TITLE}
                             </p>
-                            <p className={`mt-1 text-xs ${ovMuted}`}>
-                              {OVERVIEW_UPLOAD_FORMAT_HINT}
+                            <p className="mt-1 text-sm text-foreground">
+                              {OVERVIEW_UPLOAD_LANDING_SUBTITLE}
+                            </p>
+                            <p className={`mt-1.5 text-xs ${ovMuted}`}>
+                              {OVERVIEW_UPLOAD_LANDING_HELPER}
                             </p>
                           </>
                         )}
                       </div>
 
-                      <div className="overview-upload-actions mt-3 flex flex-wrap items-center gap-3">
+                      <div
+                        className={`overview-upload-actions flex flex-wrap items-center gap-3 ${
+                          file || loading || columns.length > 0 ? "mt-3" : "sr-only"
+                        }`}
+                      >
                         {file && !loading ? (
                           <button
                             type="button"
@@ -11479,6 +11502,8 @@ function HomeInner() {
                       </div>
                     </div>
                   </section>
+
+                  {columns.length === 0 ? <OverviewLandingTrustRow /> : null}
 
                   {columns.length > 0 ? (
                   <section className={`min-w-0 p-5 order-1 ${ovCardElevated}`}>
@@ -11828,8 +11853,15 @@ function HomeInner() {
                 </section>
               )}
             </div>
-            {columns.length === 0 ? <PilotInfoSections /> : null}
-            </>
+            {columns.length === 0 ? (
+              <>
+                <OverviewLandingScrollCue />
+                <div className="overview-landing-below-fold">
+                  <PilotInfoSections />
+                </div>
+              </>
+            ) : null}
+            </div>
           )}
 
         {activeTab === "preview" && columns.length > 0 && (

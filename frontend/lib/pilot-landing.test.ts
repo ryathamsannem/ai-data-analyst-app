@@ -23,8 +23,13 @@ describe("pilot landing content", () => {
   });
 
   it("includes value chips for pilot capabilities", () => {
-    expect(PILOT_VALUE_CHIPS).toContain("AI Insights");
-    expect(PILOT_VALUE_CHIPS).toContain("Executive PDF");
+    expect(PILOT_VALUE_CHIPS.map((chip) => chip.label)).toEqual([
+      "AI Insights",
+      "Executive Analysis",
+      "Smart Visualizations",
+      "Follow-up Questions",
+      "Executive Reports",
+    ]);
   });
 
   it("shows free and paid pricing limits", () => {
