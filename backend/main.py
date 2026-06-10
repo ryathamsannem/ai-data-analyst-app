@@ -434,10 +434,15 @@ def build_profile(input_df: pd.DataFrame):
         # JSON-friendly
         summary_stats = desc.round(6).to_dict()
 
+    unique_counts = {
+        c: int(input_df[c].nunique(dropna=True)) for c in input_df.columns
+    }
+
     return {
         "column_types": column_types,
         "null_counts": null_counts,
         "summary_stats": summary_stats,
+        "unique_counts": unique_counts,
     }
 
 
