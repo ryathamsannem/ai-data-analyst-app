@@ -1,0 +1,3161 @@
+{
+  "executed_at": "2026-06-10T06:13:17Z",
+  "duration_sec": 964.6,
+  "mode": "full_ask_live_narrative",
+  "api_key_present": true,
+  "api_errors": 0,
+  "claude_narrative_success": 0,
+  "claude_narrative_fallback": 63,
+  "claude_failure_reason": "SSL: CERTIFICATE_VERIFY_FAILED (api.anthropic.com)",
+  "note": "Full /ask executed but ALL 63 Claude calls failed TLS; answers are connection fallback text. Narrative scores are NOT valid for sign-off. Re-run in staging.",
+  "results": [
+    {
+      "domain": "Retail",
+      "qid": "R-B01",
+      "question": "Which city generates the highest revenue?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Delhi",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Delhi",
+          "Jaipur",
+          "Mumbai"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-B03",
+      "question": "Compare revenue across cities",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Delhi",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Delhi",
+          "Jaipur",
+          "Mumbai"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-B05",
+      "question": "Show revenue trend over time",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.19,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "revenue",
+        "categoryColumn": "order_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "2023-12-26/2024-01-01",
+          "2024-01-30/2024-02-05",
+          "2024-02-27/2024-03-04"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-I01",
+      "question": "Is revenue correlated with customers?",
+      "pattern": "relationship",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.69,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 5.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint revenue not in customers",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A",
+        "Correlation narrative score: 5.0"
+      ],
+      "routing": {
+        "intent": "relationship",
+        "metricColumn": "customers",
+        "categoryColumn": "revenue",
+        "chartType": "scatter",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Point 1",
+          "Point 2",
+          "Point 3"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-E01",
+      "question": "What are the biggest opportunities in this retail data?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "revenue",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "South",
+          "West"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-E02",
+      "question": "What are the biggest risks?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint profit not in revenue",
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Delhi",
+          "Jaipur",
+          "Mumbai"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-E03",
+      "question": "Summarize business performance",
+      "pattern": "summary",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.19,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "summary",
+        "metricColumn": "revenue",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "South",
+          "West"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-I09",
+      "question": "Compare East vs West region revenue",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity North",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "South",
+          "West"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-E10",
+      "question": "What concentration risk exists in our revenue?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Delhi",
+          "Jaipur",
+          "Mumbai"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-NEG",
+      "question": "Compare conversion rate across cities",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 8.0,
+        "data_grounding": 6.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.42,
+      "correlation_narrative": 7.0,
+      "limitation_first": 5.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Did not hard-fail unsupported question",
+        "Chart optional for negative test",
+        "Negative test without clear limitation wording",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "Negative test without clear limitation",
+        "Limitation-first score: 5.0"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Delhi",
+          "Jaipur",
+          "Mumbai"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-C1-Q",
+      "question": "Which city generates the highest revenue?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Delhi",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Delhi",
+          "Jaipur",
+          "Mumbai"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-C1-F1",
+      "question": "Why is Delhi highest?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Which city generates the highest revenue?' != root 'Why is Delhi highest?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Delhi",
+          "Jaipur",
+          "Mumbai"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-C1-F2",
+      "question": "What evidence supports this conclusion?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Which city generates the highest revenue?' != root 'What evidence supports this conclusion?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Delhi",
+          "Jaipur",
+          "Mumbai"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Retail",
+      "qid": "R-C1-F3",
+      "question": "Which columns were used for this analysis?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Which city generates the highest revenue?' != root 'Which columns were used for this analysis?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Delhi",
+          "Jaipur",
+          "Mumbai"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-B01",
+      "question": "Compare satisfaction_score by channel",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Paid Social",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "channel",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Paid Search",
+          "Paid Social",
+          "Affiliate"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-B04",
+      "question": "Rank channels by revenue",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Affiliate",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "channel",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Affiliate",
+          "Paid Social",
+          "Display"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-B05",
+      "question": "Monthly trend of satisfaction score",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.19,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "report_date",
+        "chartType": "area",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "2024-01",
+          "2024-02",
+          "2024-03"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-I01",
+      "question": "Is revenue correlated with satisfaction_score?",
+      "pattern": "relationship",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.69,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 5.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint revenue not in satisfaction_score",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A",
+        "Correlation narrative score: 5.0"
+      ],
+      "routing": {
+        "intent": "relationship",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "revenue",
+        "chartType": "scatter",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Point 1",
+          "Point 2",
+          "Point 3"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-E01",
+      "question": "Biggest marketing opportunity",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "revenue",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "South",
+          "West",
+          "East"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-E02",
+      "question": "Biggest marketing risk",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint satisfaction not in revenue",
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "revenue",
+        "categoryColumn": "channel",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Affiliate",
+          "Paid Social",
+          "Display"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-I07",
+      "question": "Outlier campaigns on spend",
+      "pattern": "outlier",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.19,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "outlier",
+        "metricColumn": "spend",
+        "categoryColumn": "campaign_name",
+        "chartType": "horizontalBar",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Retargeting Cart",
+          "Product Demo Webinar",
+          "Brand Awareness Q1"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-B06",
+      "question": "Rank campaigns by conversions",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Retargeting Cart",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "conversions",
+        "categoryColumn": "campaign_name",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Retargeting Cart",
+          "Referral Boost",
+          "Product Demo Webinar"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-NEG",
+      "question": "Compare NPS across channels",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 8.0,
+        "data_grounding": 6.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.42,
+      "correlation_narrative": 7.0,
+      "limitation_first": 5.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Did not hard-fail unsupported question",
+        "Chart optional for negative test",
+        "Negative test without clear limitation wording",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "Negative test without clear limitation",
+        "Limitation-first score: 5.0"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "channel",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Affiliate",
+          "Paid Social",
+          "Display"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-C1-Q",
+      "question": "Compare satisfaction_score by channel",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Paid Social",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "channel",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Paid Search",
+          "Paid Social",
+          "Affiliate"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-C1-F1",
+      "question": "Why is Paid Social highest?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Compare satisfaction_score by channel' != root 'Why is Paid Social highest?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "channel",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Paid Search",
+          "Paid Social",
+          "Affiliate"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-C1-F2",
+      "question": "Which columns were used for this analysis?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Compare satisfaction_score by channel' != root 'Which columns were used for this analysis?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "channel",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Paid Search",
+          "Paid Social",
+          "Affiliate"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Marketing",
+      "qid": "M-C1-F3",
+      "question": "Show the calculations behind this answer.",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Compare satisfaction_score by channel' != root 'Show the calculations behind this answer.'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "channel",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Paid Search",
+          "Paid Social",
+          "Affiliate"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-B02",
+      "question": "Rank departments by revenue",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Field Sales",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Field Sales",
+          "Channel Sales",
+          "Inside Sales"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-B03",
+      "question": "Compare revenue across regions",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity North",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "West",
+          "South"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-B05",
+      "question": "Show revenue trend over time",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.19,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "revenue",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "2024-01",
+          "2024-02",
+          "2024-03"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-I01",
+      "question": "Is revenue correlated with units?",
+      "pattern": "relationship",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.69,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 5.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint revenue not in units",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A",
+        "Correlation narrative score: 5.0"
+      ],
+      "routing": {
+        "intent": "relationship",
+        "metricColumn": "units",
+        "categoryColumn": "revenue",
+        "chartType": "scatter",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Point 1",
+          "Point 2",
+          "Point 3"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-E01",
+      "question": "What is the biggest sales opportunity?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "revenue",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "West",
+          "South"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-E02",
+      "question": "What is the biggest sales risk?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "revenue",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "West",
+          "South"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-D02",
+      "question": "Compare sales team performance by department",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Field Sales",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "department",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Field Sales",
+          "Channel Sales",
+          "Inside Sales"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-I03",
+      "question": "Which department is an outlier for revenue?",
+      "pattern": "outlier",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 4.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 7.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.19,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": false,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Chart family 'histogram' vs expected {'bar'}",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Thin confidence rationale",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "outlier",
+        "metricColumn": "revenue",
+        "categoryColumn": "department",
+        "chartType": "histogram",
+        "confidence": "low",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "[62742.028, 158381.24)",
+          "[158381.24, 252886.39)",
+          "[252886.39, 347391.54)"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-NEG",
+      "question": "Compare win rate by sales stage",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 8.0,
+        "data_grounding": 6.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.42,
+      "correlation_narrative": 7.0,
+      "limitation_first": 5.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Did not hard-fail unsupported question",
+        "Chart optional for negative test",
+        "Negative test without clear limitation wording",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "Negative test without clear limitation",
+        "Limitation-first score: 5.0"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "sales_rep",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Rep-14",
+          "Rep-03",
+          "Rep-13"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-C2-Q",
+      "question": "Rank departments by revenue",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Field Sales",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Field Sales",
+          "Channel Sales",
+          "Inside Sales"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-C2-F1",
+      "question": "What action should management take for the lowest department?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 9.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.44,
+      "narrative_avg": 7.92,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Channel Sales",
+          "Inside Sales",
+          "Field Sales"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Sales",
+      "qid": "S-C2-F2",
+      "question": "Show the calculations behind this answer.",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Rank departments by revenue' != root 'Show the calculations behind this answer.'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "department",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Field Sales",
+          "Channel Sales",
+          "Inside Sales"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-B01",
+      "question": "Which city generates the highest revenue?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Amritsar",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Amritsar",
+          "Chandigarh",
+          "Coimbatore"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-B02",
+      "question": "Compare revenue across zones",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity North",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "zone",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "South",
+          "West"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-B05",
+      "question": "Show revenue trend over time",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.19,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "revenue",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "2024-01",
+          "2024-02",
+          "2024-03"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-I01",
+      "question": "Is revenue correlated with customers?",
+      "pattern": "relationship",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.69,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 5.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint revenue not in customers",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A",
+        "Correlation narrative score: 5.0"
+      ],
+      "routing": {
+        "intent": "relationship",
+        "metricColumn": "customers",
+        "categoryColumn": "revenue",
+        "chartType": "scatter",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Point 1",
+          "Point 2",
+          "Point 3"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-I04",
+      "question": "Compare Mumbai vs Bengaluru revenue",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 5.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Chart top 'Mumbai' vs pandas top 'Amritsar'",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "bar",
+        "confidence": "high",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Mumbai",
+          "Bengaluru"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-E06",
+      "question": "Where is revenue overly concentrated?",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Amritsar",
+          "Chandigarh",
+          "Coimbatore"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-E03",
+      "question": "Executive summary of regional performance",
+      "pattern": "summary",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.19,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "summary",
+        "metricColumn": "revenue",
+        "categoryColumn": "zone",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "South",
+          "West"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-NEG",
+      "question": "Compare sales by salesperson across cities",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 8.0,
+        "data_grounding": 6.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.42,
+      "correlation_narrative": 7.0,
+      "limitation_first": 5.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Did not hard-fail unsupported question",
+        "Chart optional for negative test",
+        "Negative test without clear limitation wording",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "Negative test without clear limitation",
+        "Limitation-first score: 5.0"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Amritsar",
+          "Chandigarh",
+          "Coimbatore"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-C1-Q",
+      "question": "Which city generates the highest revenue?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Amritsar",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Amritsar",
+          "Chandigarh",
+          "Coimbatore"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-C1-F1",
+      "question": "Why is Amritsar highest?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Which city generates the highest revenue?' != root 'Why is Amritsar highest?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Amritsar",
+          "Chandigarh",
+          "Coimbatore"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-C1-F2",
+      "question": "What evidence supports this conclusion?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Which city generates the highest revenue?' != root 'What evidence supports this conclusion?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Amritsar",
+          "Chandigarh",
+          "Coimbatore"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Geography",
+      "qid": "G-C1-F3",
+      "question": "Which columns were used for this analysis?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Which city generates the highest revenue?' != root 'Which columns were used for this analysis?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "revenue",
+        "categoryColumn": "city",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Amritsar",
+          "Chandigarh",
+          "Coimbatore"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-B01",
+      "question": "Which branch has the highest loan balance?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity BR-003",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "loan_balance",
+        "categoryColumn": "branch",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "BR-003",
+          "BR-021",
+          "BR-012"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-B02",
+      "question": "Compare deposits across regions",
+      "pattern": "compare",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity Central",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "compare",
+        "metricColumn": "deposit_balance",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Central",
+          "North",
+          "South"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-B04",
+      "question": "Show deposit trend over time",
+      "pattern": "trend",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.69,
+      "narrative_avg": 7.58,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint deposit_balance not in npl_amount",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "npl_amount",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "2023-12-26/2024-01-01",
+          "2024-01-30/2024-02-05",
+          "2024-02-27/2024-03-04"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-I01",
+      "question": "Loan portfolio concentration by region",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint loan_balance not in spend_amount",
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "spend_amount",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "South",
+          "Central"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-I07",
+      "question": "Credit utilization risk concentration",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "credit_utilization",
+        "categoryColumn": "customer_segment",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Retail",
+          "SME",
+          "Corporate"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-E01",
+      "question": "Biggest portfolio opportunity",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint interest_income not in spend_amount",
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "spend_amount",
+        "categoryColumn": "region",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "North",
+          "South",
+          "Central"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-E02",
+      "question": "Biggest credit risk",
+      "pattern": "executive",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 6.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 5.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Metric hint npl not in spend_amount",
+        "Lead sentence unclear",
+        "Executive question lacks actionable recommendation",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "executive",
+        "metricColumn": "spend_amount",
+        "categoryColumn": "customer_segment",
+        "chartType": "bar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "Retail",
+          "Corporate",
+          "SME"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-NEG",
+      "question": "Compare net interest margin trend by quarter",
+      "pattern": "negative",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 7.0,
+        "chart_selection": 8.0,
+        "data_grounding": 6.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.44,
+      "narrative_avg": 7.42,
+      "correlation_narrative": 7.0,
+      "limitation_first": 5.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Did not hard-fail unsupported question",
+        "Chart optional for negative test",
+        "Negative test without clear limitation wording",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "Negative test without clear limitation",
+        "Limitation-first score: 5.0"
+      ],
+      "routing": {
+        "intent": "trend",
+        "metricColumn": "npl_amount",
+        "categoryColumn": "report_date",
+        "chartType": "line",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "2024-01-01 00:00",
+          "2024-02-01 00:00",
+          "2024-03-01 00:00"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-C1-Q",
+      "question": "Which branch has the highest loan balance?",
+      "pattern": "ranking",
+      "is_follow_up": false,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 6.5,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 7.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 8.12,
+      "narrative_avg": 7.5,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Answer may omit top entity BR-003",
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "loan_balance",
+        "categoryColumn": "branch",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "BR-003",
+          "BR-021",
+          "BR-012"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-C1-F1",
+      "question": "Why is BR-003 highest?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Which branch has the highest loan balance?' != root 'Why is BR-003 highest?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "loan_balance",
+        "categoryColumn": "branch",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "BR-003",
+          "BR-021",
+          "BR-012"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-C1-F2",
+      "question": "Which columns were used for this analysis?",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Which branch has the highest loan balance?' != root 'Which columns were used for this analysis?'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "loan_balance",
+        "categoryColumn": "branch",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "BR-003",
+          "BR-021",
+          "BR-012"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    },
+    {
+      "domain": "Banking & Financial Services",
+      "qid": "B-C1-F3",
+      "question": "Show the calculations behind this answer.",
+      "pattern": "follow_up",
+      "is_follow_up": true,
+      "scores": {
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
+        "data_grounding": 7.0,
+        "executive_summary_quality": 6.0,
+        "recommendation_quality": 7.0,
+        "confidence_explanation": 9.0,
+        "follow_up_continuity": 5.0,
+        "hallucination_resistance": 9.5
+      },
+      "avg": 7.94,
+      "narrative_avg": 7.25,
+      "correlation_narrative": 7.0,
+      "limitation_first": 7.0,
+      "chart_ok_answer_weak": true,
+      "answer_ok_conf_weak": false,
+      "severity": "low",
+      "notes": [
+        "Lead sentence unclear",
+        "N/A \u2014 not recommendation-focused question",
+        "Effective question 'Which branch has the highest loan balance?' != root 'Show the calculations behind this answer.'",
+        "N/A \u2014 not correlation question",
+        "N/A"
+      ],
+      "routing": {
+        "intent": "ranking",
+        "metricColumn": "loan_balance",
+        "categoryColumn": "branch",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
+        "supportStatus": null
+      },
+      "actual": {
+        "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available.",
+        "chart_labels_sample": [
+          "BR-003",
+          "BR-021",
+          "BR-012"
+        ],
+        "answer_length": 137,
+        "has_chart": true
+      },
+      "answer_excerpt": "Could not reach the AI service. Check your network connection and try again. Your chart and calculated metrics below are still available."
+    }
+  ]
+}
