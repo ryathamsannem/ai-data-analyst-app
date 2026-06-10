@@ -12347,6 +12347,25 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
             "- **Standout / outlier question** — Describe unusual highs, lows, gaps, and "
             "concentration; avoid generic ranking copy."
         )
+    if exec_amb in (
+        "executive_strategy",
+        "executive_risk",
+        "executive_opportunity",
+        "executive_outlier_standout",
+    ):
+        lines.extend(
+            [
+                "- **Executive structure** — Start with one direct takeaway, then top evidence "
+                "(≤3 bullets), then one hedged recommended action; details last.",
+                "- Do not open with process narration (avoid I will / Let me / To answer).",
+            ]
+        )
+    if exec_amb == "executive_risk" or bool(conf.get("concentrationRiskQuestion")):
+        lines.append(
+            "- **Concentration / risk** — Prefer revenue concentration, geographic dependency, "
+            "portfolio concentration, or channel dependency; avoid market penetration unless "
+            "that column exists."
+        )
     if bool(conf.get("driverAnalysis")):
         lines.extend(
             [
@@ -12368,6 +12387,15 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
                 "requested metrics, available columns, recommended action).",
                 "- Do NOT report product/category rankings, highest/lowest entities, "
                 "revenue-by-product totals, or unrelated single-metric summaries.",
+            ]
+        )
+    if bool(conf.get("unsupportedRequestedMetric")):
+        lines.extend(
+            [
+                "- **Missing requested metric** — Open limitation-first; do not substitute "
+                "another metric as the answer.",
+                "- Do not use forbidden business phrases listed in the phrase-guardrails block.",
+                "- If a fallback chart is present, label any mention as fallback context only.",
             ]
         )
     if bool(conf.get("forecastProjectionLow")):
@@ -12429,6 +12457,8 @@ def _confidence_answer_prompt_block(conf: Dict[str, Any]) -> str:
 INSIGHT_SAFETY_SYSTEM_PROMPT = (
     "You are an analyst assistant for tabular business data. "
     "You must not hallucinate columns, metrics, or magnitudes. "
+    "Never mention business concepts (conversion rate, NPS, CLV, market penetration, churn, "
+    "salesperson, net interest margin) unless the user message shows those columns exist. "
     "Never invent statistical significance: if no p-values, confidence intervals, or "
     "explicit tests appear in the user message, do not claim significance. "
     "Prefer calibrated, honest uncertainty. Keep answers concise and plain text "
@@ -15668,6 +15698,51 @@ def ask_question(data: QuestionRequest, request: Request):
         if isinstance(icr, str) and icr.strip():
             rationale_line = f"\nHeuristic confidence note: {icr.strip()}\n"
 
+        unsupported_requested_metric: Optional[Dict[str, Any]] = None
+        guard_block = ""
+        concentration_risk_question = False
+        try:
+            from intent_engine.narrative_guardrails import (
+                assess_unsupported_requested_metric,
+                build_unsupported_requested_metric_context,
+                narrative_guardrails_prompt_block,
+            )
+
+            unsupported_requested_metric = assess_unsupported_requested_metric(
+                question=data.question,
+                df=df,
+                profile=dataset_profile,
+                analysis_ctx=analysis_ctx,
+            )
+            concentration_risk_question = bool(
+                str(analysis_ctx.get("executiveAmbiguousBucket") or "")
+                in ("executive_risk", "executive_strategy")
+                or re.search(
+                    r"\b(risk|concentrat|dependency|portfolio|exposure)\b",
+                    str(data.question or ""),
+                    re.I,
+                )
+            )
+            guard_block = narrative_guardrails_prompt_block(
+                question=data.question,
+                df=df,
+                profile=dataset_profile,
+                analysis_ctx=analysis_ctx,
+                unsupported_requested=unsupported_requested_metric,
+            )
+            if guard_block:
+                guard_block = f"\n{guard_block}\n"
+            if (
+                unsupported_requested_metric
+                and unsupported_requested_metric.get("active")
+            ):
+                lim_ctx = build_unsupported_requested_metric_context(
+                    unsupported_requested_metric
+                )
+                exact_result = f"{lim_ctx}\n\n{exact_result}".strip()
+        except Exception:
+            pass
+
         conf_prompt = _confidence_answer_prompt_block(
             {
                 "analysisRowCount": int(analysis_ctx.get("analysisRowCount") or 0),
@@ -15699,6 +15774,14 @@ def ask_question(data: QuestionRequest, request: Request):
                         )
                         and analysis_ctx["unsupportedMultiMetricAnalysis"].get("active")
                     )
+                ),
+                "unsupportedRequestedMetric": bool(
+                    unsupported_requested_metric
+                    and unsupported_requested_metric.get("active")
+                ),
+                "concentrationRiskQuestion": concentration_risk_question,
+                "executiveAmbiguousBucket": analysis_ctx.get(
+                    "executiveAmbiguousBucket"
                 ),
                 "relationshipScatter": bool(
                     str(analysis_ctx.get("chartTypeInternal") or "").lower() == "scatter"
@@ -15824,6 +15907,7 @@ Exact calculated result (ground truth metrics / table):
 {outlier_block}
 {forecast_block}
 {exec_rank_block}
+{guard_block}
 {viz_anchor}
 {evidence_line}{rationale_line}
 Rules:
@@ -15837,6 +15921,18 @@ Rules:
 
         try:
             answer_text = _generate_insight_narrative(prompt)
+            try:
+                from intent_engine.narrative_guardrails import sanitize_narrative_answer
+
+                answer_text = sanitize_narrative_answer(
+                    answer_text,
+                    df,
+                    dataset_profile,
+                    data.question,
+                    unsupported_requested_metric,
+                )
+            except Exception:
+                pass
         except Exception as exc:
             logger.warning("Claude narrative unavailable: %s", exc, exc_info=True)
             answer_text = _claude_narrative_fallback_answer(exc)
