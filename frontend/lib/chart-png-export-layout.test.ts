@@ -80,6 +80,16 @@ describe("chart PNG export layout", () => {
     expect(spec.height).toBeGreaterThan(500);
   });
 
+  it("grows donut export canvas for 4, 6, and 8 categories", () => {
+    const d4 = buildPresentationExportSpec("donut", { categoryCount: 4 });
+    const d6 = buildPresentationExportSpec("donut", { categoryCount: 6 });
+    const d8 = buildPresentationExportSpec("donut", { categoryCount: 8 });
+    expect(d6.canvasHeight).toBeGreaterThan(d4.canvasHeight);
+    expect(d8.canvasHeight).toBeGreaterThan(d6.canvasHeight);
+    expect(d4.height).toBeGreaterThanOrEqual(400);
+    expect(d8.height).toBeGreaterThan(d4.height);
+  });
+
   it("documents two-column overview threshold", () => {
     expect(OVERVIEW_TWO_COLUMN_MIN_CONTAINER_PX).toBeGreaterThanOrEqual(960);
   });

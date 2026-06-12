@@ -10,15 +10,16 @@ import {
 } from "@/lib/chart-axis-theme";
 import { ensureReadableExportTextFill } from "@/lib/chart-png-export-text";
 import { applyPngExportSvgPolish } from "@/lib/chart-png-export-svg-polish";
+import { RADIAL_EXPORT_MIN_SVG_PAD_PX } from "@/lib/radial-export-layout";
 const EXPORT_MIN_WIDTH = 720;
 /** Plot uses most of the inner card width without stretching sparse bar SVGs. */
 const PLOT_WIDTH_UTIL = 0.9;
 const PLOT_WIDTH_UTIL_COMPACT = 0.96;
 const COMPOSITE_PAD_X = 24;
-const COMPOSITE_PAD_Y = 20;
+const COMPOSITE_PAD_Y = 12;
 const HEADER_PLOT_GAP = 12;
 /** Export-only inner card padding (visible UI unchanged). */
-const EXPORT_CARD_PAD = 52;
+const EXPORT_CARD_PAD = 40;
 const EXPORT_CARD_RADIUS = 18;
 const EXPORT_CARD_BORDER = 2;
 const EXPORT_FOOTER_H = 34;
@@ -239,8 +240,10 @@ function cloneSvgWithInlineStyles(
 function tightenSvgViewBox(
   clone: SVGSVGElement,
   fallbackWidth: number,
-  fallbackHeight: number
+  fallbackHeight: number,
+  opts?: { minPadPx?: number }
 ): { width: number; height: number } {
+  const minPad = opts?.minPadPx ?? 8;
   const mount = document.createElement("div");
   mount.style.cssText =
     "position:fixed;left:-9999px;top:0;visibility:hidden;pointer-events:none;overflow:visible;";
@@ -261,9 +264,9 @@ function tightenSvgViewBox(
           // ignore detached text metrics
         }
       }
-      const padX = 8;
-      const padTop = 8;
-      const padBottom = textNodes.length >= 4 ? 18 : 12;
+      const padX = minPad;
+      const padTop = minPad;
+      const padBottom = textNodes.length >= 4 ? minPad + 10 : minPad + 4;
       const x = bbox.x - padX;
       const y = bbox.y - padTop;
       const w = bbox.width + padX * 2;
@@ -278,6 +281,16 @@ function tightenSvgViewBox(
     mount.remove();
   }
   return { width, height };
+}
+
+function isRadialChartRoot(container: HTMLElement): boolean {
+  return Boolean(container.querySelector(".recharts-pie-sector, .recharts-pie"));
+}
+
+function stripRadialLegendFromSvgClone(clone: SVGSVGElement): void {
+  clone.querySelectorAll(".recharts-legend-wrapper").forEach((node) => {
+    node.remove();
+  });
 }
 
 type ExportLegendEntry = {
@@ -505,7 +518,13 @@ async function renderPlotSvgToPng(
   applyPngExportSvgPolish(clone, {
     darkBackground: isDarkExportBackground(plotBackground),
   });
-  const tightened = tightenSvgViewBox(clone, width, height);
+  const radialExport = isRadialChartRoot(container);
+  if (radialExport) {
+    stripRadialLegendFromSvgClone(clone);
+  }
+  const tightened = tightenSvgViewBox(clone, width, height, {
+    minPadPx: radialExport ? RADIAL_EXPORT_MIN_SVG_PAD_PX : 8,
+  });
   width = tightened.width;
   height = tightened.height;
 
@@ -1184,9 +1203,10 @@ async function compositeExportPng(
   const outW = canvasSize?.width
     ? Math.round(canvasSize.width * scale)
     : Math.max(contentW, Math.round(EXPORT_MIN_WIDTH * scale));
-  const outH = canvasSize?.height
+  const fixedOutH = canvasSize?.height
     ? Math.round(canvasSize.height * scale)
     : contentH;
+  const outH = Math.max(fixedOutH, contentH);
 
   const canvas = document.createElement("canvas");
   canvas.width = outW;

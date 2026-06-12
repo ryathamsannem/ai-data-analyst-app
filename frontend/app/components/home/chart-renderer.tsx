@@ -33,6 +33,10 @@ import {
   verticalCartesianOuterMargins,
 } from "@/lib/chart-layout-config";
 import {
+  radialChartExportOuterMargins,
+  resolveRadialChartRadii,
+} from "@/lib/radial-export-layout";
+import {
   formatAxisTickFromRows,
   formatAxisTickFromScatterX,
   formatChartAxisCategoryTick,
@@ -715,26 +719,31 @@ function ChartRendererInner({
   }
 
   if (rKind === "pie" || rKind === "donut") {
-    const innerR =
-      rKind === "pie" ? 0 : compact ? 52 : 62;
+    const radii = resolveRadialChartRadii({
+      kind: rKind,
+      plotHeightPx: chartHeight,
+      compact,
+      pngCaptureMode,
+    });
     const piePad = computePieChartMargins(rAxes.valueAxisCompact);
+    const margins = pngCaptureMode
+      ? radialChartExportOuterMargins(rKind, piePad)
+      : radialChartOuterMargins(rKind, compact, piePad);
     return (
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
         width="100%"
         height={chartHeight}
       >
-        <PieChart
-          margin={radialChartOuterMargins(rKind, compact, piePad)}
-        >
+        <PieChart margin={margins}>
           <Pie
             data={rData}
             dataKey="value"
             nameKey="name"
             cx="50%"
-            cy="50%"
-            innerRadius={innerR}
-            outerRadius={compact ? 84 : 100}
+            cy={radii.cy}
+            innerRadius={radii.innerRadius}
+            outerRadius={radii.outerRadius}
             paddingAngle={2}
             stroke="#fff"
             strokeWidth={2}

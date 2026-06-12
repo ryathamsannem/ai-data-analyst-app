@@ -1852,9 +1852,9 @@ body {
 .overview-filters-card--post-upload .overview-filter-control,
 .overview-filters-card--post-upload select.overview-filter-control,
 .overview-filters-card--post-upload .overview-filter-date-bar {
-  height: 40px !important;
-  min-height: 40px !important;
-  max-height: 40px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
   box-shadow: none;
 }
 
@@ -2443,6 +2443,7 @@ body {
   min-width: 0;
   max-width: 100%;
   grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
   gap: 24px;
   align-items: stretch;
 }
@@ -2450,7 +2451,6 @@ body {
 @media (min-width: 768px) {
   :root {
     --overview-chart-plot-min-h: 340px;
-    --overview-chart-solo-row-width: min(70%, 1240px);
   }
 
   /* Two columns only when the charts container is wide enough (sidebar expanded → single col). */
@@ -2462,24 +2462,6 @@ body {
       );
     }
   }
-
-  /*
-   * Lone card in the last row (3, 5, 7, …): stay in column 1 so it aligns with the first chart.
-   */
-  .overview-chart-grid__cell:last-child:nth-child(odd):not(:only-child) {
-    grid-column: 1;
-    width: 100%;
-    max-width: 100%;
-    justify-self: stretch;
-  }
-
-  /* Single chart: modest width, left-aligned with grid */
-  .overview-chart-grid__cell:only-child {
-    grid-column: 1 / -1;
-    width: var(--overview-chart-solo-row-width);
-    max-width: 1240px;
-    justify-self: start;
-  }
 }
 
 .overview-chart-grid__cell {
@@ -2488,6 +2470,25 @@ body {
   width: 100%;
   max-width: 100%;
   align-self: stretch;
+}
+
+/*
+ * Lone card in the last row (3, 5, 7, …): always span full width when class is set.
+ * Inline styles in page.tsx mirror this; keep CSS for :last-child fallback.
+ */
+.overview-chart-grid__cell--solo-row,
+.overview-chart-grid__cell:last-child:nth-child(odd):not(:only-child) {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
+}
+
+.overview-chart-grid__cell:only-child {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
 }
 
 .overview-chart-grid__inner {

@@ -35,17 +35,71 @@ function rowsFromSpec(spec: CanonicalChartSpec): ChartRow[] {
   return rows;
 }
 
+function capitalizePhraseStart(phrase: string): string {
+  const s = phrase.trim();
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function formatMetricByDimensionTitle(metric: string, dimension: string): string {
+  return `${capitalizePhraseStart(polishMetricDisplay(metric))} by ${polishMetricDisplay(dimension)}`;
+}
+
+/**
+ * Generic cleanup for auto-dashboard titles (no dataset-specific strings).
+ * Examples: "Total Top region by revenue" → "Revenue by region";
+ * "Category distribution · department" → "Department distribution".
+ */
+export function polishAutoDashboardChartTitle(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "Chart";
+
+  const categoryDist = t.match(
+    /^category\s+distribution\s*[·•\-|]\s*(.+)$/i
+  );
+  if (categoryDist) {
+    return `${capitalizePhraseStart(polishMetricDisplay(categoryDist[1].trim()))} distribution`;
+  }
+
+  const topBy = t.match(/^total\s+top\s+(.+?)\s+by\s+(.+)$/i);
+  if (topBy) {
+    return formatMetricByDimensionTitle(topBy[2].trim(), topBy[1].trim());
+  }
+
+  const rankingTopBy = t.match(/^top\s+(.+?)\s+by\s+(.+)$/i);
+  if (rankingTopBy) {
+    return formatMetricByDimensionTitle(
+      rankingTopBy[2].trim(),
+      rankingTopBy[1].trim()
+    );
+  }
+
+  const byIdx = t.toLowerCase().indexOf(" by ");
+  if (byIdx > 0) {
+    const left = t
+      .slice(0, byIdx)
+      .trim()
+      .replace(/^(total|sum|average|mean|maximum|max|minimum|min|count of)\s+/i, "");
+    const right = t.slice(byIdx + 4).trim();
+    if (left && right) {
+      return formatMetricByDimensionTitle(left, right);
+    }
+  }
+
+  return capitalizePhraseStart(polishMetricDisplay(t));
+}
+
 /** Canonical title — prefers frozen contract, else derives from chart spec. */
 export function getCanonicalChartTitle(spec: CanonicalChartSpec): string {
   const frozen = spec.contract?.displayTitle?.trim() || spec.contract?.title?.trim();
-  if (frozen) return frozen;
+  if (frozen) return polishAutoDashboardChartTitle(frozen);
 
   const raw = spec.rawTitle?.trim();
   if (!raw) return "Chart";
 
   const rows = rowsFromSpec(spec);
   if (!rows.length) {
-    return polishMetricDisplay(raw);
+    return polishAutoDashboardChartTitle(polishMetricDisplay(raw));
   }
 
   const ephemeral = freezeVisualizationContract({
@@ -58,7 +112,7 @@ export function getCanonicalChartTitle(spec: CanonicalChartSpec): string {
     rows,
     aggregationKey: spec.aggregationKey ?? "sum",
   });
-  return ephemeral.displayTitle;
+  return polishAutoDashboardChartTitle(ephemeral.displayTitle);
 }
 
 export function aggregationPrefixLabel(aggregationKey: string): string {

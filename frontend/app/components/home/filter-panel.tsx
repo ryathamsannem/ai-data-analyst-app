@@ -157,7 +157,7 @@ function FilterPanelInner({
       : "";
 
   const shellCls = isDashboard
-    ? `${filterShellClass} ${useOverviewCompact ? "overview-filters-card--post-upload space-y-2" : "space-y-3"} ${useOverviewCompact ? "p-3 sm:p-3.5" : "p-4 sm:p-5"} ${ovCard}`
+    ? `${filterShellClass} ${useOverviewCompact ? "overview-filters-card--post-upload space-y-1.5" : "space-y-3"} ${useOverviewCompact ? "p-2.5 sm:p-3" : "p-4 sm:p-5"} ${ovCard}`
     : "space-y-4 rounded-2xl border border-slate-200/55 bg-white/95 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.045)] backdrop-blur-[2px] sm:p-5";
 
   const dateBarCls = isDashboard

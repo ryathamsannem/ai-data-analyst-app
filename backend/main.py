@@ -49,6 +49,10 @@ from services.saas_context import (
     resolve_session_id,
 )
 from services.usage_tracker import usage_tracker
+from services.auto_dashboard_opportunities import (
+    DashboardDeps,
+    build_dashboard_charts_from_opportunities,
+)
 
 load_dotenv()
 
@@ -3614,16 +3618,36 @@ def _dash_generic_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
     return out_ch
 
 
-def build_auto_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
+def build_auto_dashboard_charts(
+    kind: str, kpi_cards: Optional[List[Dict[str, Any]]] = None
+) -> List[Dict[str, Any]]:
+    global df, dataset_profile
+    if df is None or df.empty:
+        return []
+    profile = dataset_profile or build_profile(df)
+    seed: List[Dict[str, Any]] = []
     if kind == "hr":
-        raw = _dash_hr_dashboard_charts()
+        seed = _dash_hr_dashboard_charts()
     elif kind == "sales":
-        raw = _dash_sales_dashboard_charts()
+        seed = _dash_sales_dashboard_charts()
     elif kind == "operations":
-        raw = _dash_operations_dashboard_charts()
+        seed = _dash_operations_dashboard_charts()
     else:
-        raw = _dash_generic_dashboard_charts(kind)
-    return _finalize_auto_dashboard_charts(raw, kind=kind, max_charts=3)
+        seed = _dash_generic_dashboard_charts(kind)
+    deps = DashboardDeps(
+        numeric_series=numeric_series,
+        time_series_grouped=_adaptive_time_series_grouped,
+        series_payload=_dash_series_payload,
+        pretty_label=_pretty_label_text,
+        chart_title_by_dimension=_dash_chart_title_by_dimension,
+        freq_human_label=_freq_human_label,
+        id_like_column=_id_like_column_name,
+        priority_metrics=_dash_priority_metric_columns,
+        record_metric_key=_DASH_RECORD_METRIC_KEY,
+    )
+    return build_dashboard_charts_from_opportunities(
+        df, profile, kind, deps, seed_candidates=seed, kpi_cards=kpi_cards
+    )
 
 
 def build_auto_dashboard() -> Dict[str, Any]:
@@ -3783,19 +3807,19 @@ def build_auto_dashboard() -> Dict[str, Any]:
             )
 
         out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind)
+        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
         return out
 
     if kind == "sales":
         _append_sales_domain_kpi_cards(cards, kp, profile, columns)
         out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind)
+        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
         return out
 
     if kind == "generic":
         cards = _build_generic_executive_kpi_cards(columns, profile)
         out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind)
+        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
         return out
 
     if kind == "finance":
@@ -3857,13 +3881,13 @@ def build_auto_dashboard() -> Dict[str, Any]:
                 )
 
         out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind)
+        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
         return out
 
     if kind == "operations":
         cards = _build_operations_kpi_cards(columns, profile, kp)
         out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind)
+        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
         return out
 
     if kind == "marketing":
@@ -3931,12 +3955,12 @@ def build_auto_dashboard() -> Dict[str, Any]:
             )
 
         out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind)
+        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
         return out
 
     # fallback (should not reach — all kinds handled above)
     out["cards"] = clamp_cards([])
-    out["charts"] = build_auto_dashboard_charts(kind)
+    out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
     return out
 
 

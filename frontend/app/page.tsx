@@ -58,8 +58,6 @@ import {
   balanceHorizontalOuterMargins,
   balanceVerticalOuterMargins,
   collectSampleTickStrings,
-  computeCategoryAxisBottomMargin,
-  computeHorizontalBarAxisLayout,
   wrapCategoryLabelLines,
   computeVerticalCategoryAxisPlan,
   computeVerticalValueAxisLayout,
@@ -81,6 +79,15 @@ import {
   buildPresentationExportSpec,
   presentationCapturePlotStyle,
 } from "@/lib/chart-png-export-layout";
+import { resolveOverviewEffectivePresentationKind } from "@/lib/overview-dashboard-export";
+import {
+  computeCartesianCategoryPlanForRender,
+  computeOverviewBarCategoryBottom,
+  computeOverviewHorizontalDashLayout,
+  computeOverviewMiniCategoryPlan,
+  computeOverviewVerticalDashLayout,
+  overviewDashboardUsesHorizontalBars,
+} from "@/lib/overview-dashboard-plot-layout";
 import { ChartPngOffscreenHost } from "@/lib/chart-png-offscreen-host";
 import {
   formatExecutiveMetricValue,
@@ -89,6 +96,7 @@ import {
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
 import { buildChartCartesianTooltipHandlers } from "@/lib/chart-tooltip-format";
+import { radialShareDisplayAllowed } from "@/lib/radial-chart-format";
 import {
   chartHasRateAbove100,
   percentGapChipAriaLabel,
@@ -421,6 +429,14 @@ import {
 } from "@/lib/pilot-landing";
 import { resolvePilotNavActive } from "@/lib/pilot-nav-state";
 import {
+  isOverviewChartGridSoloRow,
+  overviewChartGridSoloRowStyle,
+} from "@/lib/overview-chart-grid-layout";
+import {
+  filterOverviewRenderableCharts,
+  overviewChartHasRenderableData,
+} from "@/lib/overview-dashboard-chart-renderable";
+import {
   shouldAutoUploadAfterPick,
   validateOverviewUploadPick,
 } from "@/lib/upload-auto-flow";
@@ -438,6 +454,7 @@ import {
   ovUploadDropzoneActive,
   ovUploadDropzoneIdle,
   ovChartCell,
+  ovChartCellSoloRow,
   ovChartGrid,
   ovChartInner,
   ovChartsWrap,
@@ -1472,104 +1489,6 @@ function buildChartMetadataBadgeCompact(
     parts.push(`${groupCount.toLocaleString()} groups`);
   }
   return parts.join(" · ");
-}
-
-function computeCartesianCategoryPlanForRender(args: {
-  rows: ChartRow[];
-  kind: ChartKind;
-  stackedBar: boolean;
-  chartHeight: number;
-  compact: boolean;
-  insightMode: boolean;
-  viewportWidthPx: number;
-  axes: ChartAxes;
-  /** Narrow overview mini-cards (half main grid width). */
-  layoutVariant?: "default" | "overview_half";
-  /** Overview dashboard: allow horizontal bar when X ticks cannot fit. */
-  allowHorizontalBarFallback?: boolean;
-}): VerticalCategoryAxisPlan | null {
-  const {
-    rows,
-    kind,
-    stackedBar,
-    chartHeight,
-    compact,
-    insightMode,
-    viewportWidthPx,
-    axes,
-    layoutVariant = "default",
-    allowHorizontalBarFallback = false,
-  } = args;
-  if (!rows.length) return null;
-  if (kind !== "bar" && kind !== "line" && kind !== "area" && kind !== "histogram")
-    return null;
-
-  const chartLayoutMode: ChartLayoutMode = compact ? "compact" : "full";
-  const tickSamples = collectSampleTickStrings(rows);
-  const plotInnerHeightPx =
-    chartLayoutMode === "full"
-      ? Math.max(120, Math.floor(chartHeight * 0.86))
-      : Math.max(72, Math.floor(chartHeight * 0.52));
-
-  const verticalValueLayout = computeVerticalValueAxisLayout({
-    valueAxisLabel: axes.valueAxisCompact,
-    valueAxisMeasureLabel: axes.valueAxis,
-    tickSampleStrings: tickSamples,
-    chartLayoutMode,
-    plotInnerHeightPx,
-    tickFontSizePx: compact ? 10 : 11,
-    titleFontSizePx: compact ? 10 : 11,
-  });
-
-  const vmBalanced = balanceVerticalOuterMargins({
-    marginLeft: verticalValueLayout.marginLeft,
-    chartLayoutMode,
-  });
-
-  let variant: "main" | "overview_half" | "insight_compact" | "insight_full" =
-    "main";
-  if (layoutVariant === "overview_half") {
-    variant = "overview_half";
-  } else if (insightMode && compact) {
-    variant = "insight_compact";
-  } else if (insightMode && !compact) {
-    variant = "insight_full";
-  }
-
-  const innerW = estimateCartesianPlotInnerWidthPx({
-    viewportWidthPx,
-    marginLeftPx: vmBalanced.marginLeft,
-    marginRightPx: vmBalanced.marginRight,
-    variant,
-  });
-
-  const labels = rows.map((r) => String(r.name ?? ""));
-  const preferAngledInsight =
-    insightMode &&
-    !compact &&
-    !stackedBar &&
-    (kind === "bar" || kind === "histogram") &&
-    labels.length >= 5 &&
-    labels.length <= 14;
-  const categoryAngleDegInsight =
-    insightMode && !compact
-      ? kind === "line" || kind === "area"
-        ? 32
-        : kind === "bar" || kind === "histogram"
-          ? 30
-          : 25
-      : undefined;
-  return computeVerticalCategoryAxisPlan({
-    categoryLabels: labels,
-    estimatedPlotInnerWidthPx: innerW,
-    chartLayoutMode,
-    disableHorizontalFallback:
-      stackedBar ||
-      kind === "histogram" ||
-      (kind === "bar" && !allowHorizontalBarFallback),
-    preferAngledCategoryTicks: preferAngledInsight,
-    categoryAngleDeg: categoryAngleDegInsight,
-  });
 }
 
 /** Ascending bar order for lowest/min/MIN; descending for highest/max; null = keep API order. */
@@ -3775,7 +3694,7 @@ function parseAutoDashboardMiniCharts(raw: unknown): AutoDashboardMiniChart[] {
       interaction: parseChartInteraction(o.interaction),
     });
   }
-  return out.slice(0, 6);
+  return out.slice(0, 8);
 }
 
 function parseAutoDashboardPayload(raw: unknown): AutoDashboardPayload | null {
@@ -4013,16 +3932,31 @@ function computeOverviewAiSummaryBullets(args: {
     dateColumn,
   } = args;
 
-  const candidates: string[] = [];
+  const scored: { text: string; score: number }[] = [];
   const seen = new Set<string>();
 
-  const pushUnique = (raw: string) => {
+  const pushScored = (raw: string, score: number) => {
     const s = raw.replace(/\s+/g, " ").trim();
-    if (!s) return;
+    if (!s || score <= 0) return;
     const key = s.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    candidates.push(s);
+    scored.push({ text: s, score });
+  };
+
+  const isLowValueKpiTitle = (title: string) => {
+    const t = title.trim().toLowerCase();
+    if (!t) return true;
+    if (/^(records?\s+in\s+view|row\s+count|column\s+count|fields?\s+in\s+view)\b/.test(t)) {
+      return true;
+    }
+    if (
+      /^(total|sum|count|records?|rows?|columns?)\b/.test(t) &&
+      !/\b(top|highest|lowest|lead|best|worst|maximum|minimum|peak|trend)\b/.test(t)
+    ) {
+      return true;
+    }
+    return false;
   };
 
   const charts = autoDashboard?.charts ?? [];
@@ -4053,16 +3987,19 @@ function computeOverviewAiSummaryBullets(args: {
             42
           );
           if (Math.abs(rel) < 0.04) {
-            pushUnique(
-              `The time-based view "${titleHint}" is fairly level across the window shown.`
+            pushScored(
+              `The time-based view "${titleHint}" is fairly level across the window shown.`,
+              78
             );
           } else if (rel < 0) {
-            pushUnique(
-              `Recent buckets in "${titleHint}" run lower than earlier ones on average.`
+            pushScored(
+              `Recent buckets in "${titleHint}" run lower than earlier ones on average.`,
+              96
             );
           } else {
-            pushUnique(
-              `Recent buckets in "${titleHint}" run higher than earlier ones on average.`
+            pushScored(
+              `Recent buckets in "${titleHint}" run higher than earlier ones on average.`,
+              96
             );
           }
           trendBulletsAdded += 1;
@@ -4089,27 +4026,33 @@ function computeOverviewAiSummaryBullets(args: {
         const hiName = truncateOverviewPhrase(hi.name, 32);
         if (breakdown) {
           const br = truncateOverviewPhrase(breakdown, 28);
-          pushUnique(
-            `${hiName} leads on ${mShort.toLowerCase()} when split by ${br.toLowerCase()}.`
+          pushScored(
+            `${hiName} leads on ${mShort.toLowerCase()} when split by ${br.toLowerCase()}.`,
+            92
           );
         } else {
-          pushUnique(`${hiName} is the high point on ${mShort}.`);
+          pushScored(`${hiName} is the high point on ${mShort}.`, 88);
         }
         barBulletsAdded += 1;
       }
     }
   }
 
-  for (const card of cards.slice(0, 3)) {
+  for (const card of cards.slice(0, 4)) {
     const t = truncateOverviewPhrase(card.title, 40);
     const v = truncateOverviewPhrase(String(card.value ?? ""), 36);
     if (!t || !v) continue;
     if (card.subtitle?.trim()) {
       const st = truncateOverviewPhrase(card.subtitle, 44);
-      pushUnique(`${t}: ${v} (${st}).`);
-    } else {
-      pushUnique(`${t} is ${v}.`);
+      pushScored(`${t}: ${v} (${st}).`, 74);
+      continue;
     }
+    if (isLowValueKpiTitle(t)) continue;
+    const titleLc = t.toLowerCase();
+    const comparative = /\b(top|highest|lowest|lead|best|worst|maximum|minimum|peak)\b/.test(
+      titleLc
+    );
+    pushScored(`${t} is ${v}.`, comparative ? 70 : 42);
   }
 
   if (primaryMetricColumn) {
@@ -4127,15 +4070,17 @@ function computeOverviewAiSummaryBullets(args: {
       const zHi = (max - mean) / std;
       const zLo = (mean - min) / std;
       if (zHi > 2.75 || zLo > 2.75) {
-        pushUnique(
-          `The main numeric measure shows long tails—spot-check extremes before trusting aggregates.`
+        pushScored(
+          `The main numeric measure shows long tails—spot-check extremes before trusting aggregates.`,
+          86
         );
       } else if (max != null && min != null && mean != null) {
         const span = Math.abs(max - min);
         const noise = std * 4;
         if (Number.isFinite(span) && Number.isFinite(noise) && span > noise * 2.5) {
-          pushUnique(
-            `Values on the primary measure spread widely; use filters to focus on a cohort.`
+          pushScored(
+            `Values on the primary measure spread widely; use filters to focus on a cohort.`,
+            82
           );
         }
       }
@@ -4153,44 +4098,25 @@ function computeOverviewAiSummaryBullets(args: {
     const cv = std / Math.abs(mean);
     if (cv < 0.12) {
       const label = humanizeColumnName(c);
-      pushUnique(`${label} stays relatively steady across rows.`);
+      pushScored(`${label} stays relatively steady across rows.`, 28);
       break;
     }
   }
 
-  if (dateColumn) {
-    pushUnique(
-      `Time trends use ${humanizeColumnName(dateColumn)} when a calendar view applies.`
-    );
-  } else if (charts.some((c) => isLikelyTrendAutoChart(c))) {
-    pushUnique(`A time-based chart is available—pair it with a date column for richer answers.`);
-  }
-
-  if (groupingColumn) {
-    pushUnique(
-      `Default groupings lean on ${humanizeColumnName(groupingColumn)} for comparisons.`
-    );
-  }
-
-  pushUnique(
-    `This dataset has ${rows.toLocaleString()} rows across ${columns.length} columns.`
-  );
-
   if (columns.length > 0 && !primaryMetricColumn) {
-    pushUnique(
-      `Pick a primary numeric column in mapping so KPIs and summaries stay grounded.`
+    pushScored(
+      `Pick a primary numeric column in mapping so KPIs and summaries stay grounded.`,
+      24
     );
   }
 
-  const out = candidates.slice(0, 5);
+  scored.sort((a, b) => b.score - a.score);
+  const out = scored.slice(0, 5).map((item) => item.text);
   const minBullets = 3;
   const neutralFill = [
     `Ask a focused question in AI Insights to go deeper on any chart signal.`,
     `Use the chart footers on this tab to open the same view in the Charts workspace.`,
     `Column mapping drives how these bullets and KPIs are inferred—adjust if something looks off.`,
-    `Working with ${columns.length} field${
-      columns.length === 1 ? "" : "s"
-    }—narrow with filters or questions as needed.`,
     `KPI cards reflect your current sheet and mapping settings.`,
   ];
   let i = 0;
@@ -4691,15 +4617,21 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   );
 
   const chartRows = useMemo((): ChartRow[] => {
-    const mapped = baseChartRows.map((r) => ({
+    const mapped = baseChartRows.map((r) => ({ ...r }));
+    const metricCtxWithRows: MetricFormatContext = {
+      ...overviewMetricCtx,
+      chartRows: mapped,
+      shareComposition: radialShareDisplayAllowed(mapped, chart.title),
+    };
+    const withDisplay = mapped.map((r) => ({
       ...r,
-      displayValue: formatExecutiveMetricValue(r, overviewMetricCtx),
+      displayValue: formatExecutiveMetricValue(r, metricCtxWithRows),
     }));
     if (displayKind === "line" || displayKind === "area") {
-      return sortChartRowsChronologically(mapped);
+      return sortChartRowsChronologically(withDisplay);
     }
-    return mapped;
-  }, [baseChartRows, displayKind, overviewMetricCtx]);
+    return withDisplay;
+  }, [baseChartRows, displayKind, overviewMetricCtx, chart.title]);
 
   const valueAxisTitle = useMemo(
     () => overviewDashShortValueAxisLabel((chart.title || "Value").trim() || "Value"),
@@ -4730,122 +4662,26 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [categoryAxisLabel, valueAxisTitle]
   );
 
-  const miniCategoryPlan = useMemo(() => {
-    if (displayKind === "pie" || displayKind === "donut") return null;
-    if (displayKind === "bar_horizontal") return null;
-    const rowKind: ChartKind =
-      displayKind === "line" || displayKind === "area"
-        ? displayKind
-        : displayKind === "histogram"
-          ? "histogram"
-          : "bar";
-    if (rowKind !== "bar" && rowKind !== "line" && rowKind !== "area")
-      return null;
-    return computeCartesianCategoryPlanForRender({
-      rows: chartRows,
-      kind: rowKind,
-      stackedBar: false,
-      chartHeight: plotHeightPx,
-      compact: true,
-      insightMode: false,
-      viewportWidthPx: Math.max(viewportWidthPx, 200),
-      axes: miniAxes,
-      layoutVariant: "overview_half",
-      allowHorizontalBarFallback: rowKind === "bar",
-    });
-  }, [displayKind, chartRows, miniAxes, viewportWidthPx, plotHeightPx]);
-
-  const renderBarAsHorizontal =
-    displayKind === "bar_horizontal" ||
-    (displayKind === "bar" && Boolean(miniCategoryPlan?.renderAsHorizontalBar));
-
-  const verticalDashLayout = useMemo(() => {
-    if (
-      displayKind === "pie" ||
-      displayKind === "donut" ||
-      displayKind === "bar_horizontal"
-    )
-      return null;
-    return computeVerticalValueAxisLayout({
-      valueAxisLabel: valueAxisTitle,
-      valueAxisMeasureLabel: valueAxisTitle,
-      tickSampleStrings: dashTickSamples,
-      chartLayoutMode: "compact",
-      tickFontSizePx: OV_DASH_AXIS_LABEL_STYLE.fontSize,
-      titleFontSizePx: OV_DASH_AXIS_LABEL_STYLE.fontSize,
-      plotInnerHeightPx: Math.max(180, Math.floor(plotHeightPx * 0.72)),
-    });
-  }, [displayKind, valueAxisTitle, dashTickSamples, plotHeightPx]);
-
-  const horizontalDashLayout = useMemo(() => {
-    if (!renderBarAsHorizontal) return null;
-    const base = computeHorizontalBarAxisLayout({
-      categoryTickStrings: chartRows.map((r) => String(r.name ?? "")),
-      valueAxisLabel: valueAxisTitle,
-      valueAxisFull: valueAxisTitle,
-      categoryAxisLabel,
-      chartLayoutMode: "full",
-      tickFontSizePx: 9,
-      titleFontSizePx: 10,
-      maxValueAxisTitleWidthPx: Math.max(120, viewportWidthPx - 72),
-    });
-    const catCap = Math.max(72, Math.floor(viewportWidthPx * 0.38));
-    const catW = Math.min(catCap, Math.max(base.categoryAxisWidth, 72));
-    return {
-      ...base,
-      categoryAxisWidth: catW,
-    };
-  }, [renderBarAsHorizontal, chartRows, valueAxisTitle, categoryAxisLabel, viewportWidthPx]);
-
-  const exportMiniCategoryPlan = useMemo(() => {
-    if (!offscreenExportLayout) return null;
-    if (displayKind === "pie" || displayKind === "donut") return null;
-    if (displayKind === "bar_horizontal") return null;
-    const rowKind: ChartKind =
-      displayKind === "line" || displayKind === "area"
-        ? displayKind
-        : displayKind === "histogram"
-          ? "histogram"
-          : "bar";
-    if (rowKind !== "bar" && rowKind !== "line" && rowKind !== "area")
-      return null;
-    return computeCartesianCategoryPlanForRender({
-      rows: chartRows,
-      kind: rowKind,
-      stackedBar: false,
-      chartHeight: exportPlotHeight,
-      compact: true,
-      insightMode: false,
-      viewportWidthPx: Math.max(exportPlotWidth, 200),
-      axes: miniAxes,
-      layoutVariant: "overview_half",
-      allowHorizontalBarFallback: rowKind === "bar",
-    });
-  }, [
-    offscreenExportLayout,
-    displayKind,
-    chartRows,
-    miniAxes,
-    exportPlotWidth,
-    exportPlotHeight,
-  ]);
-
-  const dashboardBarCatBottom = useMemo(
+  const miniCategoryPlan = useMemo(
     () =>
-      miniCategoryPlan && (displayKind === "bar" || displayKind === "histogram")
-        ? computeCategoryAxisBottomMargin({
-            categoryTickStrings: chartRows.map((r) => String(r.name ?? "")),
-            angled: miniCategoryPlan.angled,
-            tickFontSizePx: miniCategoryPlan.tickFontSizePx,
-            chartLayoutMode: miniCategoryPlan.angled ? "full" : "compact",
-          })
-        : computeCategoryAxisBottomMargin({
-            categoryTickStrings: chartRows.map((r) => String(r.name ?? "")),
-            angled: chartRows.length > 3,
-            tickFontSizePx: 10,
-            chartLayoutMode: chartRows.length > 3 ? "full" : "compact",
-          }),
-    [displayKind, chartRows, miniCategoryPlan]
+      computeOverviewMiniCategoryPlan(
+        displayKind,
+        chartRows,
+        miniAxes,
+        viewportWidthPx,
+        plotHeightPx
+      ),
+    [displayKind, chartRows, miniAxes, viewportWidthPx, plotHeightPx]
+  );
+
+  const renderBarAsHorizontal = overviewDashboardUsesHorizontalBars(
+    displayKind,
+    miniCategoryPlan
+  );
+
+  const effectivePresentationKind = resolveOverviewEffectivePresentationKind(
+    displayKind,
+    renderBarAsHorizontal
   );
 
   const valueTickFormatter = useCallback(
@@ -4897,353 +4733,428 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 
   if (chartRows.length === 0) return null;
 
-  const overviewChartAnimOn =
-    chartRows.length <= RECHARTS_ANIMATION_MAX_POINTS;
-  const overviewAnimDuration = undefined;
-
   const tickTruncateLocal = (v: string | number) => {
     const s = String(v);
     return s.length > 28 ? `${s.slice(0, 26)}…` : s;
   };
 
-  let chartBody: ReactNode;
+  const buildOverviewDashboardPlot = (
+    viewW: number,
+    plotH: number,
+    pngCapture: boolean
+  ): ReactNode => {
+    const plotMarginTop = pngCapture ? 8 : OV_DASH_CHART_MARGIN.top;
+    const plotMarginSide = pngCapture ? 14 : OV_DASH_CHART_MARGIN.left;
+    const localCategoryPlan = computeOverviewMiniCategoryPlan(
+      displayKind,
+      chartRows,
+      miniAxes,
+      viewW,
+      plotH
+    );
+    const plotHorizontal = overviewDashboardUsesHorizontalBars(
+      displayKind,
+      localCategoryPlan
+    );
+    const plotAnimOn =
+      !pngCapture && chartRows.length <= RECHARTS_ANIMATION_MAX_POINTS;
+    const plotAnimDuration = pngCapture ? 0 : undefined;
 
-  if (displayKind === "pie" || displayKind === "donut") {
-    chartBody = (
-      <ChartRenderer
-        chartHeight={plotHeightPx}
-        compact
-        insightMode={false}
-        pngCaptureMode={false}
-        chartRows={chartRows}
-        visualization={{
-          interaction: chart.interaction
-            ? { drillDimensions: chart.interaction.drillDimensions }
-            : null,
-        }}
-        presentationKind={displayKind}
-        axes={miniAxes}
-        viewportW={viewportWidthPx}
-        sessionCartesianPlanMain={null}
-        insightCartesianPlanMain={null}
-        tickTruncate={tickTruncateLocal}
-        onInsightDrill={(primaryValue) => {
-          if (!drillPrimary || !onDashboardDrill) return;
-          const nm = String(primaryValue ?? "").trim();
-          if (!nm) return;
-          onDashboardDrill({
-            column: drillPrimary.column,
-            label: drillPrimary.label,
-            value: nm,
-          });
-        }}
-      />
-    );
-  } else if (renderBarAsHorizontal) {
-    const hb = horizontalDashLayout;
-    if (!hb) return null;
-    const hbBalanced = balanceHorizontalOuterMargins({
-      marginLeft: hb.marginLeft,
-      chartLayoutMode: "compact",
-      minRight: 8,
-    });
-    chartBody = (
-      <ResponsiveContainer
-        key={`ov-hbar-${chartLayoutWidthKey(viewportWidthPx)}`}
-        width="100%"
-        height={plotHeightPx}
-        minWidth={0}
-        minHeight={plotHeightPx}
-      >
-        <BarChart
-          layout="vertical"
-          data={chartRows}
-          margin={{
-            left: hbBalanced.marginLeft,
-            right: hbBalanced.marginRight,
-            top: OV_DASH_CHART_MARGIN.top,
-            bottom: 32,
+    if (displayKind === "pie" || displayKind === "donut") {
+      return (
+        <ChartRenderer
+          chartHeight={plotH}
+          compact
+          insightMode={false}
+          pngCaptureMode={pngCapture}
+          chartRows={chartRows}
+          visualization={{
+            interaction: chart.interaction
+              ? { drillDimensions: chart.interaction.drillDimensions }
+              : null,
           }}
+          presentationKind={displayKind}
+          axes={miniAxes}
+          viewportW={viewW}
+          sessionCartesianPlanMain={null}
+          insightCartesianPlanMain={null}
+          tickTruncate={tickTruncateLocal}
+          onInsightDrill={(primaryValue) => {
+            if (!drillPrimary || !onDashboardDrill) return;
+            const nm = String(primaryValue ?? "").trim();
+            if (!nm) return;
+            onDashboardDrill({
+              column: drillPrimary.column,
+              label: drillPrimary.label,
+              value: nm,
+            });
+          }}
+        />
+      );
+    }
+
+    if (displayKind === "scatter") {
+      return (
+        <ChartRenderer
+          chartHeight={plotH}
+          compact
+          insightMode={false}
+          pngCaptureMode={pngCapture}
+          chartRows={chartRows}
+          visualization={{
+            interaction: chart.interaction
+              ? { drillDimensions: chart.interaction.drillDimensions }
+              : null,
+          }}
+          presentationKind="scatter"
+          axes={miniAxes}
+          viewportW={viewW}
+          sessionCartesianPlanMain={null}
+          insightCartesianPlanMain={null}
+          tickTruncate={tickTruncateLocal}
+          onInsightDrill={() => {}}
+        />
+      );
+    }
+
+    if (plotHorizontal) {
+      const hb = computeOverviewHorizontalDashLayout(
+        chartRows,
+        valueAxisTitle,
+        categoryAxisLabel,
+        viewW
+      );
+      const hbBalanced = balanceHorizontalOuterMargins({
+        marginLeft: hb.marginLeft,
+        chartLayoutMode: "compact",
+        minRight: 8,
+      });
+      return (
+        <ResponsiveContainer
+          key={`ov-hbar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
+          width="100%"
+          height={plotH}
+          minWidth={0}
+          minHeight={plotH}
         >
-          <CartesianGrid
-            horizontal={false}
-            vertical
-            stroke={dashGrid.stroke}
-            strokeDasharray={OV_DASH_GRID_DASHARRAY}
-            strokeOpacity={dashGrid.opacity}
-          />
-          <XAxis
-            type="number"
-            tick={{ fontSize: OV_DASH_AXIS_LABEL_STYLE.fontSize, fill: OV_AXIS_TICK }}
-            tickFormatter={valueTickFormatter}
-            axisLine={{ stroke: OV_AXIS_LINE }}
-            tickLine={{ stroke: OV_AXIS_LINE }}
-          />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={hb.categoryAxisWidth}
-            tick={<WrappedCategoryYAxisTick chartLayoutMode="compact" compact />}
-            axisLine={{ stroke: OV_AXIS_LINE }}
-            tickLine={{ stroke: OV_AXIS_LINE }}
-          />
-          <Tooltip
-            {...CHART_TOOLTIP_FRAME}
-            formatter={overviewTooltipHandlers.formatter}
-            labelFormatter={overviewTooltipHandlers.labelFormatter}
-          />
-          <Bar
-            dataKey="value"
-            fill="#6366f1"
-            radius={[0, 6, 6, 0]}
-            maxBarSize={32}
-            isAnimationActive={overviewChartAnimOn}
-            animationDuration={overviewAnimDuration}
-            cursor={drillable ? "pointer" : "default"}
-            onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
-              e?.stopPropagation?.();
-              if (!drillPrimary || !onDashboardDrill) return;
-              const pl = entry as ChartRow & { name?: string };
-              const nm = String(pl?.name ?? "").trim();
-              if (!nm) return;
-              onDashboardDrill({
-                column: drillPrimary.column,
-                label: drillPrimary.label,
-                value: nm,
-              });
+          <BarChart
+            layout="vertical"
+            data={chartRows}
+            margin={{
+              left: hbBalanced.marginLeft,
+              right: hbBalanced.marginRight,
+              top: plotMarginTop,
+              bottom: pngCapture ? 24 : 32,
             }}
-          />
-        </BarChart>
-      </ResponsiveContainer>
-    );
-  } else if (displayKind === "line" || displayKind === "area") {
-    const vLay = verticalDashLayout;
-    if (!vLay) return null;
-    const ChartWrap = displayKind === "area" ? AreaChart : LineChart;
-    const trendTickFs = OV_DASH_AXIS_LABEL_STYLE.fontSize;
-    const trendCompact = viewportWidthPx < 640;
-    const trendVeryCompact = viewportWidthPx < 420;
-    const trendTickMini = (v: string | number) => {
-      const raw = String(v ?? "");
-      if (trendVeryCompact) return formatCompactTrendXAxisTickLabel(raw);
-      return formatOverviewTrendTickLabel(raw);
-    };
-    const temporalTickStrings = chartRows.map((r) =>
-      trendTickMini(String(r.name ?? ""))
-    );
-    const trendInterval = computeLineAreaXAxisInterval(chartRows.length, {
-      compact: trendCompact,
-      viewportWidthPx: viewportWidthPx,
-    });
-    const trendLabelLens = temporalTickStrings.map((s) => s.length);
-    const maxTrendLabelLen = Math.max(6, ...trendLabelLens, 0);
-    const needsTrendAngle =
-      trendVeryCompact ||
-      chartRows.length > 6 ||
-      maxTrendLabelLen > 9;
-    const trendAngle = needsTrendAngle ? TREND_X_AXIS_ANGLE_DEG : 0;
-    const trendXHeight = lineAreaXAxisHeightPx(true);
-    const trendBottomRaw = computeLineAreaChartBottomMargin({
-      temporalTickStrings,
-      tickFontSizePx: trendTickFs,
-      chartLayoutMode: "compact",
-    });
-    const trendBottom = Math.min(
-      trendBottomRaw,
-      needsTrendAngle ? 54 : 44
-    );
-    const trendMargins = balanceVerticalOuterMargins({
-      marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
-      chartLayoutMode: "compact",
-    });
-    const plotMargin = {
-      top: OV_DASH_CHART_MARGIN.top,
-      right: trendMargins.marginRight,
-      bottom: trendBottom,
-      left: trendMargins.marginLeft,
-    };
-    chartBody = (
-      <ResponsiveContainer
-        key={`ov-trend-${chartLayoutWidthKey(viewportWidthPx)}-${displayKind}`}
-        width="100%"
-        height={plotHeightPx}
-        minWidth={0}
-        minHeight={plotHeightPx}
-      >
-        <ChartWrap data={chartRows} margin={plotMargin}>
-          <CartesianGrid
-            stroke={dashGrid.stroke}
-            strokeDasharray={OV_DASH_GRID_DASHARRAY}
-            strokeOpacity={dashGrid.opacity}
-            vertical={false}
-          />
-          <XAxis
-            dataKey="name"
-            tick={{
-              fontSize: trendTickFs,
-              fill: OV_AXIS_TICK,
-            }}
-            tickFormatter={trendTickMini}
-            angle={trendAngle}
-            textAnchor={trendAngle ? "end" : "middle"}
-            height={trendXHeight}
-            interval={trendInterval}
-            tickMargin={6}
-            minTickGap={trendCompact ? 6 : 12}
-            axisLine={{ stroke: OV_AXIS_LINE }}
-            tickLine={{ stroke: OV_AXIS_LINE }}
           >
-            <Label
-              value={categoryAxisLabel}
-              position="insideBottom"
-              offset={-6}
-              content={CartesianXAxisTitleLabelContent}
+            <CartesianGrid
+              horizontal={false}
+              vertical
+              stroke={dashGrid.stroke}
+              strokeDasharray={OV_DASH_GRID_DASHARRAY}
+              strokeOpacity={dashGrid.opacity}
             />
-          </XAxis>
-          <YAxis
-            tick={{ fontSize: trendTickFs, fill: OV_AXIS_TICK, dx: 2 }}
-            tickFormatter={valueTickFormatter}
-            width={vLay.yAxisWidth}
-            axisLine={{ stroke: OV_AXIS_LINE }}
-            tickLine={{ stroke: OV_AXIS_LINE }}
-          />
-          <Tooltip
-            {...CHART_TOOLTIP_FRAME}
-            formatter={overviewTooltipHandlers.formatter}
-            labelFormatter={overviewTooltipHandlers.labelFormatter}
-          />
-          {displayKind === "area" ? (
-            <Area
-              type="monotone"
+            <XAxis
+              type="number"
+              tick={{ fontSize: OV_DASH_AXIS_LABEL_STYLE.fontSize, fill: OV_AXIS_TICK }}
+              tickFormatter={valueTickFormatter}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={hb.categoryAxisWidth}
+              tick={<WrappedCategoryYAxisTick chartLayoutMode="compact" compact />}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+            />
+            <Tooltip
+              {...CHART_TOOLTIP_FRAME}
+              formatter={overviewTooltipHandlers.formatter}
+              labelFormatter={overviewTooltipHandlers.labelFormatter}
+            />
+            <Bar
               dataKey="value"
-              stroke="#4f46e5"
-              strokeWidth={2.5}
               fill="#6366f1"
-              fillOpacity={0.18}
-              isAnimationActive={overviewChartAnimOn}
-              animationDuration={overviewAnimDuration}
-              dot={
-                chartRows.length > 28
-                  ? false
-                  : { r: 4, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
-              }
+              radius={[0, 6, 6, 0]}
+              maxBarSize={32}
+              isAnimationActive={plotAnimOn}
+              animationDuration={plotAnimDuration}
+              cursor={drillable ? "pointer" : "default"}
+              onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
+                e?.stopPropagation?.();
+                if (!drillPrimary || !onDashboardDrill) return;
+                const pl = entry as ChartRow & { name?: string };
+                const nm = String(pl?.name ?? "").trim();
+                if (!nm) return;
+                onDashboardDrill({
+                  column: drillPrimary.column,
+                  label: drillPrimary.label,
+                  value: nm,
+                });
+              }}
             />
-          ) : (
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke="#4f46e5"
-              strokeWidth={2.5}
-              isAnimationActive={overviewChartAnimOn}
-              animationDuration={overviewAnimDuration}
-              dot={
-                chartRows.length > 28
-                  ? false
-                  : { r: 4, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
-              }
-            />
-          )}
-        </ChartWrap>
-      </ResponsiveContainer>
-    );
-  } else if (displayKind === "bar" || displayKind === "histogram") {
-    const vLay = verticalDashLayout;
-    if (!vLay) return null;
-    const isHist = displayKind === "histogram";
-    const barMargins = balanceVerticalOuterMargins({
-      marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
-      chartLayoutMode: "compact",
-    });
-    const plotMargin = {
-      top: OV_DASH_CHART_MARGIN.top,
-      right: barMargins.marginRight,
-      bottom:
-        OV_DASH_CHART_MARGIN.bottom +
-        (miniCategoryPlan?.angled ? Math.min(12, dashboardBarCatBottom * 0.28) : 0),
-      left: barMargins.marginLeft,
-    };
-    chartBody = (
-      <ResponsiveContainer
-        key={`ov-bar-${chartLayoutWidthKey(viewportWidthPx)}`}
-        width="100%"
-        height={plotHeightPx}
-        minWidth={0}
-        minHeight={plotHeightPx}
-      >
-        <BarChart
-          data={chartRows}
-          barCategoryGap={isHist ? 2 : undefined}
-          margin={plotMargin}
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    if (displayKind === "line" || displayKind === "area") {
+      const vLay = computeOverviewVerticalDashLayout(
+        displayKind,
+        valueAxisTitle,
+        dashTickSamples,
+        plotH
+      );
+      if (!vLay) return null;
+      const ChartWrap = displayKind === "area" ? AreaChart : LineChart;
+      const trendTickFs = OV_DASH_AXIS_LABEL_STYLE.fontSize;
+      const trendCompact = viewW < 640;
+      const trendVeryCompact = viewW < 420;
+      const trendTickMini = (v: string | number) => {
+        const raw = String(v ?? "");
+        if (trendVeryCompact) return formatCompactTrendXAxisTickLabel(raw);
+        return formatOverviewTrendTickLabel(raw);
+      };
+      const temporalTickStrings = chartRows.map((r) =>
+        trendTickMini(String(r.name ?? ""))
+      );
+      const trendInterval = computeLineAreaXAxisInterval(chartRows.length, {
+        compact: trendCompact,
+        viewportWidthPx: viewW,
+      });
+      const trendLabelLens = temporalTickStrings.map((s) => s.length);
+      const maxTrendLabelLen = Math.max(6, ...trendLabelLens, 0);
+      const needsTrendAngle =
+        trendVeryCompact ||
+        chartRows.length > 6 ||
+        maxTrendLabelLen > 9;
+      const trendAngle = needsTrendAngle ? TREND_X_AXIS_ANGLE_DEG : 0;
+      const trendXHeight = lineAreaXAxisHeightPx(true);
+      const trendBottomRaw = computeLineAreaChartBottomMargin({
+        temporalTickStrings,
+        tickFontSizePx: trendTickFs,
+        chartLayoutMode: "compact",
+      });
+      const trendBottom = Math.min(
+        trendBottomRaw,
+        needsTrendAngle ? 54 : 44
+      );
+      const trendMargins = balanceVerticalOuterMargins({
+        marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
+        chartLayoutMode: "compact",
+      });
+      const plotMargin = {
+        top: plotMarginTop,
+        right: pngCapture ? plotMarginSide : trendMargins.marginRight,
+        bottom: trendBottom,
+        left: pngCapture ? plotMarginSide : trendMargins.marginLeft,
+      };
+      return (
+        <ResponsiveContainer
+          key={`ov-trend-${chartLayoutWidthKey(viewW)}-${displayKind}-${pngCapture ? "cap" : "live"}`}
+          width="100%"
+          height={plotH}
+          minWidth={0}
+          minHeight={plotH}
         >
-          <CartesianGrid
-            vertical={false}
-            horizontal
-            stroke={dashGrid.stroke}
-            strokeDasharray={OV_DASH_GRID_DASHARRAY}
-            strokeOpacity={dashGrid.opacity}
-          />
-          <XAxis
-            dataKey="name"
-            tick={{
-              fontSize: miniCategoryPlan?.tickFontSizePx ?? OV_DASH_AXIS_LABEL_STYLE.fontSize,
-              fill: OV_AXIS_TICK,
-            }}
-            tickFormatter={(v) => tickTruncateLocal(String(v))}
-            angle={
-              miniCategoryPlan?.angled ? miniCategoryPlan.angleDeg : 0
-            }
-            textAnchor={miniCategoryPlan?.angled ? "end" : "middle"}
-            height={miniCategoryPlan?.xAxisHeightPx ?? 32}
-            interval={miniCategoryPlan?.interval ?? 0}
-            axisLine={{ stroke: OV_AXIS_LINE }}
-            tickLine={{ stroke: OV_AXIS_LINE }}
-          >
-            <Label
-              value={categoryAxisLabel}
-              position="insideBottom"
-              offset={-4}
-              style={OV_DASH_AXIS_LABEL_STYLE}
+          <ChartWrap data={chartRows} margin={plotMargin}>
+            <CartesianGrid
+              stroke={dashGrid.stroke}
+              strokeDasharray={OV_DASH_GRID_DASHARRAY}
+              strokeOpacity={dashGrid.opacity}
+              vertical={false}
             />
-          </XAxis>
-          <YAxis
-            tick={{ fontSize: OV_DASH_AXIS_LABEL_STYLE.fontSize, fill: OV_AXIS_TICK, dx: 2 }}
-            tickFormatter={valueTickFormatter}
-            width={vLay.yAxisWidth}
-            axisLine={{ stroke: OV_AXIS_LINE }}
-            tickLine={{ stroke: OV_AXIS_LINE }}
-          />
-          <Tooltip
-            {...CHART_TOOLTIP_FRAME}
-            formatter={overviewTooltipHandlers.formatter}
-            labelFormatter={overviewTooltipHandlers.labelFormatter}
-          />
-          <Bar
-            dataKey="value"
-            fill="#6366f1"
-            radius={isHist ? [3, 3, 0, 0] : [8, 8, 4, 4]}
-            maxBarSize={isHist ? 44 : 42}
-            isAnimationActive={overviewChartAnimOn}
-            animationDuration={overviewAnimDuration}
-            cursor={drillable ? "pointer" : "default"}
-            onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
-              e?.stopPropagation?.();
-              if (!drillPrimary || !onDashboardDrill) return;
-              const pl = entry as ChartRow & { name?: string };
-              const nm = String(pl?.name ?? "").trim();
-              if (!nm) return;
-              onDashboardDrill({
-                column: drillPrimary.column,
-                label: drillPrimary.label,
-                value: nm,
-              });
-            }}
-          />
-        </BarChart>
-      </ResponsiveContainer>
-    );
-  } else {
-    chartBody = null;
-  }
+            <XAxis
+              dataKey="name"
+              tick={{
+                fontSize: trendTickFs,
+                fill: OV_AXIS_TICK,
+              }}
+              tickFormatter={trendTickMini}
+              angle={trendAngle}
+              textAnchor={trendAngle ? "end" : "middle"}
+              height={trendXHeight}
+              interval={trendInterval}
+              tickMargin={6}
+              minTickGap={trendCompact ? 6 : 12}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+            >
+              <Label
+                value={categoryAxisLabel}
+                position="insideBottom"
+                offset={-6}
+                content={CartesianXAxisTitleLabelContent}
+              />
+            </XAxis>
+            <YAxis
+              tick={{ fontSize: trendTickFs, fill: OV_AXIS_TICK, dx: 2 }}
+              tickFormatter={valueTickFormatter}
+              width={vLay.yAxisWidth}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+            />
+            <Tooltip
+              {...CHART_TOOLTIP_FRAME}
+              formatter={overviewTooltipHandlers.formatter}
+              labelFormatter={overviewTooltipHandlers.labelFormatter}
+            />
+            {displayKind === "area" ? (
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke="#4f46e5"
+                strokeWidth={2.5}
+                fill="#6366f1"
+                fillOpacity={0.18}
+                isAnimationActive={plotAnimOn}
+                animationDuration={plotAnimDuration}
+                dot={
+                  chartRows.length > 28
+                    ? false
+                    : { r: 4, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
+                }
+              />
+            ) : (
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#4f46e5"
+                strokeWidth={2.5}
+                isAnimationActive={plotAnimOn}
+                animationDuration={plotAnimDuration}
+                dot={
+                  chartRows.length > 28
+                    ? false
+                    : { r: 4, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
+                }
+              />
+            )}
+          </ChartWrap>
+        </ResponsiveContainer>
+      );
+    }
+
+    if (displayKind === "bar" || displayKind === "histogram") {
+      const vLay = computeOverviewVerticalDashLayout(
+        displayKind,
+        valueAxisTitle,
+        dashTickSamples,
+        plotH
+      );
+      if (!vLay) return null;
+      const isHist = displayKind === "histogram";
+      const barCatBottom = computeOverviewBarCategoryBottom(
+        displayKind,
+        chartRows,
+        localCategoryPlan
+      );
+      const barMargins = balanceVerticalOuterMargins({
+        marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
+        chartLayoutMode: "compact",
+      });
+      const plotMargin = {
+        top: plotMarginTop,
+        right: pngCapture ? plotMarginSide : barMargins.marginRight,
+        bottom:
+          (pngCapture ? 28 : OV_DASH_CHART_MARGIN.bottom) +
+          (localCategoryPlan?.angled ? Math.min(12, barCatBottom * 0.28) : 0),
+        left: pngCapture ? plotMarginSide : barMargins.marginLeft,
+      };
+      const barCategoryGap =
+        isHist ? 2 : pngCapture && chartRows.length <= 6 ? "16%" : undefined;
+      return (
+        <ResponsiveContainer
+          key={`ov-bar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
+          width="100%"
+          height={plotH}
+          minWidth={0}
+          minHeight={plotH}
+        >
+          <BarChart
+            data={chartRows}
+            barCategoryGap={barCategoryGap}
+            margin={plotMargin}
+          >
+            <CartesianGrid
+              vertical={false}
+              horizontal
+              stroke={dashGrid.stroke}
+              strokeDasharray={OV_DASH_GRID_DASHARRAY}
+              strokeOpacity={dashGrid.opacity}
+            />
+            <XAxis
+              dataKey="name"
+              tick={{
+                fontSize:
+                  localCategoryPlan?.tickFontSizePx ?? OV_DASH_AXIS_LABEL_STYLE.fontSize,
+                fill: OV_AXIS_TICK,
+              }}
+              tickFormatter={(v) => tickTruncateLocal(String(v))}
+              angle={
+                localCategoryPlan?.angled ? localCategoryPlan.angleDeg : 0
+              }
+              textAnchor={localCategoryPlan?.angled ? "end" : "middle"}
+              height={localCategoryPlan?.xAxisHeightPx ?? 32}
+              interval={localCategoryPlan?.interval ?? 0}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+            >
+              <Label
+                value={categoryAxisLabel}
+                position="insideBottom"
+                offset={-4}
+                style={OV_DASH_AXIS_LABEL_STYLE}
+              />
+            </XAxis>
+            <YAxis
+              tick={{ fontSize: OV_DASH_AXIS_LABEL_STYLE.fontSize, fill: OV_AXIS_TICK, dx: 2 }}
+              tickFormatter={valueTickFormatter}
+              width={vLay.yAxisWidth}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+            />
+            <Tooltip
+              {...CHART_TOOLTIP_FRAME}
+              formatter={overviewTooltipHandlers.formatter}
+              labelFormatter={overviewTooltipHandlers.labelFormatter}
+            />
+            <Bar
+              dataKey="value"
+              fill="#6366f1"
+              radius={isHist ? [3, 3, 0, 0] : [8, 8, 4, 4]}
+              maxBarSize={isHist ? 44 : 42}
+              isAnimationActive={plotAnimOn}
+              animationDuration={plotAnimDuration}
+              cursor={drillable ? "pointer" : "default"}
+              onClick={(entry: unknown, _index: number, e: { stopPropagation?: () => void }) => {
+                e?.stopPropagation?.();
+                if (!drillPrimary || !onDashboardDrill) return;
+                const pl = entry as ChartRow & { name?: string };
+                const nm = String(pl?.name ?? "").trim();
+                if (!nm) return;
+                onDashboardDrill({
+                  column: drillPrimary.column,
+                  label: drillPrimary.label,
+                  value: nm,
+                });
+              }}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    return null;
+  };
+
+  const chartBody = buildOverviewDashboardPlot(
+    viewportWidthPx,
+    plotHeightPx,
+    false
+  );
 
   if (chartBody == null) return null;
 
@@ -5306,7 +5217,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             disabled={exportingPng}
             onClick={async () => {
               setExportingPng(true);
-              const spec = buildPresentationExportSpec(displayKind, {
+              const spec = buildPresentationExportSpec(effectivePresentationKind, {
                 categoryCount: chartRows.length,
               });
               try {
@@ -5316,7 +5227,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 );
                 await runChartPngExport({
                   getExportRoot: () => offscreenExportRef.current,
-                  kind: displayKind,
+                  kind: effectivePresentationKind,
                   categoryCount: chartRows.length,
                   filename: sanitizeChartExportFilename(canonicalTitle),
                   datasetName: exportFooterHint,
@@ -5383,25 +5294,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             className={`${ovDashChartPlot} ${ovDashChartPlotInner} ${chartsTabVizPlotStage}`}
             style={presentationCapturePlotStyle(offscreenExportLayout)}
           >
-            <ChartRenderer
-              chartHeight={offscreenExportLayout.height}
-              compact={false}
-              insightMode={false}
-              pngCaptureMode
-              chartRows={chartRows}
-              visualization={{
-                interaction: chart.interaction
-                  ? { drillDimensions: chart.interaction.drillDimensions }
-                  : null,
-              }}
-              presentationKind={displayKind}
-              axes={miniAxes}
-              viewportW={offscreenExportLayout.width}
-              sessionCartesianPlanMain={exportMiniCategoryPlan}
-              insightCartesianPlanMain={null}
-              tickTruncate={tickTruncateLocal}
-              onInsightDrill={() => {}}
-            />
+            {buildOverviewDashboardPlot(
+              exportPlotWidth,
+              exportPlotHeight,
+              true
+            )}
           </div>
           {exportFooter}
         </ChartPngOffscreenHost>
@@ -5469,6 +5366,8 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
     },
     [onAskAiAboutDashboardChart],
   );
+
+  if (!overviewChartHasRenderableData(chart)) return null;
 
   return (
     <div ref={wrapRef} className="w-full min-w-0 max-w-full">
@@ -8298,10 +8197,15 @@ function HomeInner() {
     ]
   );
 
+  const overviewRenderableCharts = useMemo(
+    () => filterOverviewRenderableCharts(autoDashboard?.charts ?? []),
+    [autoDashboard?.charts]
+  );
+
   const autoDashboardKpiRows = useMemo(() => {
     if (!autoDashboard?.cards?.length) return [];
     const cards = autoDashboard.cards.slice(0, 5);
-    const charts = autoDashboard.charts ?? [];
+    const charts = overviewRenderableCharts;
     return cards.map((card, idx) => ({
       card,
       contextLine: buildAutoDashboardKpiContextLine({
@@ -8316,7 +8220,15 @@ function HomeInner() {
         datasetKind: datasetKind || "",
       }),
     }));
-  }, [autoDashboard, profile, effectiveSales, rows, columns, datasetKind]);
+  }, [
+    autoDashboard,
+    overviewRenderableCharts,
+    profile,
+    effectiveSales,
+    rows,
+    columns,
+    datasetKind,
+  ]);
 
   const dataPreviewDerivationsActive =
     activeTab === "preview" || activeTab === "export";
@@ -11548,6 +11460,26 @@ function HomeInner() {
                 </section>
               ) : null}
 
+              {columns.length > 0 ? (
+                <section className="col-span-1 min-w-0 lg:col-span-2 order-3 overview-post-upload-filters">
+                  <FilterPanel
+                    dashboardFilters={dashboardFilters}
+                    dimensionOptions={dimensionOptions}
+                    filterBreadcrumb={filterBreadcrumb}
+                    dashboardEmpty={dashboardEmpty}
+                    dateStart={dashDateStart}
+                    dateEnd={dashDateEnd}
+                    onPickDimension={upsertExplorerFilter}
+                    onRemoveFilter={removeExplorerFilter}
+                    onClearAll={clearExplorerFilters}
+                    onDateStart={setDashDateStart}
+                    onDateEnd={setDashDateEnd}
+                    appearance="dashboard"
+                    overviewFilterCompact
+                  />
+                </section>
+              ) : null}
+
               {columns.length > 0 && (
                 <section className={`overview-data-setup-card col-span-1 min-w-0 lg:col-span-2 p-4 sm:p-5 order-6 ${ovCardElevated}`}>
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -11737,7 +11669,7 @@ function HomeInner() {
               )}
 
               {autoDashboardKpiRows.length > 0 && (
-                <section className="overview-kpi-section col-span-1 min-w-0 lg:col-span-2 pt-0.5 order-3">
+                <section className="overview-kpi-section col-span-1 min-w-0 lg:col-span-2 pt-0.5 order-4">
                   <h2 className={`${ovSectionTitle} mb-1`}>Auto Dashboard</h2>
                   <p className={`${ovSectionDesc} mb-4`}>
                     Detected dataset type:{" "}
@@ -11759,7 +11691,7 @@ function HomeInner() {
               )}
 
               {columns.length > 0 && (
-                <section className="col-span-1 min-w-0 max-w-full lg:col-span-2 pt-1 order-4 overflow-hidden">
+                <section className="col-span-1 min-w-0 max-w-full lg:col-span-2 pt-1 order-5 overflow-hidden">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-2">
                     <div className="min-w-0">
                       <h2 className={`${ovSectionTitle} mb-1`}>Auto Dashboard Charts</h2>
@@ -11794,7 +11726,7 @@ function HomeInner() {
                     <p className={`text-sm rounded-xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-4 py-6 text-center leading-relaxed ${ovMuted}`}>
                       No records match current filters.
                     </p>
-                  ) : (autoDashboard?.charts?.length ?? 0) > 0 ? (
+                  ) : overviewRenderableCharts.length > 0 ? (
                     <div
                       className={
                         loading
@@ -11804,7 +11736,12 @@ function HomeInner() {
                     >
                       <div className={`${ovChartsWrap} min-w-0 max-w-full`}>
                       <div className={`${ovChartGrid} min-w-0 max-w-full`}>
-                      {(autoDashboard?.charts ?? []).map((c, idx) => {
+                      {overviewRenderableCharts.map((c, idx) => {
+                        const chartCount = overviewRenderableCharts.length;
+                        const isSoloLastRow = isOverviewChartGridSoloRow(
+                          idx,
+                          chartCount,
+                        );
                         const dKey = dashboardChartKeyFromTitle(c.title);
                         const dashSnap = dashboardSnapshotByKey.get(dKey);
                         const canonicalTitle = getCanonicalChartTitle({
@@ -11818,7 +11755,10 @@ function HomeInner() {
                         return (
                           <div
                             key={`overview-dash-${idx}-${c.title.slice(0, 40)}`}
-                            className={ovChartCell}
+                            className={
+                              isSoloLastRow ? ovChartCellSoloRow : ovChartCell
+                            }
+                            style={overviewChartGridSoloRowStyle(idx, chartCount)}
                           >
                             <div className={ovChartInner}>
                               <OverviewDashboardChartSlot
@@ -11851,25 +11791,6 @@ function HomeInner() {
                 </section>
               )}
 
-              {columns.length > 0 ? (
-                <section className="col-span-1 min-w-0 lg:col-span-2 order-5 overview-post-upload-filters">
-                  <FilterPanel
-                    dashboardFilters={dashboardFilters}
-                    dimensionOptions={dimensionOptions}
-                    filterBreadcrumb={filterBreadcrumb}
-                    dashboardEmpty={dashboardEmpty}
-                    dateStart={dashDateStart}
-                    dateEnd={dashDateEnd}
-                    onPickDimension={upsertExplorerFilter}
-                    onRemoveFilter={removeExplorerFilter}
-                    onClearAll={clearExplorerFilters}
-                    onDateStart={setDashDateStart}
-                    onDateEnd={setDashDateEnd}
-                    appearance="dashboard"
-                    overviewFilterCompact
-                  />
-                </section>
-              ) : null}
             </div>
             {columns.length === 0 ? (
               <>

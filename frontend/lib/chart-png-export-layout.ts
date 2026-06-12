@@ -1,4 +1,8 @@
 import type { ChartKind } from "@/app/chart-types";
+import {
+  resolveRadialExportCanvasHeight,
+  resolveRadialExportPlotHeight,
+} from "@/lib/radial-export-layout";
 
 /** Default presentation PNG canvas width (line / area / scatter). */
 export const PRESENTATION_EXPORT_WIDTH_PX = 1400;
@@ -19,7 +23,7 @@ export const PRESENTATION_EXPORT_HEIGHT_PX = 900;
 export const PRESENTATION_EXPORT_LINE_HEIGHT_PX = 800;
 
 /** Vertical chrome reserved for title, chips, warning, card padding, and composite padding. */
-export const PRESENTATION_EXPORT_CHROME_PX = 200;
+export const PRESENTATION_EXPORT_CHROME_PX = 168;
 
 /** Overview grid uses two columns only when container is at least this wide. */
 export const OVERVIEW_TWO_COLUMN_MIN_CONTAINER_PX = 1000;
@@ -64,8 +68,18 @@ export function resolvePresentationExportCanvasWidth(
 }
 
 /** Total PNG canvas height by chart kind. */
-export function resolvePresentationExportCanvasHeight(kind: ChartKind): number {
+export function resolvePresentationExportCanvasHeight(
+  kind: ChartKind,
+  options: PresentationCaptureLayoutOptions = {}
+): number {
+  const categoryCount = Math.max(1, options.categoryCount ?? 4);
   switch (kind) {
+    case "pie":
+    case "donut":
+      return resolveRadialExportCanvasHeight(
+        categoryCount,
+        resolveRadialExportPlotHeight(categoryCount)
+      );
     case "line":
     case "area":
       return PRESENTATION_EXPORT_LINE_HEIGHT_PX;
@@ -82,7 +96,7 @@ export function resolvePresentationExportPlotHeight(
   options: PresentationCaptureLayoutOptions = {}
 ): number {
   const categoryCount = Math.max(0, options.categoryCount ?? 0);
-  const canvasH = resolvePresentationExportCanvasHeight(kind);
+  const canvasH = resolvePresentationExportCanvasHeight(kind, options);
   const balancedBase = Math.max(440, canvasH - PRESENTATION_EXPORT_CHROME_PX);
 
   switch (kind) {
@@ -95,7 +109,7 @@ export function resolvePresentationExportPlotHeight(
     }
     case "pie":
     case "donut":
-      return Math.max(400, balancedBase - 80);
+      return resolveRadialExportPlotHeight(Math.max(1, categoryCount || 4));
     case "histogram":
       return Math.max(420, balancedBase - 60);
     case "scatter":
@@ -125,7 +139,7 @@ export function buildPresentationExportSpec(
   return {
     ...layout,
     canvasWidth: layout.width,
-    canvasHeight: resolvePresentationExportCanvasHeight(kind),
+    canvasHeight: resolvePresentationExportCanvasHeight(kind, options),
   };
 }
 

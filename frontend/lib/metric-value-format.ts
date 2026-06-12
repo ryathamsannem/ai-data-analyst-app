@@ -5,6 +5,10 @@
 
 import type { ChartKind, ChartRow } from "@/app/chart-types";
 import { shareCompositionAllowed } from "@/lib/final-chart-presentation";
+import {
+  radialShareDisplayAllowed,
+  radialShouldFormatValuesAsPercent,
+} from "@/lib/radial-chart-format";
 
 export type MetricValueFormatKind =
   | "number"
@@ -25,6 +29,8 @@ export type MetricFormatContext = {
   valueFormat?: MetricValueFormatKind | null;
   /** Pie/donut share-of-total questions (not min/max ranking). */
   shareComposition?: boolean;
+  /** Slice rows — used to validate composition share display on radial charts. */
+  chartRows?: ChartRow[];
   chartTitle?: string | null;
   question?: string | null;
 };
@@ -150,10 +156,19 @@ export function resolveMetricValueFormat(ctx: MetricFormatContext): MetricValueF
   if (metricLabelImpliesCurrency(label)) return "currency";
 
   const kind = ctx.presentationKind ?? "";
-  const share =
+  const titleShare =
     ctx.shareComposition ??
     shareCompositionAllowed(ctx.chartTitle ?? "", ctx.question ?? undefined);
-  if ((kind === "pie" || kind === "donut") && share) return "percent";
+  const rows = ctx.chartRows ?? [];
+  if (kind === "pie" || kind === "donut") {
+    if (rows.length >= 2 && radialShouldFormatValuesAsPercent(rows)) {
+      return "percent";
+    }
+    if (titleShare && rows.length >= 2 && radialShareDisplayAllowed(rows, ctx.chartTitle, ctx.question)) {
+      return metricLabelImpliesCurrency(label) ? "currency" : "number";
+    }
+    if (titleShare && rows.length < 2) return "percent";
+  }
 
   return "number";
 }

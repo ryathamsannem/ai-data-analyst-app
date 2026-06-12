@@ -183,7 +183,7 @@ export const ovChartGrid = "overview-chart-grid";
 
 export const ovChartCell = "overview-chart-grid__cell";
 
-/** Optional manual override; desktop solo-row widening is automatic in globals.css */
+/** Last odd chart in a 2-col grid — spans full row (see globals.css). */
 export const ovChartCellSoloRow =
   "overview-chart-grid__cell overview-chart-grid__cell--solo-row";
 
