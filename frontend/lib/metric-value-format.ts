@@ -65,6 +65,8 @@ export function readChartRowNormalizedValue(row: ChartRow): number | undefined {
 export function metricLabelImpliesPercent(metricLabel: string | null | undefined): boolean {
   const t = (metricLabel ?? "").trim();
   if (!t) return false;
+  // Part-to-whole composition titles (e.g. "Profit share by region") — not rate metrics.
+  if (/\b\w[\w\s]*\s+share\s+by\s+/i.test(t)) return false;
   const n = t.toLowerCase().replace(/\s+/g, "_");
   if (/\bprofit\s+margin\b/i.test(t) || /\bmargin\s*%/.test(t)) return true;
   return PERCENT_METRIC_RE.test(n) || /\bpercent\b/i.test(t);

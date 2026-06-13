@@ -25,6 +25,15 @@ describe("polishAutoDashboardChartTitle", () => {
       "Revenue by region"
     );
   });
+
+  it("polishes monthly trend titles without redundant Total", () => {
+    expect(polishAutoDashboardChartTitle("revenue trend (monthly)")).toBe(
+      "Monthly Revenue Trend"
+    );
+    expect(polishAutoDashboardChartTitle("cost trend (monthly)")).toBe(
+      "Monthly Cost Trend"
+    );
+  });
 });
 
 describe("getCanonicalChartTitle", () => {
@@ -37,5 +46,16 @@ describe("getCanonicalChartTitle", () => {
         values: [100, 80],
       })
     ).toBe("Revenue by region");
+  });
+
+  it("polishes auto-dashboard trend titles from contract", () => {
+    expect(
+      getCanonicalChartTitle({
+        rawTitle: "revenue trend (monthly)",
+        chartType: "line",
+        labels: ["2025-01", "2025-02", "2025-03", "2025-04"],
+        values: [100, 120, 115, 130],
+      })
+    ).toBe("Monthly Revenue Trend");
   });
 });

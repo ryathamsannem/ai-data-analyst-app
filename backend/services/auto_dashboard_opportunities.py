@@ -14,6 +14,8 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 
+from analytics_metadata import format_executive_number
+
 _GEO_KEYWORDS = (
     "region",
     "zone",
@@ -664,6 +666,20 @@ def select_diverse_charts(
     return selected[:max_charts]
 
 
+def _metric_agg_key(num_c: str, inv: ColumnInventory) -> str:
+    """Prefer AVG for score/rating/rate columns; SUM for revenue-style measures."""
+    if num_c in inv.percentages:
+        return "mean"
+    try:
+        from intent_engine.column_resolve import column_prefers_mean_aggregation
+
+        if column_prefers_mean_aggregation(num_c):
+            return "mean"
+    except Exception:
+        pass
+    return "sum"
+
+
 def _pick_numeric(
     inv: ColumnInventory,
     exclude: Optional[Set[str]] = None,
@@ -747,7 +763,7 @@ def discover_chart_opportunities(
         if pair_key in used_pairs:
             continue
         try:
-            agg = "mean" if num_c in inv.percentages else "sum"
+            agg = _metric_agg_key(num_c, inv)
             sub = df[[dim_c, num_c]].copy()
             sub["_v"] = deps.numeric_series(num_c)
             sub = sub.dropna(subset=[dim_c, "_v"])
@@ -828,8 +844,13 @@ def discover_chart_opportunities(
                 if not pd.notna(r) or abs(r) < 0.28:
                     continue
                 sample = tmp.head(180)
-                labels = [f"{float(row['_x']):.4g}" for _, row in sample.iterrows()]
-                values = [float(row["_y"]) for _, row in sample.iterrows()]
+                scatter_x = [float(row["_x"]) for _, row in sample.iterrows()]
+                scatter_y = [float(row["_y"]) for _, row in sample.iterrows()]
+                scatter_x_display = [format_executive_number(x) for x in scatter_x]
+                labels = [
+                    f"{scatter_x_display[i]} / {format_executive_number(scatter_y[i])}"
+                    for i in range(len(scatter_x))
+                ]
                 xl = deps.pretty_label(xc)
                 yl = deps.pretty_label(yc)
                 tit = f"{xl} vs {yl} (correlation)"
@@ -837,8 +858,13 @@ def discover_chart_opportunities(
                     "title": tit,
                     "chartType": "scatter",
                     "labels": labels,
-                    "values": values,
+                    "values": scatter_y,
+                    "scatterX": scatter_x,
+                    "scatterXDisplay": scatter_x_display,
+                    "scatterXLabel": xl,
+                    "scatterYLabel": yl,
                     "metricColumn": yc,
+                    "dimensionColumn": xc,
                 }
                 add(payload, "correlation", 78 + int(min(18, abs(r) * 20)))
                 pairs_done += 1
@@ -858,12 +884,18 @@ def discover_chart_opportunities(
             nu = _dimension_cardinality(df, dim_c)
             if sub.empty or nu < 2 or nu > 18:
                 continue
-            g = sub.groupby(dim_c)["_v"].sum()
+            agg = _metric_agg_key(num_c, inv)
+            g = sub.groupby(dim_c)["_v"].agg(agg)
             if g.empty:
                 continue
             opp = "geographic" if dim_c in inv.geographic else "compare"
             chart_type = "horizontalBar" if len(g) > 6 else "bar"
-            tit = deps.chart_title_by_dimension(num_c, dim_c, chart_type=chart_type)
+            if agg == "mean":
+                from analytics_metadata import build_insight_title
+
+                tit = build_insight_title("mean", num_c, dim_c, chart_type=chart_type)
+            else:
+                tit = deps.chart_title_by_dimension(num_c, dim_c, chart_type=chart_type)
             add(
                 deps.series_payload(
                     tit,

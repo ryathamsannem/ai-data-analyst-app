@@ -74,6 +74,19 @@ export function polishAutoDashboardChartTitle(raw: string): string {
     );
   }
 
+  const trendParen = t.match(/^(.+?)\s+trend\s*\(([^)]+)\)\s*$/i);
+  if (trendParen) {
+    const grain = trendParen[2].trim();
+    const metric = trendParen[1]
+      .trim()
+      .replace(/^(monthly|weekly|daily|quarterly|yearly|hourly)\s+/i, "")
+      .replace(/^total\s+/i, "");
+    const grainCap =
+      grain.charAt(0).toUpperCase() + grain.slice(1).toLowerCase();
+    const metricCap = capitalizePhraseStart(polishMetricDisplay(metric));
+    return `${grainCap} ${metricCap} Trend`;
+  }
+
   const byIdx = t.toLowerCase().indexOf(" by ");
   if (byIdx > 0) {
     const left = t

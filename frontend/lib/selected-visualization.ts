@@ -106,22 +106,39 @@ function _extractTimeBucketLabel(title: string): string {
   return "Time";
 }
 
+const TREND_CORE_NO_TOTAL_PREFIX =
+  /^(revenue|sales|cost|profit|amount|spend|quantity|units)$/i;
+
 function buildTrendMetricLabel(stem: string, aggregation: string): string {
   const core = metricStemFromRawTitle(stem) || polishMetricDisplay(stem) || "Value";
   const agg = aggregationPrefixLabel(aggregation);
   if (agg === "Count of") return `${agg} ${core}`;
+  if (agg === "Total" && TREND_CORE_NO_TOTAL_PREFIX.test(core.trim())) {
+    return polishMetricDisplay(core);
+  }
   return `${agg} ${core}`;
 }
 
+function titleCaseWords(phrase: string): string {
+  return phrase
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function buildTrendDisplayTitle(metricLabel: string, timeBucketLabel: string): string {
+  const metric = titleCaseWords(
+    polishMetricDisplay(metricLabel.replace(/^total\s+/i, "").trim() || metricLabel)
+  );
   const bucket = timeBucketLabel.trim();
-  if (/\bmonth/i.test(bucket)) return `Monthly ${metricLabel} trend`;
-  if (/\bweek/i.test(bucket)) return `Weekly ${metricLabel} trend`;
-  if (/\bday/i.test(bucket)) return `Daily ${metricLabel} trend`;
-  if (/\bquarter/i.test(bucket)) return `Quarterly ${metricLabel} trend`;
-  if (/\byear/i.test(bucket)) return `Yearly ${metricLabel} trend`;
-  if (/\bhour/i.test(bucket)) return `Hourly ${metricLabel} trend`;
-  return `${metricLabel} trend`;
+  if (/\bmonth/i.test(bucket)) return `Monthly ${metric} Trend`;
+  if (/\bweek/i.test(bucket)) return `Weekly ${metric} Trend`;
+  if (/\bday/i.test(bucket)) return `Daily ${metric} Trend`;
+  if (/\bquarter/i.test(bucket)) return `Quarterly ${metric} Trend`;
+  if (/\byear/i.test(bucket)) return `Yearly ${metric} Trend`;
+  if (/\bhour/i.test(bucket)) return `Hourly ${metric} Trend`;
+  return `${metric} Trend`;
 }
 
 function buildComparisonDisplayTitle(

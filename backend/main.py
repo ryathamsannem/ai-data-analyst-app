@@ -25,6 +25,14 @@ import time
 import uuid
 
 from analytics_metadata import build_insight_title, build_metric_label
+from services.executive_kpi_cards import (
+    KpiBuildContext,
+    build_executive_kpi_cards,
+    executive_domain_to_auto_kind,
+    executive_domain_to_kpi_domain,
+    infer_executive_domain,
+    sales_column_allowed_for_domain,
+)
 from services.file_parsers import (
     detect_dataset_format,
     is_excel_filename,
@@ -723,6 +731,48 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         if kw in n:
             score -= pen
             reasons.append(f"ops_penalty:{kw}-{-pen}")
+
+    hr_penalties = (
+        ("terminations", 72),
+        ("attrition_rate", 70),
+        ("attrition", 68),
+        ("headcount", 64),
+        ("hires", 60),
+        ("escalations", 58),
+        ("readmissions", 58),
+        ("admissions", 54),
+        ("tickets_opened", 56),
+        ("tickets_resolved", 54),
+        ("patient_volume", 56),
+        ("personnel_cost", 52),
+        ("performance_rating", 50),
+        ("defect_rate", 48),
+        ("units_produced", 46),
+        ("avg_resolution_hours", 50),
+        ("credit_utilization", 44),
+    )
+    for kw, pen in hr_penalties:
+        if kw in n:
+            score -= pen
+            reasons.append(f"domain_penalty:{kw}-{-pen}")
+
+    entity_penalties = (
+        ("sales_rep", 90),
+        ("salesperson", 90),
+        ("sales_person", 90),
+        ("employee_id", 85),
+        ("employee_name", 85),
+        ("customer_id", 80),
+        ("customers", 75),
+        ("patient_id", 80),
+        ("ticket_id", 80),
+        ("account_id", 70),
+        ("operator", 70),
+    )
+    for kw, pen in entity_penalties:
+        if kw in n:
+            score -= pen
+            reasons.append(f"entity_penalty:{kw}-{-pen}")
 
     if domain == "ecommerce":
         if re.search(r"(^|_)(qty|quantity)|units_ordered|line_qty|order_qty", n):
@@ -1693,10 +1743,24 @@ def numeric_series(column_name):
 def calculate_kpis():
     global df
 
+    from services.kpi_title_validation import is_entity_dimension_column, resolve_currency_metric_column
+
+    exec_dom = infer_executive_domain(df.columns.tolist())
     product_col = get_mapped_or_detected_column("product", ["product", "item", "sku"])
-    sales_col = get_mapped_or_detected_column(
+    mapped_sales = get_mapped_or_detected_column(
         "sales", ["sales", "revenue", "amount", "total", "value"]
     )
+    sales_col = resolve_currency_metric_column(df.columns.tolist(), mapped_sales)
+    if sales_col and not sales_column_allowed_for_domain(sales_col, exec_dom):
+        sales_col = resolve_currency_metric_column(
+            df.columns.tolist(),
+            _find_first_column(
+                df.columns.tolist(),
+                ["revenue", "sales", "order_value", "order value", "amount", "spend_amount"],
+            ),
+        )
+    if sales_col and is_entity_dimension_column(sales_col):
+        sales_col = resolve_currency_metric_column(df.columns.tolist(), None)
 
     kpis = {
         "total_rows": len(df),
@@ -1747,11 +1811,29 @@ def _find_first_column(columns, keywords):
 
 
 def infer_dataset_kind() -> str:
-    """Rough domain: hr | sales | generic (for KPI labels only)."""
+    """Rough domain: hr | sales | operations | generic (for KPI labels only)."""
     global df
     if df is None:
         return "generic"
     columns = df.columns.tolist()
+    exec_dom = infer_executive_domain(columns)
+    if exec_dom == "hr":
+        return "hr"
+    if exec_dom == "operations":
+        return "operations"
+    if exec_dom in (
+        "sales",
+        "retail",
+        "geography",
+        "banking",
+        "marketing",
+        "finance_fpa",
+        "ecommerce",
+        "healthcare",
+        "customer_support",
+    ):
+        return "sales"
+
     lower = _col_lower_list(columns)
 
     def col_has(pat_list):
@@ -1759,6 +1841,9 @@ def infer_dataset_kind() -> str:
 
     workforce_signals = col_has(
         ["employee", "emp_", "_emp", "department", "attrition", "salary", "attendance", "staff", "workforce"]
+    )
+    hr_definitive = col_has(
+        ["employee", "emp_id", "attrition", "salary", "attendance", "staff", "workforce"]
     )
     sales_signals = col_has(["sales", "revenue", "product", "order", "sku", "customer", "invoice"])
     ops_signals = col_has(
@@ -1779,14 +1864,15 @@ def infer_dataset_kind() -> str:
     if biz == "operations" or (ops_signals >= 2 and not clear_sales):
         return "operations"
 
-    # Prefer HR when people/org signals exist and we're not clearly a product sales cube.
-    if workforce_signals and (salary_col or dept_col or not clear_sales):
-        if clear_sales and not (salary_col or dept_col):
-            return "sales"
-        return "hr"
-
+    # Product + revenue cubes (and strong sales columns) beat department-only HR hints.
     if clear_sales or (sales_signals and sales_col):
         return "sales"
+
+    # HR requires definitive workforce metrics — department alone is an org dimension.
+    if hr_definitive and (salary_col or col_has(["attrition", "employee_id", "emp_id"])):
+        return "hr"
+    if workforce_signals and dept_col and not sales_signals:
+        return "hr"
     return "generic"
 
 
@@ -1845,38 +1931,13 @@ def _manufacturing_column_hit(lower_cols: List[str]) -> int:
 def infer_kpi_domain() -> str:
     """
     Domain label for KPI cards (executive-facing), finer than infer_dataset_kind().
-    Returns: manufacturing | ecommerce | hr | sales | generic
+    Returns: manufacturing | ecommerce | hr | sales | operations | generic
     """
     global df
     if df is None or df.empty:
         return "generic"
-    columns = df.columns.tolist()
-    lower = _col_lower_list(columns)
-    base = infer_dataset_kind()
-    if base == "hr":
-        return "hr"
-    if base == "operations":
-        return "operations"
-
-    mfg_h = _manufacturing_column_hit(lower)
-    eco_h = _ecommerce_column_hit(lower)
-    auto = infer_auto_dashboard_kind()
-    cust_col = get_mapped_or_detected_column(
-        "customer", ["customer", "client", "buyer", "account"]
-    )
-    order_hint = _find_order_id_column(columns)
-
-    if base == "sales":
-        if eco_h >= 2 or (eco_h >= 1 and order_hint and cust_col):
-            return "ecommerce"
-        return "sales"
-
-    if mfg_h >= 2 and mfg_h > eco_h:
-        return "manufacturing"
-    if auto == "operations" and mfg_h >= 2:
-        return "manufacturing"
-
-    return "generic"
+    exec_dom = infer_executive_domain(df.columns.tolist())
+    return executive_domain_to_kpi_domain(exec_dom)
 
 
 def _build_manufacturing_kpi_cards(
@@ -2399,6 +2460,7 @@ def _append_sales_domain_kpi_cards(
     columns: List[str],
 ) -> None:
     """Sales / marketing-adjacent KPI row labels driven by semantic column mapping."""
+    global df
     product_col = get_mapped_or_detected_column(
         "product",
         ["product", "item", "sku", "category", "campaign", "campaign_name"],
@@ -2406,9 +2468,11 @@ def _append_sales_domain_kpi_cards(
     sales_col = get_mapped_or_detected_column(
         "sales", ["sales", "revenue", "amount", "total", "value"]
     )
+    profit_col = get_mapped_or_detected_column(
+        "profit", ["profit", "margin", "net profit", "earnings", "gp"]
+    )
     rev_label = _kpi_title_total_sales_metric(sales_col)
-    top_dim_title = _kpi_title_top_dimension(product_col)
-    count_title = _kpi_title_dimension_count(product_col)
+    top_product_title = _kpi_title_top_dimension(product_col)
 
     if kp.get("total_sales") is not None:
         cards.append(
@@ -2418,31 +2482,57 @@ def _append_sales_domain_kpi_cards(
                 "subtitle": None,
             }
         )
+    elif sales_col and df is not None and sales_col in df.columns:
+        sv = numeric_series(sales_col)
+        if sv.notna().any():
+            cards.append(
+                {
+                    "title": rev_label,
+                    "value": f"{float(sv.sum(skipna=True)):,.0f}",
+                    "subtitle": None,
+                }
+            )
+        else:
+            cards.append({"title": rev_label, "value": "N/A", "subtitle": None})
     else:
         cards.append({"title": rev_label, "value": "N/A", "subtitle": None})
 
-    if kp.get("top_product"):
-        tp = kp["top_product"]
-        cards.append(
-            {
-                "title": top_dim_title,
-                "value": str(tp.get("name", "—"))[:60],
-                "subtitle": f'{float(tp.get("value", 0)):,.0f}',
-            }
-        )
-    else:
-        cards.append({"title": top_dim_title, "value": "N/A", "subtitle": None})
+    avg_rev_title = (
+        "Average Revenue"
+        if sales_col and "revenue" in str(sales_col).lower()
+        else build_metric_label("mean", "average", sales_col)
+    )
+    if sales_col and df is not None and sales_col in df.columns:
+        sv = numeric_series(sales_col)
+        if sv.notna().any():
+            cards.append(
+                {
+                    "title": avg_rev_title,
+                    "value": f"{float(sv.mean(skipna=True)):,.0f}",
+                    "subtitle": None,
+                }
+            )
+        else:
+            cards.append(
+                {
+                    "title": avg_rev_title,
+                    "value": "N/A",
+                    "subtitle": None,
+                }
+            )
 
-    if kp.get("unique_products") is not None:
-        cards.append(
-            {
-                "title": count_title,
-                "value": f'{int(kp["unique_products"]):,}',
-                "subtitle": None,
-            }
-        )
-    else:
-        cards.append({"title": count_title, "value": "N/A", "subtitle": None})
+    if profit_col and df is not None and profit_col in df.columns:
+        pv = numeric_series(profit_col)
+        if pv.notna().any():
+            cards.append(
+                {
+                    "title": "Total Profit"
+                    if "profit" in str(profit_col).lower()
+                    else build_metric_label("sum", "total", profit_col),
+                    "value": f"{float(pv.sum(skipna=True)):,.0f}",
+                    "subtitle": None,
+                }
+            )
 
     region_col = get_mapped_or_detected_column(
         "region", ["region", "state", "city", "location", "country", "territory"]
@@ -2467,8 +2557,20 @@ def _append_sales_domain_kpi_cards(
                 }
             )
 
+    if kp.get("top_product"):
+        tp = kp["top_product"]
+        cards.append(
+            {
+                "title": top_product_title,
+                "value": str(tp.get("name", "—"))[:60],
+                "subtitle": f'{float(tp.get("value", 0)):,.0f}',
+            }
+        )
+    elif product_col and sales_col and df is not None:
+        cards.append({"title": top_product_title, "value": "N/A", "subtitle": None})
+
     order_col = _find_order_id_column(columns)
-    if order_col and sales_col and kp.get("total_sales") is not None:
+    if len(cards) < 5 and order_col and sales_col and kp.get("total_sales") is not None:
         sub_o = df[[order_col, sales_col]].dropna(subset=[order_col])
         sub_o["_v"] = numeric_series(sales_col)
         uniq_orders = sub_o[order_col].nunique(dropna=True)
@@ -2481,19 +2583,36 @@ def _append_sales_domain_kpi_cards(
                     "subtitle": f"{int(uniq_orders):,} orders",
                 }
             )
-    elif not order_col:
-        date_col = get_mapped_or_detected_column(
-            "date",
-            ["date", "order date", "transaction date", "invoice date", "month", "period"],
-        )
-        if date_col and sales_col:
-            cards.append(
-                {
-                    "title": "Trend-ready",
-                    "value": "Yes",
-                    "subtitle": "Date + revenue fields detected for time-series questions",
-                }
-            )
+
+
+def _kpi_build_context(profile: Dict[str, Any], kp: Dict[str, Any]) -> KpiBuildContext:
+    return KpiBuildContext(
+        df=df,
+        columns=df.columns.tolist(),
+        profile=profile,
+        kp=kp,
+        get_mapped_column=get_mapped_or_detected_column,
+        numeric_series=numeric_series,
+        pretty_label=_pretty_label_text,
+        region_usable=_region_column_usable,
+        find_order_id=_find_order_id_column,
+    )
+
+
+EXECUTIVE_DASHBOARD_LABELS = {
+    "hr": "HR / Employee",
+    "banking": "Banking / Financial Services",
+    "healthcare": "Healthcare",
+    "customer_support": "Customer Support",
+    "operations": "Operations",
+    "marketing": "Marketing",
+    "finance_fpa": "Finance / FP&A",
+    "geography": "Geographic Analytics",
+    "retail": "Retail / Ecommerce",
+    "sales": "Sales",
+    "ecommerce": "Retail / Ecommerce",
+    "generic": "Generic",
+}
 
 
 def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
@@ -2502,109 +2621,12 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
     if df is None:
         return [], "generic"
 
-    domain = infer_kpi_domain()
     profile = dataset_profile or build_profile(df)
     kp = calculate_kpis()
-    cards: List[Dict[str, Any]] = []
     columns = df.columns.tolist()
-
-    if domain == "hr":
-        emp_id_col = _find_first_column(
-            columns,
-            ["employee_id", "emp_id", "staff_id", "emp id", "employee id"],
-        )
-        if emp_id_col is None:
-            for c in columns:
-                cl = str(c).lower().replace(" ", "_")
-                if "employee" in cl and "id" in cl:
-                    emp_id_col = c
-                    break
-
-        total_employees = int(df[emp_id_col].nunique(dropna=True)) if emp_id_col else int(len(df))
-        cards.append(
-            {"title": "Total Employees", "value": f"{total_employees:,}", "subtitle": None}
-        )
-
-        salary_col = _find_first_column(columns, ["salary", "ctc", "compensation", "pay", "wage"])
-        if salary_col:
-            sv = numeric_series(salary_col)
-            if sv.notna().any():
-                avg = float(sv.mean(skipna=True))
-                cards.append(
-                    {
-                        "title": build_metric_label("mean", "average", salary_col),
-                        "value": f"{avg:,.0f}",
-                        "subtitle": None,
-                    }
-                )
-                amax_idx = sv.idxmax(skipna=True)
-                hi_val = float(sv.max(skipna=True))
-                name_col = _find_first_column(columns, ["name", "employee name", "full name", "emp_name"]) or emp_id_col
-                hi_name = "—"
-                if amax_idx is not None and name_col is not None and name_col in df.columns:
-                    try:
-                        hi_name = str(df.loc[amax_idx, name_col])
-                    except Exception:
-                        hi_name = "—"
-                cards.append(
-                    {
-                        "title": "Highest Paid Employee",
-                        "value": hi_name[:60] + ("..." if len(str(hi_name)) > 60 else ""),
-                        "subtitle": f"Salary {hi_val:,.0f}",
-                    }
-                )
-            else:
-                cards.append(
-                    {
-                        "title": build_metric_label("mean", "average", salary_col),
-                        "value": "N/A",
-                        "subtitle": None,
-                    }
-                )
-                cards.append({"title": "Highest Paid Employee", "value": "N/A", "subtitle": None})
-        else:
-            ct_fb = profile.get("column_types", {})
-            numeric_fallback = [c for c in columns if ct_fb.get(c) == "number"]
-            fb_col = numeric_fallback[0] if numeric_fallback else None
-            cards.append(
-                {
-                    "title": build_metric_label("mean", "average", fb_col)
-                    if fb_col
-                    else "Average metric",
-                    "value": "N/A",
-                    "subtitle": None,
-                }
-            )
-            cards.append({"title": "Highest Paid Employee", "value": "N/A", "subtitle": None})
-
-        dept_col = _find_first_column(columns, ["department", "dept", "team", "division"])
-        if dept_col:
-            dcount = int(df[dept_col].nunique(dropna=True))
-            cards.append({"title": "Departments", "value": f"{dcount:,}", "subtitle": None})
-        else:
-            cards.append({"title": "Departments", "value": "N/A", "subtitle": None})
-
-        return cards[:4], domain
-
-    if domain == "manufacturing":
-        cards = _build_manufacturing_kpi_cards(columns, profile)
-        return (cards[:5] if cards else _build_generic_executive_kpi_cards(columns, profile)), domain
-
-    if domain == "operations":
-        cards = _build_operations_kpi_cards(columns, profile, kp)
-        return (cards[:5] if cards else _build_generic_executive_kpi_cards(columns, profile)), domain
-
-    if domain == "ecommerce":
-        cards = _build_ecommerce_kpi_cards(columns, profile, kp)
-        if not cards:
-            cards = _build_generic_executive_kpi_cards(columns, profile)
-        return cards[:5], domain
-
-    if domain == "sales":
-        _append_sales_domain_kpi_cards(cards, kp, profile, columns)
-        return cards[:5], domain
-
-    cards = _build_generic_executive_kpi_cards(columns, profile)
+    exec_domain = infer_executive_domain(columns)
+    domain = executive_domain_to_kpi_domain(exec_domain)
+    cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
     return cards[:5], domain
 
 
@@ -2739,6 +2761,11 @@ def infer_auto_dashboard_kind() -> str:
         scores["hr"] += 4
     if any("attrition" in c or "employee" in c for c in lower):
         scores["hr"] += 2
+
+    if product_col and sales_col_guess:
+        scores["sales"] += 4
+        if any(k in " ".join(lower) for k in ("profit", "cost", "customer_segment", "region")):
+            scores["sales"] += 3
 
     base_kind = infer_dataset_kind()
     if base_kind == "hr":
@@ -3652,21 +3679,19 @@ def build_auto_dashboard_charts(
 
 def build_auto_dashboard() -> Dict[str, Any]:
     global df, dataset_profile
-    kind = infer_auto_dashboard_kind()
-    label = AUTO_DASHBOARD_LABELS[kind]
-
-    out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": [], "charts": []}
     if df is None:
-        return out
+        return {"kind": "generic", "type_label": AUTO_DASHBOARD_LABELS["generic"], "cards": [], "charts": []}
 
     profile = dataset_profile or build_profile(df)
-    ct = profile.get("column_types", {})
     columns = df.columns.tolist()
-    kp = calculate_kpis()
-    cards: List[Dict[str, Any]] = []
+    exec_domain = infer_executive_domain(columns)
+    kind = executive_domain_to_auto_kind(exec_domain)
+    label = EXECUTIVE_DASHBOARD_LABELS.get(exec_domain, AUTO_DASHBOARD_LABELS.get(kind, "Generic"))
 
-    def typed_count(tp: str) -> int:
-        return sum(1 for col in columns if ct.get(col) == tp)
+    out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": [], "charts": []}
+
+    ct = profile.get("column_types", {})
+    kp = calculate_kpis()
 
     cat_type_count = sum(
         1 for col in columns if ct.get(col) in ("category", "text")
@@ -3711,255 +3736,8 @@ def build_auto_dashboard() -> Dict[str, Any]:
                 trimmed.append(pc)
         return trimmed[:6]
 
-    if kind == "hr":
-        emp_id_col = _find_first_column(
-            columns,
-            ["employee_id", "emp_id", "staff_id", "emp id", "employee id"],
-        )
-        if emp_id_col is None:
-            for c in columns:
-                cl = str(c).lower().replace(" ", "_")
-                if "employee" in cl and "id" in cl:
-                    emp_id_col = c
-                    break
-
-        total_employees = int(df[emp_id_col].nunique(dropna=True)) if emp_id_col else int(len(df))
-        cards.append(
-            {"title": "Total Employees", "value": f"{total_employees:,}", "subtitle": None}
-        )
-
-        salary_col = _find_first_column(columns, ["salary", "ctc", "compensation", "pay", "wage"])
-        if salary_col:
-            sv = numeric_series(salary_col)
-            if sv.notna().any():
-                avg = float(sv.mean(skipna=True))
-                hi_val = float(sv.max(skipna=True))
-                cards.append(
-                    {
-                        "title": build_metric_label("mean", "average", salary_col),
-                        "value": f"{avg:,.0f}",
-                        "subtitle": None,
-                    }
-                )
-                cards.append(
-                    {
-                        "title": build_metric_label("max", "maximum", salary_col),
-                        "value": f"{hi_val:,.0f}",
-                        "subtitle": None,
-                    }
-                )
-            else:
-                cards.append(
-                    {
-                        "title": build_metric_label("mean", "average", salary_col),
-                        "value": "N/A",
-                        "subtitle": None,
-                    }
-                )
-                cards.append(
-                    {
-                        "title": build_metric_label("max", "maximum", salary_col),
-                        "value": "N/A",
-                        "subtitle": None,
-                    }
-                )
-        else:
-            prof_ct = profile.get("column_types", {})
-            num_fb = [c for c in columns if prof_ct.get(c) == "number"]
-            fb_m = num_fb[0] if num_fb else None
-            cards.append(
-                {
-                    "title": build_metric_label("mean", "average", fb_m)
-                    if fb_m
-                    else "Average metric",
-                    "value": "N/A",
-                    "subtitle": None,
-                }
-            )
-            cards.append(
-                {
-                    "title": build_metric_label("max", "maximum", fb_m)
-                    if fb_m
-                    else "Maximum metric",
-                    "value": "N/A",
-                    "subtitle": None,
-                }
-            )
-
-        dept_col = _find_first_column(columns, ["department", "dept", "team", "division"])
-        if dept_col:
-            cards.append(
-                {
-                    "title": "Department Count",
-                    "value": f'{int(df[dept_col].nunique(dropna=True)):,}',
-                    "subtitle": None,
-                }
-            )
-        else:
-            cards.append({"title": "Department Count", "value": "N/A", "subtitle": None})
-
-        risk_col = _find_attrition_risk_column(columns)
-        if risk_col and risk_col in df.columns:
-            hi_cnt, denom = _count_high_attrition_risk(df[risk_col])
-            sub = f"{hi_cnt:,} of {denom:,} flagged" if denom else None
-            cards.append(
-                {"title": "High Attrition Risk Count", "value": f"{hi_cnt:,}", "subtitle": sub}
-            )
-
-        out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
-        return out
-
-    if kind == "sales":
-        _append_sales_domain_kpi_cards(cards, kp, profile, columns)
-        out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
-        return out
-
-    if kind == "generic":
-        cards = _build_generic_executive_kpi_cards(columns, profile)
-        out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
-        return out
-
-    if kind == "finance":
-        cards.append({"title": "Total Records", "value": f"{int(len(df)):,}", "subtitle": None})
-        amt_col = _find_first_column(
-            columns,
-            ["amount", "total_amount", "value", "debit", "credit", "payment", "budget", "expense", "balance", "net"],
-        )
-        if amt_col:
-            sv = numeric_series(amt_col)
-            if sv.notna().any():
-                cards.append(
-                    {
-                        "title": "Sum of Amounts",
-                        "value": f"{float(sv.sum(skipna=True)):,.0f}",
-                        "subtitle": str(amt_col)[:42],
-                    }
-                )
-
-        profit_col = _find_first_column(
-            columns, ["profit", "net profit", "ebitda", "margin", "income"]
-        )
-        if profit_col:
-            pv = numeric_series(profit_col)
-            if pv.notna().any():
-                cards.append(
-                    {
-                        "title": "Total Profit",
-                        "value": f"{float(pv.sum(skipna=True)):,.0f}",
-                        "subtitle": None,
-                    }
-                )
-
-        acct_col = _find_first_column(
-            columns, ["account", "gl_", "cost_center", "category", "line item"]
-        )
-        if acct_col:
-            cards.append(
-                {
-                    "title": "Distinct Accounts",
-                    "value": f'{int(df[acct_col].nunique(dropna=True)):,}',
-                    "subtitle": None,
-                }
-            )
-
-        date_col = _find_first_column(columns, ["date", "period", "month", "fiscal"])
-        cards.append({"title": "Total Columns", "value": f"{len(columns):,}", "subtitle": None})
-
-        if date_col:
-            dc = pd.to_datetime(df[date_col], errors="coerce").dropna()
-            if len(dc) >= 2:
-                rng = dc.max() - dc.min()
-                cards.append(
-                    {
-                        "title": "Date Span",
-                        "value": str(rng.days) + " days",
-                        "subtitle": f"{dc.min().date()} → {dc.max().date()}",
-                    }
-                )
-
-        out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
-        return out
-
-    if kind == "operations":
-        cards = _build_operations_kpi_cards(columns, profile, kp)
-        out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
-        return out
-
-    if kind == "marketing":
-        cards.append({"title": "Total Records", "value": f"{int(len(df)):,}", "subtitle": None})
-
-        spend_col = _find_first_column(columns, ["spend", "cost", "budget", "ad_spend"])
-        if spend_col:
-            sp = numeric_series(spend_col)
-            if sp.notna().any():
-                cards.append(
-                    {"title": "Total Spend", "value": f"{float(sp.sum()):,.0f}", "subtitle": None}
-                )
-
-        impr_col = _find_first_column(columns, ["impression", "imps", "impr"])
-        if impr_col:
-            im = numeric_series(impr_col)
-            if im.notna().any():
-                cards.append(
-                    {
-                        "title": "Total Impressions",
-                        "value": f"{float(im.sum()):,.0f}",
-                        "subtitle": None,
-                    }
-                )
-
-        clk_col = _find_first_column(columns, ["click", "clicks"])
-        if clk_col:
-            ck = numeric_series(clk_col)
-            if ck.notna().any():
-                cards.append(
-                    {"title": "Total Clicks", "value": f"{float(ck.sum()):,.0f}", "subtitle": None}
-                )
-
-        conv_col = _find_first_column(columns, ["conversion", "conversions"])
-        if conv_col:
-            cv = numeric_series(conv_col)
-            if cv.notna().any():
-                cards.append(
-                    {
-                        "title": "Total Conversions",
-                        "value": f"{float(cv.sum()):,.0f}",
-                        "subtitle": None,
-                    }
-                )
-
-        ctr_col = _find_first_column(columns, ["ctr"])
-        if ctr_col:
-            ctrv = numeric_series(ctr_col)
-            if ctrv.notna().any():
-                avg_ctr = float(ctrv.mean(skipna=True))
-                if avg_ctr > 1:
-                    ctr_show = f"{avg_ctr:.2f}%"
-                else:
-                    ctr_show = f"{avg_ctr:.2%}"
-                cards.append({"title": "Avg CTR", "value": ctr_show, "subtitle": None})
-
-        camp_col = _find_first_column(columns, ["campaign", "channel"])
-        if camp_col:
-            cards.append(
-                {
-                    "title": "Active Campaigns",
-                    "value": f'{int(df[camp_col].nunique(dropna=True)):,}',
-                    "subtitle": None,
-                }
-            )
-
-        out["cards"] = clamp_cards(cards)
-        out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
-        return out
-
-    # fallback (should not reach — all kinds handled above)
-    out["cards"] = clamp_cards([])
+    cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
+    out["cards"] = clamp_cards(cards)
     out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
     return out
 
@@ -5611,23 +5389,36 @@ def update_column_mapping(data: ColumnMappingRequest):
 
     prof_now = dataset_profile or build_profile(df)
     proposed, meta = compute_semantic_column_mapping(df, prof_now)
+    user_mapped_roles: List[str] = []
     for key, value in incoming_map.items():
         if value and value in df.columns:
             column_mapping[key] = value
+            user_mapped_roles.append(key)
         else:
             column_mapping[key] = None
 
     roles = meta.get("roles") or {}
+    core_roles = frozenset({"product", "sales", "region", "date"})
     for rk in ("product", "sales", "region", "customer", "profit", "date"):
         rm = dict(roles.get(rk) or {})
         fin = column_mapping.get(rk)
         auto = proposed.get(rk)
         rm["selected"] = fin
         rm["auto_selected"] = auto
-        if fin != auto:
-            rm["confidence"] = "user"
-            rm["override_note"] = "Saved mapping differs from auto-detect."
+        if fin and rk in user_mapped_roles:
+            if fin != auto:
+                rm["confidence"] = "high"
+                rm["override_note"] = "Saved mapping differs from auto-detect."
+            else:
+                rm["confidence"] = "high"
+                rm["override_note"] = "Confirmed by user mapping."
         roles[rk] = rm
+    if len([r for r in user_mapped_roles if r in core_roles]) >= 3:
+        for rk in core_roles:
+            if rk in user_mapped_roles and column_mapping.get(rk):
+                roles.setdefault(rk, {})
+                roles[rk] = dict(roles.get(rk) or {})
+                roles[rk]["confidence"] = "high"
     meta["roles"] = roles
     meta.setdefault("notes", []).append("Column mapping updated from client request.")
     column_mapping_metadata = meta

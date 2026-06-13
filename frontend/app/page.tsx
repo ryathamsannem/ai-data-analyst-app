@@ -441,6 +441,7 @@ import {
   validateOverviewUploadPick,
 } from "@/lib/upload-auto-flow";
 import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-summary";
+import { computeOverviewAiSummaryBullets } from "@/lib/overview-ai-summary";
 import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
 import {
   formatOverviewFilenameMiddle,
@@ -3652,6 +3653,11 @@ type AutoDashboardMiniChart = {
   chartType: string;
   labels: string[];
   values: number[];
+  scatterXValues?: number[];
+  scatterXFormatted?: string[];
+  scatterXLabel?: string;
+  scatterYLabel?: string;
+  metricColumn?: string;
   interaction?: VizInteractionPayload;
 };
 
@@ -3676,21 +3682,75 @@ function parseAutoDashboardMiniCharts(raw: unknown): AutoDashboardMiniChart[] {
         : "bar";
     const labelsRaw = Array.isArray(o.labels) ? o.labels : [];
     const valsRaw = Array.isArray(o.values) ? o.values : [];
-    const pairs: { name: string; value: number }[] = [];
+    const scatterXRaw = Array.isArray(o.scatterX) ? o.scatterX : [];
+    const scatterXDispRaw = Array.isArray(o.scatterXDisplay) ? o.scatterXDisplay : [];
+    const ctNorm = chartType.toLowerCase().replace(/\s+/g, "");
+    const pairs: {
+      name: string;
+      value: number;
+      x?: number;
+      displayX?: string;
+    }[] = [];
     const n = Math.min(labelsRaw.length, valsRaw.length);
     for (let i = 0; i < n; i++) {
       const name = String(labelsRaw[i] ?? "");
       const vx = valsRaw[i];
       const num = typeof vx === "number" ? vx : Number(vx);
       if (!Number.isFinite(num)) continue;
-      pairs.push({ name: name || "—", value: num });
+      const pair: {
+        name: string;
+        value: number;
+        x?: number;
+        displayX?: string;
+      } = { name: name || "—", value: num };
+      if (ctNorm === "scatter" && i < scatterXRaw.length) {
+        const xr = scatterXRaw[i];
+        const xn = typeof xr === "number" ? xr : Number(xr);
+        if (Number.isFinite(xn)) {
+          pair.x = xn;
+          const xd =
+            i < scatterXDispRaw.length &&
+            scatterXDispRaw[i] != null &&
+            String(scatterXDispRaw[i]).trim()
+              ? String(scatterXDispRaw[i]).trim()
+              : undefined;
+          if (xd) pair.displayX = xd;
+        }
+      }
+      pairs.push(pair);
     }
     if (!title || pairs.length === 0) continue;
+    if (
+      ctNorm === "scatter" &&
+      !pairs.some((p) => typeof p.x === "number" && Number.isFinite(p.x))
+    ) {
+      continue;
+    }
     out.push({
       title,
       chartType,
       labels: pairs.map((p) => p.name),
       values: pairs.map((p) => p.value),
+      scatterXValues:
+        ctNorm === "scatter"
+          ? pairs.map((p) =>
+              typeof p.x === "number" && Number.isFinite(p.x) ? p.x : Number.NaN
+            )
+          : undefined,
+      scatterXFormatted:
+        ctNorm === "scatter" ? pairs.map((p) => p.displayX?.trim() ?? "") : undefined,
+      scatterXLabel:
+        typeof o.scatterXLabel === "string" && o.scatterXLabel.trim()
+          ? o.scatterXLabel.trim()
+          : undefined,
+      scatterYLabel:
+        typeof o.scatterYLabel === "string" && o.scatterYLabel.trim()
+          ? o.scatterYLabel.trim()
+          : undefined,
+      metricColumn:
+        typeof o.metricColumn === "string" && o.metricColumn.trim()
+          ? o.metricColumn.trim()
+          : undefined,
       interaction: parseChartInteraction(o.interaction),
     });
   }
@@ -3793,22 +3853,6 @@ function truncateOverviewPhrase(s: string, maxLen: number): string {
   return t.length > maxLen ? `${t.slice(0, maxLen - 1)}…` : t;
 }
 
-function splitChartTitleMetricAndBreakdown(title: string): {
-  metric: string;
-  breakdown: string | null;
-} {
-  const t = title.replace(/\s+/g, " ").trim();
-  if (!t) return { metric: "this measure", breakdown: null };
-  const m = t.match(/^(.+?)\s+by\s+(.+)$/i);
-  if (m) {
-    return {
-      metric: m[1].trim() || "this measure",
-      breakdown: m[2].trim() || null,
-    };
-  }
-  return { metric: t, breakdown: null };
-}
-
 function autoDashboardChartPairs(chart: AutoDashboardMiniChart): {
   name: string;
   value: number;
@@ -3830,12 +3874,6 @@ function isLikelyTrendAutoChart(chart: AutoDashboardMiniChart): boolean {
   return /\b(trend|over time|time series|weekly|daily|monthly|quarter)\b/i.test(
     chart.title
   );
-}
-
-function meanFinite(nums: number[]): number | null {
-  const xs = nums.filter((n) => Number.isFinite(n));
-  if (!xs.length) return null;
-  return xs.reduce((a, b) => a + b, 0) / xs.length;
 }
 
 function readProfileDescribeStat(
@@ -3911,223 +3949,6 @@ function _buildNumericDistributionBlurb(
     }
   }
   return parts.join(" ").trim() || "Spread looks steady for this column.";
-}
-
-function computeOverviewAiSummaryBullets(args: {
-  rows: number;
-  columns: string[];
-  autoDashboard: AutoDashboardPayload | null;
-  profile: DatasetProfile | null;
-  primaryMetricColumn: string | null;
-  groupingColumn: string | null;
-  dateColumn: string | null;
-}): string[] {
-  const {
-    rows,
-    columns,
-    autoDashboard,
-    profile,
-    primaryMetricColumn,
-    groupingColumn,
-    dateColumn,
-  } = args;
-
-  const scored: { text: string; score: number }[] = [];
-  const seen = new Set<string>();
-
-  const pushScored = (raw: string, score: number) => {
-    const s = raw.replace(/\s+/g, " ").trim();
-    if (!s || score <= 0) return;
-    const key = s.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    scored.push({ text: s, score });
-  };
-
-  const isLowValueKpiTitle = (title: string) => {
-    const t = title.trim().toLowerCase();
-    if (!t) return true;
-    if (/^(records?\s+in\s+view|row\s+count|column\s+count|fields?\s+in\s+view)\b/.test(t)) {
-      return true;
-    }
-    if (
-      /^(total|sum|count|records?|rows?|columns?)\b/.test(t) &&
-      !/\b(top|highest|lowest|lead|best|worst|maximum|minimum|peak|trend)\b/.test(t)
-    ) {
-      return true;
-    }
-    return false;
-  };
-
-  const charts = autoDashboard?.charts ?? [];
-  const cards = autoDashboard?.cards ?? [];
-
-  let trendBulletsAdded = 0;
-  let barBulletsAdded = 0;
-
-  for (const chart of charts) {
-    if (isLikelyTrendAutoChart(chart)) {
-      if (trendBulletsAdded >= 1) {
-        continue;
-      }
-      const vals = chart.values.filter((x) => Number.isFinite(x));
-      if (vals.length >= 4) {
-        const mid = Math.floor(vals.length / 2);
-        const early = meanFinite(vals.slice(0, mid));
-        const late = meanFinite(vals.slice(mid));
-        if (early != null && late != null && early !== 0) {
-          const rel = (late - early) / (Math.abs(early) + 1e-9);
-          const titleHint = truncateOverviewPhrase(
-            getCanonicalChartTitle({
-              rawTitle: chart.title,
-              chartType: chart.chartType,
-              labels: chart.labels,
-              values: chart.values,
-            }),
-            42
-          );
-          if (Math.abs(rel) < 0.04) {
-            pushScored(
-              `The time-based view "${titleHint}" is fairly level across the window shown.`,
-              78
-            );
-          } else if (rel < 0) {
-            pushScored(
-              `Recent buckets in "${titleHint}" run lower than earlier ones on average.`,
-              96
-            );
-          } else {
-            pushScored(
-              `Recent buckets in "${titleHint}" run higher than earlier ones on average.`,
-              96
-            );
-          }
-          trendBulletsAdded += 1;
-        }
-      }
-      continue;
-    }
-
-    if (barBulletsAdded >= 2) {
-      continue;
-    }
-
-    const pairs = autoDashboardChartPairs(chart);
-    if (pairs.length >= 2) {
-      let hi = pairs[0];
-      let lo = pairs[0];
-      for (const p of pairs) {
-        if (p.value > hi.value) hi = p;
-        if (p.value < lo.value) lo = p;
-      }
-      if (hi.name !== lo.name) {
-        const { metric, breakdown } = splitChartTitleMetricAndBreakdown(chart.title);
-        const mShort = truncateOverviewPhrase(metric, 36);
-        const hiName = truncateOverviewPhrase(hi.name, 32);
-        if (breakdown) {
-          const br = truncateOverviewPhrase(breakdown, 28);
-          pushScored(
-            `${hiName} leads on ${mShort.toLowerCase()} when split by ${br.toLowerCase()}.`,
-            92
-          );
-        } else {
-          pushScored(`${hiName} is the high point on ${mShort}.`, 88);
-        }
-        barBulletsAdded += 1;
-      }
-    }
-  }
-
-  for (const card of cards.slice(0, 4)) {
-    const t = truncateOverviewPhrase(card.title, 40);
-    const v = truncateOverviewPhrase(String(card.value ?? ""), 36);
-    if (!t || !v) continue;
-    if (card.subtitle?.trim()) {
-      const st = truncateOverviewPhrase(card.subtitle, 44);
-      pushScored(`${t}: ${v} (${st}).`, 74);
-      continue;
-    }
-    if (isLowValueKpiTitle(t)) continue;
-    const titleLc = t.toLowerCase();
-    const comparative = /\b(top|highest|lowest|lead|best|worst|maximum|minimum|peak)\b/.test(
-      titleLc
-    );
-    pushScored(`${t} is ${v}.`, comparative ? 70 : 42);
-  }
-
-  if (primaryMetricColumn) {
-    const mean = readProfileDescribeStat(primaryMetricColumn, "mean", profile);
-    const std = readProfileDescribeStat(primaryMetricColumn, "std", profile);
-    const max = readProfileDescribeStat(primaryMetricColumn, "max", profile);
-    const min = readProfileDescribeStat(primaryMetricColumn, "min", profile);
-    if (
-      mean != null &&
-      std != null &&
-      max != null &&
-      min != null &&
-      std > 1e-12
-    ) {
-      const zHi = (max - mean) / std;
-      const zLo = (mean - min) / std;
-      if (zHi > 2.75 || zLo > 2.75) {
-        pushScored(
-          `The main numeric measure shows long tails—spot-check extremes before trusting aggregates.`,
-          86
-        );
-      } else if (max != null && min != null && mean != null) {
-        const span = Math.abs(max - min);
-        const noise = std * 4;
-        if (Number.isFinite(span) && Number.isFinite(noise) && span > noise * 2.5) {
-          pushScored(
-            `Values on the primary measure spread widely; use filters to focus on a cohort.`,
-            82
-          );
-        }
-      }
-    }
-  }
-
-  const numericCols = columns.filter(
-    (c) => profile?.column_types?.[c] === "number"
-  );
-  for (const c of numericCols) {
-    if (!c || c === primaryMetricColumn) continue;
-    const mean = readProfileDescribeStat(c, "mean", profile);
-    const std = readProfileDescribeStat(c, "std", profile);
-    if (mean == null || std == null || Math.abs(mean) < 1e-9) continue;
-    const cv = std / Math.abs(mean);
-    if (cv < 0.12) {
-      const label = humanizeColumnName(c);
-      pushScored(`${label} stays relatively steady across rows.`, 28);
-      break;
-    }
-  }
-
-  if (columns.length > 0 && !primaryMetricColumn) {
-    pushScored(
-      `Pick a primary numeric column in mapping so KPIs and summaries stay grounded.`,
-      24
-    );
-  }
-
-  scored.sort((a, b) => b.score - a.score);
-  const out = scored.slice(0, 5).map((item) => item.text);
-  const minBullets = 3;
-  const neutralFill = [
-    `Ask a focused question in AI Insights to go deeper on any chart signal.`,
-    `Use the chart footers on this tab to open the same view in the Charts workspace.`,
-    `Column mapping drives how these bullets and KPIs are inferred—adjust if something looks off.`,
-    `KPI cards reflect your current sheet and mapping settings.`,
-  ];
-  let i = 0;
-  while (out.length < minBullets && i < neutralFill.length) {
-    const s = neutralFill[i++];
-    if (!seen.has(s.toLowerCase())) {
-      seen.add(s.toLowerCase());
-      out.push(s);
-    }
-  }
-  return out.slice(0, 5);
 }
 
 /** Optional footnote for Auto Dashboard KPI tiles — uses charts + profile, no domain-specific copy. */
@@ -4582,17 +4403,34 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   const baseChartRows = useMemo((): ChartRow[] => {
     const cap = Math.min(chart.labels.length, chart.values.length);
     const rows: ChartRow[] = [];
+    const isScatter =
+      String(chart.chartType ?? "")
+        .toLowerCase()
+        .replace(/\s+/g, "") === "scatter";
     for (let i = 0; i < cap; i++) {
       const v = chart.values[i];
       if (!Number.isFinite(v)) continue;
-      rows.push({
+      const xVal = chart.scatterXValues?.[i];
+      const row: ChartRow = {
         name: chart.labels[i] || "—",
         value: v,
-        displayValue: fallbackChartNumericDisplay("bar", v),
-      });
+        displayValue: fallbackChartNumericDisplay(isScatter ? "scatter" : "bar", v),
+      };
+      if (isScatter && typeof xVal === "number" && Number.isFinite(xVal)) {
+        row.x = xVal;
+        const xfmt = chart.scatterXFormatted?.[i]?.trim();
+        if (xfmt) row.displayX = xfmt;
+      }
+      rows.push(row);
     }
     return rows;
-  }, [chart.labels, chart.values]);
+  }, [
+    chart.labels,
+    chart.values,
+    chart.chartType,
+    chart.scatterXValues,
+    chart.scatterXFormatted,
+  ]);
 
   const displayKind = useMemo(
     () =>
@@ -4802,6 +4640,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           pngCaptureMode={pngCapture}
           chartRows={chartRows}
           visualization={{
+            scatterXLabel: chart.scatterXLabel,
+            scatterYLabel: chart.scatterYLabel ?? chart.metricColumn,
             interaction: chart.interaction
               ? { drillDimensions: chart.interaction.drillDimensions }
               : null,
@@ -8205,30 +8045,12 @@ function HomeInner() {
   const autoDashboardKpiRows = useMemo(() => {
     if (!autoDashboard?.cards?.length) return [];
     const cards = autoDashboard.cards.slice(0, 5);
-    const charts = overviewRenderableCharts;
-    return cards.map((card, idx) => ({
+    return cards.map((card) => ({
       card,
-      contextLine: buildAutoDashboardKpiContextLine({
-        card,
-        cardIndex: idx,
-        totalCards: cards.length,
-        charts,
-        profile,
-        primaryMetricColumn: effectiveSales,
-        rows,
-        columns,
-        datasetKind: datasetKind || "",
-      }),
+      // KPI subtitles come from backend executive KPI builders — not chart-index insight fallbacks.
+      contextLine: null,
     }));
-  }, [
-    autoDashboard,
-    overviewRenderableCharts,
-    profile,
-    effectiveSales,
-    rows,
-    columns,
-    datasetKind,
-  ]);
+  }, [autoDashboard]);
 
   const dataPreviewDerivationsActive =
     activeTab === "preview" || activeTab === "export";
