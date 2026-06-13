@@ -23,7 +23,7 @@ export const PRESENTATION_EXPORT_HEIGHT_PX = 900;
 export const PRESENTATION_EXPORT_LINE_HEIGHT_PX = 800;
 
 /** Vertical chrome reserved for title, chips, warning, card padding, and composite padding. */
-export const PRESENTATION_EXPORT_CHROME_PX = 168;
+export const PRESENTATION_EXPORT_CHROME_PX = 132;
 
 /** Overview grid uses two columns only when container is at least this wide. */
 export const OVERVIEW_TWO_COLUMN_MIN_CONTAINER_PX = 1000;

@@ -18,8 +18,10 @@ from services.auto_dashboard_opportunities import (  # noqa: E402
     MAX_DONUT_CHARTS,
     build_dashboard_charts_from_opportunities,
     classify_columns,
+    evaluate_chart_visual_quality,
     extract_kpi_chart_context,
     target_chart_count,
+    _chart_skip_due_to_weak_visual_quality,
 )
 
 FIXTURE = BACKEND_ROOT / "tests" / "fixtures" / "dashboard_showcase_dataset.csv"
@@ -258,6 +260,57 @@ class TestAutoDashboardOpportunities(unittest.TestCase):
             main.dataset_profile = None
         self.assertGreaterEqual(len(charts), 2)
         self.assertLessEqual(len(charts), 8)
+
+
+class TestChartVisualQuality(unittest.TestCase):
+    def test_detects_low_spread_percent_breakdown(self) -> None:
+        chart = {
+            "title": "Conversion Rate by Campaign",
+            "chartType": "bar",
+            "metricColumn": "conversion_rate",
+            "labels": ["A", "B", "C", "D", "E"],
+            "values": [5.2, 5.2, 5.1, 5.0, 4.9],
+        }
+        q = evaluate_chart_visual_quality(chart)
+        self.assertTrue(q["is_percent_metric"])
+        self.assertTrue(q["weak_differentiation"])
+        self.assertTrue(q["prefer_tight_domain"])
+
+    def test_keeps_wide_spread_revenue_breakdown(self) -> None:
+        chart = {
+            "title": "Revenue by Region",
+            "chartType": "bar",
+            "metricColumn": "revenue",
+            "labels": ["East", "West", "North"],
+            "values": [120000.0, 240000.0, 310000.0],
+        }
+        q = evaluate_chart_visual_quality(chart)
+        self.assertFalse(q["weak_differentiation"])
+
+    def test_skips_flat_kpi_redundant_compare_chart(self) -> None:
+        chart = {
+            "title": "Satisfaction Score by Country",
+            "chartType": "bar",
+            "metricColumn": "satisfaction_score",
+            "dimensionColumn": "country",
+            "_opportunityType": "compare",
+            "labels": ["US", "UK", "DE", "FR"],
+            "values": [82.1, 82.4, 82.8, 83.0],
+        }
+        kpi_ctx = extract_kpi_chart_context(
+            [
+                {
+                    "title": "Top Country",
+                    "value": "US",
+                    "subtitle": "satisfaction score 83.0",
+                }
+            ]
+        )
+        self.assertTrue(
+            _chart_skip_due_to_weak_visual_quality(
+                chart, kpi_ctx, main._DASH_RECORD_METRIC_KEY
+            )
+        )
 
 
 if __name__ == "__main__":

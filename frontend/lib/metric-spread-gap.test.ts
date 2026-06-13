@@ -45,4 +45,23 @@ describe("formatMetricSpreadGap", () => {
       })
     ).toBe("2.1");
   });
+
+  it("preserves small score gaps instead of rounding to zero", () => {
+    expect(
+      formatMetricSpreadGap(0.03, {
+        metricLabel: "Satisfaction Score by Campaign",
+        chartTitle: "Satisfaction Score by Campaign",
+      })
+    ).toBe("0.03");
+  });
+
+  it("formats tight percent gaps as percentage points", () => {
+    expect(
+      formatMetricSpreadGap(0.3, {
+        metricLabel: "Conversion Rate by Campaign",
+        chartTitle: "Conversion Rate by Campaign",
+        chartRows: [{ name: "A", value: 5.2 }, { name: "B", value: 4.9 }],
+      })
+    ).toBe("0.3 pp");
+  });
 });

@@ -1,4 +1,5 @@
 import type { ChartKind, ChartRow } from "@/app/chart-types";
+import { OVERVIEW_PNG_EXPORT_HBAR_CATEGORY_PAD_PX } from "@/lib/overview-dashboard-export";
 import {
   balanceVerticalOuterMargins,
   collectSampleTickStrings,
@@ -118,21 +119,33 @@ export function computeOverviewHorizontalDashLayout(
   chartRows: ChartRow[],
   valueAxisTitle: string,
   categoryAxisLabel: string,
-  viewportW: number
+  viewportW: number,
+  options?: { pngCapture?: boolean }
 ) {
+  const pngCapture = options?.pngCapture === true;
+  const tickFs = pngCapture ? 15 : 9;
   const base = computeHorizontalBarAxisLayout({
     categoryTickStrings: chartRows.map((r) => String(r.name ?? "")),
     valueAxisLabel: valueAxisTitle,
     valueAxisFull: valueAxisTitle,
     categoryAxisLabel,
-    chartLayoutMode: "full",
-    tickFontSizePx: 9,
+    chartLayoutMode: pngCapture ? "export" : "full",
+    tickFontSizePx: tickFs,
     titleFontSizePx: 10,
     maxValueAxisTitleWidthPx: Math.max(120, viewportW - 72),
   });
   const catCap = Math.max(72, Math.floor(viewportW * 0.38));
-  const catW = Math.min(catCap, Math.max(base.categoryAxisWidth, 72));
-  return { ...base, categoryAxisWidth: catW };
+  let catW = Math.min(catCap, Math.max(base.categoryAxisWidth, 72));
+  if (pngCapture) {
+    catW = Math.min(
+      catCap + OVERVIEW_PNG_EXPORT_HBAR_CATEGORY_PAD_PX,
+      catW + OVERVIEW_PNG_EXPORT_HBAR_CATEGORY_PAD_PX
+    );
+  }
+  const marginLeft = pngCapture
+    ? Math.max(base.marginLeft, 16)
+    : base.marginLeft;
+  return { ...base, categoryAxisWidth: catW, marginLeft };
 }
 
 export function computeOverviewVerticalDashLayout(

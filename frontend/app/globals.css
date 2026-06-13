@@ -2772,6 +2772,30 @@ body {
   min-height: var(--overview-chart-plot-min-h) !important;
 }
 
+/* Single-line pill text — truncation without layout shifts (pair with title for full value). */
+.saas-pill-ellipsis {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-kpi-pill {
+  max-width: min(100%, 18rem);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.overview-kpi-pill__text {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .overview-dash-insight-chips {
   display: flex;
   flex-wrap: wrap;
@@ -2798,8 +2822,18 @@ body {
   font-weight: 500;
   line-height: 1.3;
   color: var(--text-muted);
-  white-space: normal;
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-insights-executive__value,
+.ai-insights-executive__hint {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chart-rate-quality-warning {

@@ -15,6 +15,43 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 import pandas as pd
 
 from analytics_metadata import format_executive_number
+from services.kpi_polish import is_valid_kpi_leader_value, is_valid_subtitle_dimension
+
+_MAX_SCATTER_POINTS = 120
+
+_FORBIDDEN_BREAKDOWN_DIM_TOKENS = (
+    "employee_name",
+    "full_name",
+    "operator",
+    "sales_rep",
+    "salesperson",
+    "sales person",
+    "manager",
+    "email",
+    "uuid",
+    "guid",
+)
+
+_COMPOSITION_BLOCK_METRIC_TOKENS = (
+    "rate",
+    "ratio",
+    "score",
+    "rating",
+    "satisfaction",
+    "utilization",
+    "attainment",
+    "margin",
+    "latency",
+    "duration",
+    "resolution",
+    "delivery",
+    "ship_days",
+    "lead_time",
+    "stay",
+    "growth_rate",
+    "ctr",
+    "nps",
+)
 
 _GEO_KEYWORDS = (
     "region",
@@ -350,9 +387,12 @@ def _dimension_priority(col: str, cardinality: int) -> int:
 
 
 def _ordered_breakdown_dimensions(
-    df: pd.DataFrame, inv: ColumnInventory
+    df: pd.DataFrame,
+    inv: ColumnInventory,
+    id_like_fn: Callable[[Optional[str]], bool],
 ) -> List[str]:
     pool = _dedupe_preserve(inv.geographic + inv.categories)
+    pool = [c for c in pool if _breakdown_dimension_eligible(c, df, id_like_fn)]
     scored = [
         (col, _dimension_priority(col, _dimension_cardinality(df, col)))
         for col in pool
@@ -375,6 +415,500 @@ def _composition_eligible_dim(
     if any(h in n for h in _HIGH_CARDINALITY_DIM_HINTS) and nu > 6:
         return False
     return True
+
+
+def _title_case_phrase(label: str) -> str:
+    s = str(label or "").replace("_", " ").strip()
+    if not s:
+        return "Metric"
+    return " ".join(w[:1].upper() + w[1:].lower() if len(w) > 1 else w.upper() for w in s.split())
+
+
+_CANONICAL_TIME_TOKENS = frozenset(
+    {"monthly", "weekly", "daily", "quarterly", "yearly", "hourly", "period", "minute"}
+)
+_CANONICAL_SUFFIX_TOKENS = frozenset({"trend"})
+_CANONICAL_AGG_TOKENS = frozenset({"total", "average", "avg", "mean"})
+
+
+def normalize_canonical_chart_title(title: str) -> str:
+    """Strip duplicated semantic tokens (Monthly Monthly, Trend Trend, by X by X)."""
+    s = " ".join(str(title or "").split())
+    if not s:
+        return ""
+    words = s.split()
+    out: List[str] = []
+    seen_time = False
+    seen_trend = False
+    seen_agg: Set[str] = set()
+    for w in words:
+        wl = w.lower()
+        if wl in _CANONICAL_TIME_TOKENS:
+            if seen_time:
+                continue
+            seen_time = True
+        elif wl in _CANONICAL_SUFFIX_TOKENS:
+            if seen_trend:
+                continue
+            seen_trend = True
+        elif wl in _CANONICAL_AGG_TOKENS:
+            if wl in seen_agg:
+                continue
+            seen_agg.add(wl)
+        elif out and out[-1].lower() == wl:
+            continue
+        out.append(w)
+    joined = " ".join(out)
+    by_match = re.match(r"^(.+?)\s+by\s+(.+)$", joined, re.I)
+    if by_match:
+        left = by_match.group(1).strip()
+        right = by_match.group(2).strip()
+        right_parts = [p.strip() for p in re.split(r"\s+by\s+", right, flags=re.I)]
+        if len(right_parts) >= 2:
+            base = right_parts[0]
+            if all(p.lower() == base.lower() for p in right_parts):
+                right = base
+        if right.lower() == left.lower():
+            joined = left
+        else:
+            joined = f"{left} by {right}"
+    return _format_executive_chart_title(joined)
+
+
+def _format_executive_chart_title(phrase: str) -> str:
+    """Title case with lowercase particles (by, vs, and)."""
+    words = phrase.split()
+    if not words:
+        return ""
+    particles = frozenset({"by", "vs", "and", "or", "of", "per"})
+    out: List[str] = []
+    for w in words:
+        wl = w.lower()
+        if wl in particles:
+            out.append(wl)
+        elif len(w) > 1:
+            out.append(w[:1].upper() + w[1:].lower())
+        else:
+            out.append(w.upper())
+    return " ".join(out)
+
+
+def _metric_semantic_strength(metric_key: str, title: str = "") -> int:
+    blob = f"{metric_key} {title}".lower().replace("_", " ")
+    if metric_key in ("__records__", "records"):
+        return 5
+    if re.search(
+        r"\b(revenue|profit|sales|order[_ ]?value|loan[_ ]?balance|spend|gmv)\b", blob
+    ):
+        return 100
+    if re.search(
+        r"\b(conversion[_ ]?rate|defect[_ ]?rate|satisfaction|utilization|delinquency|"
+        r"attrition|csat|nps|roas|resolution[_ ]?rate|attainment)\b",
+        blob,
+    ):
+        return 80
+    if re.search(
+        r"\b(orders|tickets|incidents|patients|employees|headcount|admissions|claims|"
+        r"customers|hires|terminations|downtime)\b",
+        blob,
+    ):
+        return 60
+    if re.search(r"\b(quantity|units|qty)\b", blob):
+        return 40
+    return 30
+
+
+def _chart_story_family(chart_type: str, opp_type: str) -> str:
+    ct = _norm_chart_type(chart_type)
+    opp = str(opp_type or "").lower()
+    if ct in _COMPOSITION_TYPES:
+        return "composition"
+    if ct in _TEMPORAL_TYPES:
+        return "trend"
+    if ct == "scatter":
+        return "scatter"
+    if opp == "distribution" or ct == "histogram":
+        return "distribution"
+    return "ranking"
+
+
+def _chart_story_signature(
+    chart: Dict[str, Any], record_key: str
+) -> Optional[Tuple[str, str, Tuple[str, ...]]]:
+    dim = _dimension_key(chart)
+    if not dim:
+        return None
+    ct = _norm_chart_type(chart.get("chartType"))
+    if ct in _TEMPORAL_TYPES or ct == "scatter":
+        return None
+    family = _chart_story_family(ct, str(chart.get("_opportunityType") or ""))
+    labels = chart.get("labels") or []
+    top3 = tuple(
+        str(l).strip().lower() for l in labels[:3] if str(l).strip()
+    )
+    if len(top3) < 2:
+        return None
+    return (dim.lower(), family, top3)
+
+
+def _is_generic_records_chart(chart: Dict[str, Any], record_key: str) -> bool:
+    mk = _metric_key(chart, record_key)
+    if mk == record_key or mk == "records":
+        return True
+    title = str(chart.get("title") or "").strip().lower()
+    return title.startswith("records by ")
+
+
+def _stronger_metric_exists_for_dimension(
+    charts: List[Dict[str, Any]],
+    dim_col: str,
+    record_key: str,
+    *,
+    min_strength: int = 40,
+) -> bool:
+    dim_l = str(dim_col).strip().lower()
+    for chart in charts:
+        if _is_generic_records_chart(chart, record_key):
+            continue
+        dk = _dimension_key(chart)
+        if not dk or dk.lower() != dim_l:
+            continue
+        strength = _metric_semantic_strength(
+            _metric_key(chart, record_key),
+            str(chart.get("title") or ""),
+        )
+        if strength >= min_strength:
+            return True
+    return False
+
+
+def _prune_redundant_records_charts(
+    charts: List[Dict[str, Any]], record_key: str
+) -> List[Dict[str, Any]]:
+    dims_with_strong: Set[str] = set()
+    for chart in charts:
+        if _is_generic_records_chart(chart, record_key):
+            continue
+        dk = _dimension_key(chart)
+        if not dk:
+            continue
+        if _metric_semantic_strength(
+            _metric_key(chart, record_key), str(chart.get("title") or "")
+        ) >= 40:
+            dims_with_strong.add(dk.lower())
+    out: List[Dict[str, Any]] = []
+    for chart in charts:
+        if _is_generic_records_chart(chart, record_key):
+            dk = _dimension_key(chart)
+            if dk and dk.lower() in dims_with_strong:
+                continue
+        out.append(chart)
+    return out
+
+
+def _prune_duplicate_chart_stories(
+    charts: List[Dict[str, Any]], record_key: str
+) -> List[Dict[str, Any]]:
+    kept: List[Dict[str, Any]] = []
+    for chart in charts:
+        if _chart_story_blocked_by_selected(kept, chart, record_key):
+            continue
+        survivors: List[Dict[str, Any]] = []
+        for existing in kept:
+            if _chart_story_blocked_by_selected([chart], existing, record_key):
+                continue
+            survivors.append(existing)
+        survivors.append(chart)
+        kept = survivors
+    return kept
+
+
+def _executive_trend_title(metric_col: str, time_bucket: str, pretty_label: Callable[..., str]) -> str:
+    met = _title_case_phrase(pretty_label(metric_col))
+    tb = str(time_bucket or "period").strip().capitalize()
+    return normalize_canonical_chart_title(f"{tb} {met} Trend")
+
+
+def _executive_metric_by_dim_title(
+    metric_col: str,
+    dim_col: str,
+    agg: str,
+    pretty_label: Callable[..., str],
+) -> str:
+    met = _title_case_phrase(pretty_label(metric_col))
+    dim = _title_case_phrase(pretty_label(dim_col))
+    return normalize_canonical_chart_title(f"{met} by {dim}")
+
+
+def _breakdown_dimension_eligible(
+    dim_c: str,
+    df: pd.DataFrame,
+    id_like_fn: Callable[[Optional[str]], bool],
+) -> bool:
+    if not is_valid_subtitle_dimension(dim_c):
+        return False
+    if id_like_fn(dim_c):
+        return False
+    n = _norm_col(dim_c)
+    if any(tok in n for tok in _FORBIDDEN_BREAKDOWN_DIM_TOKENS):
+        if not any(ok in n for ok in ("campaign", "issue", "ticket", "product", "category")):
+            return False
+    if _dimension_cardinality(df, dim_c) < 2:
+        return False
+    return True
+
+
+def _metric_eligible_for_composition(num_c: str, inv: ColumnInventory) -> bool:
+    if num_c in inv.percentages:
+        return False
+    try:
+        from intent_engine.column_resolve import column_prefers_mean_aggregation
+
+        if column_prefers_mean_aggregation(num_c):
+            return False
+    except Exception:
+        pass
+    n = _norm_col(num_c)
+    if any(tok in n for tok in _COMPOSITION_BLOCK_METRIC_TOKENS):
+        if not any(
+            ok in n
+            for ok in (
+                "revenue",
+                "sales",
+                "profit",
+                "spend",
+                "cost",
+                "headcount",
+                "ticket",
+                "conversion",
+                "admission",
+                "volume",
+                "unit",
+                "order",
+                "customer",
+                "loan",
+            )
+        ):
+            return False
+    return True
+
+
+def _composition_shares_valid(group: pd.Series) -> bool:
+    if group.empty:
+        return False
+    total = float(group.sum())
+    if total <= 0:
+        return False
+    shares = group.astype(float) / total
+    if float(shares.max()) > 1.05:
+        return False
+    if float(shares.sum()) > 1.05:
+        return False
+    return True
+
+
+def _build_scatter_payload(
+    df: pd.DataFrame,
+    xc: str,
+    yc: str,
+    deps: DashboardDeps,
+) -> Optional[Dict[str, Any]]:
+    try:
+        tmp = df[[xc, yc]].copy()
+        tmp["_x"] = deps.numeric_series(xc)
+        tmp["_y"] = deps.numeric_series(yc)
+        tmp = tmp.dropna(subset=["_x", "_y"])
+        tmp = tmp[tmp["_x"].map(lambda v: pd.notna(v) and float(v) == float(v))]
+        tmp = tmp[tmp["_y"].map(lambda v: pd.notna(v) and float(v) == float(v))]
+        if len(tmp) < 12:
+            return None
+        r = float(tmp["_x"].corr(tmp["_y"]))
+        if not pd.notna(r) or abs(r) < 0.28:
+            return None
+        sample = tmp.head(_MAX_SCATTER_POINTS)
+        scatter_x: List[float] = []
+        scatter_y: List[float] = []
+        for _, row in sample.iterrows():
+            xv, yv = float(row["_x"]), float(row["_y"])
+            if not (pd.notna(xv) and pd.notna(yv)):
+                continue
+            scatter_x.append(xv)
+            scatter_y.append(yv)
+        if len(scatter_x) < 12:
+            return None
+        if len(set(scatter_x)) < 2 or len(set(scatter_y)) < 2:
+            return None
+        scatter_x_display = [format_executive_number(x) for x in scatter_x]
+        labels = [
+            f"{scatter_x_display[i]} / {format_executive_number(scatter_y[i])}"
+            for i in range(len(scatter_x))
+        ]
+        xl = _title_case_phrase(deps.pretty_label(xc))
+        yl = _title_case_phrase(deps.pretty_label(yc))
+        return {
+            "title": normalize_canonical_chart_title(f"{xl} vs {yl}"),
+            "chartType": "scatter",
+            "labels": labels,
+            "values": scatter_y,
+            "valueDisplay": [format_executive_number(y) for y in scatter_y],
+            "scatterX": scatter_x,
+            "scatterXDisplay": scatter_x_display,
+            "scatterXLabel": xl,
+            "scatterYLabel": yl,
+            "xColumn": xc,
+            "yColumn": yc,
+            "xMetricLabel": xl,
+            "yMetricLabel": yl,
+            "metricColumn": yc,
+            "aggregation": "scatter",
+        }
+    except Exception:
+        return None
+
+
+def _chart_is_percent_metric(chart: Dict[str, Any]) -> bool:
+    title = str(chart.get("title") or "").lower()
+    metric = str(chart.get("metricColumn") or "").lower()
+    blob = f"{title} {metric}"
+    if _PERCENT_NAME.search(blob):
+        return True
+    values: List[float] = []
+    for raw in chart.get("values") or []:
+        try:
+            fv = float(raw)
+            if pd.notna(fv) and fv == fv:
+                values.append(fv)
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return False
+    lo, hi = min(values), max(values)
+    return (0 <= lo and hi <= 1.05) or (0 <= lo and hi <= 100.5 and _PERCENT_NAME.search(blob) is not None)
+
+
+def evaluate_chart_visual_quality(chart: Dict[str, Any]) -> Dict[str, Any]:
+    """Detect low-variance breakdowns and percent metrics that need tight scaling."""
+    values: List[float] = []
+    for raw in chart.get("values") or []:
+        try:
+            fv = float(raw)
+            if pd.notna(fv) and fv == fv:
+                values.append(fv)
+        except (TypeError, ValueError):
+            continue
+
+    n = len(values)
+    if n < 2:
+        return {
+            "category_count": n,
+            "spread_ratio": 0.0,
+            "value_span": 0.0,
+            "is_percent_metric": _chart_is_percent_metric(chart),
+            "weak_differentiation": True,
+            "prefer_tight_domain": True,
+        }
+
+    lo = min(values)
+    hi = max(values)
+    span = hi - lo
+    is_pct = _chart_is_percent_metric(chart)
+    disp_lo, disp_hi = lo, hi
+    if is_pct and hi <= 1.05:
+        disp_lo, disp_hi = lo * 100.0, hi * 100.0
+        span = disp_hi - disp_lo
+
+    spread_ratio = span / max(abs(disp_hi), 1e-9) if span > 0 else 0.0
+    weak = False
+    if span <= 0:
+        weak = True
+    elif is_pct and span <= 8.0 and spread_ratio < 0.85:
+        weak = True
+    elif n <= 5 and spread_ratio < 0.12:
+        weak = True
+    elif spread_ratio < 0.05:
+        weak = True
+
+    return {
+        "category_count": n,
+        "spread_ratio": round(spread_ratio, 4),
+        "value_span": round(span, 6),
+        "is_percent_metric": is_pct,
+        "weak_differentiation": weak,
+        "prefer_tight_domain": weak,
+    }
+
+
+def _chart_skip_due_to_weak_visual_quality(
+    chart: Dict[str, Any],
+    kpi_context: List[KpiChartContext],
+    record_key: str,
+) -> bool:
+    ct = _norm_chart_type(chart.get("chartType"))
+    if ct not in _BREAKDOWN_TYPES or ct in _TEMPORAL_TYPES:
+        return False
+    quality = evaluate_chart_visual_quality(chart)
+    if not quality["weak_differentiation"]:
+        return False
+    if _chart_redundant_with_kpi(chart, kpi_context, record_key):
+        return True
+    if quality["category_count"] <= 4 and quality["spread_ratio"] < 0.02:
+        return True
+    return False
+
+
+def validate_chart_renderable(chart: Dict[str, Any]) -> Tuple[bool, str]:
+    title = str(chart.get("title") or "").strip()
+    if not title:
+        return False, "missing title"
+    ct = _norm_chart_type(chart.get("chartType"))
+    labels = chart.get("labels") or []
+    values = chart.get("values") or []
+    if not labels or not values:
+        return False, "empty series"
+    if len(labels) != len(values):
+        return False, "label/value length mismatch"
+    for v in values:
+        try:
+            fv = float(v)
+            if not pd.notna(fv) or fv != fv:
+                return False, "non-finite value"
+        except (TypeError, ValueError):
+            return False, "non-numeric value"
+    if ct == "scatter":
+        sx = chart.get("scatterX") or []
+        if len(sx) != len(values):
+            return False, "scatter x/y length mismatch"
+        valid_x = sum(1 for x in sx if pd.notna(x) and float(x) == float(x))
+        if valid_x < 2:
+            return False, "insufficient scatter x values"
+        x_vals = [float(x) for x in sx if pd.notna(x) and float(x) == float(x)]
+        y_vals = [float(v) for v in values if pd.notna(v) and float(v) == float(v)]
+        if len(set(x_vals)) < 2:
+            return False, "scatter x constant"
+        if len(set(y_vals)) < 2:
+            return False, "scatter y constant"
+        x_lab = str(
+            chart.get("xMetricLabel") or chart.get("scatterXLabel") or ""
+        ).strip()
+        if x_lab.lower() in ("category", "x", ""):
+            return False, "invalid scatter x axis label"
+        if not str(chart.get("xColumn") or "").strip():
+            return False, "missing scatter x column"
+    if ct in _COMPOSITION_TYPES:
+        total = sum(float(v) for v in values)
+        if total <= 0:
+            return False, "composition total <= 0"
+        max_share = max(float(v) for v in values) / total
+        if max_share > 1.05:
+            return False, "composition share > 100%"
+    dim = _dimension_key(chart)
+    if dim and ct in _BREAKDOWN_TYPES and not is_valid_subtitle_dimension(dim):
+        return False, f"forbidden dimension {dim}"
+    if ct in _BREAKDOWN_TYPES and dim:
+        top = str(labels[0]) if labels else ""
+        if top and not is_valid_kpi_leader_value(top):
+            return False, f"invalid leader value {top}"
+    return True, "ok"
 
 
 def _chart_redundant_with_kpi(
@@ -459,6 +993,10 @@ def _score_candidate(
     if _chart_redundant_with_kpi(chart, kpi_context, record_key):
         base -= 55
 
+    quality = evaluate_chart_visual_quality(chart)
+    if quality["weak_differentiation"]:
+        base -= 22
+
     labels = chart.get("labels") or []
     n_pts = len(labels) if isinstance(labels, list) else 0
     if 3 <= n_pts <= 12:
@@ -499,6 +1037,53 @@ def _metric_dim_duplicate(
     return False
 
 
+def _metrics_comparable_for_story_dedup(
+    mk_a: str, title_a: str, mk_b: str, title_b: str
+) -> bool:
+    s_a = _metric_semantic_strength(mk_a, title_a)
+    s_b = _metric_semantic_strength(mk_b, title_b)
+    if s_a >= 80 and s_b >= 80:
+        return False
+    return abs(s_a - s_b) <= 25
+
+
+def _chart_story_blocked_by_selected(
+    selected: List[Dict[str, Any]],
+    candidate: Dict[str, Any],
+    record_key: str,
+) -> bool:
+    sig_c = _chart_story_signature(candidate, record_key)
+    mk_c = _metric_key(candidate, record_key)
+    title_c = str(candidate.get("title") or "")
+    str_c = _metric_semantic_strength(mk_c, title_c)
+    dim_c = _dimension_key(candidate)
+    fam_c = _chart_story_family(
+        str(candidate.get("chartType") or ""),
+        str(candidate.get("_opportunityType") or ""),
+    )
+    for existing in selected:
+        mk_e = _metric_key(existing, record_key)
+        title_e = str(existing.get("title") or "")
+        str_e = _metric_semantic_strength(mk_e, title_e)
+        dim_e = _dimension_key(existing)
+        if dim_c and dim_e and dim_c.lower() == dim_e.lower():
+            fam_e = _chart_story_family(
+                str(existing.get("chartType") or ""),
+                str(existing.get("_opportunityType") or ""),
+            )
+            if (
+                fam_c == "ranking"
+                and fam_e == "ranking"
+                and _metrics_comparable_for_story_dedup(mk_c, title_c, mk_e, title_e)
+                and str_c <= str_e
+            ):
+                return True
+        sig_e = _chart_story_signature(existing, record_key)
+        if sig_c and sig_e and sig_c == sig_e and str_c <= str_e:
+            return True
+    return False
+
+
 def _pick_best_candidate(
     remaining: List[Dict[str, Any]],
     *,
@@ -523,7 +1108,11 @@ def _pick_best_candidate(
             continue
         if _metric_dim_duplicate(selected, chart, record_key):
             continue
+        if _chart_story_blocked_by_selected(selected, chart, record_key):
+            continue
         if _chart_redundant_with_kpi(chart, kpi_context, record_key):
+            continue
+        if _chart_skip_due_to_weak_visual_quality(chart, kpi_context, record_key):
             continue
         bucket = _coverage_bucket(chart)
         if prefer_bucket and bucket != prefer_bucket:
@@ -567,6 +1156,9 @@ def _commit_pick(
         dimension_usage[dk] = dimension_usage.get(dk, 0) + 1
     coverage_filled.add(_coverage_bucket(pick))
     clean = {k: v for k, v in pick.items() if not str(k).startswith("_")}
+    tit = normalize_canonical_chart_title(str(clean.get("title") or ""))
+    if tit:
+        clean["title"] = tit
     selected.append(clean)
 
 
@@ -663,7 +1255,39 @@ def select_diverse_charts(
             record_key=deps.record_metric_key,
         )
 
-    return selected[:max_charts]
+    pruned = _prune_duplicate_chart_stories(selected, deps.record_metric_key)
+    pruned = _prune_redundant_records_charts(pruned, deps.record_metric_key)
+    return pruned[:max_charts]
+
+
+def audit_dashboard_charts(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    kind: str,
+    deps: DashboardDeps,
+    *,
+    kpi_cards: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Audit report rows for selected dashboard charts."""
+    charts = build_dashboard_charts_from_opportunities(
+        df, profile, kind, deps, kpi_cards=kpi_cards
+    )
+    rows: List[Dict[str, Any]] = []
+    for chart in charts:
+        ok, reason = validate_chart_renderable(chart)
+        rows.append(
+            {
+                "title": chart.get("title"),
+                "chart_type": chart.get("chartType"),
+                "metric_column": chart.get("metricColumn"),
+                "dimension_column": chart.get("dimensionColumn"),
+                "aggregation": chart.get("aggregation"),
+                "renderable": ok,
+                "reason": reason,
+                "opportunity_type": chart.get("_opportunityType"),
+            }
+        )
+    return rows
 
 
 def _metric_agg_key(num_c: str, inv: ColumnInventory) -> str:
@@ -714,17 +1338,23 @@ def discover_chart_opportunities(
 
     out: List[Dict[str, Any]] = []
     used_pairs: Set[Tuple[str, str, str]] = set()
-    breakdown_dims = _ordered_breakdown_dimensions(df, inv)
+    breakdown_dims = _ordered_breakdown_dimensions(df, inv, deps.id_like_column)
 
     def add(payload: Optional[Dict[str, Any]], opp_type: str, score: int) -> None:
         if not payload:
+            return
+        payload = dict(payload)
+        tit_raw = str(payload.get("title") or "").strip()
+        if tit_raw:
+            payload["title"] = normalize_canonical_chart_title(tit_raw)
+        ok, _ = validate_chart_renderable(payload)
+        if not ok:
             return
         title = str(payload.get("title") or "").strip()
         if not title:
             return
         if any(str(c.get("title", "")).strip() == title for c in out):
             return
-        payload = dict(payload)
         payload["_opportunityType"] = opp_type
         payload["_opportunityScore"] = score + _OPPORTUNITY_PRIORITY.get(opp_type, 50)
         out.append(payload)
@@ -734,15 +1364,15 @@ def discover_chart_opportunities(
     for ti, date_c in enumerate(inv.dates[:2]):
         for mi, num_c in enumerate(trend_metrics):
             try:
+                agg = _metric_agg_key(num_c, inv)
                 g_series, tsm = deps.time_series_grouped(
-                    df, str(date_c), str(num_c), agg_key="sum"
+                    df, str(date_c), str(num_c), agg_key=agg
                 )
                 if g_series is None or len(g_series) < 2:
                     continue
-                lbl = deps.pretty_label(num_c)
                 tb = deps.freq_human_label(str(tsm.get("timeBucket") or "M"))
                 chart_type = "line" if mi == 0 else "area"
-                tit = f"{lbl} trend ({tb})"
+                tit = _executive_trend_title(num_c, tb, deps.pretty_label)
                 add(
                     deps.series_payload(
                         tit,
@@ -771,9 +1401,10 @@ def discover_chart_opportunities(
             if sub.empty or nu < 3 or nu > 20:
                 continue
             g = sub.groupby(dim_c)["_v"].agg(agg).sort_values(ascending=False).head(10)
-            nice_dim = deps.pretty_label(dim_c)
-            nice_num = deps.pretty_label(num_c)
-            tit = f"Top {nice_dim.lower()} by {nice_num.lower()}"
+            g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
+            if g.empty:
+                continue
+            tit = _executive_metric_by_dim_title(num_c, dim_c, agg, deps.pretty_label)
             add(
                 deps.series_payload(
                     tit,
@@ -795,6 +1426,8 @@ def discover_chart_opportunities(
         if not _composition_eligible_dim(df, dim_c, deps.id_like_column):
             continue
         num_c = numerics[0 if di % 2 else min(1, len(numerics) - 1)]
+        if not _metric_eligible_for_composition(num_c, inv):
+            continue
         pair_key = ("composition", dim_c.lower(), num_c.lower())
         if pair_key in used_pairs:
             continue
@@ -803,12 +1436,11 @@ def discover_chart_opportunities(
             sub["_v"] = deps.numeric_series(num_c)
             sub = sub.dropna(subset=[dim_c, "_v"])
             g = sub.groupby(dim_c)["_v"].sum().sort_values(ascending=False).head(8)
-            if g.empty or len(g) < 2:
+            g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
+            if g.empty or len(g) < 2 or not _composition_shares_valid(g):
                 continue
-            nice_dim = deps.pretty_label(dim_c)
-            nice_num = deps.pretty_label(num_c)
+            tit = _executive_metric_by_dim_title(num_c, dim_c, "sum", deps.pretty_label)
             api_typ = "donut" if len(g) >= 3 else "pie"
-            tit = f"{nice_num} share by {nice_dim.lower()}"
             add(
                 deps.series_payload(
                     tit,
@@ -833,43 +1465,10 @@ def discover_chart_opportunities(
         for yc in corr_cols[i + 1 :]:
             if pairs_done >= 2 or xc == yc:
                 continue
-            try:
-                tmp = df[[xc, yc]].copy()
-                tmp["_x"] = deps.numeric_series(xc)
-                tmp["_y"] = deps.numeric_series(yc)
-                tmp = tmp.dropna(subset=["_x", "_y"])
-                if len(tmp) < 12:
-                    continue
-                r = float(tmp["_x"].corr(tmp["_y"]))
-                if not pd.notna(r) or abs(r) < 0.28:
-                    continue
-                sample = tmp.head(180)
-                scatter_x = [float(row["_x"]) for _, row in sample.iterrows()]
-                scatter_y = [float(row["_y"]) for _, row in sample.iterrows()]
-                scatter_x_display = [format_executive_number(x) for x in scatter_x]
-                labels = [
-                    f"{scatter_x_display[i]} / {format_executive_number(scatter_y[i])}"
-                    for i in range(len(scatter_x))
-                ]
-                xl = deps.pretty_label(xc)
-                yl = deps.pretty_label(yc)
-                tit = f"{xl} vs {yl} (correlation)"
-                payload: Dict[str, Any] = {
-                    "title": tit,
-                    "chartType": "scatter",
-                    "labels": labels,
-                    "values": scatter_y,
-                    "scatterX": scatter_x,
-                    "scatterXDisplay": scatter_x_display,
-                    "scatterXLabel": xl,
-                    "scatterYLabel": yl,
-                    "metricColumn": yc,
-                    "dimensionColumn": xc,
-                }
-                add(payload, "correlation", 78 + int(min(18, abs(r) * 20)))
+            payload = _build_scatter_payload(df, xc, yc, deps)
+            if payload:
+                add(payload, "correlation", 78 + pairs_done)
                 pairs_done += 1
-            except Exception:
-                pass
 
     # E. Supporting comparisons — rotate dimension × metric (max one per dim)
     for di, dim_c in enumerate(breakdown_dims[:6]):
@@ -886,16 +1485,12 @@ def discover_chart_opportunities(
                 continue
             agg = _metric_agg_key(num_c, inv)
             g = sub.groupby(dim_c)["_v"].agg(agg)
+            g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
             if g.empty:
                 continue
             opp = "geographic" if dim_c in inv.geographic else "compare"
             chart_type = "horizontalBar" if len(g) > 6 else "bar"
-            if agg == "mean":
-                from analytics_metadata import build_insight_title
-
-                tit = build_insight_title("mean", num_c, dim_c, chart_type=chart_type)
-            else:
-                tit = deps.chart_title_by_dimension(num_c, dim_c, chart_type=chart_type)
+            tit = _executive_metric_by_dim_title(num_c, dim_c, agg, deps.pretty_label)
             add(
                 deps.series_payload(
                     tit,
@@ -915,18 +1510,23 @@ def discover_chart_opportunities(
     for dim_c in inv.categories[:3]:
         if not _composition_eligible_dim(df, dim_c, deps.id_like_column):
             continue
+        if not _breakdown_dimension_eligible(dim_c, df, deps.id_like_column):
+            continue
+        if _stronger_metric_exists_for_dimension(out, dim_c, deps.record_metric_key):
+            continue
         try:
-            vc = df[dim_c].dropna().astype(str).value_counts().head(8)
-            if vc.empty or len(vc) < 2:
+            vc = df[dim_c].dropna().astype(str)
+            vc = vc[vc.map(is_valid_kpi_leader_value)]
+            counts = vc.value_counts().head(8)
+            if counts.empty or len(counts) < 2:
                 continue
             lbl = deps.pretty_label(dim_c)
-            tit = f"Category distribution · {lbl}"
-            api_typ = "donut" if 3 <= len(vc) <= 8 else "pie"
+            tit = normalize_canonical_chart_title(f"Records by {_title_case_phrase(lbl)}")
             add(
                 deps.series_payload(
                     tit,
-                    vc.astype(float),
-                    chart_type=api_typ,
+                    counts.astype(float),
+                    chart_type="horizontalBar",
                     category_column=dim_c,
                     metric_column=deps.record_metric_key,
                 ),
@@ -972,11 +1572,13 @@ def build_dashboard_charts_from_opportunities(
     for src in discovered + (seed_candidates or []):
         if not src:
             continue
-        t = str(src.get("title") or "").strip()
+        chart = dict(src)
+        t = normalize_canonical_chart_title(str(chart.get("title") or "").strip())
         if not t or t.lower() in seen_titles:
             continue
+        chart["title"] = t
         seen_titles.add(t.lower())
-        merged.append(src)
+        merged.append(chart)
 
     selected = select_diverse_charts(
         merged,

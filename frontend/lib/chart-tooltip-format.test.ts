@@ -11,6 +11,15 @@ describe("chartTooltipMetricLabel", () => {
       chartTooltipMetricLabel("Total conversion rate pct by campaign name")
     ).toBe("Conversion Rate");
   });
+
+  it("uses canonical metric labels for trend chart titles", () => {
+    expect(chartTooltipMetricLabel("Monthly Revenue Trend")).toBe("Revenue");
+    expect(chartTooltipMetricLabel("Monthly Profit Trend")).toBe("Profit");
+    expect(chartTooltipMetricLabel("Monthly Customers Trend")).toBe("Customers");
+    expect(chartTooltipMetricLabel("Monthly Attrition Rate Trend")).toBe(
+      "Attrition Rate"
+    );
+  });
 });
 
 describe("formatChartTooltipCategoryLine", () => {

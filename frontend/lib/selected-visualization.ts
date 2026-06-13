@@ -9,7 +9,7 @@ import {
   computeFinalChartPresentation,
 } from "@/lib/final-chart-presentation";
 import { humanizeColumnName, polishMetricDisplay } from "@/lib/analytics-metadata";
-import { aggregationPrefixLabel, metricStemFromRawTitle } from "@/lib/canonical-chart-title";
+import { aggregationPrefixLabel, buildTrendDisplayTitle, metricStemFromRawTitle, normalizeCanonicalChartTitle } from "@/lib/canonical-chart-title";
 import { resolveTrendBucketLabel } from "@/lib/chart-semantic-metadata";
 import {
   buildContextCore,
@@ -119,27 +119,7 @@ function buildTrendMetricLabel(stem: string, aggregation: string): string {
   return `${agg} ${core}`;
 }
 
-function titleCaseWords(phrase: string): string {
-  return phrase
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
-}
-
-export function buildTrendDisplayTitle(metricLabel: string, timeBucketLabel: string): string {
-  const metric = titleCaseWords(
-    polishMetricDisplay(metricLabel.replace(/^total\s+/i, "").trim() || metricLabel)
-  );
-  const bucket = timeBucketLabel.trim();
-  if (/\bmonth/i.test(bucket)) return `Monthly ${metric} Trend`;
-  if (/\bweek/i.test(bucket)) return `Weekly ${metric} Trend`;
-  if (/\bday/i.test(bucket)) return `Daily ${metric} Trend`;
-  if (/\bquarter/i.test(bucket)) return `Quarterly ${metric} Trend`;
-  if (/\byear/i.test(bucket)) return `Yearly ${metric} Trend`;
-  if (/\bhour/i.test(bucket)) return `Hourly ${metric} Trend`;
-  return `${metric} Trend`;
-}
+export { buildTrendDisplayTitle } from "@/lib/canonical-chart-title";
 
 function buildComparisonDisplayTitle(
   rawTitle: string,
@@ -362,8 +342,8 @@ export function freezeVisualizationContract(args: {
   return {
     id: args.id,
     source: args.source,
-    title: displayTitle,
-    displayTitle,
+    title: normalizeCanonicalChartTitle(displayTitle),
+    displayTitle: normalizeCanonicalChartTitle(displayTitle),
     chartType: effectiveKind,
     rendererType: effectiveKind,
     mode,

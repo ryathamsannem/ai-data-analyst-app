@@ -29,7 +29,9 @@ export const ovInset =
   "rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]";
 
 export const ovChip =
-  "inline-flex items-center rounded-full border border-[color:var(--border-default)] bg-gradient-to-b from-[color:var(--surface-elevated)] to-[color:var(--surface-subtle)] px-2.5 py-0.5 text-[10px] font-medium text-[color:var(--text-muted)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-[color:var(--border-strong)] hover:shadow-[var(--shadow-md)]";
+  "overview-kpi-pill inline-flex items-center rounded-full border border-[color:var(--border-default)] bg-gradient-to-b from-[color:var(--surface-elevated)] to-[color:var(--surface-subtle)] px-2.5 py-0.5 text-[10px] font-medium text-[color:var(--text-muted)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-[color:var(--border-strong)] hover:shadow-[var(--shadow-md)]";
+
+export const ovChipText = "overview-kpi-pill__text";
 
 /** Compact dataset context row (non-Overview tabs). */
 export const ovDatasetContextRow =

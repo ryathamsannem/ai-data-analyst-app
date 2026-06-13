@@ -79,7 +79,21 @@ import {
   buildPresentationExportSpec,
   presentationCapturePlotStyle,
 } from "@/lib/chart-png-export-layout";
-import { resolveOverviewEffectivePresentationKind } from "@/lib/overview-dashboard-export";
+import {
+  OVERVIEW_PNG_EXPORT_AXIS_TICK_PX,
+  OVERVIEW_PNG_EXPORT_AXIS_TITLE_PX,
+  OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE,
+  OVERVIEW_PNG_EXPORT_LINE_STROKE_PX,
+  OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR,
+  OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_VBAR,
+  OVERVIEW_PNG_EXPORT_MARGIN_SIDE,
+  OVERVIEW_PNG_EXPORT_MARGIN_TOP,
+  OVERVIEW_PNG_EXPORT_MARKER_R_PX,
+  OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE,
+  resolveOverviewEffectivePresentationKind,
+  shouldShowOverviewBarValueLabels,
+} from "@/lib/overview-dashboard-export";
+import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
 import {
   computeCartesianCategoryPlanForRender,
   computeOverviewBarCategoryBottom,
@@ -436,6 +450,8 @@ import {
   filterOverviewRenderableCharts,
   overviewChartHasRenderableData,
 } from "@/lib/overview-dashboard-chart-renderable";
+import { formatOverviewMiniInsightChips } from "@/lib/overview-dash-chart-insights";
+import { canonicalMetricLabelFromChartTitle } from "@/lib/canonical-chart-title";
 import {
   shouldAutoUploadAfterPick,
   validateOverviewUploadPick,
@@ -643,6 +659,7 @@ import {
   XAxis,
   YAxis,
   Label,
+  LabelList,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
@@ -990,11 +1007,16 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
           </span>
         </span>
       )}
-      <span className={`${monoChip}`} title={props.badgeCompact}>
+      <span className={`${monoChip} min-w-0 truncate`} title={props.badgeCompact}>
         {props.badgeCompact}
       </span>
       {props.leadInsight ? (
-        <span className={`${leadChip} items-center`}>{props.leadInsight}</span>
+        <span
+          className={`${leadChip} min-w-0 items-center truncate`}
+          title={props.leadInsight}
+        >
+          {props.leadInsight}
+        </span>
       ) : null}
       {props.qualityWarning ? (
         <p
@@ -3657,6 +3679,10 @@ type AutoDashboardMiniChart = {
   scatterXFormatted?: string[];
   scatterXLabel?: string;
   scatterYLabel?: string;
+  xColumn?: string;
+  yColumn?: string;
+  xMetricLabel?: string;
+  yMetricLabel?: string;
   metricColumn?: string;
   interaction?: VizInteractionPayload;
 };
@@ -3742,10 +3768,30 @@ function parseAutoDashboardMiniCharts(raw: unknown): AutoDashboardMiniChart[] {
       scatterXLabel:
         typeof o.scatterXLabel === "string" && o.scatterXLabel.trim()
           ? o.scatterXLabel.trim()
-          : undefined,
+          : typeof o.xMetricLabel === "string" && o.xMetricLabel.trim()
+            ? o.xMetricLabel.trim()
+            : undefined,
       scatterYLabel:
         typeof o.scatterYLabel === "string" && o.scatterYLabel.trim()
           ? o.scatterYLabel.trim()
+          : typeof o.yMetricLabel === "string" && o.yMetricLabel.trim()
+            ? o.yMetricLabel.trim()
+            : undefined,
+      xColumn:
+        typeof o.xColumn === "string" && o.xColumn.trim()
+          ? o.xColumn.trim()
+          : undefined,
+      yColumn:
+        typeof o.yColumn === "string" && o.yColumn.trim()
+          ? o.yColumn.trim()
+          : undefined,
+      xMetricLabel:
+        typeof o.xMetricLabel === "string" && o.xMetricLabel.trim()
+          ? o.xMetricLabel.trim()
+          : undefined,
+      yMetricLabel:
+        typeof o.yMetricLabel === "string" && o.yMetricLabel.trim()
+          ? o.yMetricLabel.trim()
           : undefined,
       metricColumn:
         typeof o.metricColumn === "string" && o.metricColumn.trim()
@@ -3793,58 +3839,6 @@ function parseAutoDashboardPayload(raw: unknown): AutoDashboardPayload | null {
     cards: cards.slice(0, 5),
     charts: chartsParsed,
   };
-}
-
-type OverviewMiniInsightChip = {
-  key: "top" | "lowest" | "gap";
-  text: string;
-  title?: string;
-};
-
-/** Structured insight pills for overview mini charts (avoids merged single-line text). */
-function formatOverviewMiniInsightChips(
-  rows: ChartRow[],
-  opts?: { chartTitle?: string; presentationKind?: ChartKind }
-): OverviewMiniInsightChip[] {
-  if (rows.length < 2) return [];
-  let hi = rows[0];
-  let lo = rows[0];
-  for (const r of rows) {
-    if (!Number.isFinite(r.value)) continue;
-    if (r.value > hi.value) hi = r;
-    if (r.value < lo.value) lo = r;
-  }
-  if (String(hi.name) === String(lo.name)) return [];
-  const metricCtx: MetricFormatContext = {
-    metricLabel: opts?.chartTitle,
-    chartTitle: opts?.chartTitle,
-    presentationKind: opts?.presentationKind,
-  };
-  const hiDisp = formatExecutiveMetricValue(hi, metricCtx);
-  const loDisp = formatExecutiveMetricValue(lo, metricCtx);
-  const gap =
-    typeof hi.value === "number" && typeof lo.value === "number"
-      ? hi.value - lo.value
-      : NaN;
-  const gapDisp = Number.isFinite(gap)
-    ? formatMetricSpreadGap(gap, {
-        metricLabel: opts?.chartTitle,
-        chartTitle: opts?.chartTitle,
-        presentationKind: opts?.presentationKind,
-      })
-    : "—";
-  const gapChip: OverviewMiniInsightChip = {
-    key: "gap",
-    text: `Gap: ${gapDisp}`,
-  };
-  if (metricFormatUsesPercent(metricCtx)) {
-    gapChip.title = percentGapChipAriaLabel(opts?.chartTitle);
-  }
-  return [
-    { key: "top", text: `Top: ${String(hi.name)} (${hiDisp})` },
-    { key: "lowest", text: `Lowest: ${String(lo.name)} (${loDisp})` },
-    gapChip,
-  ];
 }
 
 function truncateOverviewPhrase(s: string, maxLen: number): string {
@@ -4445,13 +4439,21 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   const exportPlotWidth = offscreenExportLayout?.width ?? viewportWidthPx;
   const exportPlotHeight = offscreenExportLayout?.height ?? plotHeightPx;
 
+  const overviewMetricLabel = useMemo(
+    () =>
+      canonicalMetricLabelFromChartTitle(canonicalTitle || chart.title, {
+        metricColumn: chart.metricColumn,
+      }),
+    [canonicalTitle, chart.title, chart.metricColumn]
+  );
+
   const overviewMetricCtx = useMemo(
     (): MetricFormatContext => ({
-      metricLabel: chart.title,
+      metricLabel: overviewMetricLabel,
       chartTitle: chart.title,
       presentationKind: displayKind,
     }),
-    [chart.title, displayKind]
+    [overviewMetricLabel, chart.title, displayKind]
   );
 
   const chartRows = useMemo((): ChartRow[] => {
@@ -4491,14 +4493,38 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chartRows]
   );
 
-  const miniAxes = useMemo(
-    (): ChartAxes => ({
+  const miniAxes = useMemo((): ChartAxes => {
+    if (displayKind === "scatter") {
+      const xLabel =
+        chart.xMetricLabel?.trim() ||
+        chart.scatterXLabel?.trim() ||
+        "X";
+      const yLabel =
+        chart.yMetricLabel?.trim() ||
+        chart.scatterYLabel?.trim() ||
+        chart.metricColumn?.trim() ||
+        valueAxisTitle;
+      return {
+        categoryAxis: xLabel,
+        valueAxis: yLabel,
+        valueAxisCompact: compactAxisLabelFromFullPhrase(yLabel),
+      };
+    }
+    return {
       categoryAxis: categoryAxisLabel,
       valueAxis: valueAxisTitle,
       valueAxisCompact: compactAxisLabelFromFullPhrase(valueAxisTitle),
-    }),
-    [categoryAxisLabel, valueAxisTitle]
-  );
+    };
+  }, [
+    displayKind,
+    chart.xMetricLabel,
+    chart.scatterXLabel,
+    chart.yMetricLabel,
+    chart.scatterYLabel,
+    chart.metricColumn,
+    categoryAxisLabel,
+    valueAxisTitle,
+  ]);
 
   const miniCategoryPlan = useMemo(
     () =>
@@ -4527,13 +4553,36 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chartRows]
   );
 
+  const overviewBarValueDomain = useMemo(
+    () =>
+      resolveOverviewBarValueDomain(chartRows, {
+        chartTitle: chart.title,
+        metricLabel: overviewMetricLabel,
+        presentationKind: displayKind,
+        executiveRounding: false,
+      }),
+    [chartRows, chart.title, overviewMetricLabel, displayKind]
+  );
+
   const overviewInsightChips = useMemo(
     () =>
       formatOverviewMiniInsightChips(chartRows, {
-        chartTitle: chart.title,
+        chartTitle: canonicalTitle,
         presentationKind: displayKind,
+        isTrendChart:
+          displayKind === "line" ||
+          displayKind === "area" ||
+          isLikelyTrendAutoChart(chart),
+        isScatterChart: displayKind === "scatter",
+        xMetricLabel:
+          chart.xMetricLabel?.trim() ||
+          chart.scatterXLabel?.trim(),
+        yMetricLabel:
+          chart.yMetricLabel?.trim() ||
+          chart.scatterYLabel?.trim() ||
+          chart.metricColumn?.trim(),
       }),
-    [chartRows, chart.title, displayKind]
+    [chartRows, canonicalTitle, chart, displayKind]
   );
 
   const overviewRateWarning = useMemo(
@@ -4548,7 +4597,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     () =>
       buildChartCartesianTooltipHandlers(
         categoryAxisLabel,
-        chart.title,
+        overviewMetricLabel,
         overviewMetricCtx,
         displayKind === "line" || displayKind === "area"
           ? {
@@ -4562,7 +4611,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       ),
     [
       categoryAxisLabel,
-      chart.title,
+      overviewMetricLabel,
       overviewMetricCtx,
       displayKind,
       viewportWidthPx,
@@ -4581,19 +4630,38 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     plotH: number,
     pngCapture: boolean
   ): ReactNode => {
-    const plotMarginTop = pngCapture ? 8 : OV_DASH_CHART_MARGIN.top;
-    const plotMarginSide = pngCapture ? 14 : OV_DASH_CHART_MARGIN.left;
+    const plotMarginTop = pngCapture
+      ? OVERVIEW_PNG_EXPORT_MARGIN_TOP
+      : OV_DASH_CHART_MARGIN.top;
+    const plotMarginSide = pngCapture
+      ? OVERVIEW_PNG_EXPORT_MARGIN_SIDE
+      : OV_DASH_CHART_MARGIN.left;
+    const axisTickFs = pngCapture
+      ? OVERVIEW_PNG_EXPORT_AXIS_TICK_PX
+      : OV_DASH_AXIS_LABEL_STYLE.fontSize;
+    const axisTitleStyle = pngCapture
+      ? {
+          ...OV_DASH_AXIS_LABEL_STYLE,
+          fontSize: OVERVIEW_PNG_EXPORT_AXIS_TITLE_PX,
+        }
+      : OV_DASH_AXIS_LABEL_STYLE;
+    const exportGridOpacity = pngCapture
+      ? Math.min(0.55, dashGrid.opacity + 0.18)
+      : dashGrid.opacity;
+    const showBarEndLabels = shouldShowOverviewBarValueLabels(
+      chartRows,
+      valueTickFormatter
+    );
     const localCategoryPlan = computeOverviewMiniCategoryPlan(
       displayKind,
       chartRows,
       miniAxes,
-      viewW,
+      pngCapture ? viewportWidthPx : viewW,
       plotH
     );
-    const plotHorizontal = overviewDashboardUsesHorizontalBars(
-      displayKind,
-      localCategoryPlan
-    );
+    const plotHorizontal = pngCapture
+      ? renderBarAsHorizontal
+      : overviewDashboardUsesHorizontalBars(displayKind, localCategoryPlan);
     const plotAnimOn =
       !pngCapture && chartRows.length <= RECHARTS_ANIMATION_MAX_POINTS;
     const plotAnimDuration = pngCapture ? 0 : undefined;
@@ -4640,8 +4708,17 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           pngCaptureMode={pngCapture}
           chartRows={chartRows}
           visualization={{
-            scatterXLabel: chart.scatterXLabel,
-            scatterYLabel: chart.scatterYLabel ?? chart.metricColumn,
+            scatterXLabel:
+              chart.xMetricLabel?.trim() ||
+              chart.scatterXLabel?.trim(),
+            scatterYLabel:
+              chart.yMetricLabel?.trim() ||
+              chart.scatterYLabel?.trim() ||
+              chart.metricColumn,
+            xColumn: chart.xColumn,
+            yColumn: chart.yColumn,
+            xMetricLabel: chart.xMetricLabel,
+            yMetricLabel: chart.yMetricLabel,
             interaction: chart.interaction
               ? { drillDimensions: chart.interaction.drillDimensions }
               : null,
@@ -4662,13 +4739,23 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         chartRows,
         valueAxisTitle,
         categoryAxisLabel,
-        viewW
+        viewW,
+        { pngCapture }
       );
       const hbBalanced = balanceHorizontalOuterMargins({
         marginLeft: hb.marginLeft,
-        chartLayoutMode: "compact",
-        minRight: 8,
+        chartLayoutMode: pngCapture ? "export" : "compact",
+        minRight: pngCapture ? 12 : 8,
       });
+      const hBarValueDomain = resolveOverviewBarValueDomain(chartRows, {
+        chartTitle: chart.title,
+        metricLabel: overviewMetricLabel,
+        presentationKind: displayKind,
+        executiveRounding: !!pngCapture,
+      });
+      const hBarRightMargin = showBarEndLabels
+        ? Math.max(hbBalanced.marginRight, 52)
+        : hbBalanced.marginRight;
       return (
         <ResponsiveContainer
           key={`ov-hbar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
@@ -4682,9 +4769,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             data={chartRows}
             margin={{
               left: hbBalanced.marginLeft,
-              right: hbBalanced.marginRight,
+              right: hBarRightMargin,
               top: plotMarginTop,
-              bottom: pngCapture ? 24 : 32,
+              bottom: pngCapture
+                ? OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR
+                : 32,
             }}
           >
             <CartesianGrid
@@ -4692,11 +4781,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               vertical
               stroke={dashGrid.stroke}
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
-              strokeOpacity={dashGrid.opacity}
+              strokeOpacity={pngCapture ? exportGridOpacity : dashGrid.opacity}
             />
             <XAxis
               type="number"
-              tick={{ fontSize: OV_DASH_AXIS_LABEL_STYLE.fontSize, fill: OV_AXIS_TICK }}
+              {...(hBarValueDomain
+                ? { domain: hBarValueDomain, allowDataOverflow: false }
+                : {})}
+              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK }}
               tickFormatter={valueTickFormatter}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
@@ -4705,7 +4797,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               type="category"
               dataKey="name"
               width={hb.categoryAxisWidth}
-              tick={<WrappedCategoryYAxisTick chartLayoutMode="compact" compact />}
+              tick={
+                <WrappedCategoryYAxisTick
+                  chartLayoutMode="compact"
+                  compact
+                  pngCaptureMode={pngCapture}
+                />
+              }
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             />
@@ -4718,7 +4816,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               dataKey="value"
               fill="#6366f1"
               radius={[0, 6, 6, 0]}
-              maxBarSize={32}
+              maxBarSize={pngCapture ? OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE : 32}
               isAnimationActive={plotAnimOn}
               animationDuration={plotAnimDuration}
               cursor={drillable ? "pointer" : "default"}
@@ -4734,7 +4832,20 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                   value: nm,
                 });
               }}
-            />
+            >
+              {showBarEndLabels ? (
+                <LabelList
+                  dataKey="value"
+                  position="insideRight"
+                  formatter={(v: number) => valueTickFormatter(Number(v))}
+                  style={{
+                    fill: "#e2e8f0",
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                />
+              ) : null}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       );
@@ -4749,7 +4860,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       );
       if (!vLay) return null;
       const ChartWrap = displayKind === "area" ? AreaChart : LineChart;
-      const trendTickFs = OV_DASH_AXIS_LABEL_STYLE.fontSize;
+      const trendTickFs = axisTickFs;
       const trendCompact = viewW < 640;
       const trendVeryCompact = viewW < 420;
       const trendTickMini = (v: string | number) => {
@@ -4803,7 +4914,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             <CartesianGrid
               stroke={dashGrid.stroke}
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
-              strokeOpacity={dashGrid.opacity}
+              strokeOpacity={pngCapture ? exportGridOpacity : dashGrid.opacity}
               vertical={false}
             />
             <XAxis
@@ -4846,7 +4957,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 type="monotone"
                 dataKey="value"
                 stroke="#4f46e5"
-                strokeWidth={2.5}
+                strokeWidth={pngCapture ? OVERVIEW_PNG_EXPORT_LINE_STROKE_PX : 2.5}
                 fill="#6366f1"
                 fillOpacity={0.18}
                 isAnimationActive={plotAnimOn}
@@ -4854,7 +4965,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 dot={
                   chartRows.length > 28
                     ? false
-                    : { r: 4, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
+                    : {
+                        r: pngCapture ? OVERVIEW_PNG_EXPORT_MARKER_R_PX : 4,
+                        strokeWidth: 1,
+                        stroke: "#fff",
+                        fill: "#4f46e5",
+                      }
                 }
               />
             ) : (
@@ -4862,13 +4978,18 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 type="monotone"
                 dataKey="value"
                 stroke="#4f46e5"
-                strokeWidth={2.5}
+                strokeWidth={pngCapture ? OVERVIEW_PNG_EXPORT_LINE_STROKE_PX : 2.5}
                 isAnimationActive={plotAnimOn}
                 animationDuration={plotAnimDuration}
                 dot={
                   chartRows.length > 28
                     ? false
-                    : { r: 4, strokeWidth: 1, stroke: "#fff", fill: "#4f46e5" }
+                    : {
+                        r: pngCapture ? OVERVIEW_PNG_EXPORT_MARKER_R_PX : 4,
+                        strokeWidth: 1,
+                        stroke: "#fff",
+                        fill: "#4f46e5",
+                      }
                 }
               />
             )}
@@ -4897,9 +5018,15 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       });
       const plotMargin = {
         top: plotMarginTop,
-        right: pngCapture ? plotMarginSide : barMargins.marginRight,
+        right: pngCapture
+          ? showBarEndLabels
+            ? 48
+            : plotMarginSide
+          : barMargins.marginRight,
         bottom:
-          (pngCapture ? 28 : OV_DASH_CHART_MARGIN.bottom) +
+          (pngCapture
+            ? OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_VBAR
+            : OV_DASH_CHART_MARGIN.bottom) +
           (localCategoryPlan?.angled ? Math.min(12, barCatBottom * 0.28) : 0),
         left: pngCapture ? plotMarginSide : barMargins.marginLeft,
       };
@@ -4923,13 +5050,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               horizontal
               stroke={dashGrid.stroke}
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
-              strokeOpacity={dashGrid.opacity}
+              strokeOpacity={pngCapture ? exportGridOpacity : dashGrid.opacity}
             />
             <XAxis
               dataKey="name"
               tick={{
                 fontSize:
-                  localCategoryPlan?.tickFontSizePx ?? OV_DASH_AXIS_LABEL_STYLE.fontSize,
+                  localCategoryPlan?.tickFontSizePx ?? axisTickFs,
                 fill: OV_AXIS_TICK,
               }}
               tickFormatter={(v) => tickTruncateLocal(String(v))}
@@ -4946,13 +5073,16 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 value={categoryAxisLabel}
                 position="insideBottom"
                 offset={-4}
-                style={OV_DASH_AXIS_LABEL_STYLE}
+                style={axisTitleStyle}
               />
             </XAxis>
             <YAxis
-              tick={{ fontSize: OV_DASH_AXIS_LABEL_STYLE.fontSize, fill: OV_AXIS_TICK, dx: 2 }}
+              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK, dx: 2 }}
               tickFormatter={valueTickFormatter}
               width={vLay.yAxisWidth}
+              {...(overviewBarValueDomain
+                ? { domain: overviewBarValueDomain, allowDataOverflow: false }
+                : {})}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             />
@@ -4965,7 +5095,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               dataKey="value"
               fill="#6366f1"
               radius={isHist ? [3, 3, 0, 0] : [8, 8, 4, 4]}
-              maxBarSize={isHist ? 44 : 42}
+              maxBarSize={
+                isHist ? 44 : pngCapture ? OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE : 42
+              }
               isAnimationActive={plotAnimOn}
               animationDuration={plotAnimDuration}
               cursor={drillable ? "pointer" : "default"}
@@ -4981,7 +5113,20 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                   value: nm,
                 });
               }}
-            />
+            >
+              {showBarEndLabels && !isHist ? (
+                <LabelList
+                  dataKey="value"
+                  position="top"
+                  formatter={(v: number) => valueTickFormatter(Number(v))}
+                  style={{
+                    fill: "#e2e8f0",
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                />
+              ) : null}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       );
@@ -5010,7 +5155,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               <span
                 key={chip.key}
                 className={`${ovDashInsightChip} overview-dash-insight-chip--${chip.key}`}
-                title={chip.title}
+                title={chip.title ? `${chip.text}. ${chip.title}` : chip.text}
                 aria-label={chip.title ? `${chip.text}. ${chip.title}` : chip.text}
               >
                 {chip.text}
@@ -5071,6 +5216,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                   categoryCount: chartRows.length,
                   filename: sanitizeChartExportFilename(canonicalTitle),
                   datasetName: exportFooterHint,
+                  parity: {
+                    displayKind,
+                    renderBarAsHorizontal,
+                    chartTitle: canonicalTitle,
+                  },
                 });
               } catch (err) {
                 onChartExportError?.(

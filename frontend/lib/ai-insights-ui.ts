@@ -319,7 +319,7 @@ export const aiInsightsVizMetaChipValue =
   "ai-insights-viz-meta-chip-value text-slate-800 dark:text-[color:var(--insights-answer-body)]";
 
 export const aiInsightsVizMetaChipMono =
-  "ai-insights-viz-meta-chip ai-insights-viz-meta-chip-mono inline-flex max-w-full items-center gap-1 rounded-full border border-[color:var(--border-default)]/50 bg-[color:color-mix(in_srgb,var(--surface-subtle)_55%,var(--surface-elevated))] font-mono font-medium tabular-nums text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-answer-body)] dark:shadow-none";
+  "ai-insights-viz-meta-chip ai-insights-viz-meta-chip-mono inline-flex max-w-full min-w-0 items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-[color:var(--border-default)]/50 bg-[color:color-mix(in_srgb,var(--surface-subtle)_55%,var(--surface-elevated))] font-mono font-medium tabular-nums text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-answer-body)] dark:shadow-none";
 
 export const aiInsightsVizMetaChipMonoCompactSize =
   "px-2.5 py-1 text-[9px] sm:text-[10px]";
@@ -328,7 +328,7 @@ export const aiInsightsVizMetaChipMonoSize =
   "px-2.5 py-1 text-[10px]";
 
 export const aiInsightsVizMetaChipLead =
-  "ai-insights-viz-meta-chip-lead inline-flex items-center rounded-full border border-emerald-200/45 bg-emerald-50/55 font-medium leading-snug text-emerald-900/90 shadow-[0_1px_2px_rgba(16,185,129,0.06)] dark:border-emerald-400/35 dark:bg-emerald-950/50 dark:text-emerald-50 dark:shadow-none";
+  "ai-insights-viz-meta-chip-lead inline-flex min-w-0 max-w-full items-center overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-emerald-200/45 bg-emerald-50/55 font-medium leading-snug text-emerald-900/90 shadow-[0_1px_2px_rgba(16,185,129,0.06)] dark:border-emerald-400/35 dark:bg-emerald-950/50 dark:text-emerald-50 dark:shadow-none";
 
 export const aiInsightsVizMetaChipLeadCompactSize =
   "max-w-[min(100%,18rem)] px-2.5 py-1 text-[9px] sm:text-[10px]";
@@ -443,7 +443,7 @@ export const aiInsightsExecutiveCardLabel =
   "ai-insights-executive__label text-[10px] font-semibold uppercase tracking-[0.1em] leading-tight text-[var(--text-subtle)] dark:text-[#b4c4dc]";
 
 export const aiInsightsExecutiveCardValue =
-  "mt-1.5 min-h-[1.375rem] text-[15px] font-bold leading-snug text-[var(--foreground)] break-words dark:text-[color:var(--insights-text-secondary)]";
+  "ai-insights-executive__value mt-1.5 min-h-[1.375rem] text-[15px] font-bold leading-snug text-[var(--foreground)] dark:text-[color:var(--insights-text-secondary)]";
 
 export const aiInsightsExecutiveCardHint =
   "ai-insights-executive__hint mt-1 min-h-[1.25rem] text-[11px] leading-snug text-[var(--text-muted)] dark:text-[#9eb0cc]";

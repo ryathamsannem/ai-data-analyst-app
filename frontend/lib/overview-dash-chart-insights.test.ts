@@ -1,0 +1,259 @@
+import { describe, expect, it } from "vitest";
+import {
+  computePearsonCorrelation,
+  computeTrendPeriodChangePercent,
+  describeScatterRelationship,
+  formatOverviewMiniInsightChips,
+  inferTrendPeriodLabelFromTitle,
+  resolveChronologicalTrendEndpoints,
+  trendPeriodChipLabels,
+} from "@/lib/overview-dash-chart-insights";
+import type { ChartRow } from "@/app/chart-types";
+
+const trendRows: ChartRow[] = [
+  { name: "Jan 2025", value: 620_000, displayValue: "$620,000" },
+  { name: "Sep 2025", value: 825_000, displayValue: "$825,000" },
+];
+
+describe("inferTrendPeriodLabelFromTitle", () => {
+  it("reads month from trend title", () => {
+    expect(inferTrendPeriodLabelFromTitle("Monthly Revenue Trend")).toBe("Month");
+  });
+
+  it("reads week from trend title", () => {
+    expect(inferTrendPeriodLabelFromTitle("Weekly Order Value Trend")).toBe("Week");
+  });
+
+  it("reads quarter and year from trend title", () => {
+    expect(inferTrendPeriodLabelFromTitle("Quarterly Revenue Trend")).toBe("Quarter");
+    expect(inferTrendPeriodLabelFromTitle("Yearly Revenue Trend")).toBe("Year");
+  });
+});
+
+describe("trendPeriodChipLabels", () => {
+  it("uses Start/Latest with granularity from title", () => {
+    expect(trendPeriodChipLabels("Monthly Revenue Trend")).toEqual({
+      startLabel: "Start Month",
+      latestLabel: "Latest Month",
+    });
+    expect(trendPeriodChipLabels("Weekly Revenue Trend")).toEqual({
+      startLabel: "Start Week",
+      latestLabel: "Latest Week",
+    });
+    expect(trendPeriodChipLabels("Quarterly Revenue Trend")).toEqual({
+      startLabel: "Start Quarter",
+      latestLabel: "Latest Quarter",
+    });
+    expect(trendPeriodChipLabels("Yearly Revenue Trend")).toEqual({
+      startLabel: "Start Year",
+      latestLabel: "Latest Year",
+    });
+    expect(trendPeriodChipLabels("Revenue Trend")).toEqual({
+      startLabel: "Start Period",
+      latestLabel: "Latest Period",
+    });
+  });
+});
+
+describe("resolveChronologicalTrendEndpoints", () => {
+  it("returns first and last chronological rows, not peak/trough", () => {
+    const endpoints = resolveChronologicalTrendEndpoints([
+      { name: "2025-09", value: 825_000 },
+      { name: "2025-01", value: 620_000 },
+      { name: "2025-03", value: 900_000 },
+    ]);
+    expect(endpoints?.start.name).toBe("2025-01");
+    expect(endpoints?.latest.name).toBe("2025-09");
+  });
+});
+
+describe("computeTrendPeriodChangePercent", () => {
+  it("uses first-to-last chronological change, not peak-to-trough", () => {
+    const change = computeTrendPeriodChangePercent([
+      { name: "2025-01", value: 620_000 },
+      { name: "2025-03", value: 900_000 },
+      { name: "2025-09", value: 700_000 },
+    ]);
+    expect(change).toBe("+13%");
+  });
+
+  it("falls back to peak-vs-trough when time order is unknown", () => {
+    const change = computeTrendPeriodChangePercent([
+      { name: "Segment A", value: 620_000 },
+      { name: "Segment B", value: 825_000 },
+    ]);
+    expect(change).toBe("+33%");
+  });
+});
+
+describe("scatter relationship insight", () => {
+  it("computes Pearson correlation", () => {
+    const xs = [1, 2, 3, 4, 5];
+    const ys = [2, 4, 6, 8, 10];
+    const r = computePearsonCorrelation(xs, ys);
+    expect(r).not.toBeNull();
+    expect(r!).toBeCloseTo(1, 5);
+  });
+
+  it("classifies strong positive relationship", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => ({
+      name: `${i}`,
+      value: 10 + i * 5,
+      x: 100 + i * 20,
+    }));
+    expect(describeScatterRelationship(rows)).toBe("Strong Positive");
+  });
+
+  it("classifies moderate negative relationship", () => {
+    const rows: ChartRow[] = [
+      { name: "1", value: 10, x: 1 },
+      { name: "2", value: 8, x: 2 },
+      { name: "3", value: 12, x: 3 },
+      { name: "4", value: 6, x: 4 },
+      { name: "5", value: 11, x: 5 },
+      { name: "6", value: 5, x: 6 },
+      { name: "7", value: 9, x: 7 },
+      { name: "8", value: 4, x: 8 },
+    ];
+    const r = computePearsonCorrelation(
+      rows.map((row) => row.x!),
+      rows.map((row) => row.value)
+    );
+    expect(r).not.toBeNull();
+    expect(r!).toBeLessThan(0);
+    expect(Math.abs(r!)).toBeGreaterThanOrEqual(0.4);
+    expect(Math.abs(r!)).toBeLessThan(0.7);
+    expect(describeScatterRelationship(rows)).toBe("Moderate Negative");
+  });
+
+  it("adds Relationship chip alongside scatter footer chips", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "340,000 / 82,000", value: 82000, x: 340000 },
+        { name: "200,000 / 50,000", value: 50000, x: 200000 },
+        { name: "90,000 / 18,000", value: 18000, x: 90000 },
+      ],
+      {
+        chartTitle: "Revenue vs Profit",
+        presentationKind: "scatter",
+        isScatterChart: true,
+        xMetricLabel: "Revenue",
+        yMetricLabel: "Profit",
+      }
+    );
+    expect(chips).toHaveLength(4);
+    expect(chips[0]?.text).toMatch(/^Highest Profit:/);
+    expect(chips[1]?.text).toMatch(/^Lowest Profit:/);
+    expect(chips[2]?.text).toMatch(/^Profit Spread:/);
+    expect(chips[3]?.text).toMatch(/^Relationship: Strong Positive$/);
+  });
+});
+
+describe("formatOverviewMiniInsightChips trend wording", () => {
+  it("uses Start Month / Latest Month / Change for line charts", () => {
+    const chips = formatOverviewMiniInsightChips(trendRows, {
+      chartTitle: "Monthly Revenue Trend",
+      presentationKind: "line",
+    });
+    expect(chips[0]?.text).toMatch(/^Start Month:/);
+    expect(chips[1]?.text).toMatch(/^Latest Month:/);
+    expect(chips[2]?.text).toMatch(/^Change: \+/);
+    expect(chips[0]?.text).not.toMatch(/^Top /);
+    expect(chips[1]?.text).not.toMatch(/^Lowest /);
+  });
+
+  it("shows chronological endpoints when rows are out of order", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "2025-09", value: 825_000 },
+        { name: "2025-01", value: 620_000 },
+        { name: "2025-03", value: 900_000 },
+      ],
+      {
+        chartTitle: "Monthly Revenue Trend",
+        presentationKind: "line",
+      }
+    );
+    expect(chips[0]?.text).toMatch(/^Start Month: 2025-01/);
+    expect(chips[1]?.text).toMatch(/^Latest Month: 2025-09/);
+    expect(chips[2]?.text).toBe("Change: +33%");
+  });
+
+  it("uses Start Week labels for weekly trends", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "2025-01-01/2025-01-07", value: 100 },
+        { name: "2025-03-01/2025-03-07", value: 130 },
+      ],
+      {
+        chartTitle: "Weekly Revenue Trend",
+        presentationKind: "area",
+      }
+    );
+    expect(chips[0]?.text).toMatch(/^Start Week:/);
+    expect(chips[1]?.text).toMatch(/^Latest Week:/);
+  });
+
+  it("prefers weekly labels over a stale monthly title", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "2025-12-30/2026-01-05", value: 32 },
+        { name: "2026-02-24/2026-03-02", value: 47 },
+      ],
+      {
+        chartTitle: "Monthly Delivery Days Trend",
+        presentationKind: "line",
+      }
+    );
+    expect(chips[0]?.text).toMatch(/^Start Week:/);
+    expect(chips[1]?.text).toMatch(/^Latest Week:/);
+  });
+
+  it("keeps Top / Lowest for non-trend breakdown charts", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "Delhi", value: 100 },
+        { name: "Mumbai", value: 50 },
+      ],
+      { chartTitle: "Orders by City", presentationKind: "bar" }
+    );
+    expect(chips[0]?.text).toMatch(/^Top: /);
+    expect(chips[1]?.text).toMatch(/^Lowest: /);
+  });
+
+  it("preserves small score gaps in breakdown chips", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "Q1 Launch", value: 4.08 },
+        { name: "Retention", value: 4.08 },
+        { name: "Upsell", value: 4.05 },
+      ],
+      {
+        chartTitle: "Satisfaction Score by Campaign",
+        presentationKind: "bar",
+      }
+    );
+    expect(chips[2]?.text).toBe("Gap: 0.03");
+  });
+
+  it("uses executive scatter chip labels", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "340,000 / 82,000", value: 82000, x: 340000 },
+        { name: "90,000 / 18,000", value: 18000, x: 90000 },
+      ],
+      {
+        chartTitle: "Revenue vs Profit",
+        presentationKind: "scatter",
+        isScatterChart: true,
+        xMetricLabel: "Revenue",
+        yMetricLabel: "Profit",
+      }
+    );
+    expect(chips[0]?.text).toMatch(/^Highest Profit: Revenue .+, Profit .+/);
+    expect(chips[1]?.text).toMatch(/^Lowest Profit: Revenue .+, Profit .+/);
+    expect(chips[2]?.text).toMatch(/^Profit Spread: /);
+    expect(chips[3]?.text).toMatch(/^Relationship: /);
+    expect(chips[0]?.text).not.toContain("340,000 / 82,000");
+  });
+});

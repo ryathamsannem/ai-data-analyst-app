@@ -46,7 +46,7 @@ describe("chart PNG export SVG polish", () => {
 
   it("uses premium export typography constants", () => {
     expect(PNG_EXPORT_TICK_FONT_PX).toBeGreaterThanOrEqual(13);
-    expect(PNG_EXPORT_GRID_OPACITY_DARK).toBeLessThan(0.25);
+    expect(PNG_EXPORT_GRID_OPACITY_DARK).toBeGreaterThanOrEqual(0.28);
   });
 
   it("softens grid lines and hides redundant h-bar titles in cloned SVG", () => {
@@ -68,11 +68,28 @@ describe("chart PNG export SVG polish", () => {
     `;
     applyPngExportSvgPolish(svg, { darkBackground: true });
     const grid = svg.querySelector(".recharts-cartesian-grid-vertical line")!;
-    expect(grid.getAttribute("stroke-opacity")).toBe("0.16");
+    expect(grid.getAttribute("stroke-opacity")).toBe("0.3");
     expect(svg.querySelector(".recharts-xAxis text[font-weight='600']")).toBeNull();
     const tick = svg.querySelector(
       ".recharts-yAxis .recharts-cartesian-axis-tick text"
     );
-    expect(tick?.getAttribute("font-size")).toBe("13");
+    expect(tick?.getAttribute("font-size")).toBe("15");
+    expect(tick?.getAttribute("font-weight")).toBe("500");
+    expect(tick?.getAttribute("fill")).toBe("#e2e8f0");
+  });
+
+  it("thickens horizontal bars without extending past the value baseline", () => {
+    if (typeof document === "undefined") return;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.innerHTML = `
+      <g class="recharts-bar">
+        <rect class="recharts-bar-rectangle" x="120" y="40" width="200" height="24" />
+      </g>
+    `;
+    applyPngExportSvgPolish(svg, { darkBackground: true });
+    const rect = svg.querySelector(".recharts-bar-rectangle")!;
+    const transform = rect.getAttribute("transform") ?? "";
+    expect(transform).toMatch(/scale\(\s*1\s+1\.18\s*\)/);
+    expect(transform).not.toMatch(/scale\(\s*1\.18\s*\)/);
   });
 });
