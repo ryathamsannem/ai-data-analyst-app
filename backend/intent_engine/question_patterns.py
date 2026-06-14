@@ -48,6 +48,25 @@ _BY_DIMENSION_RE = re.compile(
     re.I,
 )
 
+_GROUPED_DUAL_METRIC_RE = re.compile(
+    r"\b(revenue|sales)\s+(?:vs\.?|versus)\s+(?:spend|cost|ad\s+spend)\b"
+    r"|\b(spend|cost|ad\s+spend)\s+(?:vs\.?|versus)\s+(?:revenue|sales)\b"
+    r"|\bcompare\s+(?:campaign\s+)?roi\b.*\bby\s+"
+    r"|\bcampaign\s+(?:roi|efficiency)\b.*\bby\s+",
+    re.I,
+)
+
+
+def question_requests_grouped_dual_metric_compare(question: str) -> bool:
+    """Revenue vs spend (or campaign ROI) with an explicit ``by {dimension}`` breakdown."""
+    q = (question or "").strip()
+    if not q:
+        return False
+    ql = q.lower()
+    if not re.search(r"\bby\s+", ql):
+        return False
+    return bool(_GROUPED_DUAL_METRIC_RE.search(ql))
+
 _METRIC_WORD_RE = re.compile(
     r"\b("
     r"revenue|sales|profit|spend|cost|margin|customers?|customer\s+count|"
@@ -153,6 +172,8 @@ def question_requests_relationship_intent(question: str) -> bool:
                 return False
         except Exception:
             pass
+        if question_requests_grouped_dual_metric_compare(q):
+            return False
         if re.search(r"\bcompare\b", ql) and not re.search(
             r"\b(relationship|correlation|correlat|association|impact)\b", ql
         ):
@@ -178,6 +199,8 @@ def question_requests_multi_metric_comparison(question: str) -> bool:
     if question_requests_driver_intent(q):
         return False
     if question_requests_decline_intent(q):
+        return False
+    if question_requests_grouped_dual_metric_compare(q):
         return False
 
     try:

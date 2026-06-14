@@ -1,0 +1,227 @@
+[
+  {
+    "fixture": "hr.csv",
+    "title": "Total Headcount",
+    "value": "19,452",
+    "subtitle": "7 departments \u00b7 Largest: Finance",
+    "source_dimension": "department",
+    "source_metric": "headcount",
+    "issues": []
+  },
+  {
+    "fixture": "hr.csv",
+    "title": "Average personnel cost",
+    "value": "106,531",
+    "subtitle": "Highest personnel cost department: Support",
+    "source_dimension": "department",
+    "source_metric": "personnel_cost",
+    "issues": []
+  },
+  {
+    "fixture": "hr.csv",
+    "title": "Average Attrition Rate",
+    "value": "2.1%",
+    "subtitle": "Highest attrition department: Marketing",
+    "source_dimension": "department",
+    "source_metric": "attrition_rate",
+    "issues": []
+  },
+  {
+    "fixture": "hr.csv",
+    "title": "Department Count",
+    "value": "7",
+    "subtitle": "Largest department: Finance",
+    "source_dimension": "department",
+    "source_metric": "headcount",
+    "issues": []
+  },
+  {
+    "fixture": "hr.csv",
+    "title": "Top Department",
+    "value": "Finance",
+    "subtitle": "Finance contributes 16% of total headcount",
+    "source_dimension": "department",
+    "source_metric": "headcount",
+    "issues": []
+  },
+  {
+    "fixture": "retail.csv",
+    "title": "Total Revenue",
+    "value": "47,397,210",
+    "subtitle": "Top region: North",
+    "source_dimension": "region",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "retail.csv",
+    "title": "Average Revenue",
+    "value": "131,659",
+    "subtitle": "Highest-value product: Tablet",
+    "source_dimension": "product",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "retail.csv",
+    "title": "Total Profit",
+    "value": "10,806,442",
+    "subtitle": "Top product by profit: Tablet",
+    "source_dimension": "product",
+    "source_metric": "profit",
+    "issues": []
+  },
+  {
+    "fixture": "retail.csv",
+    "title": "Top Region",
+    "value": "North",
+    "subtitle": "North contributes 33% of total revenue",
+    "source_dimension": "region",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "retail.csv",
+    "title": "Top Product Category",
+    "value": "Electronics",
+    "subtitle": "Electronics contributes 39% of total revenue",
+    "source_dimension": "product_category",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "sales.csv",
+    "title": "Total Revenue",
+    "value": "91,732,347",
+    "subtitle": "Top region: North",
+    "source_dimension": "region",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "sales.csv",
+    "title": "Average Revenue",
+    "value": "269,801",
+    "subtitle": "Highest-value product: SMB Starter",
+    "source_dimension": "product_line",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "sales.csv",
+    "title": "Total Profit",
+    "value": "41,298,575",
+    "subtitle": "Top product line by profit: SMB Starter",
+    "source_dimension": "product_line",
+    "source_metric": "revenue_minus_cost",
+    "issues": []
+  },
+  {
+    "fixture": "sales.csv",
+    "title": "Top Region",
+    "value": "North",
+    "subtitle": "North contributes 28% of total revenue",
+    "source_dimension": "region",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "sales.csv",
+    "title": "Top Product Line",
+    "value": "SMB Starter",
+    "subtitle": "SMB Starter contributes 27% of total revenue",
+    "source_dimension": "product_line",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "operations.csv",
+    "title": "Total Units Produced",
+    "value": "1,515,219",
+    "subtitle": "Top plant by output: Plant-A",
+    "source_dimension": "facility",
+    "source_metric": "units_produced",
+    "issues": []
+  },
+  {
+    "fixture": "operations.csv",
+    "title": "Total Downtime Hours",
+    "value": "2,269",
+    "subtitle": "Highest downtime plant: Plant-A (23% of total)",
+    "source_dimension": "facility",
+    "source_metric": "downtime_hours",
+    "issues": []
+  },
+  {
+    "fixture": "operations.csv",
+    "title": "Average Defect Rate",
+    "value": "2.24%",
+    "subtitle": "Highest defect rate at production line: Line-4",
+    "source_dimension": "production_line",
+    "source_metric": "defect_rate",
+    "issues": []
+  },
+  {
+    "fixture": "operations.csv",
+    "title": "Top Plant",
+    "value": "Plant-A",
+    "subtitle": "Plant-A contributes 23% of total downtime hours",
+    "source_dimension": "facility",
+    "source_metric": "downtime_hours",
+    "issues": []
+  },
+  {
+    "fixture": "operations.csv",
+    "title": "Top Production Line",
+    "value": "Line-1",
+    "subtitle": "Line-1 contributes 26% of total downtime hours",
+    "source_dimension": "production_line",
+    "source_metric": "downtime_hours",
+    "issues": []
+  },
+  {
+    "fixture": "dashboard_showcase_dataset.csv",
+    "title": "Total Revenue",
+    "value": "2,847,582",
+    "subtitle": "Top region: East",
+    "source_dimension": "region",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "dashboard_showcase_dataset.csv",
+    "title": "Average Revenue",
+    "value": "5,476",
+    "subtitle": "Highest-value product: Enterprise",
+    "source_dimension": "product",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "dashboard_showcase_dataset.csv",
+    "title": "Total Profit",
+    "value": "1,194,817",
+    "subtitle": "Top product by profit: Enterprise",
+    "source_dimension": "product",
+    "source_metric": "profit",
+    "issues": []
+  },
+  {
+    "fixture": "dashboard_showcase_dataset.csv",
+    "title": "Top Region",
+    "value": "East",
+    "subtitle": "East contributes 24% of total revenue",
+    "source_dimension": "region",
+    "source_metric": "revenue",
+    "issues": []
+  },
+  {
+    "fixture": "dashboard_showcase_dataset.csv",
+    "title": "Top Product",
+    "value": "Enterprise",
+    "subtitle": "Enterprise contributes 66% of total revenue",
+    "source_dimension": "product",
+    "source_metric": "revenue",
+    "issues": []
+  }
+]

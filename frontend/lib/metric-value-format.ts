@@ -5,6 +5,10 @@
 
 import type { ChartKind, ChartRow } from "@/app/chart-types";
 import { shareCompositionAllowed } from "@/lib/final-chart-presentation";
+import {
+  radialShareDisplayAllowed,
+  radialShouldFormatValuesAsPercent,
+} from "@/lib/radial-chart-format";
 
 export type MetricValueFormatKind =
   | "number"
@@ -25,6 +29,8 @@ export type MetricFormatContext = {
   valueFormat?: MetricValueFormatKind | null;
   /** Pie/donut share-of-total questions (not min/max ranking). */
   shareComposition?: boolean;
+  /** Slice rows — used to validate composition share display on radial charts. */
+  chartRows?: ChartRow[];
   chartTitle?: string | null;
   question?: string | null;
 };
@@ -59,6 +65,8 @@ export function readChartRowNormalizedValue(row: ChartRow): number | undefined {
 export function metricLabelImpliesPercent(metricLabel: string | null | undefined): boolean {
   const t = (metricLabel ?? "").trim();
   if (!t) return false;
+  // Part-to-whole composition titles (e.g. "Profit share by region") — not rate metrics.
+  if (/\b\w[\w\s]*\s+share\s+by\s+/i.test(t)) return false;
   const n = t.toLowerCase().replace(/\s+/g, "_");
   if (/\bprofit\s+margin\b/i.test(t) || /\bmargin\s*%/.test(t)) return true;
   return PERCENT_METRIC_RE.test(n) || /\bpercent\b/i.test(t);
@@ -83,6 +91,60 @@ export function metricLabelImpliesOperationalMetric(
     return true;
   }
   return false;
+}
+
+export function metricLabelImpliesScoreLike(
+  metricLabel: string | null | undefined,
+  chartTitle?: string | null
+): boolean {
+  const label = `${metricLabel ?? ""} ${chartTitle ?? ""}`.trim().toLowerCase();
+  if (!label) return false;
+  return (
+    /\b(score|rating|nps|csat|satisfaction|sentiment)\b/.test(label) ||
+    /_(score|rating)(?:_|$)/.test(label.replace(/\s+/g, "_"))
+  );
+}
+
+const TIGHT_BAR_MONETARY_COUNT_RE =
+  /\b(revenue|profit|sales|quantity|quantities|cost|count|balance|loan|amount|orders?|headcount|customers?|units?|qty)\b/i;
+
+/** Revenue, balance, quantity, etc. — keep zero-baseline bar domains. */
+export function metricLabelExcludesTightBarDomain(
+  metricLabel: string | null | undefined,
+  chartTitle?: string | null
+): boolean {
+  const t = `${metricLabel ?? ""} ${chartTitle ?? ""}`.trim().toLowerCase();
+  if (!t) return false;
+  if (/\butilization\b/.test(t)) return false;
+  if (/\b(conversion|retention|churn|interest|growth|success|failure|error)\s+rate\b/.test(t)) {
+    return false;
+  }
+  if (metricLabelImpliesScoreLike(metricLabel, chartTitle)) return false;
+  if (metricLabelImpliesPercent(metricLabel)) return false;
+  return TIGHT_BAR_MONETARY_COUNT_RE.test(t);
+}
+
+/** Revenue, profit, quantity, etc. — bar length alone is enough in exports. */
+export function metricLabelImpliesLargeNumericBarMetric(
+  metricLabel: string | null | undefined,
+  chartTitle?: string | null
+): boolean {
+  const label = `${metricLabel ?? ""} ${chartTitle ?? ""}`.trim().toLowerCase();
+  if (!label) return false;
+  if (metricLabelImpliesPercent(label) || metricLabelImpliesScoreLike(label, chartTitle)) {
+    return false;
+  }
+  return /\b(revenue|profit|sales|quantity|quantities|orders?|cost|amount|units?|headcount|customers?)\b/.test(
+    label
+  );
+}
+
+/** Percent, score, and rating breakdowns benefit from in-bar value labels. */
+export function metricLabelImpliesPrecisionBarLabels(
+  ctx: MetricFormatContext
+): boolean {
+  if (metricFormatUsesPercent(ctx)) return true;
+  return metricLabelImpliesScoreLike(ctx.metricLabel, ctx.chartTitle);
 }
 
 export function metricLabelImpliesCurrency(
@@ -150,10 +212,19 @@ export function resolveMetricValueFormat(ctx: MetricFormatContext): MetricValueF
   if (metricLabelImpliesCurrency(label)) return "currency";
 
   const kind = ctx.presentationKind ?? "";
-  const share =
+  const titleShare =
     ctx.shareComposition ??
     shareCompositionAllowed(ctx.chartTitle ?? "", ctx.question ?? undefined);
-  if ((kind === "pie" || kind === "donut") && share) return "percent";
+  const rows = ctx.chartRows ?? [];
+  if (kind === "pie" || kind === "donut") {
+    if (rows.length >= 2 && radialShouldFormatValuesAsPercent(rows)) {
+      return "percent";
+    }
+    if (titleShare && rows.length >= 2 && radialShareDisplayAllowed(rows, ctx.chartTitle, ctx.question)) {
+      return metricLabelImpliesCurrency(label) ? "currency" : "number";
+    }
+    if (titleShare && rows.length < 2) return "percent";
+  }
 
   return "number";
 }
@@ -190,15 +261,48 @@ export function formatExecutivePercentValue(value: number): string {
 }
 
 /** Percentage-point spread for rate metrics — always 1 decimal + pp suffix. */
-export function formatExecutivePercentPointGap(gap: number): string {
+export function formatExecutivePercentPointGap(
+  gap: number,
+  options?: { skipFractionScale?: boolean }
+): string {
   if (!Number.isFinite(gap)) return "—";
   let n = gap;
-  if (Math.abs(n) > 0 && Math.abs(n) <= 1) n = n * 100;
-  const rounded = Number(n.toFixed(1));
+  if (
+    !options?.skipFractionScale &&
+    Math.abs(n) > 0 &&
+    Math.abs(n) <= 1
+  ) {
+    n = n * 100;
+  }
+  const abs = Math.abs(n);
+  const decimals = abs > 0 && abs < 0.05 ? 2 : 1;
+  const rounded = Number(n.toFixed(decimals));
+  if (rounded === 0 && abs > 0) {
+    return `${n.toLocaleString(undefined, {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 1,
+    })} pp`;
+  }
   return `${rounded.toLocaleString(undefined, {
-    maximumFractionDigits: 1,
-    minimumFractionDigits: 1,
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: decimals,
   })} pp`;
+}
+
+function formatScoreLikeSpreadGap(gap: number): string {
+  const abs = Math.abs(gap);
+  const decimals = abs < 1 ? 2 : 1;
+  const rounded = Number(gap.toFixed(decimals));
+  if (rounded === 0 && abs > 0) {
+    return gap.toLocaleString(undefined, {
+      maximumFractionDigits: 3,
+      minimumFractionDigits: 0,
+    });
+  }
+  return gap.toLocaleString(undefined, {
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: 0,
+  });
 }
 
 export function formatMetricNumber(
@@ -323,7 +427,16 @@ export function formatMetricSpreadGap(
   const abs = Math.abs(gap);
 
   if (format === "percent") {
-    return formatExecutivePercentPointGap(gap);
+    let pp = gap;
+    const rows = ctx.chartRows ?? [];
+    const vals = rows
+      .map((row) => readChartRowRawValue(row))
+      .filter((v) => Number.isFinite(v));
+    const maxV = vals.length ? Math.max(...vals.map(Math.abs)) : Math.abs(gap);
+    if (Math.abs(gap) <= 1 && maxV <= 1.05) {
+      pp = gap * 100;
+    }
+    return formatExecutivePercentPointGap(pp, { skipFractionScale: true });
   }
 
   if (format === "currency") {
@@ -349,11 +462,15 @@ export function formatMetricSpreadGap(
     return Math.round(gap).toLocaleString();
   }
 
+  if (
+    metricLabelImpliesScoreLike(ctx.metricLabel, ctx.chartTitle) ||
+    metricLabelImpliesScoreLike(ctx.chartTitle, ctx.chartTitle)
+  ) {
+    return formatScoreLikeSpreadGap(gap);
+  }
+
   const label = (ctx.metricLabel ?? "").toLowerCase();
-  const scoreLike =
-    /\b(score|rating|nps|csat|satisfaction)\b/.test(label) ||
-    /_(score|rating)(?:_|$)/.test(label.replace(/\s+/g, "_"));
-  const maxFrac = scoreLike ? 1 : abs >= 10 ? 1 : 2;
+  const maxFrac = abs >= 10 ? 1 : 2;
   return gap.toLocaleString(undefined, {
     maximumFractionDigits: maxFrac,
     minimumFractionDigits: 0,

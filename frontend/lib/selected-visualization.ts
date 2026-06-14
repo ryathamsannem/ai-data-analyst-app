@@ -9,7 +9,8 @@ import {
   computeFinalChartPresentation,
 } from "@/lib/final-chart-presentation";
 import { humanizeColumnName, polishMetricDisplay } from "@/lib/analytics-metadata";
-import { aggregationPrefixLabel, metricStemFromRawTitle } from "@/lib/canonical-chart-title";
+import { apiChartStringToKind } from "@/lib/smart-chart-intelligence";
+import { aggregationPrefixLabel, buildTrendDisplayTitle, metricStemFromRawTitle, normalizeCanonicalChartTitle } from "@/lib/canonical-chart-title";
 import { resolveTrendBucketLabel } from "@/lib/chart-semantic-metadata";
 import {
   buildContextCore,
@@ -106,23 +107,20 @@ function _extractTimeBucketLabel(title: string): string {
   return "Time";
 }
 
+const TREND_CORE_NO_TOTAL_PREFIX =
+  /^(revenue|sales|cost|profit|amount|spend|quantity|units)$/i;
+
 function buildTrendMetricLabel(stem: string, aggregation: string): string {
   const core = metricStemFromRawTitle(stem) || polishMetricDisplay(stem) || "Value";
   const agg = aggregationPrefixLabel(aggregation);
   if (agg === "Count of") return `${agg} ${core}`;
+  if (agg === "Total" && TREND_CORE_NO_TOTAL_PREFIX.test(core.trim())) {
+    return polishMetricDisplay(core);
+  }
   return `${agg} ${core}`;
 }
 
-export function buildTrendDisplayTitle(metricLabel: string, timeBucketLabel: string): string {
-  const bucket = timeBucketLabel.trim();
-  if (/\bmonth/i.test(bucket)) return `Monthly ${metricLabel} trend`;
-  if (/\bweek/i.test(bucket)) return `Weekly ${metricLabel} trend`;
-  if (/\bday/i.test(bucket)) return `Daily ${metricLabel} trend`;
-  if (/\bquarter/i.test(bucket)) return `Quarterly ${metricLabel} trend`;
-  if (/\byear/i.test(bucket)) return `Yearly ${metricLabel} trend`;
-  if (/\bhour/i.test(bucket)) return `Hourly ${metricLabel} trend`;
-  return `${metricLabel} trend`;
-}
+export { buildTrendDisplayTitle } from "@/lib/canonical-chart-title";
 
 function buildComparisonDisplayTitle(
   rawTitle: string,
@@ -226,7 +224,9 @@ export function freezeVisualizationContract(args: {
 
   if (
     isTimeSeries &&
-    (chartType === "bar" || chartType === "bar_horizontal")
+    chartType === "bar" &&
+    args.chartKindPinned !== "bar_horizontal" &&
+    apiChartStringToKind(args.apiChartType) !== "bar_horizontal"
   ) {
     chartType = "line";
   }
@@ -345,8 +345,8 @@ export function freezeVisualizationContract(args: {
   return {
     id: args.id,
     source: args.source,
-    title: displayTitle,
-    displayTitle,
+    title: normalizeCanonicalChartTitle(displayTitle),
+    displayTitle: normalizeCanonicalChartTitle(displayTitle),
     chartType: effectiveKind,
     rendererType: effectiveKind,
     mode,

@@ -24,6 +24,24 @@ describe("formatExecutivePercentPointGap", () => {
   });
 });
 
+describe("metricLabelImpliesPercent composition titles", () => {
+  it("does not treat profit share composition as a rate metric", () => {
+    const rows = [
+      { name: "North", value: 40000 },
+      { name: "South", value: 60000 },
+    ];
+    const ctx = {
+      presentationKind: "donut" as const,
+      chartTitle: "Profit share by region",
+      chartRows: rows,
+      shareComposition: true,
+    };
+    const top = { name: "North", value: 40000 };
+    expect(formatExecutiveMetricValue(top, ctx)).not.toMatch(/%/);
+    expect(formatExecutiveMetricValue(top, ctx)).toMatch(/40,000|40000/);
+  });
+});
+
 describe("formatExecutiveMetricValue rate chips", () => {
   it("formats top/lowest consistently for conversion rate", () => {
     const ctx = {

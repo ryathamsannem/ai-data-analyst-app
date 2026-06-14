@@ -1,0 +1,11 @@
+order_date,product_category,region,order_value,quantity,profit
+2024-01-05,Electronics,East,1250.00,2,312.50
+2024-01-12,Furniture,West,890.00,1,178.00
+2024-01-18,Clothing,North,420.00,6,84.00
+2024-02-02,Electronics,South,2100.00,3,525.00
+2024-02-14,Home,East,650.00,4,130.00
+2024-02-22,Furniture,North,1100.00,2,220.00
+2024-03-01,Electronics,West,980.00,1,245.00
+2024-03-10,Clothing,South,310.00,5,62.00
+2024-03-20,Home,North,720.00,3,144.00
+2024-04-08,Electronics,East,1450.00,2,362.50

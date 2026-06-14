@@ -27,10 +27,16 @@ export type ChartKind =
 
 export function fallbackChartNumericDisplay(
   chartKind: ChartKind,
-  num: number
+  num: number,
+  opts?: { radialValuesArePercent?: boolean }
 ): string {
   if (!Number.isFinite(num)) return String(num);
-  if (chartKind === "pie" || chartKind === "donut") return `${num.toFixed(1)}%`;
+  if (
+    (chartKind === "pie" || chartKind === "donut") &&
+    opts?.radialValuesArePercent
+  ) {
+    return `${num.toFixed(1)}%`;
+  }
   if (chartKind === "histogram") {
     if (Number.isInteger(num)) return num.toLocaleString();
     return num.toLocaleString(undefined, { maximumFractionDigits: 2 });

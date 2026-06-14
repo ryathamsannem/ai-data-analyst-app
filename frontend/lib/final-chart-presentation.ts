@@ -125,6 +125,10 @@ function barFamilyKindFromRows(args: {
 }): ChartKind {
   const { apiBarLike, title, question, rows } = args;
 
+  if (apiBarLike === "bar_horizontal") {
+    return "bar_horizontal";
+  }
+
   if (!rows.length) {
     return apiBarLike === "pie" || apiBarLike === "donut" ? apiBarLike : "bar";
   }
@@ -190,6 +194,68 @@ function barFamilyKindFromRows(args: {
   return "bar_horizontal";
 }
 
+function overviewDashLabelLooksTemporal(name: string): boolean {
+  const s = String(name ?? "").trim();
+  if (!s) return false;
+  if (/^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(s))
+    return true;
+  if (/\bq[1-4]\b(?:\s*[''\u2019]?|\/|\s|,)\s*\d{2,4}$/i.test(s)) return true;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return true;
+  return !Number.isNaN(Date.parse(s));
+}
+
+function overviewRowsLookReadableTimeSeries(rows: ChartRow[]): boolean {
+  if (rows.length < 2 || rows.length > 28) return false;
+  const hits = rows.filter((r) =>
+    overviewDashLabelLooksTemporal(String(r.name ?? ""))
+  ).length;
+  return hits >= Math.max(2, Math.ceil(rows.length * 0.75));
+}
+
+/**
+ * Auto-dashboard chart kind — preserves API horizontalBar and Overview bar rules.
+ * Shared by Overview mini-cards and Charts/Insights session sync.
+ */
+export function computeAutoDashboardChartPresentation(args: {
+  apiChartType: string;
+  title: string;
+  rows: ChartRow[];
+}): ChartKind {
+  const api = apiChartStringToKind(args.apiChartType);
+  const { rows } = args;
+
+  if (
+    api === "pie" ||
+    api === "donut" ||
+    api === "histogram" ||
+    api === "scatter"
+  ) {
+    return computeFinalChartPresentation(args);
+  }
+
+  if (api === "line" || api === "area") {
+    return overviewRowsLookReadableTimeSeries(rows) ? api : "bar_horizontal";
+  }
+
+  if (api === "bar_horizontal") return "bar_horizontal";
+
+  const fromRows = computeFinalChartPresentation(args);
+  if (fromRows === "line" || fromRows === "area") {
+    return overviewRowsLookReadableTimeSeries(rows)
+      ? fromRows
+      : "bar_horizontal";
+  }
+  if (fromRows !== "bar" && fromRows !== "bar_horizontal") return fromRows;
+
+  const labels = rows.map((r) => String(r.name ?? ""));
+  const n = labels.length;
+  const maxLen = Math.max(0, ...labels.map((s) => s.length));
+  const shortLabels = maxLen <= 14;
+
+  if (n <= 4 && shortLabels) return "bar";
+  return "bar_horizontal";
+}
+
 /** Radial charts only for composition/share questions — not min/max ranking. */
 export function shareCompositionAllowed(title: string, question?: string): boolean {
   const blob = `${title} ${question ?? ""}`.toLowerCase();
@@ -230,6 +296,7 @@ export function computeFinalChartPresentation(args: {
 
   if (api === "area") return "area";
   if (api === "line") return "line";
+  if (api === "bar_horizontal") return "bar_horizontal";
   if (api === "pie" || api === "donut") {
     if (
       !shareCompositionAllowed(title, question) ||

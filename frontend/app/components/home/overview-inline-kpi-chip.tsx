@@ -1,8 +1,8 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { useDevRenderCount } from "@/lib/dev-render-count";
-import { ovChip } from "@/lib/overview-ui";
+import { ovChip, ovChipText } from "@/lib/overview-ui";
 
 /** Small inline KPI chip on Overview (auto-dashboard header row). */
 export const OverviewInlineKpiChip = memo(function OverviewInlineKpiChip({
@@ -13,10 +13,13 @@ export const OverviewInlineKpiChip = memo(function OverviewInlineKpiChip({
   value: string;
 }) {
   useDevRenderCount("OverviewInlineKpiChip");
+  const fullLabel = useMemo(() => `${title}: ${value}`, [title, value]);
   return (
-    <span className={ovChip}>
-      <span className="text-[color:var(--text-subtle)]">{title}: </span>
-      <span className="font-semibold text-foreground">{value}</span>
+    <span className={ovChip} title={fullLabel}>
+      <span className={ovChipText}>
+        <span className="text-[color:var(--text-subtle)]">{title}: </span>
+        <span className="font-semibold text-foreground">{value}</span>
+      </span>
     </span>
   );
 });

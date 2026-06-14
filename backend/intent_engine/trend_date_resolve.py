@@ -89,6 +89,26 @@ def question_requests_trend_intent(q: str) -> bool:
         return True
     if re.search(r"\btrack\b.+\bover\s+periods?\b", ql):
         return True
+    if re.search(
+        r"\b("
+        r"increase\s+over\s+time|decline\s+over\s+time|decrease\s+over\s+time|"
+        r"month\s+over\s+month|week\s+over\s+week|year\s+over\s+year|mom|wow|yoy"
+        r")\b",
+        ql,
+    ):
+        return True
+    if re.search(r"\b(grew|growth)\b", ql) and re.search(
+        r"\b(over\s+time|month\s+over\s+month|week\s+over\s+week|year\s+over\s+year|mom|wow|yoy|by\s+(?:month|week|year|date|quarter|report\s+date))\b",
+        ql,
+    ):
+        return True
+    if re.search(r"\btrend\s+by\s+\w+", ql):
+        return True
+    if re.search(
+        r"\b(which|what)\s+(?:\w+\s+){0,4}(?:city|cities|region|product|department|campaign|channel|segment|country|state|ward|branch)\b",
+        ql,
+    ) and re.search(r"\b(growth\s+rate|highest\s+growth|fastest\s+growth|most\s+growth)\b", ql):
+        return False
     return bool(
         re.search(
             r"\b(by|per)\s+(day|date|week|month|year|quarter|period|periods|report\s+date|report_date)\b",

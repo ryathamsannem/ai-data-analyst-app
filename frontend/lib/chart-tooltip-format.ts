@@ -1,4 +1,5 @@
 import type { ChartRow } from "@/app/chart-types";
+import { canonicalMetricLabelFromChartTitle } from "@/lib/canonical-chart-title";
 import {
   humanizeColumnName,
   polishMetricDisplay,
@@ -11,9 +12,15 @@ import {
 } from "@/lib/metric-value-format";
 
 /** Clean measure phrase for tooltip series labels (not axis-truncated). */
-export function chartTooltipMetricLabel(raw: string): string {
+export function chartTooltipMetricLabel(
+  raw: string,
+  opts?: { metricColumn?: string | null }
+): string {
   const trimmed = raw.replace(/\s+/g, " ").trim();
   if (!trimmed) return "Value";
+
+  const fromTitle = canonicalMetricLabelFromChartTitle(trimmed, opts);
+  if (fromTitle && fromTitle !== "Value") return fromTitle;
 
   const withoutBreakdown = trimmed.replace(/\s+by\s+.+$/i, "").trim();
   let s = sanitizeExecutiveMeasureLabel(withoutBreakdown);

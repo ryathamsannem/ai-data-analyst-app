@@ -3,6 +3,14 @@
  * Maps to Recharts `ChartKind` via `timelineTypeToChartKind`.
  */
 import type { ChartKind } from "@/app/chart-types";
+import {
+  computeDetailViewCartesianPlan,
+  getSharedDetailLayoutMetrics,
+  resolveSharedDetailPlotHeight,
+  SHARED_CHART_LAYOUT,
+  SHARED_DETAIL_PLOT_BAND,
+  type SharedDetailLayoutMetrics,
+} from "@/lib/shared-chart-layout";
 
 export type TimelineChartType = "bar" | "horizontalBar" | "line";
 
@@ -18,75 +26,37 @@ export function timelineTypeToChartKind(t: TimelineChartType): ChartKind {
   return "bar";
 }
 
-export type InsightChartLayoutMetrics = {
-  /** Width passed into category-axis layout math (px). */
-  planViewportPx: number;
-  outerShellMinHeight: number;
-  plotHeightMin: number;
-  plotHeightMax: number;
+export type InsightChartLayoutMetrics = SharedDetailLayoutMetrics;
+
+export {
+  SHARED_CHART_LAYOUT,
+  SHARED_DETAIL_PLOT_BAND,
+  computeDetailViewCartesianPlan,
+  getSharedDetailLayoutMetrics,
+  resolveSharedDetailPlotHeight,
 };
 
-/** AI Insight + PDF off-screen capture: dimensions by presentation kind. */
-/**
- * Charts tab session preview — responsive height with less vertical dead space than legacy 300–500px floor.
- */
-/** Taller Charts tab plot after duplicate metadata row removal (+ cleanup pass). */
-const CHARTS_TAB_PLOT_HEIGHT_BOOST = 1.23;
+/** @deprecated Use getSharedDetailLayoutMetrics */
+export function getInsightLayoutMetrics(kind: ChartKind): InsightChartLayoutMetrics {
+  return getSharedDetailLayoutMetrics(kind);
+}
+
+/** @deprecated Use resolveSharedDetailPlotHeight */
+export function resolveDetailPlotHeight(
+  pointCount: number,
+  kind: ChartKind,
+  viewportInnerH: number,
+  _context: "insights" | "chartsTab" = "insights"
+): number {
+  return resolveSharedDetailPlotHeight(pointCount, kind, viewportInnerH);
+}
 
 export function resolveChartsTabPreviewPlotHeight(
   pointCount: number,
   kind: ChartKind,
   viewportInnerH: number
 ): number {
-  const n = Math.max(1, pointCount);
-  const cap = Math.round(Math.min(Math.max(viewportInnerH, 320) * 0.47, 500));
-  const floor = 196;
-  const boostedCap = Math.round(cap * CHARTS_TAB_PLOT_HEIGHT_BOOST);
-  const fit = (h: number) =>
-    Math.min(boostedCap, Math.round(h * CHARTS_TAB_PLOT_HEIGHT_BOOST));
-
-  if (kind === "bar_horizontal") {
-    const slot = 26;
-    const extra = Math.max(0, n - 3) * slot;
-    return fit(Math.min(cap, Math.max(240, 248 + extra)));
-  }
-  if (kind === "pie" || kind === "donut" || kind === "scatter") {
-    return fit(Math.min(cap, Math.max(260, 292)));
-  }
-  if (kind === "line" || kind === "area") {
-    return fit(Math.min(cap, Math.max(272, 300)));
-  }
-  if (kind === "bar" || kind === "histogram") {
-    const extra = Math.min(28, Math.max(0, n - 5) * 5);
-    return fit(Math.min(cap, Math.max(228, 252 + extra)));
-  }
-  return fit(Math.min(cap, Math.max(floor, 268)));
-}
-
-export function getInsightLayoutMetrics(kind: ChartKind): InsightChartLayoutMetrics {
-  const t = chartKindToTimelineType(kind);
-  if (t === "horizontalBar") {
-    return {
-      planViewportPx: 900,
-      outerShellMinHeight: 352,
-      plotHeightMin: 288,
-      plotHeightMax: 500,
-    };
-  }
-  if (t === "line") {
-    return {
-      planViewportPx: 850,
-      outerShellMinHeight: 352,
-      plotHeightMin: 312,
-      plotHeightMax: 376,
-    };
-  }
-  return {
-    planViewportPx: 760,
-    outerShellMinHeight: 352,
-    plotHeightMin: 312,
-    plotHeightMax: 384,
-  };
+  return resolveSharedDetailPlotHeight(pointCount, kind, viewportInnerH);
 }
 
 /** Tailwind max-width for the inner insight viewport (matches plan targets). */

@@ -1,5 +1,6 @@
 import type { ChartKind } from "@/app/chart-types";
 import { humanizeColumnName, polishMetricDisplay } from "@/lib/analytics-metadata";
+import { canonicalMetricLabelFromChartTitle } from "@/lib/canonical-chart-title";
 
 export type ChartSemanticVizLike = {
   chartType?: string;
@@ -96,6 +97,36 @@ export function grainLabelFromChartTitle(title: string): string | null {
   return titleCaseGrainPhrase(inner);
 }
 
+const WEEK_RANGE_LABEL_RE =
+  /^\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$/;
+const MONTH_BUCKET_LABEL_RE = /^\d{4}-\d{2}$/;
+const DAY_BUCKET_LABEL_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Infer trend grain from bucket labels (overrides stale title copy). */
+export function inferTrendGrainFromLabels(labels: string[]): string | null {
+  const samples = labels.map((l) => String(l ?? "").trim()).filter(Boolean);
+  if (samples.length < 2) return null;
+
+  const weekRanges = samples.filter((l) => WEEK_RANGE_LABEL_RE.test(l)).length;
+  if (weekRanges >= Math.ceil(samples.length * 0.5)) return "Weekly";
+
+  const monthBuckets = samples.filter((l) => MONTH_BUCKET_LABEL_RE.test(l)).length;
+  if (monthBuckets >= Math.ceil(samples.length * 0.5)) return "Monthly";
+
+  const dayBuckets = samples.filter((l) => DAY_BUCKET_LABEL_RE.test(l)).length;
+  if (dayBuckets >= Math.ceil(samples.length * 0.5)) return "Daily";
+
+  const quarterBuckets = samples.filter((l) =>
+    /\bQ[1-4]\b/i.test(l) || /^\d{4}-Q[1-4]$/i.test(l)
+  ).length;
+  if (quarterBuckets >= Math.ceil(samples.length * 0.5)) return "Quarterly";
+
+  const yearBuckets = samples.filter((l) => /^\d{4}$/.test(l)).length;
+  if (yearBuckets >= Math.ceil(samples.length * 0.5)) return "Yearly";
+
+  return null;
+}
+
 /** Prefer engine bucket metadata over title defaults (avoids weekly copy on monthly series). */
 export function resolveTrendBucketLabel(args: {
   title?: string;
@@ -125,6 +156,9 @@ export function resolveTrendBucketLabel(args: {
   }
 
   const labels = (args.labels ?? []).map((l) => String(l ?? "").trim());
+  const fromLabels = inferTrendGrainFromLabels(labels);
+  if (fromLabels) return fromLabels;
+
   if (
     labels.length >= 2 &&
     labels.every((l) => /^\d{4}-\d{2}(-\d{2})?/.test(l) || /^\d{4}-\d{2}$/.test(l))
@@ -324,6 +358,16 @@ export function buildChartSemanticMetadata(args: {
     ).trim() || args.refinedMetricLabel;
   if (presentationKind === "scatter" && relMeasure) {
     metricPhrase = polishMetricDisplay(relMeasure);
+  } else if (
+    /\b(monthly|weekly|daily|quarterly|yearly)\s+.+\btrend\b/i.test(
+      args.chartTitle
+    ) ||
+    /\btrend\b/i.test(metricPhrase)
+  ) {
+    const canonical = canonicalMetricLabelFromChartTitle(args.chartTitle, {
+      metricColumn: metCol,
+    });
+    if (canonical !== "Value") metricPhrase = canonical;
   }
 
   const ts = viz?.provenance?.timeSeriesAnalysis;

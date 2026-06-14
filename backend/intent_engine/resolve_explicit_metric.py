@@ -169,6 +169,15 @@ def resolve_explicit_metric_column(
     if not nums:
         return None
 
+    try:
+        from intent_engine.banking_metric_resolve import resolve_banking_metric_column
+
+        banking_hit = resolve_banking_metric_column(question, df, profile)
+        if banking_hit:
+            return banking_hit
+    except Exception:
+        pass
+
     synonym = resolve_synonym_metric_column(question, df, profile)
     if synonym:
         return synonym
