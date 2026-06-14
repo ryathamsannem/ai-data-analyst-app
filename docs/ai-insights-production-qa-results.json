@@ -1,6 +1,6 @@
 {
-  "executed_at": "2026-06-10T11:10:11Z",
-  "duration_sec": 5.2,
+  "executed_at": "2026-06-13T18:21:48Z",
+  "duration_sec": 17.0,
   "wave": "all",
   "waves": [
     1,
@@ -183,7 +183,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -192,16 +192,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint revenue not in customers",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "customers",
-        "categoryColumn": "revenue",
+        "metricColumn": "revenue",
+        "categoryColumn": "customers",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -1648,7 +1647,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -1657,16 +1656,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint revenue not in satisfaction_score",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "satisfaction_score",
-        "categoryColumn": "revenue",
+        "metricColumn": "revenue",
+        "categoryColumn": "satisfaction_score",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -1696,30 +1694,26 @@
       "pattern": "compare",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 5.0,
+        "data_grounding": 8.5,
         "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
-        "confidence_explanation": 7.0,
+        "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.5,
+      "avg": 8.69,
       "severity": "low",
       "notes": [
-        "Metric hint revenue not in ",
-        "Dimension hint campaign not in ",
-        "Chart top 'Retargeting Cart' vs pandas top 'Holiday Promo'",
-        "N/A \u2014 not recommendation-focused question",
-        "Thin confidence rationale"
+        "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "compare",
-        "metricColumn": null,
-        "categoryColumn": null,
+        "metricColumn": "revenue",
+        "categoryColumn": "campaign_name",
         "chartType": "horizontalBar",
-        "confidence": "low",
+        "confidence": "medium",
         "supportStatus": null
       },
       "expected": {
@@ -1735,11 +1729,11 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Compare campaign ROI: revenue vs spend by campaign. Retargeting Cart leads with 1640138.0. Score 36/100 (low) from 5 evidence factor(s); 320 row(s), 8 chart group(s).",
+        "answer_excerpt": "Total revenue by campaign name. Holiday Promo leads with 82112280.3. Score 57/100 (medium) from 9 evidence factor(s); 320 row(s), 8 chart group(s). Revenue And Spend Gap: 31.8M. Top Campaign: Holiday Promo.",
         "chart_labels_sample": [
+          "Holiday Promo",
           "Retargeting Cart",
-          "Product Demo Webinar",
-          "Brand Awareness Q1"
+          "Referral Boost"
         ]
       }
     },
@@ -2328,7 +2322,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue by campaign name. Holiday Promo leads with 82112280.3. Score 69/100 (medium) from 6 evidence factor(s); 320 row(s), 8 chart group(s). Revenue Gap: 31.8M. Top Campaign: Holiday Promo.",
+        "answer_excerpt": "Total revenue by campaign name. Holiday Promo leads with 82112280.3. Score 57/100 (medium) from 9 evidence factor(s); 320 row(s), 8 chart group(s). Revenue And Cost Gap: 31.8M. Top Campaign: Holiday Promo.",
         "chart_labels_sample": [
           "Holiday Promo",
           "Retargeting Cart",
@@ -2685,7 +2679,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -2694,16 +2688,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint revenue not in satisfaction_score",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "satisfaction_score",
-        "categoryColumn": "revenue",
+        "metricColumn": "revenue",
+        "categoryColumn": "satisfaction_score",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -2733,7 +2726,7 @@
       "pattern": "follow_up",
       "is_follow_up": true,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -2742,17 +2735,15 @@
         "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.25,
+      "avg": 8.75,
       "severity": "low",
       "notes": [
-        "Metric hint revenue not in satisfaction_score",
-        "Dimension hint satisfaction not in revenue",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "satisfaction_score",
-        "categoryColumn": "revenue",
+        "metricColumn": "revenue",
+        "categoryColumn": "satisfaction_score",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -2782,8 +2773,8 @@
       "pattern": "follow_up",
       "is_follow_up": true,
       "scores": {
-        "intent_detection": 5.0,
-        "chart_selection": 4.0,
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
@@ -2791,20 +2782,17 @@
         "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.38,
+      "avg": 8.75,
       "severity": "low",
       "notes": [
-        "Intent mismatch: got 'compare', expected ('relationship',)",
-        "Dimension hint satisfaction not in channel",
-        "Chart family 'bar' vs expected {'scatter'}",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "relationship",
         "metricColumn": "revenue",
-        "categoryColumn": "channel",
-        "chartType": "bar",
-        "confidence": "medium",
+        "categoryColumn": "satisfaction_score",
+        "chartType": "scatter",
+        "confidence": "high",
         "supportStatus": null
       },
       "expected": {
@@ -2817,11 +2805,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by channel. Affiliate leads with 115252428.0. Score 69/100 (medium) from 6 evidence factor(s); 320 row(s), 6 chart group(s). Revenue Share: 22%. Revenue Gap: 45.4M.",
+        "answer_excerpt": "Revenue vs Satisfaction Score. Point 1 leads with 3.2. Score 93/100 (high): scatter correlation on 307 joint pair(s) from 320 filtered row(s).",
         "chart_labels_sample": [
-          "Affiliate",
-          "Paid Social",
-          "Display"
+          "Point 1",
+          "Point 2",
+          "Point 3"
         ]
       }
     },
@@ -3034,7 +3022,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -3043,16 +3031,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint revenue not in units",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "units",
-        "categoryColumn": "revenue",
+        "metricColumn": "revenue",
+        "categoryColumn": "units",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -3186,27 +3173,25 @@
       "is_follow_up": false,
       "scores": {
         "intent_detection": 10.0,
-        "chart_selection": 4.0,
+        "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
-        "confidence_explanation": 7.0,
+        "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.5,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Chart family 'histogram' vs expected {'bar'}",
-        "N/A \u2014 not recommendation-focused question",
-        "Thin confidence rationale"
+        "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "outlier",
         "metricColumn": "revenue",
         "categoryColumn": "department",
-        "chartType": "histogram",
-        "confidence": "low",
+        "chartType": "horizontalBar",
+        "confidence": "medium",
         "supportStatus": null
       },
       "expected": {
@@ -3220,11 +3205,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by department. [62742.028, 158381.24) leads with 54.0. Score 33/100 (low) from 6 evidence factor(s); 340 row(s), 8 chart group(s). Revenue Share: 37%. Revenue Gap: 126.0.",
+        "answer_excerpt": "Total revenue by department. Field Sales leads with 36237995.0. Score 53/100 (medium) from 8 evidence factor(s); 340 row(s), 3 chart group(s). Outlier Signal: Field Sales. Revenue Share: 40%. Underperformer: Inside Sales.",
         "chart_labels_sample": [
-          "[62742.028, 158381.24)",
-          "[158381.24, 252886.39)",
-          "[252886.39, 347391.54)"
+          "Field Sales",
+          "Channel Sales",
+          "Inside Sales"
         ]
       }
     },
@@ -3523,8 +3508,8 @@
       "pattern": "trend",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 5.0,
-        "chart_selection": 4.0,
+        "intent_detection": 10.0,
+        "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
@@ -3532,18 +3517,16 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.12,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Intent mismatch: got 'compare', expected ('trend',)",
-        "Chart family 'bar' vs expected {'line'}",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "trend",
         "metricColumn": "revenue",
-        "categoryColumn": "region",
-        "chartType": "bar",
+        "categoryColumn": "report_date",
+        "chartType": "line",
         "confidence": "medium",
         "supportStatus": null
       },
@@ -3560,11 +3543,11 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue by region. North leads with 25473805.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 4 chart group(s). Revenue Share: 28%. Revenue Gap: 8.6M.",
+        "answer_excerpt": "Total revenue trend (monthly). 2024-01 leads with 11723917.0. Score 65/100 (medium) from 5 evidence factor(s); 340 row(s), 8 chart group(s). Recent Change: 21%. Revenue Gap: 4.6M. Top Report Date: 2024-07.",
         "chart_labels_sample": [
-          "North",
-          "West",
-          "South"
+          "2024-01",
+          "2024-02",
+          "2024-03"
         ]
       }
     },
@@ -4257,7 +4240,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -4266,16 +4249,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint revenue not in customers",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "customers",
-        "categoryColumn": "revenue",
+        "metricColumn": "revenue",
+        "categoryColumn": "customers",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -5471,7 +5453,7 @@
       "pattern": "trend",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -5480,15 +5462,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint deposit_balance not in npl_amount",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "trend",
-        "metricColumn": "npl_amount",
+        "metricColumn": "deposit_balance",
         "categoryColumn": "report_date",
         "chartType": "line",
         "confidence": "medium",
@@ -5507,7 +5488,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total npl amount trend (weekly). 2023-12-26/2024-01-01 leads with 6544212.0. Score 66/100 (medium) from 5 evidence factor(s); 360 row(s), 3 chart group(s). Npl Amount Share: 37%. Npl Amount Gap: 1.2M.",
+        "answer_excerpt": "Total deposit balance trend (weekly). 2023-12-26/2024-01-01 leads with 248635362.0. Score 66/100 (medium) from 5 evidence factor(s); 360 row(s), 3 chart group(s). Deposit Balance Share: 35%.",
         "chart_labels_sample": [
           "2023-12-26/2024-01-01",
           "2024-01-30/2024-02-05",
@@ -5572,7 +5553,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -5581,15 +5562,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint loan_balance not in spend_amount",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "spend_amount",
+        "metricColumn": "loan_balance",
         "categoryColumn": "region",
         "chartType": "bar",
         "confidence": "medium",
@@ -5606,11 +5586,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total spend amount by region. North leads with 4375219.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Primary concern: Underperformer: West. Spend Amount Share: 23%.",
+        "answer_excerpt": "Total loan balance by region. Central leads with 190365002.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Primary concern: Underperformer: West. Loan Balance Share: 23%.",
         "chart_labels_sample": [
-          "North",
+          "Central",
           "South",
-          "Central"
+          "North"
         ]
       }
     },
@@ -5621,7 +5601,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -5630,16 +5610,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint interest_income not in loan_balance",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "loan_balance",
-        "categoryColumn": "interest_income",
+        "metricColumn": "interest_income",
+        "categoryColumn": "loan_balance",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -5669,7 +5648,7 @@
       "pattern": "ranking",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 5.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 6.5,
         "executive_summary_quality": 8.5,
@@ -5678,17 +5657,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.81,
+      "avg": 8.44,
       "severity": "low",
       "notes": [
-        "Intent mismatch: got 'fallback', expected ('ranking',)",
-        "Metric hint delinquency not in spend_amount",
         "Answer may omit top entity North",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "fallback",
-        "metricColumn": "spend_amount",
+        "intent": "ranking",
+        "metricColumn": "delinquency_rate",
         "categoryColumn": "region",
         "chartType": "bar",
         "confidence": "medium",
@@ -5707,11 +5684,11 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Average spend amount by region. East leads with 60093.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Spend Amount Share: 22%.",
+        "answer_excerpt": "Average delinquency rate by region. East leads with 0.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s).",
         "chart_labels_sample": [
           "East",
           "North",
-          "South"
+          "West"
         ]
       }
     },
@@ -5722,7 +5699,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -5731,15 +5708,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint interest_income not in spend_amount",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "spend_amount",
+        "metricColumn": "interest_income",
         "categoryColumn": "region",
         "chartType": "bar",
         "confidence": "medium",
@@ -5755,11 +5731,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total spend amount by region. North leads with 4375219.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Spend Amount Gap: 1,181,041. Spend Amount Gap: 1.2M. Spend Amount Share: 23%.",
+        "answer_excerpt": "Average interest income by region. Central leads with 18848.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Interest Income Gap: 520,516. Interest Income Share: 21%.",
         "chart_labels_sample": [
-          "North",
-          "South",
-          "Central"
+          "Central",
+          "East",
+          "North"
         ]
       }
     },
@@ -5770,7 +5746,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -5779,15 +5755,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint npl not in spend_amount",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "spend_amount",
+        "metricColumn": "npl_amount",
         "categoryColumn": "customer_segment",
         "chartType": "bar",
         "confidence": "medium",
@@ -5803,11 +5778,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total spend amount by customer segment. Retail leads with 4223900.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Primary concern: Underperformer: Mass Affluent. Spend Amount Share: 22%.",
+        "answer_excerpt": "Total npl amount by customer segment. Retail leads with 4447672.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Primary concern: Underperformer: Premium. Npl Amount Share: 22%.",
         "chart_labels_sample": [
           "Retail",
-          "Corporate",
-          "SME"
+          "SME",
+          "Mass Affluent"
         ]
       }
     },
@@ -5818,7 +5793,7 @@
       "pattern": "summary",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -5827,14 +5802,12 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
-      "notes": [
-        "Metric hint deposit_balance not in spend_amount"
-      ],
+      "notes": [],
       "routing": {
         "intent": "summary",
-        "metricColumn": "spend_amount",
+        "metricColumn": "deposit_balance",
         "categoryColumn": "region",
         "chartType": "bar",
         "confidence": "medium",
@@ -5850,11 +5823,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total spend amount by region. North leads with 4375219.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Top Region: North. Spend Amount Share: 23%. Spend Amount Gap: 27%.",
+        "answer_excerpt": "Average deposit balance by region. Central leads with 2281395.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Top Region: Central. Deposit Balance Share: 22%. Deposit Balance Gap: 40%.",
         "chart_labels_sample": [
+          "Central",
           "North",
-          "South",
-          "Central"
+          "South"
         ]
       }
     },
@@ -6078,13 +6051,12 @@
       "avg": 8.0,
       "severity": "low",
       "notes": [
-        "Metric hint delinquency not in spend_amount",
         "Dimension hint branch not in customer_segment",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "outlier",
-        "metricColumn": "spend_amount",
+        "metricColumn": "delinquency_rate",
         "categoryColumn": "customer_segment",
         "chartType": "horizontalBar",
         "confidence": "high",
@@ -6100,10 +6072,10 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total spend amount by customer segment. Retail leads with 4223900.0. Score 76/100 (high) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Largest gap: 12%. High outlier: Retail. Low outlier: Mass Affluent.",
+        "answer_excerpt": "Total delinquency rate by customer segment. Mass Affluent leads with 2.9. Score 76/100 (high) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Largest gap: 23%. High outlier: Mass Affluent. Low outlier: Corporate.",
         "chart_labels_sample": [
+          "Mass Affluent",
           "Retail",
-          "Corporate",
           "SME"
         ]
       }
@@ -6115,7 +6087,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 7.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -6124,16 +6096,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 7.88,
       "severity": "low",
       "notes": [
         "Intent 'compare' acceptable fallback for executive",
-        "Metric hint npl not in spend_amount",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "compare",
-        "metricColumn": "spend_amount",
+        "metricColumn": "npl_amount",
         "categoryColumn": "product_type",
         "chartType": "bar",
         "confidence": "medium",
@@ -6149,11 +6120,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total spend amount by product type. Personal Loan leads with 4560029.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Spend Amount Share: 23%. Spend Amount Gap: 1.2M.",
+        "answer_excerpt": "Total npl amount by product type. Mortgage leads with 4946056.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Npl Amount Share: 24%. Npl Amount Gap: 1.2M.",
         "chart_labels_sample": [
-          "Personal Loan",
           "Mortgage",
-          "Term Deposit"
+          "Personal Loan",
+          "Credit Card"
         ]
       }
     },
@@ -6806,7 +6777,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -6815,16 +6786,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint revenue not in units",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "units",
-        "categoryColumn": "revenue",
+        "metricColumn": "revenue",
+        "categoryColumn": "units",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -7545,7 +7515,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -7554,16 +7524,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint downtime not in defect_rate",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "defect_rate",
-        "categoryColumn": "downtime_hours",
+        "metricColumn": "downtime_hours",
+        "categoryColumn": "defect_rate",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -8326,7 +8295,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -8335,16 +8304,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint satisfaction not in avg_resolution_hours",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "avg_resolution_hours",
-        "categoryColumn": "satisfaction_score",
+        "metricColumn": "satisfaction_score",
+        "categoryColumn": "avg_resolution_hours",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -9062,7 +9030,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -9071,16 +9039,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint attrition not in satisfaction_score",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "satisfaction_score",
-        "categoryColumn": "attrition_rate",
+        "metricColumn": "attrition_rate",
+        "categoryColumn": "satisfaction_score",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null
@@ -9743,7 +9710,7 @@
       "pattern": "relationship",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -9752,16 +9719,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint cost not in patient_volume",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "relationship",
-        "metricColumn": "patient_volume",
-        "categoryColumn": "cost",
+        "metricColumn": "cost",
+        "categoryColumn": "patient_volume",
         "chartType": "scatter",
         "confidence": "high",
         "supportStatus": null

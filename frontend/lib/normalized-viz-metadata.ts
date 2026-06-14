@@ -26,6 +26,7 @@ import {
   fromAlignedAnalysis,
   type SemanticMetricContext,
 } from "@/lib/semantic-metric-engine";
+import { canonicalMetricLabelFromChartTitle } from "@/lib/canonical-chart-title";
 
 const CHAT_TITLE_RE =
   /\b(summarize|summarise|explain|describe|analyze|analyse|what\s+does\s+the\s+chart|what\s+the\s+chart|how\s+does\s+the\s+chart|chart\s+shows|based\s+on\s+(the|your)\s+(question|prompt|chart)|please\s+(tell|show|give)|tell\s+me\s+about|walk\s+me\s+through|can\s+you\s+)\b/i;
@@ -179,7 +180,6 @@ export function buildNormalizedVizMetadata(args: {
     chartTitle = polishMetricDisplay(stripIntentNoiseFromMetricLabel(raw)).trim();
   }
   let titleForInference = chartTitle;
-  const metricLabelOut = semanticCtx?.metricLabel?.trim() || metricLabel;
   const categoryLabelOut = semanticCtx?.dimensionLabel?.trim() || categoryLabel;
 
   const embedded = extractEmbeddedChartTitlePhrase(raw);
@@ -202,6 +202,16 @@ export function buildNormalizedVizMetadata(args: {
   }
 
   const grainHintTitle = chartTitle;
+
+  const metricFromProvenance =
+    semanticCtx?.metricLabel?.trim() || metricLabel.trim() || "Value";
+  const metricLabelOut =
+    metricFromProvenance !== "Value" &&
+    !/\b(monthly|weekly|daily|quarterly|yearly)\s+.+\btrend\b/i.test(
+      metricFromProvenance
+    )
+      ? metricFromProvenance
+      : canonicalMetricLabelFromChartTitle(chartTitle, { metricColumn: metCol });
 
   return {
     chartTitle,

@@ -1,0 +1,808 @@
+[
+  {
+    "file": "banking_financial_services.csv",
+    "rows": 360,
+    "columns": [
+      "report_date",
+      "branch",
+      "region",
+      "customer_segment",
+      "product_type",
+      "loan_balance",
+      "deposit_balance",
+      "interest_income",
+      "npl_amount",
+      "delinquency_rate",
+      "credit_utilization",
+      "spend_category",
+      "spend_amount"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "banking",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "finance",
+    "type_label": "Banking / Financial Services",
+    "cards": [
+      {
+        "title": "Total Loan Balance",
+        "value": "830,843,833",
+        "subtitle": null
+      },
+      {
+        "title": "Total Spend Amount",
+        "value": "19,425,033",
+        "subtitle": null
+      },
+      {
+        "title": "Average Spend Amount",
+        "value": "53,958",
+        "subtitle": null
+      },
+      {
+        "title": "Average Credit Utilization",
+        "value": "55.2%",
+        "subtitle": null
+      },
+      {
+        "title": "Average Delinquency Rate",
+        "value": "3.65%",
+        "subtitle": null
+      },
+      {
+        "title": "Top Customer Segment",
+        "value": "SME",
+        "subtitle": "SME is the top customer segment by loan balance."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "customer_support.csv",
+    "rows": 300,
+    "columns": [
+      "report_date",
+      "department",
+      "ticket_category",
+      "priority",
+      "channel",
+      "tickets_opened",
+      "tickets_resolved",
+      "avg_resolution_hours",
+      "satisfaction_score",
+      "escalations"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "customer_support",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "operations",
+    "type_label": "Customer Support",
+    "cards": [
+      {
+        "title": "Total Tickets Opened",
+        "value": "84,471",
+        "subtitle": null
+      },
+      {
+        "title": "Total Tickets Resolved",
+        "value": "72,349",
+        "subtitle": null
+      },
+      {
+        "title": "Average Resolution Time",
+        "value": "15.9 hrs",
+        "subtitle": null
+      },
+      {
+        "title": "Average Satisfaction Score",
+        "value": "3.87",
+        "subtitle": null
+      },
+      {
+        "title": "Escalation Rate",
+        "value": "8.8%",
+        "subtitle": null
+      },
+      {
+        "title": "Top Issue Type",
+        "value": "Onboarding",
+        "subtitle": "Onboarding is the top ticket category by ticket volume."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "dashboard_showcase_dataset.csv",
+    "rows": 520,
+    "columns": [
+      "date",
+      "region",
+      "country",
+      "city",
+      "department",
+      "product",
+      "customer_segment",
+      "campaign",
+      "channel",
+      "revenue",
+      "profit",
+      "cost",
+      "quantity",
+      "customers",
+      "satisfaction_score",
+      "conversion_rate",
+      "ad_spend",
+      "loan_balance",
+      "deposit_balance",
+      "latitude",
+      "longitude"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "sales",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "sales",
+    "type_label": "Sales",
+    "cards": [
+      {
+        "title": "Total Revenue",
+        "value": "2,847,582",
+        "subtitle": null
+      },
+      {
+        "title": "Average Revenue",
+        "value": "5,476",
+        "subtitle": null
+      },
+      {
+        "title": "Total Profit",
+        "value": "1,194,817",
+        "subtitle": null
+      },
+      {
+        "title": "Top Region",
+        "value": "East",
+        "subtitle": "East is the top region by revenue."
+      },
+      {
+        "title": "Top Product",
+        "value": "Enterprise",
+        "subtitle": "Enterprise is the top product by revenue."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "employee_test.csv",
+    "rows": 15,
+    "columns": [
+      "employee_id",
+      "name",
+      "department",
+      "designation",
+      "salary",
+      "bonus",
+      "manager",
+      "hire_date",
+      "location",
+      "team",
+      "performance_rating",
+      "grade"
+    ],
+    "infer_dataset_kind": "hr",
+    "infer_executive_domain": "hr",
+    "infer_kpi_domain": "hr",
+    "infer_auto_dashboard_kind": "hr",
+    "dashboard_kind": "hr",
+    "type_label": "HR / Employee",
+    "cards": [
+      {
+        "title": "Total Employees",
+        "value": "15",
+        "subtitle": null
+      },
+      {
+        "title": "Average salary",
+        "value": "78,667",
+        "subtitle": null
+      },
+      {
+        "title": "Average bonus",
+        "value": "6,267",
+        "subtitle": null
+      },
+      {
+        "title": "Department Count",
+        "value": "7",
+        "subtitle": null
+      },
+      {
+        "title": "Top Department",
+        "value": "IT",
+        "subtitle": "IT is the largest department by employee count."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "finance_fpa.csv",
+    "rows": 330,
+    "columns": [
+      "report_date",
+      "department",
+      "cost_center",
+      "category",
+      "budget",
+      "actual",
+      "variance",
+      "revenue",
+      "cost",
+      "units"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "finance_fpa",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "finance",
+    "type_label": "Finance / FP&A",
+    "cards": [
+      {
+        "title": "Total Revenue",
+        "value": "39,044,642",
+        "subtitle": null
+      },
+      {
+        "title": "Total Cost",
+        "value": "43,356,088",
+        "subtitle": null
+      },
+      {
+        "title": "Net Profit",
+        "value": "-4,311,446",
+        "subtitle": null
+      },
+      {
+        "title": "Margin",
+        "value": "-11.0%",
+        "subtitle": null
+      },
+      {
+        "title": "Total Budget Variance",
+        "value": "1,467,446",
+        "subtitle": null
+      },
+      {
+        "title": "Top Category",
+        "value": "Facilities",
+        "subtitle": "Facilities is the top category by cost."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "geography.csv",
+    "rows": 300,
+    "columns": [
+      "report_date",
+      "zone",
+      "state",
+      "city",
+      "market_type",
+      "store_count",
+      "revenue",
+      "profit",
+      "customers",
+      "growth_rate"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "geography",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "sales",
+    "type_label": "Geographic Analytics",
+    "cards": [
+      {
+        "title": "Total Revenue",
+        "value": "69,163,144",
+        "subtitle": null
+      },
+      {
+        "title": "Average Revenue",
+        "value": "230,544",
+        "subtitle": null
+      },
+      {
+        "title": "Total Profit",
+        "value": "12,183,214",
+        "subtitle": null
+      },
+      {
+        "title": "Top Zone",
+        "value": "North",
+        "subtitle": "North is the top zone by revenue."
+      },
+      {
+        "title": "Top City",
+        "value": "Amritsar",
+        "subtitle": "Amritsar is the top city by revenue."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "healthcare.csv",
+    "rows": 340,
+    "columns": [
+      "report_date",
+      "department",
+      "ward",
+      "region",
+      "patient_volume",
+      "admissions",
+      "readmissions",
+      "length_of_stay_days",
+      "satisfaction_score",
+      "cost"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "healthcare",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "operations",
+    "type_label": "Healthcare",
+    "cards": [
+      {
+        "title": "Total Patient Volume",
+        "value": "340,339",
+        "subtitle": null
+      },
+      {
+        "title": "Total Admissions",
+        "value": "238,445",
+        "subtitle": null
+      },
+      {
+        "title": "Total Readmissions",
+        "value": "21,892",
+        "subtitle": null
+      },
+      {
+        "title": "Readmission Rate",
+        "value": "9.2%",
+        "subtitle": null
+      },
+      {
+        "title": "Average Length of Stay",
+        "value": "5.6 days",
+        "subtitle": null
+      },
+      {
+        "title": "Average Satisfaction Score",
+        "value": "4.03",
+        "subtitle": null
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "hr.csv",
+    "rows": 300,
+    "columns": [
+      "report_date",
+      "department",
+      "location",
+      "job_family",
+      "headcount",
+      "hires",
+      "terminations",
+      "attrition_rate",
+      "satisfaction_score",
+      "personnel_cost"
+    ],
+    "infer_dataset_kind": "hr",
+    "infer_executive_domain": "hr",
+    "infer_kpi_domain": "hr",
+    "infer_auto_dashboard_kind": "hr",
+    "dashboard_kind": "hr",
+    "type_label": "HR / Employee",
+    "cards": [
+      {
+        "title": "Total Headcount",
+        "value": "19,452",
+        "subtitle": null
+      },
+      {
+        "title": "Average personnel cost",
+        "value": "106,531",
+        "subtitle": null
+      },
+      {
+        "title": "Average Attrition Rate",
+        "value": "2.1%",
+        "subtitle": null
+      },
+      {
+        "title": "Department Count",
+        "value": "7",
+        "subtitle": null
+      },
+      {
+        "title": "Top Department",
+        "value": "Finance",
+        "subtitle": "Finance is the top department by headcount."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "marketing.csv",
+    "rows": 320,
+    "columns": [
+      "report_date",
+      "campaign_name",
+      "channel",
+      "region",
+      "spend",
+      "impressions",
+      "clicks",
+      "conversions",
+      "revenue",
+      "cost",
+      "satisfaction_score"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "marketing",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "marketing",
+    "type_label": "Marketing",
+    "cards": [
+      {
+        "title": "Total Spend",
+        "value": "11,675,630",
+        "subtitle": null
+      },
+      {
+        "title": "Total Revenue",
+        "value": "530,243,347",
+        "subtitle": null
+      },
+      {
+        "title": "ROAS",
+        "value": "45.41x",
+        "subtitle": null
+      },
+      {
+        "title": "Total Conversions",
+        "value": "2,069,662",
+        "subtitle": null
+      },
+      {
+        "title": "Top Campaign",
+        "value": "Holiday Promo",
+        "subtitle": "Holiday Promo is the top campaign by revenue."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "monthly_sales.csv",
+    "rows": 5,
+    "columns": [
+      "month",
+      "region",
+      "sales",
+      "units_sold"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "sales",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "sales",
+    "type_label": "Sales",
+    "cards": [
+      {
+        "title": "Total sales",
+        "value": "563,000",
+        "subtitle": null
+      },
+      {
+        "title": "Average sales",
+        "value": "112,600",
+        "subtitle": null
+      },
+      {
+        "title": "Top Region",
+        "value": "North",
+        "subtitle": "North is the top region by sales."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "operations.csv",
+    "rows": 310,
+    "columns": [
+      "report_date",
+      "facility",
+      "department",
+      "production_line",
+      "shift",
+      "units_produced",
+      "downtime_hours",
+      "cost",
+      "defect_rate",
+      "sla_score"
+    ],
+    "infer_dataset_kind": "operations",
+    "infer_executive_domain": "operations",
+    "infer_kpi_domain": "operations",
+    "infer_auto_dashboard_kind": "operations",
+    "dashboard_kind": "operations",
+    "type_label": "Operations",
+    "cards": [
+      {
+        "title": "Total Units Produced",
+        "value": "1,515,219",
+        "subtitle": null
+      },
+      {
+        "title": "Total Downtime Hours",
+        "value": "2,269",
+        "subtitle": null
+      },
+      {
+        "title": "Average Defect Rate",
+        "value": "2.24%",
+        "subtitle": null
+      },
+      {
+        "title": "Top Plant",
+        "value": "Plant-A",
+        "subtitle": "Plant-A is the top facility by downtime hours."
+      },
+      {
+        "title": "Top Production Line",
+        "value": "Line-1",
+        "subtitle": "Line-1 is the top production line by downtime hours."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "operations_incidents_chart_test.csv",
+    "rows": 10,
+    "columns": [
+      "incident_date",
+      "severity",
+      "priority",
+      "plant",
+      "downtime_minutes",
+      "root_cause"
+    ],
+    "infer_dataset_kind": "operations",
+    "infer_executive_domain": "operations",
+    "infer_kpi_domain": "operations",
+    "infer_auto_dashboard_kind": "operations",
+    "dashboard_kind": "operations",
+    "type_label": "Operations",
+    "cards": [
+      {
+        "title": "Total Incidents",
+        "value": "10",
+        "subtitle": null
+      },
+      {
+        "title": "Total Downtime Minutes",
+        "value": "1,130",
+        "subtitle": null
+      },
+      {
+        "title": "Top Plant",
+        "value": "Plant-A",
+        "subtitle": "Plant-A is the top plant by downtime minutes."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "retail.csv",
+    "rows": 360,
+    "columns": [
+      "order_date",
+      "region",
+      "city",
+      "product_category",
+      "product",
+      "revenue",
+      "profit",
+      "customers",
+      "orders",
+      "quantity",
+      "growth_rate"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "sales",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "sales",
+    "type_label": "Sales",
+    "cards": [
+      {
+        "title": "Total Revenue",
+        "value": "47,397,210",
+        "subtitle": null
+      },
+      {
+        "title": "Average Revenue",
+        "value": "131,659",
+        "subtitle": null
+      },
+      {
+        "title": "Total Profit",
+        "value": "10,806,442",
+        "subtitle": null
+      },
+      {
+        "title": "Top Region",
+        "value": "North",
+        "subtitle": "North is the top region by revenue."
+      },
+      {
+        "title": "Top Product Category",
+        "value": "Electronics",
+        "subtitle": "Electronics is the top product category by revenue."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "retail_orders_chart_test.csv",
+    "rows": 10,
+    "columns": [
+      "order_date",
+      "product_category",
+      "region",
+      "order_value",
+      "quantity",
+      "profit"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "sales",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "sales",
+    "type_label": "Sales",
+    "cards": [
+      {
+        "title": "Total Order Value",
+        "value": "9,870",
+        "subtitle": null
+      },
+      {
+        "title": "Average Order Value",
+        "value": "987",
+        "subtitle": null
+      },
+      {
+        "title": "Total Profit",
+        "value": "2,263",
+        "subtitle": null
+      },
+      {
+        "title": "Top Region",
+        "value": "East",
+        "subtitle": "East is the top region by order value."
+      },
+      {
+        "title": "Top Product Category",
+        "value": "Electronics",
+        "subtitle": "Electronics is the top product category by order value."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "sales.csv",
+    "rows": 340,
+    "columns": [
+      "report_date",
+      "region",
+      "territory",
+      "sales_rep",
+      "product_line",
+      "department",
+      "revenue",
+      "units",
+      "cost",
+      "quota",
+      "attainment_pct"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "sales",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "sales",
+    "type_label": "Sales",
+    "cards": [
+      {
+        "title": "Total Revenue",
+        "value": "91,732,347",
+        "subtitle": null
+      },
+      {
+        "title": "Average Revenue",
+        "value": "269,801",
+        "subtitle": null
+      },
+      {
+        "title": "Total units",
+        "value": "40,248",
+        "subtitle": null
+      },
+      {
+        "title": "Top Region",
+        "value": "North",
+        "subtitle": "North is the top region by revenue."
+      },
+      {
+        "title": "Top Product Line",
+        "value": "SMB Starter",
+        "subtitle": "SMB Starter is the top product line by revenue."
+      }
+    ],
+    "na_titles": []
+  },
+  {
+    "file": "screenshot-fixture.csv",
+    "rows": 36,
+    "columns": [
+      "order_date",
+      "region",
+      "city",
+      "product_category",
+      "product",
+      "revenue",
+      "profit",
+      "customers",
+      "orders",
+      "quantity",
+      "growth_rate"
+    ],
+    "infer_dataset_kind": "sales",
+    "infer_executive_domain": "sales",
+    "infer_kpi_domain": "sales",
+    "infer_auto_dashboard_kind": "sales",
+    "dashboard_kind": "sales",
+    "type_label": "Sales",
+    "cards": [
+      {
+        "title": "Total Revenue",
+        "value": "6,458,000",
+        "subtitle": null
+      },
+      {
+        "title": "Average Revenue",
+        "value": "179,389",
+        "subtitle": null
+      },
+      {
+        "title": "Total Profit",
+        "value": "1,488,500",
+        "subtitle": null
+      },
+      {
+        "title": "Top Region",
+        "value": "West",
+        "subtitle": "West is the top region by revenue."
+      },
+      {
+        "title": "Top Product Category",
+        "value": "Electronics",
+        "subtitle": "Electronics is the top product category by revenue."
+      }
+    ],
+    "na_titles": []
+  }
+]

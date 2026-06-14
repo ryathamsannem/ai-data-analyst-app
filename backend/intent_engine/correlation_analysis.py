@@ -569,6 +569,68 @@ def resolve_relationship_numeric_pair(
     return _best_pair_by_joint_observations(df, nums)
 
 
+def resolve_scatter_metric_columns_for_payload(
+    question: str,
+    col_x: str,
+    col_y: str,
+    *,
+    driver: bool = False,
+    profile: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, str]:
+    """
+    Map scatter axes to analysis payload metricColumn / secondaryMetricColumn.
+
+    - Driver questions: outcome metric (Y) is primary.
+    - \"A correlated with B\": A is primary.
+    - Otherwise prefer the business outcome token named in the question (revenue, cost, …).
+    """
+    x, y = str(col_x), str(col_y)
+    if driver:
+        return y, x
+
+    q = (question or "").strip()
+    pair = [x, y]
+    prof = profile or {}
+
+    m = _CORRELATED_WITH_RE.search(q)
+    if m:
+        left = _phrase_to_column(m.group(1).strip(), pair, prof)
+        if left and left in pair:
+            return left, y if left == x else x
+
+    ql = _norm_phrase(q)
+    for token in (
+        "interest income",
+        "loan balance",
+        "revenue",
+        "sales",
+        "profit",
+        "margin",
+        "income",
+        "cost",
+        "spend",
+        "downtime",
+        "defect",
+        "attrition",
+        "satisfaction",
+        "resolution",
+        "patient volume",
+        "customers",
+        "units",
+    ):
+        if token not in ql:
+            continue
+        for c in pair:
+            cn = _norm_phrase(str(c))
+            if token in cn or cn.startswith(token.split()[0]):
+                return c, y if c == x else x
+
+    ordered = _columns_ordered_in_question(q, pair)
+    if len(ordered) >= 2:
+        return ordered[0], ordered[1]
+    return x, y
+
+
 def can_compute_correlation(df: pd.DataFrame, col_x: str, col_y: str) -> bool:
     """True when at least two joint numeric observations exist."""
     return _joint_non_null_count(df, col_x, col_y) >= 2

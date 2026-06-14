@@ -57,6 +57,29 @@ def _column_labels(df: pd.DataFrame, col: str) -> Set[str]:
 
 
 def _resolve_expected_metric(main_mod, question: str, df: pd.DataFrame, profile: Dict[str, Any]) -> Optional[str]:
+    try:
+        from intent_engine.correlation_analysis import (
+            resolve_relationship_numeric_pair,
+            resolve_scatter_metric_columns_for_payload,
+        )
+        from intent_engine.question_patterns import (
+            question_requests_correlation_routing,
+            question_requests_driver_intent,
+        )
+
+        if question_requests_correlation_routing(question):
+            pair = resolve_relationship_numeric_pair(question, df, profile)
+            if pair:
+                primary, _ = resolve_scatter_metric_columns_for_payload(
+                    question,
+                    str(pair[0]),
+                    str(pair[1]),
+                    driver=question_requests_driver_intent(question),
+                    profile=profile,
+                )
+                return str(primary)
+    except Exception:
+        pass
     spec = main_mod._resolve_question_metric_spec(question, df, profile)
     if spec and spec.get("value_col"):
         return str(spec["value_col"])

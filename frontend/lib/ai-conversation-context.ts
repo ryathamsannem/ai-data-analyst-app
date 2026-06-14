@@ -60,6 +60,40 @@ export type BuildParentAnalysisContextArgs = {
   } | null;
 };
 
+export type AskAiMode =
+  | "default"
+  | "scoped_follow_up"
+  | "fresh_root_chart_entry"
+  | "fresh_root_from_suggestion";
+
+export type AskAiContinuationOpts = {
+  mode?: AskAiMode;
+  fromFollowUpChip?: boolean;
+  manualSubmit?: boolean;
+  /** Chart entry (Overview / Charts / KPI) — always a new root analysis, never a follow-up. */
+  freshRoot?: boolean;
+};
+
+export function resolveAskAiMode(opts?: AskAiContinuationOpts): AskAiMode {
+  if (opts?.mode) return opts.mode;
+  if (opts?.freshRoot) return "fresh_root_chart_entry";
+  if (opts?.fromFollowUpChip) return "scoped_follow_up";
+  return "default";
+}
+
+export function isFreshRootAskMode(opts?: AskAiContinuationOpts): boolean {
+  const mode = resolveAskAiMode(opts);
+  return (
+    mode === "fresh_root_chart_entry" || mode === "fresh_root_from_suggestion"
+  );
+}
+
+export function isFreshRootFromSuggestionMode(
+  opts?: AskAiContinuationOpts
+): boolean {
+  return resolveAskAiMode(opts) === "fresh_root_from_suggestion";
+}
+
 export function buildParentAnalysisContext(
   args: BuildParentAnalysisContextArgs
 ): ParentAnalysisContext | null {
@@ -109,12 +143,61 @@ export function buildParentAnalysisContext(
 
 export function shouldSendFollowUpContinuation(
   parent: ParentAnalysisContext | null,
-  opts?: { fromFollowUpChip?: boolean; manualSubmit?: boolean }
+  opts?: AskAiContinuationOpts
 ): boolean {
+  if (isFreshRootAskMode(opts)) return false;
   if (!parent?.priorQuestion?.trim()) return false;
+  if (resolveAskAiMode(opts) === "scoped_follow_up") return true;
   if (opts?.fromFollowUpChip) return true;
   if (opts?.manualSubmit) return true;
   return false;
+}
+
+/** Options for ASK AI launched from a chart tile (not from in-thread follow-up). */
+export const CHART_ENTRY_ASK_OPTS: AskAiContinuationOpts = {
+  mode: "fresh_root_chart_entry",
+  freshRoot: true,
+};
+
+export type BuildAskContinuationPayloadArgs = BuildParentAnalysisContextArgs & {
+  opts?: AskAiContinuationOpts;
+  hasValidAIAnswer?: boolean;
+  aiConversationState?: {
+    followUpChain?: string[];
+    turnId?: string | null;
+    lastQuestion?: string;
+  } | null;
+};
+
+/** Pure helper — mirrors `/ask` continuation fields for tests and askAI. */
+export function buildAskContinuationPayload(
+  args: BuildAskContinuationPayloadArgs
+): {
+  continuationIntent: boolean;
+  parentAnalysisContext: ParentAnalysisContext | null;
+} {
+  const opts = args.opts;
+  const freshRoot = isFreshRootAskMode(opts);
+  const parentAnalysisContext = freshRoot
+    ? null
+    : buildParentAnalysisContext(args);
+  const continuationIntent = shouldSendFollowUpContinuation(
+    parentAnalysisContext,
+    {
+      ...opts,
+      freshRoot,
+      manualSubmit: freshRoot
+        ? false
+        : Boolean(
+            opts?.manualSubmit ??
+              (parentAnalysisContext?.priorQuestion?.trim() &&
+                (args.conversationSnapshot?.lastQuestion?.trim() ||
+                  args.aiConversationState?.lastQuestion?.trim() ||
+                  args.hasValidAIAnswer))
+          ),
+    }
+  );
+  return { continuationIntent, parentAnalysisContext };
 }
 
 /** Universal meta follow-ups after any answered insight (provenance / audit). */

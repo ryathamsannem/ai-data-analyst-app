@@ -102,6 +102,7 @@ def resolve_analysis_intent(
     if (
         requests_multi
         and not requests_relationship
+        and not dual_compare
         and df is not None
         and not df.empty
         and profile is not None

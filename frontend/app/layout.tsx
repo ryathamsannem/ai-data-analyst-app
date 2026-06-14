@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BrandingStyles } from "@/components/branding/branding-styles";
+import {
+  ScrollRestoration,
+  ScrollRestorationScript,
+} from "@/components/scroll-restoration";
 import { APP_METADATA } from "@/lib/branding-config";
 import { ThemeScript } from "@/components/theme-script";
 import "./globals.css";
@@ -33,8 +37,10 @@ export default function RootLayout({
     >
       <head>
         <ThemeScript />
+        <ScrollRestorationScript />
       </head>
       <body className="min-h-full w-full overflow-x-hidden bg-background font-sans text-foreground">
+        <ScrollRestoration />
         <BrandingStyles />
         {children}
       </body>

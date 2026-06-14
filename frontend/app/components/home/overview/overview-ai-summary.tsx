@@ -46,36 +46,36 @@ export const OverviewAiSummaryPanel = memo(function OverviewAiSummaryPanel({
 }) {
   return (
     <section
-      className={`overview-ai-summary-card relative overflow-hidden p-5 sm:p-6 ${ovCardElevated} ring-1 ring-[color:var(--accent)]/10`}
+      className={`overview-ai-summary-card relative overflow-hidden p-4 sm:p-5 ${ovCardElevated} ring-1 ring-[color:var(--accent)]/8`}
     >
       <div
-        className="overview-ai-summary-card__glow pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[color:var(--accent-wash)] blur-3xl"
+        className="overview-ai-summary-card__glow pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[color:var(--accent-wash)] blur-3xl"
         aria-hidden
       />
-      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--accent-muted)] bg-[color:var(--accent-wash)] shadow-[var(--shadow-sm)]">
+      <div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color:var(--accent-muted)] bg-[color:var(--accent-wash)] shadow-[var(--shadow-sm)]">
             <SparkleIcon />
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className={ovSectionTitle}>AI Summary</h2>
-              <span className={ovChipAccent}>Auto-generated</span>
+              <span className={ovChipAccent}>Executive snapshot</span>
             </div>
-            <p className={`mt-1.5 ${ovSectionDesc}`}>
-              Based on your file, KPI cards, and auto-dashboard charts—updates when you
-              upload, switch sheets, or change mapping.
+            <p className={`mt-1 ${ovSectionDesc}`}>
+              Key takeaways from your dataset—updates when you upload, switch sheets, or
+              change mapping.
             </p>
           </div>
         </div>
         <span className={`hidden shrink-0 sm:inline ${ovLabel}`}>Insights</span>
       </div>
 
-      <ul className="relative mt-5 space-y-2.5">
+      <ul className="relative mt-3.5 space-y-2">
         {bullets.map((line, idx) => (
           <li
             key={idx}
-            className="saas-btn-premium !flex !h-auto !w-full !cursor-default !justify-start gap-3 !rounded-xl !px-3.5 !py-3 !text-left !text-sm !font-normal !leading-relaxed hover:!-translate-y-0.5"
+            className="overview-ai-summary-card__insight saas-btn-premium !flex !h-auto !w-full !cursor-default !justify-start gap-2.5 !rounded-lg !px-3 !py-2.5 !text-left !text-sm !font-normal !leading-relaxed hover:!translate-y-0"
           >
             <InsightRowIcon />
             <span className="min-w-0 flex-1 pt-0.5">{line}</span>

@@ -9,20 +9,26 @@ import {
   type ReactNode,
 } from "react";
 import type { ChartKind, ChartRow } from "../app/chart-types";
-import { formatExecutiveMetricValue } from "../lib/metric-value-format";
+import {
+  autoDashboardChartRowsEqual,
+  buildRowsFromAutoDashboardMini,
+  buildStubVizFromAutoDashboardMini,
+  resolveScatterAxisLabels,
+  type AutoDashboardMiniLike,
+} from "../lib/auto-dashboard-session-sync";
+import {
+  chartKindToTimelineType,
+  type TimelineChartType,
+} from "../lib/chart-layout-config";
 import {
   buildFinalChartPresentationMeta,
   chartKindToApiChartType,
-  computeFinalChartPresentation,
+  computeAutoDashboardChartPresentation,
 } from "../lib/final-chart-presentation";
 import {
   freezeVisualizationContract,
   type VisualizationContract,
 } from "../lib/selected-visualization";
-import {
-  chartKindToTimelineType,
-  type TimelineChartType,
-} from "../lib/chart-layout-config";
 
 export type ChartSource = "ai" | "auto_dashboard";
 
@@ -37,12 +43,7 @@ export type FinalChartPresentationMeta = {
   grain?: string | null;
 };
 
-export type AutoDashboardLike = {
-  title: string;
-  chartType: string;
-  labels: string[];
-  values: number[];
-};
+export type AutoDashboardLike = AutoDashboardMiniLike;
 
 export type ChartSnapshot = {
   id: string;
@@ -120,73 +121,6 @@ function aiDedupeKeyFromSnapshot(h: ChartSnapshot): string {
     chartKind: h.chartKind,
     analysisContextKey: h.analysisContextKey,
   });
-}
-
-function normalizeMiniChartKind(raw: string): ChartKind {
-  const c = raw.toLowerCase().replace(/\s+/g, "");
-  if (c === "horizontalbar" || c === "bar_horizontal" || c === "horizontal_bar")
-    return "bar_horizontal";
-  if (c === "line") return "line";
-  if (c === "area") return "area";
-  if (c === "scatter") return "scatter";
-  if (c === "histogram") return "histogram";
-  if (c === "pie") return "pie";
-  if (c === "donut") return "donut";
-  return "bar";
-}
-
-function rowsFromMiniChart(
-  mini: AutoDashboardLike,
-  kindOverride?: ChartKind
-): ChartRow[] {
-  const chartKind = kindOverride ?? normalizeMiniChartKind(mini.chartType);
-  const cap = Math.min(mini.labels.length, mini.values.length);
-  const rows: ChartRow[] = [];
-  for (let i = 0; i < cap; i++) {
-    const v = mini.values[i];
-    if (!Number.isFinite(v)) continue;
-    const dispKind: ChartKind =
-      chartKind === "donut"
-        ? "pie"
-        : chartKind === "bar_horizontal"
-          ? "bar_horizontal"
-          : chartKind === "histogram"
-            ? "histogram"
-            : "bar";
-    const row: ChartRow = {
-      name: mini.labels[i] || "—",
-      value: v,
-    };
-    rows.push({
-      ...row,
-      displayValue: formatExecutiveMetricValue(row, {
-        metricLabel: mini.title,
-        chartTitle: mini.title,
-        presentationKind: dispKind,
-      }),
-    });
-  }
-  return rows;
-}
-
-/** Minimal visualization envelope so `renderDatasetChart` / export paths behave like AI charts. */
-function stubVisualizationForMini(
-  mini: AutoDashboardLike,
-  chartKind: ChartKind,
-  rows: ChartRow[]
-): Record<string, unknown> {
-  return {
-    chartType: chartKindToApiChartType(chartKind),
-    title: mini.title.trim(),
-    subtitle: "Auto dashboard",
-    labels: rows.map((r) => r.name),
-    values: rows.map((r) => r.value),
-    formattedValues: rows.map((r) => r.displayValue ?? ""),
-    provenance: null,
-    multiSeries: null,
-    partialVisualizationWarning: null,
-    interaction: null,
-  };
 }
 
 export type ChartSessionValue = {
@@ -411,32 +345,28 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
       const added: ChartSnapshot[] = [];
       for (const mini of charts) {
         if (!mini?.title?.trim()) continue;
-        const baseRows = rowsFromMiniChart(mini);
+        const baseRows = buildRowsFromAutoDashboardMini(mini);
         if (!baseRows.length) continue;
-        const finalKind = computeFinalChartPresentation({
+        const finalKind = computeAutoDashboardChartPresentation({
           apiChartType: mini.chartType,
           title: mini.title.trim(),
-          question: undefined,
           rows: baseRows,
         });
-        const rows = rowsFromMiniChart(mini, finalKind);
+        const rows = buildRowsFromAutoDashboardMini(mini, finalKind);
         const key = dashboardChartKeyFromTitle(mini.title);
         const existing = existingAuto.get(key);
         if (
           existing &&
           existing.chartKind === finalKind &&
-          existing.chartData.length === rows.length &&
-          existing.chartData.every(
-            (row, i) =>
-              String(row.name ?? "") === String(rows[i]?.name ?? "") &&
-              Number(row.value) === Number(rows[i]?.value)
-          )
+          autoDashboardChartRowsEqual(existing.chartData, rows)
         ) {
           added.push(existing);
           continue;
         }
         const snapId = existing?.id ?? newId();
         const createdAt = existing?.createdAt ?? Date.now();
+        const scatterAxis =
+          finalKind === "scatter" ? resolveScatterAxisLabels(mini) : null;
         const contract = freezeVisualizationContract({
           id: snapId,
           source: "auto_dashboard",
@@ -446,8 +376,12 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           labels: rows.map((r) => String(r.name ?? "")),
           values: rows.map((r) => Number(r.value)),
           rows,
+          metricColumn: scatterAxis?.yColumn ?? mini.metricColumn ?? null,
+          categoryColumn: scatterAxis?.xColumn ?? null,
+          scatterXLabel: scatterAxis?.scatterXLabel ?? null,
+          scatterYLabel: scatterAxis?.scatterYLabel ?? null,
         });
-        const viz = stubVisualizationForMini(mini, contract.chartType, rows);
+        const viz = buildStubVizFromAutoDashboardMini(mini, contract.chartType, rows);
         added.push({
           id: snapId,
           source: "auto_dashboard",

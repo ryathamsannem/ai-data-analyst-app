@@ -138,9 +138,13 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
                 <p className={aiInsightsExecutiveCardLabel}>{c.title}</p>
               </div>
               <div className="flex flex-1 flex-col justify-end">
-                <p className={aiInsightsExecutiveCardValue}>{c.value}</p>
+                <p className={aiInsightsExecutiveCardValue} title={c.value}>
+                  {c.value}
+                </p>
                 {c.hint ? (
-                  <p className={aiInsightsExecutiveCardHint}>{c.hint}</p>
+                  <p className={aiInsightsExecutiveCardHint} title={c.hint}>
+                    {c.hint}
+                  </p>
                 ) : (
                   <span className={aiInsightsExecutiveCardHintSpacer} aria-hidden />
                 )}

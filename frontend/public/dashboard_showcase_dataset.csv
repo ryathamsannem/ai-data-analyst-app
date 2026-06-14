@@ -1,0 +1,521 @@
+date,region,country,city,department,product,customer_segment,campaign,channel,revenue,profit,cost,quantity,customers,satisfaction_score,conversion_rate,ad_spend,loan_balance,deposit_balance,latitude,longitude
+2025-01-11,North,USA,Minneapolis,Finance,Professional,Mid-Market,Upsell,Direct,2493.27,716.35,1776.92,13,3,4.5,0.0526,198.32,3456.83,1803.54,42.5028,-87.6399
+2025-04-27,North,USA,Minneapolis,Finance,Professional,SMB,Upsell,Partner,3284.13,1713.03,1571.1,22,1,4.29,0.0591,322.37,3855.21,3819.94,41.7088,-88.2721
+2025-03-25,South,USA,Atlanta,Operations,Enterprise,Enterprise,Holiday Push,Direct,13267.25,6451.73,6815.52,67,5,4.41,0.0452,2009.92,15221.38,33043.34,33.4799,-83.204
+2025-02-17,East,USA,Philadelphia,Finance,Professional,Enterprise,Holiday Push,Direct,8180.76,3386.23,4794.53,51,2,3.89,0.0777,471.04,5754.83,12496.74,41.2524,-74.3418
+2025-03-15,East,USA,Philadelphia,Support,Enterprise,Mid-Market,Holiday Push,Partner,10883.74,6238.41,4645.33,117,4,4.32,0.0566,1435.96,9844.68,8780.72,39.6418,-74.7978
+2025-06-07,South,USA,Miami,Operations,Enterprise,Mid-Market,Summer Promo,Retail,11243.68,4103.19,7140.49,78,2,3.95,0.059,820.57,24078.74,35471.77,33.2764,-84.2139
+2024-02-15,South,USA,Dallas,Sales,Enterprise,SMB,Retention,Online,9898.71,5617.67,4281.04,66,2,4.76,0.0358,941.3,14623.26,5739.41,32.5234,-85.2125
+2024-09-21,East,USA,Philadelphia,Sales,Starter,SMB,Holiday Push,Online,827.1,337.85,489.24,5,3,3.82,0.045,100.93,224.51,2359.58,40.657,-72.5857
+2024-05-04,Central,Canada,Calgary,Marketing,Starter,Mid-Market,Upsell,Retail,963.35,398.39,564.96,7,6,4.08,0.0409,172.45,2147.49,3005.77,43.728,-79.4949
+2024-12-23,North,USA,Detroit,Operations,Professional,SMB,Retention,Partner,4859.55,2680.82,2178.73,26,4,4.88,0.0378,367.07,3770.09,15652.21,41.4843,-87.6041
+2024-03-12,East,USA,New York,Support,Starter,SMB,Summer Promo,Partner,1201.61,653.02,548.6,7,5,3.5,0.0455,107.09,1467.72,3388.58,41.7699,-74.1236
+2024-12-08,Central,Canada,Calgary,Operations,Starter,Mid-Market,Holiday Push,Direct,775.48,417.13,358.35,5,7,4.64,0.0523,99.87,1682.29,2024.69,43.1764,-80.1015
+2024-05-13,North,USA,Detroit,Support,Add-on Analytics,SMB,Holiday Push,Online,446.1,158.9,287.2,2,2,3.93,0.0631,75.72,184.61,667.6,41.6929,-88.6999
+2024-01-29,East,USA,New York,Finance,Starter,SMB,Q1 Launch,Retail,1061.87,399.04,662.84,7,5,4.06,0.0825,104.67,1390.4,908.81,41.6529,-73.7898
+2025-05-02,East,USA,Philadelphia,Finance,Starter,Enterprise,Upsell,Retail,1332.4,452.21,880.2,7,4,4.17,0.0777,112.77,465.57,2894.74,40.9624,-72.6181
+2024-07-23,South,USA,Dallas,Operations,Professional,Enterprise,Summer Promo,Partner,4541.88,2229.78,2312.1,21,6,4.47,0.0483,346.6,7889.22,15953.42,33.7563,-83.463
+2025-05-20,West,USA,San Francisco,Finance,Enterprise,Mid-Market,Q1 Launch,Online,12896.73,3770.18,9126.55,67,7,4.24,0.0998,1925.61,25769.11,28663.45,36.0494,-122.8729
+2024-12-21,Central,Canada,Toronto,Finance,Starter,Enterprise,Q1 Launch,Partner,2285.93,794.82,1491.1,13,5,4.03,0.0402,228.21,4170.02,5567.32,42.9422,-79.2382
+2025-01-22,West,USA,Seattle,Sales,Professional,Mid-Market,Upsell,Direct,6802.08,3703.44,3098.64,34,3,3.89,0.0649,745.58,7521.64,10589.11,38.1194,-122.179
+2024-06-02,East,USA,New York,Marketing,Add-on Analytics,SMB,Upsell,Online,792.18,434.18,358.01,3,3,4.2,0.0588,60.02,1803.48,2215.69,40.4873,-74.094
+2024-05-08,North,USA,Chicago,Support,Enterprise,Enterprise,Upsell,Retail,8606.54,4844.02,3762.52,44,5,3.75,0.0827,1252.26,4153.55,12459.3,42.4429,-86.2234
+2024-01-23,West,USA,Seattle,Operations,Starter,SMB,Retention,Direct,848.75,311.6,537.15,8,2,3.62,0.0395,58.45,2007.34,1319.54,36.5185,-121.5462
+2024-10-01,South,USA,Dallas,Operations,Add-on Analytics,SMB,Q1 Launch,Partner,605.05,264.86,340.19,6,2,4.58,0.0362,62.41,329.19,1548.37,32.8061,-84.7669
+2024-11-05,South,USA,Dallas,Operations,Professional,SMB,Summer Promo,Direct,3332.88,1231.16,2101.72,19,5,4.1,0.0802,565.71,4196.37,7735.49,33.0764,-84.0558
+2024-02-08,East,USA,Philadelphia,Marketing,Professional,SMB,Q1 Launch,Direct,5370.92,3025.6,2345.32,45,3,3.28,0.0543,375.8,8067.66,4935.09,38.3284,-74.4348
+2025-01-06,North,USA,Minneapolis,Operations,Add-on Analytics,Mid-Market,Summer Promo,Retail,529.22,245.37,283.85,3,1,4.46,0.0601,94.51,735.58,1818.8,42.8686,-87.7531
+2025-02-11,East,USA,Boston,Support,Professional,SMB,Q1 Launch,Retail,4042.83,1775.62,2267.21,39,3,3.4,0.0503,246.35,2462.76,13958.11,40.8981,-74.1434
+2024-07-16,East,USA,Philadelphia,Finance,Add-on Analytics,Mid-Market,Q1 Launch,Online,1107.03,529.67,577.36,5,8,3.7,0.0467,104.12,530.28,649.7,40.1777,-73.5613
+2024-05-30,East,USA,New York,Sales,Enterprise,Mid-Market,Q1 Launch,Partner,9436.38,3678.95,5757.43,43,9,5.0,0.0315,1679.63,6799.58,28952.12,39.3786,-75.0249
+2024-09-08,East,USA,Philadelphia,Support,Professional,Enterprise,Upsell,Retail,3217.4,1468.83,1748.57,16,2,3.81,0.0538,181.24,879.01,9213.26,39.561,-73.6429
+2024-01-27,North,USA,Minneapolis,Finance,Enterprise,Mid-Market,Upsell,Partner,10330.34,4064.27,6266.07,51,1,4.22,0.0419,1418.46,6137.73,35998.49,43.0887,-85.5605
+2024-05-28,Central,Canada,Toronto,Finance,Enterprise,Mid-Market,Summer Promo,Direct,12146.57,6361.42,5785.14,132,6,4.04,0.0722,1226.9,27794.35,27198.7,43.4607,-78.0657
+2024-09-01,North,USA,Chicago,Marketing,Starter,Mid-Market,Q1 Launch,Partner,1108.32,528.68,579.64,7,6,3.37,0.0876,149.56,829.53,1490.47,42.4686,-87.3205
+2025-03-03,South,USA,Miami,Sales,Professional,SMB,Holiday Push,Partner,3585.71,1608.14,1977.58,24,7,4.77,0.0396,195.99,8603.69,3085.54,33.0741,-86.2563
+2024-06-17,East,USA,New York,Support,Professional,SMB,Holiday Push,Retail,3190.36,1743.59,1446.76,23,2,3.69,0.0526,206.0,6881.31,1608.95,40.5314,-74.9727
+2025-03-30,North,USA,Chicago,Operations,Professional,Mid-Market,Retention,Partner,5336.75,2579.0,2757.75,46,4,4.45,0.0313,299.7,1843.92,19830.74,41.9265,-86.9778
+2024-05-10,Central,Canada,Toronto,Sales,Starter,Enterprise,Retention,Partner,2943.35,1186.0,1757.35,14,1,4.52,0.0859,244.46,6760.83,6153.37,45.239,-77.9719
+2025-03-07,North,USA,Detroit,Finance,Add-on Analytics,SMB,Summer Promo,Online,835.62,430.42,405.2,6,2,4.25,0.028,118.7,1542.93,1345.37,42.0042,-86.5195
+2024-04-03,South,USA,Atlanta,Finance,Starter,Enterprise,Retention,Direct,2043.44,577.21,1466.24,25,1,4.91,0.0616,244.61,3176.49,2975.57,33.1031,-85.4003
+2024-01-10,North,USA,Chicago,Marketing,Enterprise,Enterprise,Upsell,Direct,25288.13,12912.52,12375.61,124,4,4.27,0.0729,2642.75,32532.11,13747.75,41.3377,-87.3977
+2024-08-01,East,USA,Boston,Support,Starter,Enterprise,Upsell,Online,1748.49,935.77,812.72,8,2,3.58,0.0246,204.94,3242.21,5348.59,41.0167,-72.7508
+2025-03-06,East,USA,New York,Finance,Add-on Analytics,Enterprise,Upsell,Retail,1321.27,685.32,635.95,7,1,4.96,0.0494,120.88,2010.78,3347.39,40.1342,-73.2248
+2024-07-22,East,USA,Philadelphia,Operations,Professional,SMB,Q1 Launch,Partner,3503.13,1894.03,1609.1,34,5,4.07,0.0442,412.89,4102.32,4932.55,40.9231,-74.8063
+2024-02-29,North,USA,Minneapolis,Marketing,Enterprise,Enterprise,Holiday Push,Retail,19556.87,9613.53,9943.34,104,7,4.66,0.0543,2356.75,8082.43,27113.53,41.5506,-86.7605
+2024-07-19,South,USA,Dallas,Operations,Enterprise,Enterprise,Summer Promo,Retail,19006.05,6690.05,12316.01,101,3,4.0,0.0353,1972.14,21375.13,25817.95,34.4899,-83.474
+2024-05-14,East,USA,Philadelphia,Finance,Professional,Mid-Market,Holiday Push,Online,2757.12,1465.75,1291.37,13,7,4.13,0.0414,196.49,3821.48,3383.01,40.6297,-73.2478
+2024-11-24,South,USA,Atlanta,Sales,Add-on Analytics,SMB,Summer Promo,Retail,875.4,402.56,472.83,5,6,4.31,0.0287,114.63,1643.2,2869.31,34.9935,-84.2952
+2025-06-20,East,USA,Boston,Marketing,Enterprise,Enterprise,Q1 Launch,Online,16379.05,9194.89,7184.16,113,2,4.05,0.0608,1800.76,27023.44,42568.07,41.0551,-73.6293
+2025-04-01,East,USA,Boston,Operations,Starter,SMB,Retention,Retail,1205.15,536.42,668.72,5,7,4.69,0.0419,202.37,1263.3,3331.93,40.1166,-74.3316
+2024-12-26,East,USA,Boston,Marketing,Starter,Enterprise,Q1 Launch,Partner,1510.31,575.62,934.69,18,4,3.63,0.0351,131.18,2547.66,5567.23,41.0279,-73.5071
+2024-05-17,East,USA,Philadelphia,Finance,Add-on Analytics,Mid-Market,Retention,Online,991.98,479.97,512.01,4,3,3.86,0.0524,159.73,799.08,2386.63,41.2589,-73.9185
+2025-05-13,Central,Canada,Vancouver,Support,Starter,Mid-Market,Upsell,Retail,955.83,273.88,681.95,5,5,4.17,0.0517,74.99,1950.02,3356.86,43.0845,-79.4482
+2024-03-15,North,USA,Detroit,Operations,Add-on Analytics,SMB,Upsell,Direct,672.83,366.89,305.94,4,3,4.69,0.076,57.31,1488.38,1898.78,40.6815,-88.8349
+2024-09-27,East,USA,New York,Sales,Professional,Mid-Market,Holiday Push,Direct,5389.87,2070.75,3319.11,24,3,4.32,0.0556,305.52,9058.54,9360.49,41.2606,-75.0847
+2025-02-08,Central,Canada,Calgary,Support,Professional,Mid-Market,Summer Promo,Direct,4771.86,2064.42,2707.45,23,3,3.94,0.0507,509.26,9241.0,2967.79,43.3839,-77.9829
+2025-03-20,South,USA,Atlanta,Sales,Starter,SMB,Upsell,Partner,878.48,293.62,584.86,9,5,4.1,0.108,129.75,261.15,703.61,33.3926,-83.5848
+2024-03-15,North,USA,Minneapolis,Sales,Professional,Enterprise,Upsell,Retail,6542.63,2913.96,3628.67,48,5,3.94,0.0513,1031.85,11621.88,3879.93,41.5091,-88.5194
+2025-02-13,South,USA,Dallas,Finance,Professional,SMB,Holiday Push,Partner,2116.91,871.39,1245.52,15,3,4.48,0.0367,352.01,3420.34,2332.54,33.5872,-83.1746
+2024-04-26,Central,Canada,Vancouver,Support,Add-on Analytics,Mid-Market,Q1 Launch,Partner,2029.69,1058.19,971.5,11,2,3.5,0.0414,186.02,1830.57,1407.48,45.4253,-79.162
+2025-05-17,Central,Canada,Vancouver,Operations,Starter,Enterprise,Upsell,Direct,760.63,416.66,343.97,7,4,4.68,0.0636,70.06,1803.92,1916.03,44.053,-79.8396
+2025-06-08,Central,Canada,Calgary,Marketing,Professional,Mid-Market,Holiday Push,Partner,5239.65,2414.13,2825.52,32,2,4.38,0.0892,540.35,5652.52,14231.0,43.2703,-80.8462
+2024-11-02,West,USA,Seattle,Finance,Professional,SMB,Holiday Push,Retail,2221.63,849.49,1372.14,14,3,4.88,0.0404,273.59,4196.32,3112.46,37.0312,-121.8703
+2025-05-25,North,USA,Detroit,Sales,Enterprise,Enterprise,Q1 Launch,Online,16637.19,5038.24,11598.95,103,1,3.83,0.0805,2674.91,20647.48,35439.73,41.8484,-87.3996
+2024-11-01,Central,Canada,Toronto,Support,Add-on Analytics,Enterprise,Summer Promo,Retail,1208.33,642.62,565.71,6,6,3.67,0.0762,136.09,1704.93,4757.81,42.8029,-78.4137
+2025-03-05,Central,Canada,Vancouver,Sales,Professional,SMB,Q1 Launch,Retail,3007.84,1487.92,1519.92,24,2,4.27,0.0315,297.7,4652.49,1926.02,44.374,-79.1657
+2024-07-04,Central,Canada,Toronto,Operations,Starter,Mid-Market,Q1 Launch,Partner,816.34,241.48,574.87,5,4,5.0,0.0423,97.55,2027.68,3147.39,43.8615,-79.9858
+2025-05-20,East,USA,New York,Operations,Add-on Analytics,Mid-Market,Q1 Launch,Partner,630.01,343.2,286.81,7,5,3.99,0.0557,47.01,450.53,2441.48,41.7629,-73.0035
+2025-03-30,North,USA,Minneapolis,Operations,Add-on Analytics,SMB,Upsell,Online,413.04,223.83,189.2,2,7,4.03,0.0251,62.53,460.61,1551.95,42.9819,-88.034
+2024-04-28,South,USA,Atlanta,Support,Starter,SMB,Upsell,Retail,892.99,267.14,625.86,4,2,4.01,0.0374,107.02,1397.51,1077.43,33.3649,-82.6162
+2024-02-18,West,USA,Denver,Finance,Add-on Analytics,SMB,Summer Promo,Direct,1528.69,685.84,842.85,7,4,4.73,0.0456,219.9,645.39,5775.92,36.9568,-123.0946
+2024-08-23,East,USA,Boston,Operations,Enterprise,SMB,Holiday Push,Retail,2628.94,1141.27,1487.68,17,2,3.47,0.0712,291.74,5893.8,5690.25,40.4396,-73.5921
+2024-12-10,West,USA,Seattle,Finance,Add-on Analytics,Enterprise,Holiday Push,Partner,2770.71,1082.46,1688.25,21,7,3.52,0.0376,210.06,4341.88,8632.0,37.5474,-122.5302
+2024-04-16,East,USA,New York,Sales,Add-on Analytics,Enterprise,Q1 Launch,Partner,1748.37,736.38,1011.98,8,4,3.48,0.0591,212.48,3081.62,1302.11,39.8168,-73.7418
+2025-03-19,East,USA,Philadelphia,Sales,Add-on Analytics,SMB,Holiday Push,Partner,580.27,273.74,306.52,5,3,4.08,0.0844,51.87,535.69,769.43,40.8682,-74.5719
+2025-06-23,South,USA,Dallas,Finance,Enterprise,SMB,Upsell,Online,3278.81,1026.48,2252.32,15,3,4.02,0.0238,399.3,6857.73,2886.33,32.9325,-83.8006
+2025-04-25,North,USA,Minneapolis,Finance,Add-on Analytics,Enterprise,Upsell,Direct,1991.98,915.32,1076.66,16,5,4.28,0.0301,315.6,3392.99,2334.05,42.4172,-86.9527
+2024-12-31,Central,Canada,Toronto,Support,Add-on Analytics,Enterprise,Q1 Launch,Partner,875.81,446.16,429.65,7,4,4.11,0.0448,68.05,9.43,2188.72,41.8287,-79.1234
+2024-02-18,South,USA,Atlanta,Support,Enterprise,Enterprise,Upsell,Retail,18557.86,6604.32,11953.54,140,2,3.9,0.0307,3299.37,19107.33,35477.81,33.8909,-83.1378
+2024-09-09,Central,Canada,Calgary,Sales,Add-on Analytics,Enterprise,Q1 Launch,Partner,681.91,357.59,324.33,4,5,3.99,0.0526,54.01,1443.39,1293.71,42.9918,-78.9381
+2025-05-10,West,USA,Seattle,Operations,Add-on Analytics,SMB,Summer Promo,Partner,1046.64,340.67,705.98,9,2,3.55,0.0363,180.03,1905.87,2139.63,37.7066,-122.563
+2024-06-04,Central,Canada,Calgary,Sales,Add-on Analytics,SMB,Retention,Online,842.73,428.53,414.2,5,6,4.34,0.0539,147.38,1520.78,3128.64,45.5096,-80.2801
+2024-02-20,South,USA,Dallas,Finance,Professional,SMB,Upsell,Direct,4053.39,1286.3,2767.09,33,7,4.54,0.0567,577.81,5710.45,9057.78,33.1884,-83.8878
+2025-05-25,Central,Canada,Calgary,Finance,Starter,Enterprise,Summer Promo,Partner,1573.19,558.62,1014.57,13,7,3.32,0.0556,230.82,2090.81,3408.26,43.2372,-79.1922
+2024-07-07,South,USA,Atlanta,Sales,Add-on Analytics,Enterprise,Upsell,Direct,1605.86,863.46,742.4,7,4,3.5,0.0741,95.75,532.11,5452.52,33.2766,-84.3414
+2024-10-08,North,USA,Detroit,Operations,Add-on Analytics,SMB,Retention,Partner,323.85,144.37,179.48,2,4,3.93,0.0919,52.25,62.94,1029.06,41.4066,-86.8857
+2024-11-03,East,USA,Philadelphia,Finance,Add-on Analytics,SMB,Summer Promo,Retail,810.2,335.19,475.01,4,4,3.75,0.0451,49.64,450.4,1655.53,42.9477,-74.3611
+2024-11-30,North,USA,Minneapolis,Support,Professional,Mid-Market,Holiday Push,Direct,4931.21,2132.53,2798.68,32,3,4.14,0.0513,362.52,2674.15,4108.47,41.7937,-87.3809
+2024-11-03,South,USA,Miami,Operations,Enterprise,Enterprise,Q1 Launch,Direct,14461.42,4304.83,10156.58,139,5,3.24,0.056,2600.85,8096.43,21751.76,33.6943,-84.2639
+2024-10-11,West,USA,Seattle,Finance,Add-on Analytics,SMB,Upsell,Direct,490.39,157.91,332.48,2,4,4.49,0.0443,59.41,687.5,1112.83,37.8757,-122.607
+2024-03-09,West,USA,Denver,Support,Professional,Mid-Market,Summer Promo,Online,7437.36,2415.98,5021.38,52,4,4.4,0.0402,424.98,10816.29,4284.16,38.535,-122.0853
+2024-02-08,East,USA,Boston,Marketing,Professional,Enterprise,Holiday Push,Partner,10889.74,3398.52,7491.22,133,4,4.49,0.0473,1243.92,8174.71,23634.17,41.8403,-75.3009
+2024-01-10,West,USA,San Francisco,Sales,Professional,Mid-Market,Retention,Partner,2438.11,943.05,1495.06,14,4,3.75,0.0337,266.09,2523.02,2726.62,36.8394,-122.8437
+2025-05-14,East,USA,New York,Finance,Add-on Analytics,Mid-Market,Q1 Launch,Partner,666.14,383.95,282.19,3,5,2.79,0.0765,46.61,1231.98,507.97,41.5215,-75.5372
+2025-06-07,East,USA,Boston,Finance,Enterprise,Mid-Market,Summer Promo,Retail,8921.55,4186.92,4734.64,85,5,4.82,0.0528,1520.83,5752.04,26097.71,38.9557,-74.3037
+2024-02-08,East,USA,New York,Finance,Enterprise,Enterprise,Summer Promo,Partner,38321.62,13560.83,24760.8,319,7,3.84,0.053,5341.25,4538.48,57600.4,40.6291,-74.3444
+2024-01-18,West,USA,Seattle,Operations,Enterprise,SMB,Summer Promo,Partner,15907.01,7442.65,8464.37,92,2,4.81,0.0617,1892.26,23602.65,9168.96,37.8587,-123.0138
+2025-05-23,Central,Canada,Vancouver,Finance,Starter,SMB,Retention,Retail,996.86,398.33,598.53,5,6,3.8,0.0698,51.95,1127.72,3438.46,44.1005,-80.4116
+2024-01-28,North,USA,Minneapolis,Marketing,Professional,SMB,Q1 Launch,Direct,6269.77,3136.5,3133.27,41,2,4.31,0.0475,1014.07,7026.09,9268.01,39.7185,-87.4357
+2024-06-11,South,USA,Dallas,Support,Add-on Analytics,SMB,Q1 Launch,Online,575.38,266.08,309.3,5,4,4.52,0.0672,92.54,822.72,718.31,33.7818,-85.2984
+2024-05-08,West,USA,San Francisco,Operations,Professional,Mid-Market,Q1 Launch,Retail,6108.56,2064.18,4044.38,28,6,4.27,0.0384,1042.1,4040.42,3900.08,36.5745,-123.9822
+2024-04-14,South,USA,Atlanta,Support,Starter,Mid-Market,Summer Promo,Partner,1358.49,630.95,727.54,10,2,4.27,0.0296,156.97,1806.19,2174.99,34.0743,-84.2439
+2025-02-18,West,USA,Denver,Operations,Add-on Analytics,SMB,Holiday Push,Direct,922.02,449.45,472.57,4,4,3.78,0.0668,148.81,225.62,1351.43,38.0124,-122.0029
+2024-08-17,West,USA,Seattle,Operations,Professional,Enterprise,Summer Promo,Retail,6335.86,3160.95,3174.92,30,4,4.13,0.0366,657.3,13050.49,8860.87,39.5703,-122.7024
+2024-10-11,East,USA,Philadelphia,Operations,Add-on Analytics,SMB,Q1 Launch,Retail,722.49,241.7,480.79,4,3,4.28,0.0429,42.47,925.22,1015.06,41.2852,-74.6774
+2024-06-23,South,USA,Miami,Marketing,Add-on Analytics,SMB,Q1 Launch,Partner,483.74,176.36,307.37,3,2,4.69,0.0496,82.65,1145.84,774.71,33.0193,-85.2621
+2024-05-16,West,USA,Seattle,Marketing,Starter,Mid-Market,Upsell,Retail,1570.33,879.15,691.17,18,4,3.65,0.0274,153.71,2108.84,2416.8,36.9551,-123.1993
+2024-05-21,East,USA,New York,Finance,Professional,SMB,Q1 Launch,Online,3701.78,1715.98,1985.81,28,6,3.89,0.0595,659.93,4242.02,3053.04,40.0069,-73.9889
+2025-04-14,West,USA,Denver,Sales,Enterprise,SMB,Retention,Retail,9947.26,3941.78,6005.48,53,3,4.17,0.0558,740.61,8430.89,29475.95,36.9612,-123.2352
+2024-06-06,East,USA,Philadelphia,Finance,Add-on Analytics,SMB,Q1 Launch,Partner,1028.23,377.92,650.31,6,3,3.39,0.0329,152.53,1212.39,2263.3,41.527,-74.946
+2025-04-29,West,USA,Seattle,Operations,Professional,SMB,Holiday Push,Online,1656.89,921.86,735.03,12,3,4.37,0.0479,97.27,1670.45,1293.98,37.8015,-124.851
+2024-09-25,South,USA,Atlanta,Sales,Starter,SMB,Holiday Push,Partner,1100.82,514.06,586.76,5,3,4.41,0.113,64.94,2003.16,1660.26,34.632,-83.6578
+2024-01-13,Central,Canada,Calgary,Finance,Add-on Analytics,SMB,Q1 Launch,Partner,548.34,177.61,370.72,4,5,4.68,0.0504,90.6,911.9,1589.22,43.3694,-79.076
+2024-06-25,North,USA,Detroit,Marketing,Enterprise,SMB,Holiday Push,Partner,12697.45,6408.96,6288.49,96,4,4.55,0.0344,712.87,24196.62,50220.35,42.4676,-86.7604
+2024-07-12,North,USA,Chicago,Support,Enterprise,Mid-Market,Retention,Retail,10902.11,4376.58,6525.53,49,2,4.78,0.0559,1810.08,21961.56,14886.12,41.9201,-87.3408
+2025-06-10,Central,Canada,Toronto,Operations,Add-on Analytics,Mid-Market,Retention,Retail,838.77,351.25,487.52,5,2,3.93,0.0412,125.39,203.26,3062.33,41.6486,-78.9964
+2025-03-23,North,USA,Minneapolis,Support,Enterprise,SMB,Retention,Direct,12717.28,5139.65,7577.63,101,8,3.35,0.0643,1304.23,18534.74,32405.78,41.4431,-86.8158
+2024-10-17,North,USA,Detroit,Marketing,Add-on Analytics,Enterprise,Retention,Retail,825.55,453.76,371.79,6,4,4.81,0.0255,104.74,698.81,1702.19,39.9383,-89.089
+2024-03-18,South,USA,Dallas,Marketing,Professional,SMB,Q1 Launch,Retail,5726.73,2680.02,3046.71,26,3,4.56,0.035,368.84,8714.08,22087.07,33.9211,-83.6036
+2024-10-25,Central,Canada,Calgary,Support,Add-on Analytics,Mid-Market,Holiday Push,Retail,1007.32,336.61,670.71,6,1,3.89,0.067,173.51,2359.8,2380.74,43.6717,-78.6032
+2024-05-05,West,USA,Seattle,Support,Starter,SMB,Q1 Launch,Online,596.24,319.73,276.51,5,3,4.7,0.0641,100.61,1345.25,2028.3,37.7292,-124.0253
+2025-06-01,West,USA,Seattle,Operations,Enterprise,Mid-Market,Q1 Launch,Direct,9477.94,3275.2,6202.74,71,1,4.05,0.0416,1123.9,8892.16,36914.32,37.1386,-121.7872
+2024-12-13,Central,Canada,Toronto,Operations,Enterprise,SMB,Holiday Push,Direct,3730.73,1844.6,1886.13,21,1,4.21,0.0555,548.7,4818.0,9751.42,43.3543,-79.8812
+2024-01-09,West,USA,San Francisco,Operations,Enterprise,SMB,Upsell,Partner,6999.47,2482.69,4516.77,35,5,4.34,0.0358,353.52,7791.4,11690.91,37.2664,-121.4814
+2024-12-18,North,USA,Detroit,Support,Add-on Analytics,Mid-Market,Upsell,Retail,1257.8,384.89,872.91,13,6,4.08,0.0327,171.8,1104.42,4532.18,41.4531,-89.268
+2024-04-16,South,USA,Miami,Sales,Professional,SMB,Holiday Push,Partner,6354.6,2116.59,4238.01,30,6,4.3,0.0237,727.94,14103.43,17192.57,34.005,-85.0527
+2024-04-17,South,USA,Dallas,Finance,Starter,SMB,Upsell,Partner,1348.25,474.59,873.66,8,9,4.42,0.0259,166.52,357.09,1739.53,34.8291,-84.4703
+2025-03-11,Central,Canada,Vancouver,Operations,Starter,SMB,Holiday Push,Online,894.01,499.72,394.29,5,5,3.79,0.0541,84.38,1789.32,3118.12,43.7692,-79.8416
+2024-12-28,West,USA,San Francisco,Finance,Enterprise,Mid-Market,Summer Promo,Online,11762.05,5018.36,6743.69,55,5,4.64,0.0396,1402.7,11405.19,39320.99,36.9345,-121.2424
+2024-12-13,East,USA,Philadelphia,Marketing,Starter,Mid-Market,Q1 Launch,Online,2652.55,1341.72,1310.83,23,3,4.09,0.0451,411.06,2356.01,5135.86,40.4221,-75.1431
+2025-04-27,Central,Canada,Calgary,Marketing,Starter,SMB,Summer Promo,Online,947.2,464.48,482.72,6,3,3.99,0.0505,151.34,414.35,3009.11,44.3965,-79.9521
+2024-01-18,North,USA,Chicago,Finance,Starter,Enterprise,Holiday Push,Retail,2854.8,1035.71,1819.09,14,4,4.53,0.0534,180.05,2253.61,2151.36,42.7489,-87.4313
+2024-03-28,North,USA,Minneapolis,Sales,Add-on Analytics,Enterprise,Upsell,Partner,1442.08,452.49,989.59,16,5,4.17,0.0649,112.72,2494.39,4187.76,41.5034,-88.3238
+2025-02-03,East,USA,Boston,Operations,Add-on Analytics,Enterprise,Q1 Launch,Partner,895.96,292.1,603.86,5,7,4.39,0.0325,66.21,371.27,588.98,41.2998,-73.6868
+2024-11-18,East,USA,New York,Operations,Enterprise,Mid-Market,Summer Promo,Retail,7108.05,2153.78,4954.27,59,2,3.79,0.0264,1106.21,13085.11,9075.84,41.3606,-73.3841
+2024-12-16,South,USA,Miami,Finance,Enterprise,Mid-Market,Retention,Retail,9962.24,4667.17,5295.06,115,4,3.8,0.0536,985.67,9469.99,20020.25,33.3404,-83.2163
+2024-08-21,East,USA,Philadelphia,Marketing,Add-on Analytics,Mid-Market,Retention,Retail,1007.57,459.12,548.45,6,2,3.98,0.0764,55.12,1565.41,2117.98,40.9227,-75.1008
+2024-10-12,Central,Canada,Toronto,Sales,Professional,SMB,Holiday Push,Partner,2874.41,1527.57,1346.83,30,4,4.23,0.0598,510.4,4438.52,7576.98,45.5951,-80.1322
+2024-08-14,South,USA,Miami,Operations,Starter,Enterprise,Retention,Online,1501.47,451.38,1050.08,14,5,4.43,0.0414,206.54,1712.6,1565.2,34.8447,-83.3052
+2024-01-05,Central,Canada,Toronto,Marketing,Enterprise,Enterprise,Upsell,Online,18420.06,6958.3,11461.76,208,6,4.33,0.07,1691.07,3955.07,24981.19,43.6936,-81.1943
+2024-06-02,Central,Canada,Toronto,Sales,Add-on Analytics,Enterprise,Q1 Launch,Online,1554.95,750.54,804.41,8,5,3.92,0.0407,127.87,3553.14,5116.44,43.0702,-80.3683
+2024-06-22,West,USA,Seattle,Sales,Professional,Enterprise,Holiday Push,Partner,5845.41,2384.03,3461.38,55,3,4.61,0.045,836.46,12788.29,15476.42,37.9859,-120.8443
+2024-02-02,West,USA,Seattle,Sales,Starter,Enterprise,Summer Promo,Partner,1460.53,776.85,683.67,8,6,3.96,0.0329,185.83,894.04,4542.04,38.8373,-122.721
+2025-02-09,West,USA,Seattle,Operations,Starter,SMB,Q1 Launch,Retail,830.27,260.05,570.22,4,5,4.44,0.0619,75.42,293.27,1190.83,39.2608,-123.4153
+2024-05-17,West,USA,Seattle,Operations,Add-on Analytics,Mid-Market,Q1 Launch,Partner,567.56,161.41,406.15,3,2,4.56,0.0517,61.39,1063.49,2221.38,37.0726,-122.5
+2024-02-22,West,USA,Denver,Finance,Starter,SMB,Upsell,Partner,877.48,302.86,574.62,5,3,4.81,0.0474,144.58,820.27,1808.58,37.0868,-123.368
+2025-06-04,North,USA,Minneapolis,Sales,Professional,SMB,Q1 Launch,Online,4566.66,1657.39,2909.27,22,5,4.43,0.0978,416.09,2343.38,9533.59,42.6458,-87.2971
+2025-06-04,South,USA,Miami,Sales,Add-on Analytics,SMB,Upsell,Partner,1138.31,644.01,494.3,12,3,4.43,0.0297,156.95,943.3,3144.58,34.5733,-84.0105
+2024-12-20,South,USA,Atlanta,Finance,Professional,Mid-Market,Retention,Online,7268.01,2836.46,4431.55,71,3,4.32,0.0469,545.76,9843.41,6912.4,33.3391,-85.3107
+2024-01-24,North,USA,Detroit,Marketing,Add-on Analytics,Mid-Market,Q1 Launch,Online,1441.35,506.91,934.43,7,2,4.1,0.0402,227.03,2304.33,4428.94,42.4166,-86.5859
+2024-07-10,South,USA,Atlanta,Marketing,Starter,SMB,Holiday Push,Partner,1182.62,619.88,562.74,9,2,3.89,0.0705,169.04,1776.31,3450.02,34.4499,-85.0273
+2024-12-28,East,USA,New York,Support,Enterprise,SMB,Upsell,Online,16906.38,4811.97,12094.41,96,1,4.45,0.0665,1410.89,20774.28,18735.98,40.8881,-73.0276
+2024-06-04,Central,Canada,Calgary,Sales,Add-on Analytics,SMB,Q1 Launch,Online,531.84,304.18,227.66,3,5,4.21,0.0543,71.49,1234.19,1041.59,43.6415,-79.8989
+2025-01-13,South,USA,Atlanta,Support,Starter,Mid-Market,Summer Promo,Direct,1496.56,603.02,893.54,14,3,4.21,0.0379,210.15,520.07,4979.68,32.9728,-84.0652
+2024-03-01,South,USA,Dallas,Marketing,Professional,SMB,Holiday Push,Direct,3462.69,1904.55,1558.14,33,3,4.4,0.0436,308.15,994.09,8472.39,34.2509,-83.6187
+2024-10-25,West,USA,Denver,Marketing,Professional,SMB,Upsell,Online,3088.51,1338.28,1750.24,36,3,4.35,0.0703,345.98,2615.17,4009.75,37.0425,-122.331
+2024-11-17,South,USA,Miami,Marketing,Starter,Enterprise,Upsell,Partner,1454.95,534.0,920.95,8,5,3.95,0.0488,193.56,2286.01,2871.62,32.8799,-83.5864
+2024-09-22,East,USA,Boston,Finance,Enterprise,Enterprise,Holiday Push,Online,21034.42,6102.31,14932.1,113,3,3.83,0.033,1121.45,31531.59,15785.82,41.3958,-74.3878
+2024-02-04,East,USA,Boston,Finance,Enterprise,Mid-Market,Summer Promo,Partner,8700.96,4780.87,3920.1,94,2,4.32,0.067,894.85,18462.84,19774.3,39.5759,-73.2271
+2024-07-17,East,USA,New York,Finance,Starter,SMB,Summer Promo,Partner,592.09,250.22,341.87,2,4,4.28,0.022,74.99,1145.47,1109.87,40.3982,-75.5335
+2024-07-11,Central,Canada,Toronto,Sales,Professional,SMB,Holiday Push,Partner,2842.56,1238.84,1603.72,16,4,3.49,0.0792,192.03,3134.22,10302.76,43.1336,-78.9037
+2024-01-06,North,USA,Chicago,Marketing,Enterprise,Enterprise,Holiday Push,Online,21421.73,9501.02,11920.71,100,5,3.65,0.0382,1456.19,37414.85,83745.77,41.6706,-88.136
+2025-01-08,Central,Canada,Calgary,Support,Starter,Enterprise,Q1 Launch,Direct,1881.74,1052.56,829.19,9,6,4.08,0.026,107.39,1409.01,2469.38,42.2976,-79.6785
+2024-07-03,West,USA,San Francisco,Sales,Add-on Analytics,SMB,Upsell,Partner,577.04,264.99,312.06,5,2,4.13,0.0628,102.71,357.62,441.91,37.2805,-123.2157
+2024-05-22,East,USA,New York,Operations,Starter,Mid-Market,Holiday Push,Partner,948.89,538.85,410.04,7,6,3.44,0.0429,143.94,2224.11,3471.09,40.8807,-73.7401
+2024-06-04,South,USA,Dallas,Operations,Add-on Analytics,Mid-Market,Q1 Launch,Partner,951.64,325.55,626.09,5,4,3.63,0.0672,149.86,2162.72,3580.42,34.36,-84.9704
+2025-01-12,South,USA,Miami,Sales,Add-on Analytics,Enterprise,Holiday Push,Online,2414.27,1249.16,1165.11,16,2,3.11,0.0257,358.71,2366.24,8425.1,33.8093,-83.4173
+2024-11-02,South,USA,Atlanta,Finance,Enterprise,Enterprise,Retention,Direct,40721.08,13723.78,26997.3,232,9,3.81,0.0391,4052.65,51508.54,81977.17,34.5848,-84.6631
+2024-01-09,South,USA,Miami,Support,Professional,Mid-Market,Q1 Launch,Retail,2823.68,1498.49,1325.19,15,4,3.68,0.044,262.33,3324.54,6156.41,35.3511,-83.31
+2024-07-04,South,USA,Miami,Operations,Add-on Analytics,Mid-Market,Holiday Push,Partner,802.07,394.83,407.25,4,7,4.5,0.0576,127.4,615.14,2540.02,33.5102,-85.3699
+2025-03-18,Central,Canada,Vancouver,Marketing,Professional,Mid-Market,Summer Promo,Direct,5418.59,1931.27,3487.32,59,8,4.02,0.0658,332.07,601.43,21630.29,43.8854,-79.6436
+2024-04-28,West,USA,San Francisco,Marketing,Starter,SMB,Holiday Push,Retail,737.95,427.12,310.83,7,2,4.81,0.0704,94.7,1281.33,1313.01,37.9815,-122.023
+2024-08-31,South,USA,Miami,Operations,Enterprise,SMB,Summer Promo,Online,5491.17,2083.72,3407.45,34,5,4.57,0.041,861.44,2974.09,18208.22,33.4978,-84.5692
+2024-01-28,West,USA,San Francisco,Sales,Add-on Analytics,Mid-Market,Q1 Launch,Partner,1001.54,475.72,525.82,7,4,4.32,0.0563,104.38,2202.06,701.6,36.1817,-122.1283
+2024-08-14,East,USA,Philadelphia,Marketing,Enterprise,Mid-Market,Summer Promo,Partner,22069.38,11948.88,10120.5,165,4,3.74,0.0343,1901.52,2942.66,68028.88,40.358,-74.4569
+2024-07-06,West,USA,Seattle,Sales,Starter,Enterprise,Q1 Launch,Online,1054.71,417.1,637.62,7,1,3.36,0.0754,93.79,124.94,618.82,36.2178,-121.7106
+2024-06-27,Central,Canada,Calgary,Operations,Starter,SMB,Q1 Launch,Online,950.79,426.23,524.56,5,12,3.52,0.0427,78.31,1686.74,2994.23,43.0821,-79.6192
+2025-06-10,East,USA,Boston,Finance,Enterprise,Enterprise,Q1 Launch,Online,18678.71,6772.51,11906.2,97,3,4.26,0.051,3062.03,14456.01,22432.16,40.9518,-74.1351
+2024-07-04,West,USA,Seattle,Sales,Add-on Analytics,Mid-Market,Holiday Push,Partner,935.64,464.6,471.04,4,4,3.63,0.058,127.31,1475.14,3545.64,36.8599,-122.1858
+2025-01-15,West,USA,Denver,Operations,Add-on Analytics,Mid-Market,Holiday Push,Partner,1201.59,423.67,777.92,5,4,4.03,0.0337,169.13,665.56,1966.65,37.5143,-122.5429
+2025-02-24,North,USA,Detroit,Sales,Enterprise,Mid-Market,Retention,Partner,17007.4,8468.88,8538.52,206,3,4.3,0.0555,2615.09,24140.14,16691.87,42.9096,-87.4172
+2024-05-31,West,USA,Seattle,Marketing,Professional,Enterprise,Holiday Push,Direct,9565.34,3134.72,6430.62,50,3,4.8,0.0484,1254.66,11380.66,25570.32,37.4067,-123.7334
+2024-01-22,South,USA,Atlanta,Sales,Professional,Enterprise,Retention,Retail,5888.61,2915.49,2973.12,33,8,3.9,0.0563,756.7,3237.11,19520.86,34.442,-83.7997
+2024-12-30,East,USA,New York,Sales,Professional,Enterprise,Q1 Launch,Retail,10194.46,3009.65,7184.81,81,4,3.27,0.0363,1772.62,509.21,20032.64,41.939,-74.2998
+2024-01-22,East,USA,Philadelphia,Support,Professional,SMB,Upsell,Direct,1983.89,645.13,1338.76,9,2,3.76,0.0394,179.42,1984.22,1918.88,41.0227,-73.786
+2024-07-21,West,USA,Denver,Finance,Enterprise,SMB,Holiday Push,Direct,6866.47,2308.02,4558.46,33,6,4.01,0.0387,727.61,3739.43,24265.75,39.4148,-122.5423
+2025-03-23,North,USA,Chicago,Marketing,Enterprise,SMB,Holiday Push,Online,9189.17,2821.25,6367.92,59,3,4.93,0.0503,570.82,1677.97,10565.73,41.2064,-88.683
+2024-02-19,Central,Canada,Toronto,Marketing,Add-on Analytics,SMB,Summer Promo,Online,704.2,346.05,358.16,5,4,3.33,0.0286,64.1,228.39,2064.58,43.2079,-80.3695
+2024-08-21,South,USA,Atlanta,Operations,Professional,Mid-Market,Q1 Launch,Direct,4744.08,1394.03,3350.06,47,3,4.66,0.0425,291.07,5230.57,12023.24,32.5692,-86.2718
+2025-06-18,South,USA,Atlanta,Operations,Starter,SMB,Holiday Push,Direct,1626.49,465.36,1161.13,11,2,3.41,0.0338,119.46,2911.82,2846.2,34.7821,-82.462
+2024-03-23,South,USA,Dallas,Operations,Starter,SMB,Holiday Push,Retail,863.61,342.28,521.33,7,3,3.6,0.0525,124.16,478.65,1016.34,32.855,-83.7958
+2024-12-23,West,USA,Denver,Marketing,Add-on Analytics,Mid-Market,Retention,Online,1344.94,414.84,930.1,8,4,4.19,0.0609,144.6,2533.53,1309.28,37.1184,-120.4929
+2024-07-17,East,USA,New York,Finance,Starter,Mid-Market,Summer Promo,Partner,570.29,168.3,401.99,3,6,3.99,0.0421,71.97,169.34,1860.29,40.8877,-72.6394
+2024-12-15,Central,Canada,Calgary,Support,Starter,Enterprise,Summer Promo,Partner,2171.34,1145.5,1025.84,25,4,3.82,0.0294,261.04,5011.59,5184.01,43.0477,-78.9185
+2025-03-27,West,USA,San Francisco,Operations,Starter,Enterprise,Retention,Online,1289.76,663.22,626.54,10,6,3.72,0.0665,186.53,2951.38,2985.84,38.907,-121.626
+2024-05-24,Central,Canada,Calgary,Finance,Enterprise,Mid-Market,Retention,Partner,8137.62,2607.66,5529.96,65,7,4.36,0.057,1069.98,8695.64,18603.75,43.6737,-79.5209
+2025-03-05,North,USA,Detroit,Sales,Add-on Analytics,Enterprise,Retention,Direct,1396.45,588.33,808.11,16,3,4.28,0.0382,167.46,1529.2,3014.85,42.271,-87.6787
+2024-04-21,East,USA,Philadelphia,Sales,Starter,Enterprise,Holiday Push,Direct,2114.63,1048.71,1065.92,10,4,4.03,0.0552,379.44,1559.86,6897.27,40.292,-73.1139
+2025-01-26,East,USA,Philadelphia,Support,Enterprise,Enterprise,Upsell,Direct,18401.85,6811.87,11589.98,124,4,3.76,0.0405,2919.73,12871.9,42636.95,41.152,-73.8632
+2025-03-11,West,USA,San Francisco,Support,Starter,Enterprise,Summer Promo,Direct,850.84,336.65,514.18,4,3,3.81,0.0633,55.09,1207.23,977.9,37.1835,-121.8139
+2024-01-08,North,USA,Minneapolis,Marketing,Enterprise,Mid-Market,Q1 Launch,Partner,17440.79,9316.1,8124.69,157,5,3.63,0.0382,1261.72,16756.53,61714.96,41.6311,-87.3719
+2024-10-01,West,USA,Denver,Support,Add-on Analytics,SMB,Holiday Push,Partner,1076.31,539.23,537.08,5,1,4.75,0.0607,128.08,2276.88,804.3,38.0648,-123.4653
+2025-04-24,East,USA,Philadelphia,Support,Professional,Mid-Market,Upsell,Online,6079.4,2036.09,4043.32,34,8,3.62,0.0388,532.45,10639.11,3196.05,39.5664,-72.1153
+2025-05-06,West,USA,San Francisco,Sales,Add-on Analytics,Enterprise,Q1 Launch,Retail,1137.01,320.32,816.7,6,2,3.65,0.0683,143.95,1515.18,3306.68,36.1087,-121.9675
+2024-03-08,North,USA,Minneapolis,Marketing,Professional,Enterprise,Q1 Launch,Direct,10807.9,5152.37,5655.53,51,6,4.72,0.055,1698.47,14883.33,28801.86,40.846,-88.1515
+2025-03-29,Central,Canada,Vancouver,Marketing,Starter,SMB,Retention,Partner,1325.68,728.42,597.26,6,2,4.65,0.0566,206.15,422.32,1241.02,42.7031,-80.0788
+2025-04-18,East,USA,Philadelphia,Marketing,Add-on Analytics,Enterprise,Retention,Partner,1609.52,531.63,1077.89,15,2,3.9,0.0639,182.2,2984.41,2172.41,40.4044,-73.7665
+2024-09-13,Central,Canada,Calgary,Support,Enterprise,Mid-Market,Q1 Launch,Partner,8123.36,4354.23,3769.13,57,2,4.02,0.0302,612.35,18202.12,4806.86,43.4084,-79.7026
+2025-05-09,South,USA,Atlanta,Marketing,Professional,SMB,Upsell,Online,3197.75,1706.73,1491.02,17,4,3.9,0.026,225.16,6222.04,10530.28,35.0421,-84.5506
+2025-05-11,East,USA,New York,Finance,Professional,Enterprise,Holiday Push,Online,7796.89,2475.46,5321.43,75,2,3.03,0.0533,392.11,9953.91,12220.41,40.2663,-74.7581
+2024-04-10,South,USA,Atlanta,Marketing,Enterprise,SMB,Summer Promo,Online,10043.47,5111.54,4931.93,119,5,3.56,0.07,555.54,7901.4,35882.3,33.5001,-86.0309
+2024-10-26,Central,Canada,Vancouver,Finance,Professional,Mid-Market,Holiday Push,Partner,4707.3,1540.83,3166.47,21,5,3.44,0.0312,435.58,11407.6,5235.51,43.8712,-79.6958
+2025-05-04,South,USA,Dallas,Support,Add-on Analytics,Enterprise,Summer Promo,Direct,1381.08,532.59,848.49,16,4,4.49,0.0243,112.41,2984.69,2044.97,34.0799,-84.9536
+2025-04-04,West,USA,San Francisco,Finance,Enterprise,Enterprise,Holiday Push,Retail,11312.82,6197.58,5115.24,95,6,3.89,0.0343,1171.05,5308.99,35602.3,38.716,-122.8266
+2024-03-02,West,USA,Seattle,Support,Add-on Analytics,Enterprise,Q1 Launch,Online,1408.24,634.6,773.64,11,3,4.24,0.0463,202.99,2398.9,1859.28,38.282,-122.2635
+2024-09-28,West,USA,San Francisco,Finance,Enterprise,Enterprise,Holiday Push,Online,8286.69,3150.06,5136.63,41,3,3.91,0.0729,1470.07,5225.81,25191.38,37.781,-123.2622
+2024-05-15,East,USA,Philadelphia,Marketing,Starter,Mid-Market,Retention,Partner,1015.66,354.54,661.12,5,1,4.37,0.0979,71.96,1677.32,3191.81,41.5691,-74.4936
+2024-03-28,Central,Canada,Vancouver,Operations,Professional,SMB,Upsell,Retail,9032.53,2939.18,6093.35,84,3,3.79,0.0617,1240.73,17366.44,20505.23,43.9448,-79.2165
+2025-01-29,North,USA,Minneapolis,Support,Starter,Enterprise,Holiday Push,Retail,2166.05,1118.98,1047.07,9,3,4.25,0.0398,305.39,1742.75,7581.31,40.7539,-86.9624
+2024-12-30,North,USA,Minneapolis,Sales,Add-on Analytics,Mid-Market,Summer Promo,Direct,652.89,315.39,337.51,5,3,4.14,0.0667,41.92,1016.64,2267.58,40.955,-87.3453
+2024-06-25,North,USA,Chicago,Marketing,Professional,SMB,Holiday Push,Online,3137.29,1209.26,1928.03,35,3,4.91,0.0283,268.18,7802.46,11653.1,42.6463,-87.3821
+2024-03-09,Central,Canada,Vancouver,Marketing,Add-on Analytics,Mid-Market,Upsell,Partner,399.32,127.37,271.95,1,3,3.79,0.0436,41.17,809.52,675.33,44.1153,-79.9873
+2024-03-17,Central,Canada,Toronto,Support,Professional,SMB,Retention,Online,1312.89,709.33,603.56,14,3,4.05,0.0294,190.0,1547.97,1780.24,43.2183,-78.7912
+2024-09-15,East,USA,Boston,Marketing,Enterprise,Mid-Market,Holiday Push,Direct,9250.74,3212.62,6038.12,42,4,4.48,0.0799,1416.89,5687.53,24437.05,40.4123,-73.7358
+2024-09-30,North,USA,Chicago,Support,Professional,Mid-Market,Holiday Push,Direct,4003.51,1785.41,2218.1,25,3,3.59,0.0333,364.88,9169.36,6811.64,39.5501,-88.4022
+2024-03-11,South,USA,Miami,Finance,Enterprise,SMB,Q1 Launch,Partner,9813.19,5075.09,4738.1,87,3,3.79,0.0417,741.56,12997.58,17412.31,31.1851,-85.2351
+2024-02-05,South,USA,Dallas,Operations,Professional,Mid-Market,Upsell,Partner,7102.67,3050.61,4052.06,47,5,3.67,0.0705,359.2,7929.8,3701.94,33.2032,-85.1559
+2024-06-15,East,USA,New York,Finance,Professional,Enterprise,Retention,Online,17482.76,5334.15,12148.61,107,5,3.9,0.0554,1591.95,7930.81,20216.37,39.8237,-72.7087
+2024-01-25,East,USA,Philadelphia,Operations,Professional,SMB,Summer Promo,Partner,2785.71,934.79,1850.92,15,5,3.77,0.042,224.89,3486.37,6663.43,40.3081,-75.4501
+2024-08-10,East,USA,New York,Operations,Enterprise,Mid-Market,Retention,Retail,9598.76,5052.05,4546.72,69,7,3.94,0.0855,1576.7,10198.25,14035.9,41.6036,-74.2572
+2024-03-14,North,USA,Chicago,Operations,Starter,SMB,Retention,Partner,867.24,450.53,416.72,4,3,4.5,0.0651,100.34,1921.41,1257.53,42.002,-86.9974
+2024-08-26,Central,Canada,Toronto,Operations,Professional,Mid-Market,Summer Promo,Direct,4590.06,2065.41,2524.65,40,5,3.85,0.049,589.12,3905.0,16108.71,44.4478,-80.5985
+2024-05-01,North,USA,Minneapolis,Support,Professional,Mid-Market,Upsell,Partner,4812.36,2152.9,2659.47,40,4,4.11,0.0485,790.14,8543.95,12043.29,41.8095,-86.015
+2024-09-08,South,USA,Miami,Operations,Starter,Enterprise,Q1 Launch,Direct,1447.51,430.85,1016.66,11,7,4.34,0.0514,163.63,2593.44,2176.21,33.6474,-84.3463
+2024-03-24,West,USA,Denver,Marketing,Professional,Mid-Market,Retention,Online,2416.31,876.38,1539.93,14,3,3.8,0.0672,366.8,3960.3,7053.12,36.1881,-123.4525
+2024-05-07,West,USA,San Francisco,Support,Add-on Analytics,Mid-Market,Summer Promo,Retail,780.27,395.68,384.59,5,3,3.65,0.0289,71.3,60.77,2086.69,37.7196,-122.6571
+2024-08-10,North,USA,Chicago,Finance,Add-on Analytics,Enterprise,Holiday Push,Partner,1802.27,932.7,869.57,9,5,4.33,0.0402,114.27,30.99,6294.09,41.9443,-88.6814
+2024-09-11,West,USA,Seattle,Marketing,Starter,Enterprise,Q1 Launch,Retail,1827.37,722.6,1104.77,16,4,4.3,0.0355,147.18,2429.39,2220.76,36.8183,-123.0669
+2024-11-20,North,USA,Chicago,Support,Enterprise,Enterprise,Holiday Push,Partner,17534.37,5333.22,12201.15,88,6,3.67,0.0451,2072.97,26958.56,20929.02,41.8818,-88.9833
+2024-03-22,East,USA,Philadelphia,Support,Add-on Analytics,SMB,Summer Promo,Direct,966.43,445.15,521.28,8,4,4.77,0.0773,150.94,663.66,2341.12,40.9054,-75.3368
+2024-06-12,East,USA,New York,Operations,Starter,Enterprise,Q1 Launch,Retail,1660.69,503.89,1156.8,10,4,4.48,0.0692,131.25,2025.95,1699.37,39.0,-73.5129
+2024-01-28,Central,Canada,Toronto,Operations,Enterprise,Mid-Market,Holiday Push,Partner,10818.85,4932.52,5886.33,57,4,4.02,0.0433,1510.52,17403.81,36759.59,44.5014,-79.9699
+2025-03-21,Central,Canada,Toronto,Finance,Starter,Enterprise,Retention,Online,1206.39,640.1,566.29,10,4,4.07,0.0377,180.56,162.18,2740.34,42.8858,-79.6064
+2024-01-23,North,USA,Detroit,Marketing,Enterprise,Enterprise,Holiday Push,Online,10548.47,5441.48,5106.99,50,4,3.46,0.084,1683.12,16389.17,26058.44,41.1786,-86.7252
+2024-09-18,South,USA,Atlanta,Marketing,Add-on Analytics,SMB,Upsell,Retail,515.18,256.03,259.16,2,2,4.47,0.0611,56.25,388.67,2044.87,32.8007,-84.3956
+2024-07-16,Central,Canada,Vancouver,Finance,Enterprise,SMB,Retention,Online,13042.51,7078.89,5963.62,103,4,4.17,0.0674,1547.9,21451.4,24092.04,43.6275,-80.2387
+2024-10-13,South,USA,Atlanta,Sales,Add-on Analytics,SMB,Q1 Launch,Online,609.78,248.94,360.84,3,4,4.96,0.0436,50.89,262.45,668.2,32.9128,-84.9109
+2024-02-09,West,USA,San Francisco,Support,Starter,Mid-Market,Upsell,Direct,934.09,415.34,518.75,8,6,3.99,0.0782,59.2,1122.11,1913.01,37.5916,-122.3708
+2025-05-09,South,USA,Atlanta,Sales,Starter,Enterprise,Upsell,Direct,2410.37,1105.13,1305.23,13,3,4.36,0.0696,202.4,2776.51,6714.61,33.6337,-84.8084
+2024-02-03,East,USA,New York,Finance,Add-on Analytics,SMB,Holiday Push,Online,701.92,237.8,464.12,3,5,4.31,0.0405,39.63,575.36,2487.95,40.7902,-72.7318
+2025-04-09,East,USA,Philadelphia,Finance,Add-on Analytics,Mid-Market,Upsell,Retail,1004.08,354.5,649.58,6,5,3.15,0.0386,122.63,770.96,2640.31,39.8204,-73.1869
+2024-11-11,East,USA,Philadelphia,Marketing,Enterprise,Enterprise,Retention,Retail,11054.76,5611.14,5443.62,94,3,3.8,0.0386,976.04,5083.38,16429.42,41.1932,-74.0013
+2024-01-22,South,USA,Dallas,Finance,Professional,SMB,Summer Promo,Online,3977.19,1821.29,2155.9,31,3,3.83,0.048,425.2,3418.46,12649.24,32.5243,-85.2004
+2025-01-10,East,USA,New York,Operations,Professional,SMB,Retention,Partner,2843.43,941.66,1901.77,23,2,4.64,0.0557,418.94,4735.58,3449.74,41.0097,-73.9609
+2025-05-16,East,USA,Boston,Finance,Enterprise,Enterprise,Upsell,Partner,11061.3,5032.88,6028.42,84,3,4.25,0.034,1680.52,22903.11,17752.71,40.8124,-71.407
+2024-05-18,East,USA,Boston,Sales,Enterprise,Mid-Market,Retention,Partner,21787.86,11222.5,10565.37,111,4,3.43,0.046,3724.06,30605.29,40457.28,39.4943,-75.6027
+2024-06-24,North,USA,Detroit,Finance,Professional,SMB,Summer Promo,Partner,2750.52,1561.61,1188.91,15,3,3.9,0.0803,430.06,1840.43,8833.18,41.0441,-88.2125
+2025-06-02,West,USA,Denver,Marketing,Professional,Mid-Market,Q1 Launch,Direct,5798.78,2748.49,3050.29,43,3,4.38,0.0624,743.0,5179.89,11888.66,37.8077,-122.649
+2024-04-20,South,USA,Miami,Marketing,Starter,Mid-Market,Upsell,Partner,1627.04,867.76,759.28,16,7,3.81,0.0307,118.27,3789.61,3833.96,34.0101,-84.0808
+2024-02-29,East,USA,New York,Sales,Starter,Mid-Market,Retention,Online,1789.6,640.71,1148.89,20,4,3.19,0.0565,248.35,573.98,2207.63,40.9369,-73.2069
+2024-07-08,West,USA,Denver,Finance,Starter,SMB,Q1 Launch,Partner,418.34,131.71,286.63,2,4,3.95,0.0578,34.54,1008.54,657.6,37.9457,-122.4525
+2024-12-04,Central,Canada,Toronto,Finance,Enterprise,Mid-Market,Q1 Launch,Partner,10043.94,4620.14,5423.8,52,3,4.27,0.0922,753.86,3655.56,25066.41,42.4619,-80.6951
+2024-06-14,East,USA,Philadelphia,Sales,Professional,Enterprise,Upsell,Retail,10944.58,5221.21,5723.37,55,5,4.62,0.0315,1398.68,16413.9,26565.18,41.4418,-72.9113
+2024-06-04,West,USA,Seattle,Finance,Enterprise,SMB,Holiday Push,Retail,5861.74,2783.92,3077.82,56,5,4.14,0.0842,1003.86,3621.38,16518.05,37.1603,-122.8714
+2024-09-27,East,USA,Philadelphia,Sales,Starter,Enterprise,Q1 Launch,Online,928.77,447.85,480.91,9,7,3.71,0.0897,105.54,1424.99,1851.55,41.4194,-73.5535
+2025-05-09,East,USA,New York,Support,Enterprise,SMB,Retention,Online,11147.37,4544.33,6603.04,76,2,3.97,0.0432,1423.89,11959.78,33237.58,41.4094,-74.7885
+2024-05-02,West,USA,San Francisco,Support,Enterprise,Mid-Market,Retention,Retail,17959.24,5914.16,12045.08,108,2,3.78,0.0455,2613.62,34514.52,12686.68,38.172,-121.8214
+2024-03-02,West,USA,San Francisco,Support,Professional,SMB,Q1 Launch,Retail,2931.51,1469.36,1462.15,16,1,3.55,0.0482,383.89,1667.66,7420.9,37.204,-122.7258
+2024-11-15,South,USA,Atlanta,Support,Add-on Analytics,SMB,Holiday Push,Online,399.11,196.91,202.2,3,5,4.2,0.0496,33.3,889.91,1117.56,32.7763,-85.1154
+2024-10-05,East,USA,Philadelphia,Finance,Professional,Mid-Market,Holiday Push,Direct,4649.05,2466.44,2182.61,28,5,3.65,0.0559,697.42,10367.84,11203.01,41.095,-74.4634
+2024-03-07,East,USA,Philadelphia,Sales,Enterprise,SMB,Summer Promo,Direct,11171.07,3616.89,7554.17,127,3,4.04,0.0542,642.24,17205.88,35780.21,41.0242,-74.3796
+2025-03-22,Central,Canada,Calgary,Finance,Starter,Mid-Market,Q1 Launch,Online,2329.83,1282.57,1047.26,24,2,4.45,0.0448,214.18,5278.9,3600.83,43.8562,-79.5506
+2025-05-29,North,USA,Minneapolis,Finance,Add-on Analytics,Enterprise,Q1 Launch,Partner,2258.23,857.2,1401.03,10,7,3.79,0.0349,225.19,4288.78,7079.77,42.1781,-85.572
+2024-01-29,South,USA,Atlanta,Finance,Professional,Mid-Market,Summer Promo,Direct,7909.39,2426.06,5483.32,42,5,4.78,0.0452,434.08,13996.16,19152.06,32.2109,-83.8465
+2025-04-12,South,USA,Miami,Support,Add-on Analytics,SMB,Holiday Push,Direct,537.63,192.86,344.76,2,6,3.22,0.0421,72.98,532.45,1047.71,34.5016,-84.4764
+2025-01-15,West,USA,Seattle,Finance,Enterprise,Mid-Market,Retention,Retail,10259.1,5757.76,4501.34,55,2,3.87,0.0274,782.24,8995.54,19853.17,36.9999,-123.1949
+2024-03-26,East,USA,Philadelphia,Sales,Starter,Mid-Market,Summer Promo,Partner,1007.95,509.57,498.38,6,5,3.92,0.0406,76.4,949.98,1678.13,40.8815,-73.1897
+2024-04-28,North,USA,Detroit,Sales,Add-on Analytics,Enterprise,Upsell,Retail,494.15,170.19,323.97,2,2,4.1,0.0388,60.33,311.87,1287.63,41.9211,-87.4438
+2025-03-22,West,USA,Denver,Support,Enterprise,Mid-Market,Summer Promo,Partner,6472.07,3504.7,2967.38,60,3,4.3,0.0507,923.08,4546.83,10293.53,38.1166,-121.7052
+2024-05-20,West,USA,Denver,Marketing,Professional,Mid-Market,Q1 Launch,Partner,6038.79,1975.72,4063.07,65,5,4.24,0.0447,410.57,12044.73,12844.8,37.616,-122.2804
+2025-06-03,North,USA,Detroit,Operations,Professional,Enterprise,Q1 Launch,Online,18118.56,7633.29,10485.27,153,6,3.87,0.0439,1304.7,37115.85,60886.57,41.8225,-87.954
+2024-05-14,North,USA,Minneapolis,Finance,Starter,Enterprise,Summer Promo,Online,1769.2,732.8,1036.39,15,6,3.93,0.0371,173.18,2884.0,3033.48,42.5067,-86.9832
+2024-10-21,Central,Canada,Toronto,Operations,Professional,SMB,Retention,Retail,3256.4,1236.07,2020.32,26,1,4.01,0.0246,489.97,2332.21,8704.43,43.7669,-79.2381
+2025-06-07,South,USA,Atlanta,Finance,Enterprise,Mid-Market,Upsell,Direct,9725.59,3435.97,6289.63,75,4,4.75,0.0498,964.21,23099.12,21312.85,34.2189,-85.5637
+2024-07-22,West,USA,Denver,Operations,Add-on Analytics,Enterprise,Holiday Push,Direct,1837.35,615.92,1221.43,9,3,3.89,0.074,295.88,3595.85,6431.34,37.8418,-120.4418
+2024-02-01,Central,Canada,Toronto,Sales,Enterprise,Mid-Market,Q1 Launch,Online,10856.3,3615.28,7241.02,58,8,4.99,0.0567,718.44,560.03,43200.65,43.6205,-79.5734
+2024-09-01,North,USA,Chicago,Finance,Starter,Enterprise,Holiday Push,Partner,1537.73,532.4,1005.33,7,4,3.99,0.0444,121.91,106.35,974.6,41.6772,-87.1776
+2024-08-05,South,USA,Miami,Sales,Add-on Analytics,Enterprise,Retention,Retail,1076.0,494.5,581.5,8,4,4.05,0.0623,167.23,1408.13,2894.93,32.4326,-85.329
+2024-11-05,North,USA,Minneapolis,Sales,Starter,SMB,Q1 Launch,Direct,387.5,213.62,173.88,2,3,4.48,0.0272,68.36,362.85,282.01,42.1414,-87.7654
+2025-04-01,South,USA,Atlanta,Operations,Enterprise,Enterprise,Q1 Launch,Online,30901.48,13940.0,16961.47,143,3,4.65,0.0362,3198.49,58919.14,57274.92,33.6596,-83.3563
+2025-01-05,East,USA,New York,Marketing,Starter,Mid-Market,Summer Promo,Direct,744.09,416.77,327.32,5,2,4.42,0.0229,62.69,612.37,1015.07,41.4378,-73.8056
+2024-03-25,Central,Canada,Toronto,Sales,Professional,Enterprise,Q1 Launch,Retail,14067.84,5457.6,8610.24,84,8,4.02,0.0498,710.61,32760.44,40975.1,44.4207,-80.609
+2024-11-21,North,USA,Detroit,Marketing,Add-on Analytics,Enterprise,Retention,Online,1124.01,416.37,707.64,5,4,3.11,0.0444,61.56,1483.17,3754.0,42.235,-88.2458
+2024-12-02,North,USA,Minneapolis,Sales,Enterprise,SMB,Summer Promo,Online,4881.75,1601.52,3280.22,49,3,4.03,0.0444,565.16,6081.73,11988.48,42.3156,-88.0295
+2024-01-17,Central,Canada,Calgary,Marketing,Professional,SMB,Summer Promo,Retail,2584.72,1474.07,1110.65,13,4,4.39,0.0708,201.81,3651.24,2612.57,43.6636,-81.4742
+2024-08-22,Central,Canada,Vancouver,Sales,Professional,SMB,Holiday Push,Partner,2230.47,965.83,1264.63,11,3,4.45,0.0674,162.92,207.47,7295.65,43.9716,-78.5864
+2024-07-23,South,USA,Miami,Finance,Add-on Analytics,Mid-Market,Retention,Direct,757.83,393.0,364.83,5,5,4.69,0.0387,107.29,858.79,2602.6,32.6491,-85.3025
+2024-04-29,East,USA,New York,Sales,Starter,Enterprise,Holiday Push,Direct,2741.17,1568.65,1172.52,32,5,4.01,0.0409,336.88,3458.44,10663.0,39.0323,-74.1092
+2025-06-19,East,USA,Philadelphia,Support,Add-on Analytics,Enterprise,Upsell,Retail,1326.71,452.67,874.04,6,4,3.81,0.0376,126.6,2352.98,1391.33,39.8725,-73.2093
+2024-10-14,Central,Canada,Toronto,Sales,Enterprise,SMB,Holiday Push,Direct,12628.65,5472.98,7155.67,76,4,3.27,0.0354,1041.58,13791.89,48641.04,43.6273,-81.4859
+2024-06-30,Central,Canada,Calgary,Support,Professional,SMB,Holiday Push,Online,2944.17,1077.15,1867.02,14,7,4.0,0.0372,338.53,2415.53,11186.89,43.7094,-78.2076
+2024-03-10,East,USA,Boston,Sales,Enterprise,Enterprise,Holiday Push,Partner,11210.32,5294.59,5915.73,79,5,4.65,0.0589,1836.75,8166.44,23764.46,40.1453,-72.8119
+2025-04-18,South,USA,Dallas,Operations,Add-on Analytics,Mid-Market,Q1 Launch,Direct,927.5,502.23,425.27,4,2,4.1,0.0494,142.01,360.59,2271.47,32.8706,-84.8245
+2024-04-15,South,USA,Atlanta,Sales,Starter,SMB,Holiday Push,Direct,1655.54,482.32,1173.22,15,3,3.98,0.0663,179.58,839.74,5915.43,32.8085,-85.1869
+2024-02-13,West,USA,Seattle,Finance,Enterprise,Mid-Market,Retention,Partner,13477.71,7354.3,6123.4,99,3,4.27,0.1076,2170.76,19374.71,30084.07,38.1507,-120.3425
+2025-01-07,Central,Canada,Calgary,Support,Starter,SMB,Q1 Launch,Direct,1316.53,493.55,822.98,7,3,4.15,0.0533,153.19,2346.29,1694.88,44.8564,-79.974
+2024-05-14,West,USA,San Francisco,Sales,Enterprise,Mid-Market,Upsell,Partner,7556.7,2220.23,5336.46,37,5,4.14,0.0444,834.88,16407.47,23215.99,36.6026,-122.6021
+2025-06-19,Central,Canada,Toronto,Sales,Enterprise,Mid-Market,Q1 Launch,Partner,11868.32,4516.63,7351.7,59,3,3.99,0.032,1097.92,17187.11,42383.2,43.4047,-80.0751
+2024-11-06,Central,Canada,Calgary,Marketing,Starter,Enterprise,Holiday Push,Retail,1733.14,928.04,805.1,16,4,3.84,0.0682,96.67,951.43,2943.78,45.0772,-79.607
+2025-06-19,North,USA,Detroit,Marketing,Starter,SMB,Summer Promo,Partner,609.99,344.52,265.47,4,2,3.9,0.0492,103.69,789.93,857.6,41.4877,-88.3158
+2025-04-11,North,USA,Detroit,Sales,Enterprise,Enterprise,Summer Promo,Partner,33593.42,11019.91,22573.51,369,4,4.1,0.071,5803.61,36799.77,97963.76,41.0341,-87.5807
+2024-10-14,West,USA,Seattle,Finance,Add-on Analytics,SMB,Retention,Direct,493.39,196.41,296.98,3,9,4.95,0.0428,57.62,313.49,1443.38,38.4717,-123.307
+2024-05-24,Central,Canada,Calgary,Finance,Professional,Enterprise,Summer Promo,Retail,5529.08,2553.25,2975.83,67,2,4.19,0.0571,354.51,139.7,16605.04,43.5273,-79.3734
+2024-08-10,North,USA,Chicago,Sales,Add-on Analytics,Enterprise,Q1 Launch,Partner,1968.06,996.89,971.17,16,3,3.8,0.0532,149.98,3443.84,5649.09,42.4047,-87.5376
+2024-03-06,West,USA,Seattle,Marketing,Add-on Analytics,Mid-Market,Summer Promo,Partner,1702.75,582.06,1120.69,12,1,3.65,0.0272,101.07,109.42,6314.2,37.1706,-122.6732
+2024-10-08,East,USA,Philadelphia,Finance,Enterprise,Mid-Market,Holiday Push,Partner,10117.36,4047.61,6069.75,47,5,3.21,0.0447,758.77,21367.06,18072.44,41.3065,-73.8695
+2024-08-23,East,USA,Boston,Finance,Enterprise,SMB,Q1 Launch,Partner,8502.36,4839.38,3662.98,59,6,4.29,0.0466,490.1,18968.27,28597.87,41.4355,-73.6991
+2024-10-27,West,USA,Seattle,Operations,Starter,Mid-Market,Retention,Online,1556.01,611.66,944.34,7,3,3.99,0.0398,251.02,1211.3,4210.82,37.6757,-121.0496
+2024-08-30,West,USA,Denver,Operations,Add-on Analytics,Mid-Market,Retention,Partner,715.75,333.75,382.0,5,3,3.9,0.0604,86.28,1528.27,2352.12,38.6361,-123.2088
+2024-06-28,North,USA,Chicago,Support,Enterprise,SMB,Retention,Partner,14229.06,6707.05,7522.0,160,1,4.36,0.0261,1991.35,598.55,20609.96,41.6866,-87.8926
+2025-04-22,East,USA,Boston,Support,Starter,Mid-Market,Retention,Partner,1565.06,793.48,771.59,18,7,4.5,0.0422,277.05,2020.45,2892.4,41.1989,-74.5028
+2024-07-26,South,USA,Dallas,Operations,Enterprise,SMB,Summer Promo,Direct,14177.71,7964.27,6213.44,82,6,5.0,0.0558,2133.04,6735.86,34664.39,33.9712,-84.6864
+2025-04-22,South,USA,Dallas,Marketing,Professional,Enterprise,Summer Promo,Direct,7092.92,2994.01,4098.91,33,4,3.63,0.0439,529.93,2190.05,27604.26,33.3205,-85.0696
+2024-10-28,South,USA,Dallas,Operations,Starter,Enterprise,Holiday Push,Partner,1399.58,450.14,949.44,8,6,3.91,0.0721,197.72,3466.05,4240.58,35.2942,-84.9139
+2024-04-18,West,USA,San Francisco,Finance,Starter,SMB,Holiday Push,Online,1785.73,502.36,1283.36,13,3,3.33,0.0507,139.76,4043.58,1425.5,38.1989,-122.7986
+2024-12-16,South,USA,Dallas,Marketing,Enterprise,Enterprise,Q1 Launch,Partner,23392.15,8788.67,14603.49,146,3,4.1,0.037,1360.86,38139.66,44262.9,33.0743,-85.1932
+2024-11-24,West,USA,Denver,Support,Professional,Enterprise,Summer Promo,Retail,6251.4,2458.65,3792.74,49,2,4.31,0.0592,740.93,10874.05,10065.33,38.1766,-121.8591
+2024-07-18,South,USA,Miami,Support,Add-on Analytics,Enterprise,Upsell,Online,772.37,308.3,464.06,4,6,4.4,0.0436,72.14,326.39,1090.43,34.0911,-84.7631
+2024-11-05,North,USA,Minneapolis,Finance,Starter,Mid-Market,Retention,Retail,920.15,355.93,564.23,5,3,4.08,0.075,91.78,1780.26,2790.25,42.6659,-88.2161
+2024-03-05,Central,Canada,Calgary,Support,Enterprise,Enterprise,Upsell,Partner,19530.93,7127.27,12403.66,133,5,3.82,0.058,2342.15,8456.75,50618.97,43.3212,-79.0925
+2024-10-30,Central,Canada,Vancouver,Finance,Starter,Enterprise,Upsell,Partner,1449.72,483.9,965.83,13,7,4.12,0.0332,96.6,933.81,5326.79,43.497,-80.2044
+2025-04-11,North,USA,Minneapolis,Support,Enterprise,Mid-Market,Summer Promo,Retail,6890.17,2460.17,4430.0,33,6,4.11,0.0448,987.77,4192.4,26778.18,41.7523,-87.8622
+2025-06-13,East,USA,New York,Sales,Enterprise,Mid-Market,Upsell,Online,19612.18,8535.0,11077.18,208,4,3.91,0.0392,1404.1,30688.78,16855.3,41.9371,-73.939
+2024-02-16,South,USA,Miami,Sales,Enterprise,SMB,Q1 Launch,Partner,11695.13,3408.11,8287.02,54,4,3.55,0.0663,1166.79,25048.94,11592.95,34.3362,-84.7027
+2024-02-03,East,USA,New York,Support,Starter,SMB,Summer Promo,Direct,898.11,302.61,595.5,4,5,4.14,0.0383,58.4,2146.23,2992.2,40.031,-73.3924
+2025-02-06,Central,Canada,Toronto,Support,Enterprise,Enterprise,Retention,Direct,23631.27,12422.11,11209.16,187,6,3.51,0.076,1968.37,33786.94,16968.58,43.416,-80.0056
+2024-03-20,Central,Canada,Vancouver,Support,Enterprise,SMB,Summer Promo,Partner,10298.47,4167.61,6130.86,58,6,3.85,0.046,904.3,25688.43,16579.99,44.9679,-77.9193
+2024-03-11,East,USA,New York,Support,Professional,Mid-Market,Retention,Retail,4865.94,2370.57,2495.36,27,2,4.88,0.0374,303.32,10364.39,14762.78,41.5697,-73.8326
+2025-01-31,South,USA,Miami,Marketing,Enterprise,SMB,Holiday Push,Direct,4703.42,1911.63,2791.79,24,5,3.55,0.0382,490.4,8441.85,5591.42,33.9694,-84.6219
+2024-12-16,North,USA,Detroit,Marketing,Enterprise,SMB,Retention,Direct,5619.8,3249.82,2369.98,58,5,4.42,0.029,518.38,2289.47,15768.83,41.4854,-87.4785
+2025-05-31,West,USA,Seattle,Sales,Professional,Mid-Market,Retention,Partner,5345.5,1682.9,3662.6,29,4,4.77,0.0744,387.95,8330.42,12294.19,37.3755,-122.7677
+2025-01-08,Central,Canada,Vancouver,Operations,Add-on Analytics,Enterprise,Q1 Launch,Retail,847.1,421.39,425.71,7,2,3.91,0.0457,77.52,406.31,3354.77,44.0179,-77.8283
+2025-02-26,West,USA,San Francisco,Finance,Professional,Enterprise,Retention,Online,13211.85,5181.8,8030.05,89,6,3.13,0.0454,1579.15,16975.2,46068.93,35.877,-121.9285
+2025-01-19,West,USA,San Francisco,Marketing,Professional,Mid-Market,Upsell,Retail,7238.27,2278.62,4959.64,36,2,3.79,0.039,698.59,15562.7,26884.82,37.9643,-121.4082
+2024-12-20,Central,Canada,Calgary,Marketing,Add-on Analytics,SMB,Summer Promo,Partner,947.09,339.12,607.97,5,2,4.04,0.0508,118.06,443.31,1694.67,43.7489,-80.5953
+2025-01-06,West,USA,San Francisco,Operations,Enterprise,Mid-Market,Upsell,Online,7440.77,2289.12,5151.65,43,6,3.75,0.0394,642.92,7487.41,19815.01,37.0834,-122.8464
+2024-06-25,Central,Canada,Calgary,Sales,Add-on Analytics,SMB,Holiday Push,Online,464.65,264.36,200.29,3,6,4.38,0.0544,46.73,1047.48,1277.02,42.599,-79.4721
+2025-04-19,West,USA,Denver,Sales,Enterprise,Mid-Market,Summer Promo,Online,17982.53,8735.5,9247.03,115,3,4.06,0.0357,2042.18,17277.79,53578.42,37.759,-122.5522
+2025-04-29,South,USA,Dallas,Operations,Professional,Enterprise,Retention,Online,9740.19,5111.04,4629.14,104,5,3.66,0.0409,587.32,23308.73,19385.98,34.2912,-83.97
+2024-03-05,West,USA,Seattle,Finance,Add-on Analytics,SMB,Q1 Launch,Online,934.48,387.97,546.5,9,1,3.59,0.0594,150.64,2098.45,1742.52,36.9998,-121.8794
+2024-10-19,South,USA,Atlanta,Sales,Professional,Enterprise,Holiday Push,Direct,6216.19,1816.25,4399.94,38,5,3.8,0.0437,683.73,1500.02,5406.06,32.9463,-84.0638
+2025-06-20,West,USA,Seattle,Sales,Enterprise,Mid-Market,Q1 Launch,Online,14345.17,5740.74,8604.42,68,5,3.96,0.0649,2358.45,29369.68,43018.36,37.3638,-121.9559
+2024-09-12,West,USA,Seattle,Finance,Enterprise,Mid-Market,Summer Promo,Online,12757.39,6481.03,6276.36,102,7,3.99,0.0426,2218.03,111.05,15880.03,38.1352,-122.7172
+2024-07-09,South,USA,Dallas,Marketing,Starter,Enterprise,Upsell,Partner,1263.57,586.05,677.52,8,5,4.13,0.0554,66.39,507.73,727.55,32.2482,-84.9844
+2024-09-28,North,USA,Minneapolis,Finance,Enterprise,Enterprise,Summer Promo,Online,15735.21,9012.89,6722.32,104,4,2.95,0.0303,2020.63,21446.25,11136.91,40.9702,-86.6826
+2024-07-14,West,USA,Seattle,Sales,Add-on Analytics,Mid-Market,Retention,Retail,822.51,462.46,360.05,6,3,3.55,0.0593,52.98,179.16,1537.66,38.1259,-121.9034
+2024-03-10,West,USA,Denver,Finance,Enterprise,Mid-Market,Upsell,Direct,14676.52,4344.78,10331.74,109,6,4.66,0.0508,1155.79,25062.96,54572.6,38.185,-123.5042
+2024-06-07,West,USA,Denver,Marketing,Add-on Analytics,Enterprise,Upsell,Direct,717.7,321.53,396.17,5,2,4.14,0.0425,42.94,644.64,380.74,36.7115,-122.4865
+2024-05-19,West,USA,San Francisco,Finance,Starter,Enterprise,Summer Promo,Direct,814.66,433.28,381.38,4,3,4.8,0.0246,127.7,1652.1,2164.3,37.8927,-121.7522
+2025-06-23,East,USA,Philadelphia,Operations,Professional,Mid-Market,Holiday Push,Direct,3088.55,1316.38,1772.16,19,4,4.35,0.0652,321.16,3113.57,10288.76,40.1245,-72.9191
+2025-02-04,North,USA,Minneapolis,Support,Add-on Analytics,Mid-Market,Summer Promo,Partner,1424.49,767.21,657.29,10,3,4.34,0.0298,178.07,414.27,725.1,39.9306,-88.4846
+2025-05-09,East,USA,Boston,Operations,Professional,SMB,Q1 Launch,Online,6290.92,2318.63,3972.3,35,2,4.03,0.0657,347.76,3369.67,19918.11,41.3311,-73.8447
+2025-06-19,North,USA,Chicago,Operations,Enterprise,Enterprise,Holiday Push,Direct,22430.57,6716.6,15713.97,223,5,2.74,0.0397,2662.92,14880.81,86869.14,41.6364,-88.6093
+2025-04-04,South,USA,Miami,Finance,Enterprise,Mid-Market,Holiday Push,Online,14901.76,4912.8,9988.97,99,4,3.83,0.0706,1360.68,30930.54,13260.3,32.7291,-84.1592
+2024-08-18,North,USA,Detroit,Support,Enterprise,Enterprise,Retention,Direct,14560.74,7654.79,6905.95,100,5,4.77,0.0382,2183.89,15936.35,17275.17,43.0419,-87.2629
+2024-03-04,East,USA,Boston,Finance,Add-on Analytics,Enterprise,Summer Promo,Retail,1381.55,552.61,828.94,13,4,4.23,0.0419,148.19,1753.5,2904.65,41.3025,-73.8698
+2024-12-14,South,USA,Miami,Finance,Enterprise,SMB,Holiday Push,Retail,9313.37,3133.44,6179.92,46,6,4.35,0.0227,774.06,6547.61,25350.02,33.6821,-83.3245
+2024-01-29,North,USA,Detroit,Marketing,Add-on Analytics,Enterprise,Retention,Partner,748.44,414.3,334.14,3,5,4.62,0.0505,74.29,1805.86,2189.92,42.5402,-87.3966
+2024-04-05,Central,Canada,Toronto,Marketing,Enterprise,SMB,Holiday Push,Retail,12539.64,4884.79,7654.85,68,4,4.63,0.0443,1745.41,24484.69,21166.76,44.1984,-79.6133
+2024-05-15,West,USA,San Francisco,Support,Enterprise,Enterprise,Retention,Online,21470.76,10402.24,11068.52,136,6,4.08,0.0864,3318.64,9969.33,83414.93,37.041,-122.0354
+2024-05-20,East,USA,Philadelphia,Marketing,Enterprise,Mid-Market,Summer Promo,Partner,6816.12,2437.39,4378.73,54,3,3.85,0.0329,531.31,11982.48,16457.5,40.0042,-74.4339
+2024-04-16,Central,Canada,Vancouver,Sales,Professional,Enterprise,Retention,Partner,16863.09,5523.06,11340.03,91,2,4.11,0.0334,2365.02,1409.26,10989.02,43.5044,-80.8915
+2025-02-23,East,USA,Boston,Support,Starter,SMB,Retention,Direct,1029.37,304.16,725.22,8,1,3.59,0.0533,80.82,1817.18,2889.28,40.2913,-74.1792
+2024-12-20,East,USA,New York,Finance,Starter,Enterprise,Summer Promo,Retail,3134.66,1748.47,1386.19,14,5,3.77,0.0293,304.32,7717.21,3114.15,41.1395,-75.6529
+2024-01-28,Central,Canada,Calgary,Finance,Add-on Analytics,Enterprise,Upsell,Online,1751.71,790.98,960.72,10,5,4.59,0.0387,214.49,306.56,1922.07,41.6252,-79.5815
+2024-12-02,North,USA,Chicago,Finance,Starter,SMB,Summer Promo,Direct,614.19,289.4,324.79,3,5,4.34,0.0718,35.38,1286.23,1764.27,42.9339,-87.6304
+2024-05-20,East,USA,New York,Marketing,Add-on Analytics,Enterprise,Q1 Launch,Partner,2203.78,808.68,1395.09,21,4,3.61,0.0454,333.63,4955.91,7572.37,42.4202,-74.176
+2025-05-15,South,USA,Dallas,Finance,Professional,SMB,Upsell,Partner,2167.0,757.38,1409.62,20,7,3.71,0.0591,173.78,5157.86,5325.68,34.0136,-84.3085
+2024-10-21,East,USA,New York,Support,Add-on Analytics,SMB,Retention,Partner,695.78,228.2,467.58,4,5,4.55,0.06,52.45,458.57,2655.05,40.3544,-72.3445
+2025-06-03,West,USA,Seattle,Finance,Professional,Enterprise,Retention,Partner,4918.23,1980.35,2937.88,37,3,3.03,0.0401,354.82,5048.82,16923.28,38.1725,-121.8965
+2024-10-23,West,USA,San Francisco,Finance,Enterprise,SMB,Upsell,Partner,5583.24,2579.64,3003.6,30,7,4.08,0.0406,960.97,2185.78,5283.08,37.2498,-122.4056
+2024-05-02,South,USA,Miami,Sales,Professional,SMB,Holiday Push,Retail,4944.06,1407.04,3537.02,33,1,4.78,0.0349,296.63,7137.26,4650.99,33.3163,-84.7096
+2024-07-02,South,USA,Atlanta,Operations,Professional,SMB,Q1 Launch,Direct,4422.38,2214.0,2208.38,20,1,4.48,0.0758,335.55,1986.56,13800.04,31.6709,-83.9237
+2024-11-20,East,USA,New York,Finance,Professional,Enterprise,Upsell,Direct,5326.67,2616.59,2710.07,45,5,3.35,0.0427,758.33,2601.74,20267.14,39.3899,-73.2815
+2024-12-16,West,USA,Denver,Marketing,Enterprise,Enterprise,Holiday Push,Retail,18929.16,6434.31,12494.86,96,4,4.04,0.0295,1778.24,28622.06,48127.0,37.6822,-122.146
+2024-10-08,North,USA,Minneapolis,Support,Starter,Mid-Market,Holiday Push,Direct,1294.67,406.92,887.75,7,4,3.68,0.0513,128.92,2175.12,3765.47,42.327,-86.337
+2024-11-15,North,USA,Detroit,Support,Add-on Analytics,Enterprise,Retention,Direct,1386.18,772.58,613.6,6,5,4.07,0.0458,136.69,1432.04,3720.32,41.3322,-88.0046
+2025-05-03,Central,Canada,Calgary,Sales,Starter,Mid-Market,Upsell,Retail,1521.44,597.28,924.16,13,3,3.26,0.0512,154.74,1274.39,4154.91,42.6188,-80.0797
+2024-05-08,North,USA,Minneapolis,Finance,Enterprise,Enterprise,Retention,Direct,14861.8,4821.46,10040.34,92,5,4.51,0.048,2577.29,24356.82,19439.41,40.4982,-87.705
+2025-05-14,South,USA,Dallas,Support,Add-on Analytics,SMB,Q1 Launch,Retail,731.93,277.75,454.18,5,4,4.6,0.058,41.57,722.15,720.49,33.1941,-83.3892
+2024-05-14,North,USA,Minneapolis,Finance,Starter,Mid-Market,Retention,Online,1424.61,583.78,840.83,10,4,3.61,0.0472,161.52,559.04,5572.69,41.1051,-87.6473
+2025-05-14,West,USA,Seattle,Support,Professional,Enterprise,Retention,Retail,5469.52,2397.02,3072.5,33,3,4.38,0.0472,801.68,12978.21,11523.91,37.7797,-123.4383
+2024-01-02,West,USA,Seattle,Support,Enterprise,SMB,Summer Promo,Retail,15731.85,5798.17,9933.68,116,4,4.42,0.0756,1433.19,1222.8,24841.64,38.2817,-122.7747
+2024-08-19,South,USA,Miami,Sales,Add-on Analytics,Enterprise,Summer Promo,Retail,1264.64,527.04,737.6,14,7,3.73,0.0519,175.84,2617.94,1117.1,34.0634,-83.1921
+2024-07-10,East,USA,New York,Marketing,Enterprise,Mid-Market,Retention,Retail,7461.01,3184.38,4276.63,44,2,4.39,0.0615,882.71,14849.6,21348.52,39.3054,-73.9717
+2024-07-20,Central,Canada,Toronto,Finance,Add-on Analytics,Mid-Market,Holiday Push,Partner,1095.49,312.85,782.64,11,3,3.91,0.0397,136.87,1980.54,3754.71,43.4723,-79.5564
+2024-06-17,West,USA,Seattle,Sales,Enterprise,SMB,Q1 Launch,Retail,10518.93,4883.35,5635.58,48,5,4.87,0.0494,1560.78,25840.93,34556.18,37.7411,-122.1055
+2025-03-21,West,USA,Seattle,Operations,Add-on Analytics,Enterprise,Upsell,Retail,1323.57,484.73,838.85,6,5,3.65,0.0353,82.27,926.96,4566.23,37.2047,-123.123
+2024-05-06,North,USA,Detroit,Marketing,Enterprise,Mid-Market,Retention,Online,8379.45,3370.89,5008.56,103,1,4.06,0.0536,1288.92,19640.02,9239.18,41.9587,-88.5429
+2024-01-12,North,USA,Chicago,Operations,Professional,Enterprise,Upsell,Retail,6211.47,2335.42,3876.05,65,4,3.8,0.0386,840.07,8562.99,23089.98,41.955,-87.3805
+2024-07-29,South,USA,Miami,Marketing,Enterprise,Mid-Market,Holiday Push,Direct,11291.85,4779.35,6512.5,86,4,4.31,0.0861,1754.66,542.48,12532.58,34.0255,-84.0774
+2024-02-04,South,USA,Miami,Finance,Add-on Analytics,Mid-Market,Upsell,Retail,1310.59,481.47,829.12,12,6,4.37,0.0369,93.12,1961.75,3779.47,34.1531,-84.1483
+2024-06-04,West,USA,San Francisco,Marketing,Add-on Analytics,Mid-Market,Upsell,Partner,803.41,345.31,458.1,3,4,4.3,0.0432,83.56,273.54,2746.86,38.2398,-122.8522
+2024-01-21,Central,Canada,Calgary,Finance,Professional,Mid-Market,Retention,Partner,3853.8,1157.36,2696.44,21,2,4.83,0.0602,350.07,9385.72,6538.59,43.5749,-80.3801
+2024-11-24,Central,Canada,Vancouver,Support,Enterprise,Enterprise,Retention,Partner,17561.52,5975.32,11586.2,97,5,3.03,0.0978,1917.38,30482.8,57586.61,43.5898,-79.8551
+2024-10-10,Central,Canada,Calgary,Operations,Professional,Mid-Market,Upsell,Direct,3468.7,1741.27,1727.43,20,3,3.89,0.0674,370.91,4216.01,9472.71,43.8654,-79.2524
+2025-02-21,South,USA,Miami,Marketing,Professional,SMB,Q1 Launch,Partner,2896.33,1115.57,1780.75,20,3,4.32,0.0344,425.4,1884.71,3094.13,33.8436,-83.8049
+2024-12-08,West,USA,Seattle,Support,Starter,Mid-Market,Q1 Launch,Retail,1494.21,559.13,935.07,14,6,4.29,0.0512,173.52,1931.18,774.38,37.7997,-121.0213
+2024-10-17,North,USA,Detroit,Finance,Professional,Enterprise,Summer Promo,Direct,5611.48,2775.58,2835.9,25,2,4.54,0.0394,751.0,4521.76,21439.8,42.9166,-87.0175
+2024-09-22,South,USA,Dallas,Marketing,Starter,SMB,Q1 Launch,Online,498.74,225.58,273.16,4,4,4.27,0.049,29.28,435.89,1969.63,32.7654,-84.3874
+2025-02-23,East,USA,Philadelphia,Sales,Add-on Analytics,SMB,Retention,Retail,1193.99,643.88,550.11,7,4,4.0,0.0427,110.4,34.12,744.63,40.1647,-75.4537
+2024-03-01,South,USA,Atlanta,Operations,Professional,Mid-Market,Q1 Launch,Direct,4694.43,1948.88,2745.55,42,4,4.19,0.0435,715.0,8399.21,2412.01,33.4453,-85.3383
+2025-03-09,East,USA,New York,Sales,Enterprise,Enterprise,Q1 Launch,Partner,10174.2,3679.13,6495.07,54,5,3.9,0.0772,1518.14,6969.86,24226.41,41.2851,-73.7684
+2024-04-01,West,USA,Seattle,Operations,Starter,Enterprise,Retention,Online,4070.08,1667.91,2402.17,29,8,4.14,0.079,305.64,6059.73,3482.58,37.418,-121.6679
+2025-06-15,Central,Canada,Vancouver,Finance,Professional,SMB,Retention,Retail,2991.4,1664.06,1327.34,31,6,4.3,0.0298,522.23,1886.11,9103.5,44.9387,-80.8447
+2025-04-23,North,USA,Detroit,Operations,Professional,Enterprise,Upsell,Retail,12191.83,5861.35,6330.48,66,5,4.01,0.0458,1848.9,16758.78,7104.8,42.4609,-88.0448
+2024-11-12,Central,Canada,Calgary,Support,Add-on Analytics,Mid-Market,Upsell,Partner,501.1,148.0,353.1,4,7,2.51,0.0427,36.69,1190.54,363.13,44.2139,-79.858
+2024-12-15,East,USA,Boston,Support,Professional,Mid-Market,Q1 Launch,Online,7793.82,4113.14,3680.67,43,2,4.2,0.067,988.97,15535.44,30534.85,41.0995,-74.2649
+2024-04-09,South,USA,Atlanta,Finance,Enterprise,Mid-Market,Holiday Push,Online,13305.12,3898.07,9407.05,115,2,4.16,0.0308,821.5,13511.82,25443.65,34.1819,-83.9162
+2024-01-13,North,USA,Minneapolis,Marketing,Starter,SMB,Retention,Partner,751.81,237.65,514.16,4,5,4.01,0.0222,41.12,1472.78,2234.66,41.779,-85.7757
+2024-06-12,North,USA,Detroit,Operations,Starter,Mid-Market,Summer Promo,Online,1545.68,815.33,730.35,14,6,4.64,0.0348,202.0,1567.34,3106.14,41.6272,-87.1417
+2024-08-09,Central,Canada,Toronto,Sales,Add-on Analytics,Enterprise,Retention,Partner,1784.7,1031.38,753.32,13,6,5.0,0.0478,311.62,971.92,1003.6,42.6513,-78.8669
+2025-02-17,West,USA,San Francisco,Sales,Starter,SMB,Q1 Launch,Partner,854.23,317.25,536.98,9,4,4.1,0.0318,42.98,1320.79,1155.93,37.6981,-120.8236
+2024-09-29,East,USA,Boston,Finance,Professional,SMB,Q1 Launch,Retail,4369.18,1337.5,3031.68,28,4,4.73,0.0517,573.52,5816.4,10894.29,40.5376,-75.1972
+2025-06-11,East,USA,Boston,Support,Enterprise,Mid-Market,Summer Promo,Retail,14019.92,6505.62,7514.3,68,2,2.88,0.0356,2474.33,22511.74,49880.16,41.9159,-73.1897
+2024-03-04,East,USA,New York,Finance,Starter,Enterprise,Retention,Retail,2958.77,1098.29,1860.48,35,7,3.98,0.0586,497.43,3591.22,8964.79,40.3408,-74.0707
+2024-06-30,North,USA,Minneapolis,Support,Starter,Mid-Market,Q1 Launch,Partner,1391.82,640.96,750.86,6,5,4.41,0.0308,125.25,228.01,1985.89,41.469,-88.8037
+2025-05-11,West,USA,Seattle,Operations,Starter,Mid-Market,Holiday Push,Direct,1773.68,583.78,1189.9,8,3,4.76,0.0848,133.67,2674.41,3113.27,38.454,-122.7449
+2024-12-24,North,USA,Detroit,Finance,Starter,SMB,Summer Promo,Online,553.8,198.04,355.76,5,3,3.87,0.0998,29.46,128.86,793.06,40.7203,-87.9732
+2024-03-12,West,USA,Seattle,Support,Enterprise,SMB,Holiday Push,Partner,6722.26,3450.15,3272.1,40,5,4.02,0.0547,512.22,7547.3,22446.36,37.6117,-123.0901
+2024-08-22,North,USA,Detroit,Finance,Professional,Enterprise,Holiday Push,Direct,10843.16,5783.93,5059.23,67,9,4.36,0.0684,1133.94,15920.66,6403.08,40.8652,-87.0477
+2024-08-23,Central,Canada,Vancouver,Finance,Professional,Enterprise,Q1 Launch,Online,8365.3,4280.2,4085.09,47,2,4.57,0.0255,799.02,10918.92,32651.68,44.873,-80.0967
+2024-08-08,West,USA,Seattle,Sales,Starter,SMB,Summer Promo,Direct,1141.26,365.49,775.77,6,5,3.83,0.0818,80.83,2575.27,4555.22,39.2084,-121.5966
+2024-02-23,East,USA,Philadelphia,Marketing,Starter,Mid-Market,Holiday Push,Online,1504.96,428.69,1076.27,8,7,4.31,0.0499,123.24,1104.67,3381.05,39.9026,-74.8777
+2025-03-31,West,USA,Seattle,Marketing,Professional,SMB,Q1 Launch,Retail,3873.65,1762.81,2110.84,33,4,3.6,0.0425,588.58,1570.61,15192.39,36.3524,-121.1561
+2025-06-22,North,USA,Minneapolis,Marketing,Starter,Enterprise,Upsell,Retail,1662.23,574.29,1087.93,12,3,4.18,0.075,253.33,3993.58,2549.73,42.3508,-87.5601
+2024-07-15,Central,Canada,Vancouver,Sales,Enterprise,Mid-Market,Holiday Push,Retail,21420.01,7098.92,14321.09,188,5,3.87,0.0443,1385.81,37785.01,74448.35,43.3398,-80.1522
+2025-04-16,South,USA,Dallas,Finance,Add-on Analytics,Mid-Market,Upsell,Partner,796.76,281.21,515.55,3,3,4.57,0.0346,142.58,948.95,893.18,31.5789,-84.0064
+2024-02-12,West,USA,Denver,Sales,Enterprise,Enterprise,Holiday Push,Direct,15963.4,5110.56,10852.84,89,2,3.97,0.0789,2433.58,14702.53,21663.09,36.7344,-122.253
+2024-07-03,West,USA,Seattle,Operations,Add-on Analytics,Mid-Market,Upsell,Online,815.19,417.34,397.85,5,3,3.76,0.0478,119.22,575.65,794.61,38.1357,-121.7349
+2024-01-28,West,USA,Seattle,Operations,Enterprise,Enterprise,Q1 Launch,Online,11722.49,4605.07,7117.42,135,6,3.64,0.0554,891.26,18470.38,29536.76,37.3336,-121.8904
+2024-09-30,Central,Canada,Calgary,Finance,Starter,SMB,Retention,Partner,501.52,181.52,320.0,2,5,3.91,0.034,42.19,880.36,1684.14,43.9767,-79.2393
+2025-06-07,South,USA,Miami,Support,Starter,SMB,Retention,Direct,689.58,355.0,334.58,3,3,3.71,0.0378,80.61,1528.6,2318.48,35.5862,-84.2131
+2024-04-24,South,USA,Dallas,Operations,Add-on Analytics,SMB,Holiday Push,Direct,399.8,151.58,248.22,2,7,3.86,0.0255,53.57,342.08,698.5,35.4321,-85.2466
+2025-06-10,Central,Canada,Vancouver,Operations,Enterprise,Mid-Market,Holiday Push,Partner,10744.59,6121.34,4623.24,67,4,3.8,0.0796,1355.47,12208.99,34401.36,43.197,-79.7275
+2024-10-31,East,USA,Philadelphia,Marketing,Enterprise,Mid-Market,Q1 Launch,Direct,7982.65,2940.37,5042.28,65,5,3.11,0.05,951.87,2744.33,9706.89,41.1909,-75.5031
+2024-05-27,South,USA,Miami,Marketing,Add-on Analytics,Mid-Market,Q1 Launch,Direct,922.68,265.08,657.59,8,4,3.68,0.0292,163.08,1262.33,2898.62,34.833,-85.5291
+2024-12-10,Central,Canada,Calgary,Operations,Professional,Enterprise,Upsell,Direct,4442.26,2240.45,2201.81,26,8,4.02,0.0298,621.08,7069.06,12034.12,42.7722,-78.7885
+2025-01-25,Central,Canada,Vancouver,Operations,Enterprise,Enterprise,Q1 Launch,Partner,10431.24,4200.03,6231.2,73,3,4.36,0.044,1764.16,16364.83,6376.01,43.477,-79.7301
+2025-03-16,Central,Canada,Vancouver,Sales,Enterprise,SMB,Q1 Launch,Online,8834.51,3688.89,5145.62,52,6,3.46,0.0335,1043.46,13202.62,12921.63,43.1606,-80.0533
+2024-03-03,East,USA,Boston,Operations,Starter,Enterprise,Upsell,Direct,2023.17,1110.87,912.3,20,1,3.6,0.0564,138.03,290.01,5439.8,40.4775,-74.489
+2024-12-07,East,USA,New York,Finance,Add-on Analytics,SMB,Q1 Launch,Direct,414.36,158.98,255.39,2,2,3.87,0.0314,59.13,65.81,532.81,41.7692,-74.5454
+2025-02-21,South,USA,Miami,Sales,Professional,SMB,Holiday Push,Retail,3998.55,1450.21,2548.34,42,5,4.49,0.0565,558.79,3918.92,4556.89,34.0084,-84.4536
+2025-05-24,North,USA,Detroit,Operations,Add-on Analytics,SMB,Summer Promo,Online,508.8,198.47,310.33,4,2,4.09,0.0386,88.26,945.33,1651.84,40.5452,-86.3854
+2025-03-02,North,USA,Detroit,Marketing,Add-on Analytics,Mid-Market,Retention,Retail,597.82,305.23,292.59,4,2,4.42,0.0589,37.73,1290.52,1340.5,41.1927,-87.607
+2025-03-08,South,USA,Atlanta,Sales,Professional,SMB,Upsell,Retail,3305.04,1249.22,2055.82,16,3,3.7,0.041,523.91,628.38,10220.81,34.7455,-83.9755
+2025-05-16,Central,Canada,Calgary,Operations,Professional,SMB,Upsell,Online,4372.3,2008.53,2363.77,45,5,3.94,0.0752,705.67,9435.5,3644.63,43.4511,-80.5249
+2024-10-23,North,USA,Chicago,Operations,Enterprise,Enterprise,Q1 Launch,Retail,15908.2,7007.82,8900.38,114,2,3.93,0.0443,2706.6,31408.78,42063.76,41.0333,-87.3038
+2024-09-20,North,USA,Minneapolis,Operations,Add-on Analytics,Enterprise,Q1 Launch,Online,1155.44,640.27,515.18,5,1,4.93,0.0934,178.64,693.99,1591.57,42.5467,-87.828
+2024-04-05,West,USA,San Francisco,Sales,Professional,Enterprise,Upsell,Partner,5525.86,2227.33,3298.53,66,4,4.14,0.0442,753.86,12353.51,18970.76,37.6368,-122.8034
+2024-11-22,Central,Canada,Calgary,Marketing,Professional,Enterprise,Q1 Launch,Retail,4413.93,1567.52,2846.41,28,2,4.05,0.0559,525.39,2759.61,12278.95,43.1535,-78.6118
+2024-10-21,Central,Canada,Vancouver,Operations,Enterprise,SMB,Retention,Partner,8908.47,4879.22,4029.24,92,5,3.91,0.0223,880.36,4818.12,32607.66,41.9271,-80.3687
+2024-11-24,South,USA,Atlanta,Support,Starter,Mid-Market,Q1 Launch,Direct,1006.33,497.1,509.23,11,2,4.79,0.0497,140.62,142.52,2055.61,33.7811,-83.5425
+2025-06-06,East,USA,Boston,Finance,Enterprise,Mid-Market,Q1 Launch,Partner,9969.54,5702.56,4266.98,123,7,4.4,0.0506,1527.73,5594.69,29755.62,41.4874,-72.744
+2025-04-04,East,USA,New York,Operations,Starter,Mid-Market,Holiday Push,Direct,2390.34,959.82,1430.52,21,3,4.24,0.0396,198.47,4172.29,4210.27,40.852,-73.038
+2024-10-07,East,USA,New York,Support,Enterprise,SMB,Retention,Partner,7156.97,3822.24,3334.72,47,3,4.34,0.0527,968.79,4468.38,8648.97,39.6699,-73.2364
+2024-05-08,West,USA,Denver,Operations,Starter,SMB,Summer Promo,Retail,1217.4,623.78,593.62,6,3,3.95,0.0691,146.95,2511.36,3401.77,37.0803,-121.6374
+2025-01-19,South,USA,Miami,Sales,Starter,Mid-Market,Summer Promo,Online,1255.99,502.71,753.28,7,5,4.02,0.0403,154.93,1296.4,1102.58,33.4591,-83.4505
+2024-02-21,West,USA,Seattle,Operations,Enterprise,Enterprise,Q1 Launch,Direct,15819.96,6021.81,9798.15,186,3,3.86,0.0741,1376.22,10788.17,50403.91,37.1387,-122.6681
+2024-06-15,Central,Canada,Toronto,Operations,Add-on Analytics,SMB,Holiday Push,Partner,821.66,274.69,546.96,7,3,4.7,0.0333,120.62,275.93,1694.44,42.5894,-77.5312
+2024-01-09,West,USA,Seattle,Operations,Starter,SMB,Upsell,Online,820.14,383.8,436.34,4,4,4.61,0.0409,130.61,215.87,771.36,38.056,-122.6087
+2025-06-01,South,USA,Miami,Marketing,Enterprise,Enterprise,Retention,Retail,33911.12,11384.88,22526.24,265,3,2.71,0.04,2424.48,31656.91,74033.98,32.1933,-83.4956
+2024-03-25,East,USA,New York,Operations,Starter,Enterprise,Summer Promo,Partner,2176.16,622.81,1553.35,20,4,4.22,0.0378,183.9,3944.71,2382.09,41.0536,-73.4112
+2025-05-14,North,USA,Minneapolis,Operations,Starter,SMB,Q1 Launch,Direct,1143.4,361.56,781.84,6,4,3.25,0.0573,59.39,1427.73,3067.96,41.2621,-88.8011
+2025-06-03,West,USA,Seattle,Finance,Enterprise,SMB,Holiday Push,Retail,11105.49,6436.94,4668.55,133,4,4.14,0.0573,1254.14,22566.83,8286.43,38.3759,-122.7597
+2024-02-27,North,USA,Detroit,Marketing,Add-on Analytics,SMB,Summer Promo,Partner,620.67,191.06,429.61,5,5,4.44,0.0844,108.27,1017.6,2068.28,42.2508,-87.2019
+2024-02-25,West,USA,San Francisco,Sales,Professional,Mid-Market,Retention,Retail,5811.49,2265.35,3546.14,28,2,4.39,0.0423,998.15,11719.15,16162.15,38.2438,-122.7904
+2024-07-20,North,USA,Minneapolis,Operations,Add-on Analytics,SMB,Summer Promo,Partner,437.45,210.92,226.53,2,1,3.81,0.0573,26.08,245.5,357.22,41.8106,-87.3735
+2024-03-07,South,USA,Atlanta,Marketing,Starter,SMB,Upsell,Online,913.89,288.92,624.97,9,4,4.26,0.047,83.9,314.77,2115.6,33.1418,-84.2017
+2024-09-14,North,USA,Chicago,Operations,Professional,Enterprise,Retention,Direct,6526.84,3699.24,2827.59,51,4,4.49,0.0512,783.86,1758.16,25044.25,41.5917,-87.2282
+2024-06-20,Central,Canada,Calgary,Sales,Starter,Mid-Market,Holiday Push,Retail,1149.49,601.38,548.11,10,3,4.23,0.0494,64.82,128.21,932.05,44.2364,-78.5826
+2024-03-05,South,USA,Atlanta,Operations,Starter,SMB,Upsell,Online,725.0,317.95,407.05,9,4,3.99,0.0602,102.38,1030.27,1660.53,31.9882,-84.5186
+2024-01-02,North,USA,Detroit,Finance,Starter,Mid-Market,Holiday Push,Retail,838.39,309.19,529.2,5,2,4.53,0.0615,119.02,1550.16,2544.78,41.3772,-87.0429
+2025-02-15,East,USA,New York,Sales,Professional,Mid-Market,Holiday Push,Retail,7875.08,3917.57,3957.5,41,3,3.44,0.0434,739.43,6174.55,25589.62,41.3926,-74.1546
+2025-06-14,Central,Canada,Toronto,Finance,Add-on Analytics,SMB,Retention,Direct,703.22,341.24,361.98,3,4,3.85,0.0739,62.66,746.03,1516.11,44.0796,-78.9592
+2024-11-21,East,USA,New York,Finance,Enterprise,SMB,Upsell,Retail,5953.64,3117.52,2836.12,60,3,5.0,0.0375,452.11,2755.58,21529.37,40.5472,-74.9446
+2025-04-01,East,USA,New York,Sales,Professional,SMB,Retention,Online,2496.93,1402.35,1094.58,14,5,3.48,0.039,289.71,767.9,7394.0,40.809,-73.7129
+2025-01-19,East,USA,Boston,Finance,Enterprise,Mid-Market,Upsell,Direct,21467.86,10220.5,11247.37,141,5,3.31,0.0965,2108.57,47690.69,39876.25,40.2974,-73.3784
+2024-11-22,West,USA,San Francisco,Operations,Starter,Mid-Market,Upsell,Online,894.98,435.82,459.15,4,3,3.24,0.0539,86.56,1853.66,1274.49,37.121,-123.0959
+2024-09-19,Central,Canada,Calgary,Marketing,Professional,Mid-Market,Retention,Retail,4733.66,1788.17,2945.49,26,5,3.5,0.0342,381.4,231.39,4212.03,42.6844,-80.8757
+2024-10-08,Central,Canada,Calgary,Finance,Enterprise,Mid-Market,Summer Promo,Retail,11145.15,4184.56,6960.6,67,1,3.9,0.0514,764.71,5384.76,32223.1,44.4161,-78.7918
+2024-01-30,East,USA,Boston,Finance,Enterprise,Mid-Market,Holiday Push,Direct,14231.29,4410.62,9820.67,73,4,4.47,0.0356,754.25,4623.25,32929.47,40.3424,-74.6186
+2025-01-26,Central,Canada,Vancouver,Finance,Starter,Enterprise,Q1 Launch,Partner,2145.47,1123.49,1021.98,15,4,3.88,0.0646,186.16,2651.64,3308.36,43.9598,-80.013
+2024-07-24,East,USA,Philadelphia,Support,Professional,SMB,Summer Promo,Online,2311.14,911.42,1399.71,14,1,3.01,0.0837,384.54,4564.95,2754.21,39.3921,-74.1331
+2024-12-04,Central,Canada,Vancouver,Operations,Starter,Enterprise,Summer Promo,Retail,855.34,326.27,529.06,10,5,4.3,0.0635,135.61,850.36,627.66,44.4102,-79.1866
+2024-01-28,West,USA,San Francisco,Support,Add-on Analytics,SMB,Upsell,Partner,875.53,338.2,537.32,7,3,3.04,0.0607,93.71,1970.91,3100.1,38.508,-121.9404
+2024-01-29,Central,Canada,Vancouver,Operations,Add-on Analytics,SMB,Summer Promo,Online,519.43,205.19,314.24,2,3,3.98,0.063,53.48,1193.6,571.68,44.5048,-79.6245
+2025-02-08,South,USA,Dallas,Operations,Add-on Analytics,SMB,Upsell,Online,633.64,276.19,357.45,3,4,4.17,0.0748,44.62,551.8,1846.85,33.4908,-84.2598
+2024-03-27,East,USA,Philadelphia,Operations,Add-on Analytics,SMB,Holiday Push,Retail,665.65,337.53,328.13,3,6,3.46,0.0625,39.61,1339.08,2296.53,41.7018,-73.9394
+2024-08-20,South,USA,Miami,Finance,Starter,Enterprise,Retention,Partner,2061.09,681.33,1379.76,16,5,4.47,0.0509,126.33,4001.89,4026.27,33.634,-85.5004
+2025-06-08,North,USA,Detroit,Marketing,Enterprise,SMB,Retention,Direct,8350.7,3406.62,4944.08,93,6,3.86,0.0557,1366.88,16525.46,16797.3,43.0983,-89.1156
+2024-04-20,Central,Canada,Calgary,Finance,Add-on Analytics,Enterprise,Retention,Online,2683.88,848.29,1835.59,26,4,3.48,0.0363,335.9,3332.3,7756.21,42.3464,-79.8471
+2024-06-09,South,USA,Miami,Finance,Enterprise,Mid-Market,Q1 Launch,Retail,7125.05,2776.44,4348.61,42,4,3.78,0.0536,946.14,5721.87,15979.67,32.8481,-84.616
+2025-03-16,North,USA,Chicago,Operations,Enterprise,SMB,Holiday Push,Direct,10102.65,4842.11,5260.54,85,5,3.36,0.0352,892.51,762.16,11409.73,42.6225,-88.4909
+2025-05-27,West,USA,Denver,Support,Professional,SMB,Retention,Partner,5539.69,2406.31,3133.37,29,2,3.28,0.0417,659.07,11465.48,19701.83,36.3197,-123.4302
+2024-05-01,West,USA,Denver,Operations,Enterprise,SMB,Q1 Launch,Online,8830.84,4827.41,4003.43,60,6,3.87,0.0556,1182.65,14958.9,30081.0,38.0725,-120.3173
+2024-10-01,Central,Canada,Toronto,Marketing,Enterprise,Enterprise,Summer Promo,Direct,13509.8,7764.47,5745.32,84,2,3.89,0.0355,1750.08,26243.01,49147.83,43.506,-80.0302
+2024-09-07,South,USA,Miami,Support,Add-on Analytics,Mid-Market,Summer Promo,Partner,1258.74,582.62,676.12,6,4,3.88,0.034,132.45,501.8,2007.87,33.4777,-83.8661
+2025-03-29,East,USA,New York,Support,Enterprise,Mid-Market,Holiday Push,Online,18360.4,5527.56,12832.84,89,3,3.19,0.0595,2829.23,36544.61,11325.0,39.8469,-73.6334
+2025-04-23,Central,Canada,Vancouver,Finance,Starter,SMB,Summer Promo,Retail,674.38,240.59,433.79,4,4,4.62,0.076,49.1,1580.96,2263.9,43.5112,-78.9872
+2024-06-14,North,USA,Chicago,Marketing,Enterprise,Enterprise,Q1 Launch,Direct,12594.12,4024.03,8570.09,133,3,4.22,0.0718,2161.63,12243.72,32095.37,41.3442,-86.7925
+2025-01-27,West,USA,San Francisco,Finance,Starter,Mid-Market,Retention,Direct,1206.13,571.09,635.05,5,2,3.78,0.0534,156.14,1306.91,3813.01,37.7905,-121.9353
+2024-07-05,North,USA,Minneapolis,Finance,Professional,SMB,Q1 Launch,Retail,4209.34,2287.37,1921.96,23,5,4.36,0.0369,458.16,4425.18,11041.96,40.8943,-87.4227
+2024-12-30,South,USA,Atlanta,Marketing,Enterprise,SMB,Retention,Retail,13703.99,6340.74,7363.25,73,3,3.96,0.0695,1495.24,5038.31,46090.51,33.5989,-83.531
+2024-06-30,South,USA,Dallas,Sales,Starter,Enterprise,Holiday Push,Direct,1651.71,905.56,746.15,8,7,3.77,0.0313,229.36,3972.85,2555.45,33.8301,-84.1704
+2024-08-05,Central,Canada,Toronto,Support,Starter,Mid-Market,Summer Promo,Online,609.92,308.87,301.06,6,2,4.47,0.0563,82.21,1420.67,2363.5,44.3648,-81.3564
+2024-12-18,West,USA,Denver,Sales,Starter,SMB,Holiday Push,Retail,1549.88,727.46,822.42,12,5,4.15,0.0562,102.44,3042.18,4124.43,37.7053,-121.8244
+2024-09-02,North,USA,Detroit,Marketing,Add-on Analytics,Enterprise,Holiday Push,Online,741.08,216.44,524.64,3,4,4.55,0.0514,128.35,1028.35,1646.36,42.5955,-86.6965
+2024-10-16,Central,Canada,Toronto,Support,Add-on Analytics,SMB,Retention,Retail,526.73,224.4,302.33,2,6,3.68,0.0464,65.93,444.87,765.03,43.7516,-79.4978
+2025-06-23,South,USA,Miami,Support,Starter,SMB,Q1 Launch,Partner,809.21,251.81,557.4,4,6,4.0,0.0415,132.96,1959.44,2506.57,32.5008,-83.8806
+2024-11-01,East,USA,Boston,Finance,Professional,SMB,Upsell,Online,5242.05,1986.56,3255.49,43,5,4.26,0.0323,427.35,9383.0,2995.71,41.2137,-73.4493

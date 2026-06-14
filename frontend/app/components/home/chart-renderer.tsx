@@ -27,11 +27,15 @@ import {
   createVerticalValueAxisLabel,
 } from "@/app/components/chart-value-axis-title";
 import {
-  getInsightLayoutMetrics,
+  getSharedDetailLayoutMetrics,
   radialChartOuterMargins,
   resolveVerticalBarPlotBottomPad,
   verticalCartesianOuterMargins,
 } from "@/lib/chart-layout-config";
+import {
+  radialChartExportOuterMargins,
+  resolveRadialChartRadii,
+} from "@/lib/radial-export-layout";
 import {
   formatAxisTickFromRows,
   formatAxisTickFromScatterX,
@@ -115,6 +119,12 @@ function rechartsContainerKey(
 }
 
 export type ChartRendererViz = {
+  scatterXLabel?: string | null;
+  scatterYLabel?: string | null;
+  xColumn?: string | null;
+  yColumn?: string | null;
+  xMetricLabel?: string | null;
+  yMetricLabel?: string | null;
   multiSeries?: {
     layout?: string;
     seriesKeys: string[];
@@ -129,6 +139,8 @@ export type ChartRendererProps = {
   chartHeight: number;
   compact?: boolean;
   insightMode?: boolean;
+  /** Detail-view layout preset (AI Insights + Charts) — margins, bar size, axis spacing. */
+  detailViewLayout?: boolean;
   chartRows: ChartRow[];
   visualization: ChartRendererViz;
   presentationKind: ChartKind;
@@ -146,6 +158,7 @@ function ChartRendererInner({
   chartHeight,
   compact = false,
   insightMode = false,
+  detailViewLayout = false,
   chartRows,
   visualization,
   presentationKind,
@@ -217,7 +230,7 @@ function ChartRendererInner({
   );
 
   const chartLayoutMode = compact ? "compact" : "full";
-  const insightUi = insightMode && !compact;
+  const detailLayout = (insightMode || detailViewLayout) && !compact;
 
   const categoryTickStrings = useMemo(
     () => rData.map((r) => String(r.name ?? "")),
@@ -329,8 +342,8 @@ function ChartRendererInner({
     categoryAxisBottomMargin,
   } = cartesianLayout;
 
-  const insightLayoutViewportW = insightUi
-    ? getInsightLayoutMetrics(rKind).planViewportPx
+  const detailLayoutViewportW = detailLayout
+    ? getSharedDetailLayoutMetrics(rKind).planViewportPx
     : viewportW;
   const rechartsAnimActive =
     !pngCaptureMode && rData.length <= RECHARTS_ANIMATION_MAX_POINTS;
@@ -338,11 +351,11 @@ function ChartRendererInner({
 
   const pickCartesianMargin = (bottomForCartesian: number) =>
     verticalCartesianOuterMargins(rKind, vmBalanced, bottomForCartesian, {
-      insightUi,
+      insightUi: detailLayout,
     });
 
   const insightVBarCatDense =
-    insightUi &&
+    detailLayout &&
     (rKind === "bar" || rKind === "histogram") &&
     rData.length >= 6;
   const insightHasCategoryLabel = Boolean(rAxes.categoryAxis?.trim());
@@ -352,7 +365,7 @@ function ChartRendererInner({
     (manyCategoryLegacy && (rKind === "bar" || rKind === "histogram"));
   const insightVBarXHeight =
     (categoryPlan?.xAxisHeightPx ??
-      (manyCategoryLegacy ? (insightUi ? 42 : 58) : insightUi ? 24 : 36)) +
+      (manyCategoryLegacy ? (detailLayout ? 42 : 58) : detailLayout ? 24 : 36)) +
     (insightVBarCatDense ? 2 : 0);
   const insightVBarLabelOffset = insightVBarAngled ? -14 : -4;
   const insightVBarBottomPad =
@@ -363,7 +376,7 @@ function ChartRendererInner({
           xAxisHeightPx: insightVBarXHeight,
           angled: insightVBarAngled,
           hasCategoryLabel: insightHasCategoryLabel,
-          insightUi,
+          insightUi: detailLayout,
           denseCategories: insightVBarCatDense,
         })
       : categoryAxisBottomMargin;
@@ -502,7 +515,7 @@ function ChartRendererInner({
               name={stackedSpec.seriesLabels[k] ?? k}
               fill={PIE_COLORS[i % PIE_COLORS.length]}
               radius={[0, 6, 6, 0]}
-              maxBarSize={compact ? 22 : insightUi ? 32 : 26}
+              maxBarSize={compact ? 22 : detailLayout ? 32 : 26}
               isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
               cursor={canInsightDrill ? "pointer" : "default"}
@@ -555,7 +568,7 @@ function ChartRendererInner({
             textAnchor={insightVBarXAnchor}
             height={insightVBarXHeight}
             interval={insightVBarXInterval}
-            minTickGap={compact ? 4 : insightUi ? 28 : 14}
+            minTickGap={compact ? 4 : detailLayout ? 28 : 14}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
           >
@@ -715,26 +728,31 @@ function ChartRendererInner({
   }
 
   if (rKind === "pie" || rKind === "donut") {
-    const innerR =
-      rKind === "pie" ? 0 : compact ? 52 : 62;
+    const radii = resolveRadialChartRadii({
+      kind: rKind,
+      plotHeightPx: chartHeight,
+      compact,
+      pngCaptureMode,
+    });
     const piePad = computePieChartMargins(rAxes.valueAxisCompact);
+    const margins = pngCaptureMode
+      ? radialChartExportOuterMargins(rKind, piePad)
+      : radialChartOuterMargins(rKind, compact, piePad);
     return (
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
         width="100%"
         height={chartHeight}
       >
-        <PieChart
-          margin={radialChartOuterMargins(rKind, compact, piePad)}
-        >
+        <PieChart margin={margins}>
           <Pie
             data={rData}
             dataKey="value"
             nameKey="name"
             cx="50%"
-            cy="50%"
-            innerRadius={innerR}
-            outerRadius={compact ? 84 : 100}
+            cy={radii.cy}
+            innerRadius={radii.innerRadius}
+            outerRadius={radii.outerRadius}
             paddingAngle={2}
             stroke="#fff"
             strokeWidth={2}
@@ -867,7 +885,7 @@ function ChartRendererInner({
             dataKey="value"
             fill="#6366f1"
             radius={[0, 8, 8, 0]}
-            maxBarSize={compact ? 28 : insightUi ? 48 : 36}
+            maxBarSize={compact ? 28 : detailLayout ? 48 : 36}
             activeBar={{ opacity: 0.88 }}
             isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
@@ -889,14 +907,14 @@ function ChartRendererInner({
     const ChartBody =
       rKind === "area" ? AreaChart : LineChart;
     const temporalTickStrings = temporalTickStringsForChartRows(rData);
-    const trendViewport = insightUi ? insightLayoutViewportW : viewportW;
+    const trendViewport = detailLayout ? detailLayoutViewportW : viewportW;
     const trendTickFs = lineAreaTickFontSizePx(compact, trendViewport);
     const lineAreaBottomMargin = Math.ceil(
       computeLineAreaChartBottomMargin({
         temporalTickStrings,
         tickFontSizePx: trendTickFs,
         chartLayoutMode,
-      }) * (insightUi ? 0.86 : 0.94)
+      }) * (detailLayout ? 0.86 : 0.94)
     );
     const trendInterval = computeLineAreaXAxisInterval(rData.length, {
       compact,
@@ -938,14 +956,14 @@ function ChartRendererInner({
             height={trendXAxisHeight}
             interval={trendInterval}
             tickMargin={10}
-            minTickGap={compact ? 6 : insightUi ? 26 : 16}
+            minTickGap={compact ? 6 : detailLayout ? 26 : 16}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
           >
             <Label
               value={rAxes.categoryAxis}
               position="insideBottom"
-              offset={insightUi ? -14 : compact ? -20 : -24}
+              offset={detailLayout ? -14 : compact ? -20 : -24}
               content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
@@ -1037,13 +1055,13 @@ function ChartRendererInner({
         barCategoryGap={
           isHistogram
             ? 2
-            : insightUi && rData.length <= 5
+            : detailLayout && rData.length <= 5
               ? "5%"
-              : insightUi && rData.length <= 10
+              : detailLayout && rData.length <= 10
                 ? "10%"
                 : undefined
         }
-        barGap={insightUi && rData.length <= 6 ? 4 : undefined}
+        barGap={detailLayout && rData.length <= 6 ? 4 : undefined}
         margin={pickCartesianMargin(insightVBarBottomPad)}
       >
         <CartesianGrid
@@ -1064,7 +1082,7 @@ function ChartRendererInner({
           textAnchor={insightVBarXAnchor}
           height={insightVBarXHeight}
           interval={insightVBarXInterval}
-          minTickGap={compact ? 4 : insightUi ? 28 : 14}
+          minTickGap={compact ? 4 : detailLayout ? 28 : 14}
           axisLine={{ stroke: CHART_AXIS_LINE }}
           tickLine={{ stroke: CHART_AXIS_LINE }}
         >

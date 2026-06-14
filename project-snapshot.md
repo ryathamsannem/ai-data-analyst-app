@@ -1,126 +1,282 @@
-# Project Snapshot
+# AI Data Analyst App — Project Snapshot
 
 **Generated:** June 8, 2026  
-**Purpose:** Handoff snapshot for a new Cursor chat session  
-**Branch:** `DEV` (working tree may contain uncommitted changes)
+**Branch:** `DEV` (latest: `b2c1a47` — auto dashboard chart selection fixes)  
+**Purpose:** Handoff for a new Cursor chat and external architecture review.
+
+**Companion docs:** [`auto-dashboard-status.md`](auto-dashboard-status.md) · [`file-map.md`](file-map.md) · [`architecture-summary.md`](architecture-summary.md) · [`open-issues.md`](open-issues.md)
 
 ---
 
-## Current application status
-
-The **AI Data Analyst App** is a working **MVP-stage** analytics SaaS:
-
-- Upload CSV / Excel / JSON / Parquet
-- Explore **Overview** (KPIs, filters, auto-dashboard mini charts)
-- Browse **Data Preview** (search, sort, pagination)
-- Ask questions in **AI Insights** (pandas viz + Claude narrative)
-- View chart history in **Charts**
-- Export executive **PDF** from **Export** tab
-
-Core flows are stable for controlled pilot use. Recent work focused on **intent routing**, **chart/PNG export polish**, **confidence scoring**, **follow-up context**, and **SaaS limit UX**.
-
-**Baseline docs (verify against code before contradicting):**
-
-- [`AGENTS.md`](AGENTS.md)
-- [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md)
-- [`LATEST_STABLE_UI_SNAPSHOT.md`](LATEST_STABLE_UI_SNAPSHOT.md)
-- [`PDF_EXPORT_STABLE_BASELINE.md`](PDF_EXPORT_STABLE_BASELINE.md)
-
----
-
-## Features completed
-
-| Area | Status | Key paths |
-|------|--------|-----------|
-| File upload + column mapping + sheet selection | ✅ Stable | `backend/main.py`, `backend/services/file_parsers.py` |
-| Overview KPIs, filters, auto-dashboard | ✅ Stable | `frontend/app/page.tsx`, `frontend/lib/overview-ui.ts` |
-| Data Preview (search/sort/pagination/copy) | ✅ Stable | `frontend/lib/data-preview-*.ts` |
-| AI Insights ask → chart + narrative | ✅ Stable | `POST /ask`, `backend/intent_engine/` |
-| Charts tab timeline + shared renderer | ✅ Stable | `frontend/contexts/chart-session-context.tsx`, `chart-renderer.tsx` |
-| Intent engine (routing, confidence, correlation) | ✅ Wired | `backend/intent_engine/` (28 modules) |
-| Follow-up conversation context | ✅ Implemented | `frontend/lib/ai-conversation-context.ts`, `backend/main.py` |
-| Executive PDF export (multi-section) | ✅ Functional E2E | `frontend/app/pdf-report.ts` |
-| Chart PNG export (offscreen renderer) | ✅ Production-ready polish | `frontend/lib/chart-png-capture.ts`, `chart-png-export-session.ts` |
-| Mock SaaS plan limits UX | ✅ Working | `backend/services/plan_limits.py`, `frontend/lib/plan-limits.ts` |
-| Health / readiness endpoints | ✅ Working | `GET /health`, `GET /ready` |
-| Pilot landing + auto-upload flow | ✅ Working | `frontend/lib/pilot-landing.ts`, `upload-auto-flow.ts` |
-| Percentage-point gap formatting (rates) | ✅ Fixed | `frontend/lib/metric-value-format.ts` |
-| Rate >100% warning (muted, export + UI) | ✅ Fixed | `frontend/lib/chart-quality-warnings.ts` |
-
----
-
-## Features in progress
+## Current project status
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **Export/PDF finalization** | 🟡 Functional, not product-final | Pagination, page utilization, narrative density per `AGENTS.md` |
-| **DAIE full migration** | 🟡 Design only | `DYNAMIC_ANALYTICS_INTENT_ENGINE.md` — no full engine swap |
-| **Manual follow-up chain E2E QA** | 🟡 Pending | 5-step retail regression sequence in browser |
-| **PDF 7-section smoke test** | 🟡 Pending | All Export checkboxes in downloaded PDF |
-| **Multi-user production** | 🔴 Not started | Single global `df`; no auth |
-| **TypeScript strict clean** | 🟡 Partial | Vitest passes; some `tsc` issues may remain in large files |
-| **Real billing / server-side limits** | 🔴 Mock only | Client-spoofable `X-Plan-Tier` |
+| **Pilot / single-user** | ✅ Ready | Upload → Overview → AI Insights → Charts → PDF/PNG export functional |
+| **Public multi-user SaaS** | 🔴 Not ready | Global in-memory dataset; no auth; client-spoofable plan tier |
+| **Frontend tests** | ✅ 261/261 Vitest pass | `npm run test` |
+| **Frontend build** | ✅ Pass | `npm run build` (Next.js 16.2.4) |
+| **Backend tests** | ✅ Green | `python run_tests.py -v` or `pytest tests/` |
+| **Auto Dashboard** | ✅ Functional | Opportunity engine + diversity selection; recent layout/PNG/title fixes |
+| **AI Insights** | ✅ Stable baseline | Deterministic chart routing + Claude narrative; regression packs in CI |
+| **PDF Export** | 🟡 Functional | Phase 7 validation artifacts; polish incomplete in places |
+| **PNG Export** | ✅ Functional | Offscreen capture; overview + Charts tab parity for orientation |
+| **Usage Dashboard** | 🟡 Mock SaaS | In-memory counters; client plan tier header |
 
 ---
 
-## Known issues
+## Major completed features
 
-See [`bug-inventory.md`](bug-inventory.md) for full ranked list. Top items:
+### Data ingestion & profiling
+- CSV, Parquet, JSON/JSONL upload with tier size caps
+- Excel multi-sheet selection (`POST /select-sheet`)
+- Semantic column mapping (product, sales, region, date, customer, profit)
+- Dataset profile: dtypes, describe stats, column types
 
-| ID | Severity | Summary |
-|----|----------|---------|
-| C1 | Critical | Global in-memory `df` — not multi-tenant |
-| C2 | Critical | LLM narrative can diverge from chart on thin grounding |
-| C3 | Critical | Chart routing fallback chain can mislead on edge intents |
-| C4 | Critical | Missing `ANTHROPIC_API_KEY` → template fallback copy |
-| H3 | High | Monolithic `page.tsx` (~14k) + `main.py` (~15.8k) |
-| H5 | High | AI quota debited before pipeline completes |
+### Overview (Auto Dashboard)
+- Domain-aware KPI cards (sales, HR, operations, generic)
+- Deterministic auto-dashboard chart generation (no LLM)
+- Opportunity discovery: trend, ranking, composition, correlation, compare, distribution
+- Coverage-first chart selection with KPI deduplication
+- Filter-aware refresh (`POST /filtered-dashboard`)
+- Drill-down from chart bars to filters
+- Two-column responsive chart grid with full-width solo last row (5/7/9 charts)
+- Per-chart PNG export from dashboard cards
 
-**Test pitfall:** Do **not** run `unittest discover -s tests` — shadows `intent_engine` package. Use `cd backend && python run_tests.py -v`.
+### AI Insights
+- `POST /ask` — question → pandas visualization → Claude narrative
+- Intent engine: metric/dimension resolution, correlation pack, confidence scoring
+- Executive insight cards, follow-up suggestions, conversation context
+- Frontend alignment gates (question match, intent match)
+- Relationship scatter with Pearson/Spearman metadata
+
+### Charts tab
+- Chart session timeline (AI + auto-dashboard snapshots)
+- Shared `ChartRenderer` with presentation contract
+- PNG export per session chart
+
+### Data Preview
+- Paginated table (`POST /preview` — **not filter-aware**)
+- Column quality insights, suggested questions, schema summary
+
+### Export
+- Executive PDF (jsPDF + Canvg composite charts)
+- Section toggles (KPI, insight, chart, conversation, appendix)
+- PDF quota reserve/refund flow
+- Branding config (client `localStorage`)
+
+### Usage & plan limits (mock)
+- Free vs paid tier limits (AI questions, PDF exports, upload size)
+- `GET /usage`, `POST /usage/pdf-export`, refund endpoint
+- Header menu usage dashboard (`PlanUsageMenu`)
 
 ---
 
-## Production readiness status
+## Current architecture
 
-| Dimension | Verdict |
-|-----------|---------|
-| **Controlled pilot / demo** | ✅ Acceptable with known limits |
-| **Public multi-user SaaS** | 🔴 **NO-GO** without auth, per-session datasets, server-side billing |
-| **Automated tests** | ✅ Green — frontend **180** Vitest, backend **166** unittest (Jun 8, 2026) |
-| **Lint / build** | ✅ `npm run lint`, `npm run build`, `npm run test` pass |
-| **Deployment artifacts** | 🟡 Partial — `render.yaml`, `.env.example`; no Docker |
+### Stack
 
-Full review: [`deployment-readiness.md`](deployment-readiness.md)
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS v4, Recharts 3 |
+| Backend | FastAPI, pandas (in-memory `df` per process) |
+| AI narrative | Anthropic Claude (`claude-haiku-4-5`) via `POST /ask` |
+| Chart data | **Deterministic pandas** — not LLM-generated numbers |
+| PDF | jsPDF + Canvg in `frontend/app/pdf-report.ts` |
+| PNG | Canvg plot + canvas 2D composite in `chart-png-capture.ts` |
+| Persistence | Client-only: theme, sidebar, branding, chart session |
 
----
+### Repository layout
 
-## Current priorities
-
-1. **Commit / stabilize** uncommitted `DEV` work after QA sign-off
-2. **Manual E2E:** follow-up chains + PDF all-sections smoke on pilot dataset
-3. **PNG export spot-check** in light/dark mode after latest polish (offscreen renderer, 1100px h-bar)
-4. **PDF polish phase** — page fill, export in-progress UI improvements
-5. **Production blockers** (if moving beyond pilot): auth, per-session storage, server-side plan enforcement
-6. **Incremental extraction** from `page.tsx` / `main.py` only when touching those areas
-
----
-
-## Test status (Jun 8, 2026)
-
-```bash
-cd frontend && npm run lint && npm run build && npm run test   # 180 tests
-cd backend && python run_tests.py -v                           # 166 tests
+```
+AI-Data-Analyst-App/
+├── frontend/                 # Next.js SPA (single route `/`)
+├── backend/                  # FastAPI monolith + intent_engine/
+├── docs/                     # Deployment, QA, validation PDFs/screenshots
+├── project-snapshot.md       # This file
+├── auto-dashboard-status.md
+├── file-map.md
+├── architecture-summary.md
+├── open-issues.md
+├── bug-inventory.md          # Full severity-ranked bug list
+├── deployment-readiness.md   # Pilot vs prod verdict
+└── AGENTS.md                 # Agent baseline rules
 ```
 
+### Session model (critical)
+
+- **One active dataset per backend process** — globals `df`, `dataset_profile`, `column_mapping`
+- Usage tracked in-memory per `X-Session-Id` header (not durable across restarts)
+- Chart history lives in browser (`ChartSessionProvider`)
+
 ---
 
-## Related handoff files
+## Backend services
 
-| File | Purpose |
-|------|---------|
-| [`system-understanding.md`](system-understanding.md) | Architecture flows |
-| [`file-map.md`](file-map.md) | Important files + risk tiers |
-| [`bug-inventory.md`](bug-inventory.md) | Open bugs ranked |
-| [`root-cause-analysis.md`](root-cause-analysis.md) | Structural debt + risks |
-| [`recent-work-summary.md`](recent-work-summary.md) | Latest session work |
-| [`deployment-readiness.md`](deployment-readiness.md) | Security + deploy blockers |
+| Module | Path | Role |
+|--------|------|------|
+| **API monolith** | `backend/main.py` | All HTTP routes, upload, KPIs, auto-dashboard, `/ask` viz pipeline, Claude prompts |
+| **Auto dashboard engine** | `backend/services/auto_dashboard_opportunities.py` | Column inventory, opportunity discovery, diversity selection |
+| **File parsers** | `backend/services/file_parsers.py` | CSV, Parquet, JSON parsing |
+| **Usage tracker** | `backend/services/usage_tracker.py` | In-memory AI/PDF counters |
+| **Plan limits** | `backend/services/plan_limits.py` | Tier limit definitions |
+| **SaaS context** | `backend/services/saas_context.py` | Session/plan from headers |
+| **CORS** | `backend/services/cors_config.py` | `ALLOWED_ORIGINS` parsing |
+| **Readiness** | `backend/services/readiness.py` | `/ready` health checks |
+| **Intent engine** | `backend/intent_engine/` | Question patterns, routing, correlation, confidence, narratives |
+| **Analytics metadata** | `backend/analytics_metadata.py` | Chart titles, metric labels |
+
+### Key HTTP endpoints
+
+| Method | Path | Role |
+|--------|------|------|
+| `POST` | `/upload` | Parse file, profile, mapping, KPIs, `auto_dashboard` |
+| `POST` | `/filtered-dashboard` | Apply filters → refreshed KPIs + charts |
+| `POST` | `/preview` | Data Preview rows (unfiltered) |
+| `POST` | `/ask` | AI Insights visualization + narrative |
+| `POST` | `/update-column-mapping` | User column role overrides |
+| `GET` | `/usage` | Plan tier + remaining quotas |
+| `POST` | `/usage/pdf-export` | Reserve PDF export slot |
+| `GET` | `/health`, `/ready` | Liveness / readiness |
+
+---
+
+## Frontend modules
+
+| Area | Primary files |
+|------|---------------|
+| **SPA shell** | `app/page.tsx`, `components/app-shell/` |
+| **Overview UI** | `lib/overview-ui.ts`, `app/globals.css` (overview-chart-grid) |
+| **Auto dashboard charts** | `OverviewAutoDashboardChartCard` in `page.tsx`, `lib/overview-dashboard-*.ts` |
+| **Shared chart renderer** | `app/components/home/chart-renderer.tsx` |
+| **Chart session** | `contexts/chart-session-context.tsx` |
+| **Presentation** | `lib/final-chart-presentation.ts`, `lib/selected-visualization.ts` |
+| **PNG export** | `lib/chart-png-capture.ts`, `chart-png-export-session.ts`, `chart-png-offscreen-host.tsx` |
+| **PDF export** | `app/pdf-report.ts`, `lib/build-executive-pdf-input.ts` |
+| **AI Insights UI** | `SmartChartInsightPanel.tsx`, `ai-executive-insights-panel.tsx` |
+| **Data Preview** | `app/components/home/data-preview-*.tsx` |
+| **Usage** | `app/components/usage-dashboard.tsx`, `lib/usage-api.ts` |
+
+**Tab IDs:** `overview` · `preview` · `insights` · `charts` · `export`
+
+---
+
+## AI Insights status
+
+**Pipeline:** Question → filters → `compute_visualization_for_question()` → unified analysis payload → Claude narrative → frontend gates → `ChartSession`.
+
+**Stable behaviors:**
+- Correlation/relationship routing runs early (scatter when |r| sufficient)
+- Chart numbers authoritative from `exact_result` / `visualization` block
+- Confidence scoring, executive ranking, insight card titles
+- Follow-up context payload to backend
+- Frontend blocks misaligned charts (`chartSnapshotMatchesQuestionIntent`)
+
+**Gates:**
+- `insightChartMatchesCurrentQuestion`
+- `showInsightExportButton` (valid answer + aligned viz)
+
+**Tests:** `backend/tests/intent_engine/` — routing matrix, correlation pack, five-questions, geographic QA, wave QA scripts.
+
+---
+
+## PDF Export status
+
+**Flow:** Export tab or Insights export → `buildExecutivePdfExportInput` → alignment validation → `runExecutivePdfExport` (`pdf-report.ts`).
+
+**Features:**
+- Light print-safe theme
+- KPI section, insight narrative, chart capture, conversation appendix
+- Section toggles; analyst-mode advanced sections
+- Quota reserve with refund on failure
+
+**Validation:** `docs/pdf-validation-screenshots/phase7-*.pdf`, `frontend/lib/phase7-pdf-generate.test.ts`
+
+**Limitations:** Heavy main-thread work; appendix unbounded; some polish gaps vs on-screen Charts tab.
+
+---
+
+## Usage Dashboard status
+
+**Location:** Header `PlanUsageMenu` → `UsageDashboard` component.
+
+**Data source:** `GET /usage` with `X-Session-Id` + `X-Plan-Tier` headers from `saas-session.ts`.
+
+**Tracks:**
+- AI questions remaining (daily)
+- PDF exports remaining
+- Upload size limit display
+
+**Limitations:**
+- Plan tier is **client-set** (`localStorage`) — spoofable
+- Counters in-memory — reset on backend restart
+- Not tied to real billing
+
+---
+
+## Auto Dashboard status
+
+**Summary:** Deterministic BI-style dashboard from column inventory. See [`auto-dashboard-status.md`](auto-dashboard-status.md) for full detail.
+
+**Recent fixes (Jun 2026):**
+- Grid gap: filter non-renderable charts; explicit `gridColumn: span 1` / solo full-width
+- PNG h-bar parity: shared `buildOverviewDashboardPlot()` for live + export
+- PNG padding: reduced export chrome constants
+- Donut export: `radial-export-layout.ts` safe radius + dynamic canvas height
+- Composition %: `radial-chart-format.ts` share_pct sanity
+- Title polish: `polishAutoDashboardChartTitle()` in `canonical-chart-title.ts`
+
+**Validation fixture:** `backend/tests/fixtures/dashboard_showcase_dataset.csv` (500+ rows), mirrored at `frontend/public/dashboard_showcase_dataset.csv`
+
+---
+
+## Known limitations
+
+1. **Single-tenant backend** — global `df`; last upload wins across users
+2. **No authentication** — all routes open
+3. **Mock SaaS** — plan tier and session ID from client headers
+4. **Data Preview ignores Overview filters** — intentional but confusing
+5. **Monolithic files** — `page.tsx` (~14k lines), `main.py` (~16k lines)
+6. **AI narrative drift** — mitigated by grounding; not fully validated post-generation
+7. **No HTTP E2E in CI** — unit tests only
+8. **In-memory usage** — not durable or multi-worker safe
+
+---
+
+## Active branches
+
+| Branch | Role |
+|--------|------|
+| `DEV` | **Active development** (current) |
+| `QA` | QA / validation branch |
+| `main` | Production baseline (`origin/HEAD`) |
+| `stable/pdf-export-phase2` | PDF export stable snapshot |
+| `cursor/agents-md-product-baseline` | Agent baseline docs |
+
+**Remotes:** `origin/DEV`, `origin/QA`, `origin/main`, `origin/cursor/agents-md-product-baseline`
+
+---
+
+## Quick start (new developer)
+
+```bash
+# Backend
+cd backend
+pip install -r requirements.txt
+# Set ANTHROPIC_API_KEY, ALLOWED_ORIGINS in .env
+uvicorn main:app --reload --port 8000
+
+# Frontend
+cd frontend
+npm install
+# Set NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+npm run dev
+```
+
+**Tests:**
+```bash
+cd frontend && npm run lint && npm run test && npm run build
+cd backend && python run_tests.py -v
+```
+
+**Showcase validation:** Upload `frontend/public/dashboard_showcase_dataset.csv` → Overview should show 6–8 charts, KPI chips, no grid holes.

@@ -1,136 +1,182 @@
-# File Map
+# File Map — Auto Dashboard & Export Focus
 
 **Generated:** June 8, 2026  
-**Purpose:** Navigate the codebase safely in a new Cursor session
+**Purpose:** Navigate Auto Dashboard, chart rendering, and PNG export code safely.
 
 ---
 
-## Repository layout
-
-```
-AI-Data-Analyst-App/
-├── frontend/          Next.js 16 app
-├── backend/           FastAPI + intent_engine
-├── docs/              Deployment, QA, validation artifacts
-├── project-snapshot/  Older handoff notes (Jun 4)
-├── handoff docs/      Root-level *.md (this package)
-├── AGENTS.md          Agent baseline rules (READ FIRST)
-├── render.yaml        Render backend deploy
-└── .env.example       Env template
-```
-
----
-
-## Critical path files
-
-### Frontend — entry and shell
-
-| File | Purpose | Depends on |
-|------|---------|------------|
-| `frontend/app/page.tsx` | **Monolithic SPA** — all tabs, upload, filters, Insights, Charts, Export (~14k lines) | Most of `lib/`, `contexts/`, `components/` |
-| `frontend/app/layout.tsx` | Root layout, fonts, theme script | `globals.css` |
-| `frontend/app/chart-types.ts` | `ChartKind`, `ChartRow` types | — |
-| `frontend/contexts/chart-session-context.tsx` | Chart timeline state | `chart-types.ts` |
-| `frontend/components/app-shell/app-shell.tsx` | Sidebar + header chrome | `app-sidebar.tsx`, `app-header.tsx` |
-
-### Frontend — chart pipeline
-
-| File | Purpose | Depends on |
-|------|---------|------------|
-| `frontend/app/components/home/chart-renderer.tsx` | Shared Recharts renderer (Charts/Insights/export) | `chart-axis-layout.ts`, `chart-time-x-axis.ts` |
-| `frontend/lib/final-chart-presentation.ts` | Resolve presentation kind from API + question | `chart-types.ts` |
-| `frontend/lib/selected-visualization.ts` | Viz normalization for renderer | `final-chart-presentation.ts` |
-| `frontend/lib/chart-axis-layout.ts` | Margin/category axis plans | — |
-| `frontend/lib/chart-time-x-axis.ts` | Trend x-axis ticks, chronological sort | — |
-| `frontend/lib/chart-layout-config.ts` | Viewport wrappers, outer margins | — |
-| `frontend/lib/trend-visualization.ts` | Trend bucket labels | — |
-| `frontend/lib/metric-value-format.ts` | Currency, %, pp gap formatting | — |
-| `frontend/lib/chart-quality-warnings.ts` | Rate >100% warning + detection | `metric-value-format.ts` |
-| `frontend/lib/overview-ui.ts` | Overview dash CSS class tokens | — |
-
-### Frontend — PNG export
-
-| File | Purpose | Depends on |
-|------|---------|------------|
-| `frontend/lib/chart-png-capture.ts` | Canvg plot + canvas header/composite | `chart-png-export-text.ts`, `chart-axis-theme.ts` |
-| `frontend/lib/chart-png-export-layout.ts` | Export canvas dimensions by chart kind | `chart-types.ts` |
-| `frontend/lib/chart-png-export-session.ts` | Offscreen wait + download orchestration | `chart-png-capture.ts` |
-| `frontend/lib/chart-png-offscreen-host.tsx` | Body portal for export-only render | `chart-png-export-layout.ts` |
-
-### Frontend — PDF export
-
-| File | Purpose | Depends on |
-|------|---------|------------|
-| `frontend/app/pdf-report.ts` | jsPDF engine, capture, pagination (~4k lines) | `pdf-enterprise-style.ts`, `chart-png-capture.ts` |
-| `frontend/lib/build-executive-pdf-input.ts` | PDF input contract builder | `pdf-export-sections.ts` |
-| `frontend/lib/pdf-executive-content.ts` | Executive narrative blocks for PDF | — |
-| `frontend/lib/pdf-export-quota.ts` | Quota reserve/refund helpers | `usage-api.ts` |
-
-### Frontend — AI Insights client
-
-| File | Purpose | Depends on |
-|------|---------|------------|
-| `frontend/lib/ai-conversation-context.ts` | Follow-up / thread payload | — |
-| `frontend/lib/ai-follow-up-suggestions.ts` | Suggested questions | — |
-| `frontend/lib/routing-plan.ts` | RoutingPlan TypeScript mirror | — |
-| `frontend/lib/api-base.ts` | `getApiBaseUrl()` from env | — |
-| `frontend/lib/saas-session.ts` | Session ID + plan tier headers | — |
-| `frontend/lib/plan-limits.ts` | Client-side limit gates | — |
-
-### Backend — core
-
-| File | Purpose | Depends on |
-|------|---------|------------|
-| `backend/main.py` | **All routes**, viz pipeline, narrative (~15.8k lines) | `intent_engine/`, `services/` |
-| `backend/analytics_metadata.py` | Metric/chart title builders | — |
-| `backend/services/file_parsers.py` | CSV/Excel/JSON/Parquet parse | — |
-| `backend/services/plan_limits.py` | Tier limits definition | — |
-| `backend/services/usage_tracker.py` | In-memory usage counters | — |
-| `backend/services/saas_context.py` | Parse `X-Session-Id`, `X-Plan-Tier` | — |
-| `backend/services/readiness.py` | `/health`, `/ready` | — |
-| `backend/run_tests.py` | Canonical test runner | `tests/` |
-
-### Backend — intent engine
+## Frontend — Auto Dashboard
 
 | File | Purpose |
 |------|---------|
-| `backend/intent_engine/attach.py` | Entry: enrich analysis with intent |
-| `backend/intent_engine/resolve_analysis_intent.py` | Core intent resolution |
-| `backend/intent_engine/routing_plan.py` | RoutingPlan schema |
-| `backend/intent_engine/confidence_scoring.py` | Confidence bands |
-| `backend/intent_engine/correlation_routing_guard.py` | Correlation-first routing |
-| `backend/intent_engine/executive_lens.py` | Executive lens prioritization |
-| `backend/intent_engine/executive_ambiguous_intent.py` | Ambiguous phrase routing |
-| `backend/intent_engine/chart_presentation_align.py` | Chart type alignment |
+| `frontend/app/page.tsx` | Overview tab UI, `parseAutoDashboardMiniCharts`, `OverviewAutoDashboardChartCard`, `buildOverviewDashboardPlot`, grid map, filter refresh, drill-down |
+| `frontend/lib/overview-ui.ts` | CSS class tokens: `ovChartGrid`, `ovDashChartCard`, PNG export root classes |
+| `frontend/lib/overview-chart-grid-layout.ts` | Solo-row detection, `gridColumn` inline styles |
+| `frontend/lib/overview-dashboard-chart-renderable.ts` | `filterOverviewRenderableCharts`, finite-value check |
+| `frontend/lib/overview-dashboard-export.ts` | `resolveOverviewEffectivePresentationKind` (bar → bar_horizontal) |
+| `frontend/lib/overview-dashboard-plot-layout.ts` | Horizontal/vertical dash layout, category plan for overview |
+| `frontend/lib/canonical-chart-title.ts` | `getCanonicalChartTitle`, `polishAutoDashboardChartTitle` |
+| `frontend/lib/final-chart-presentation.ts` | Shared presentation kind (Charts/AI/PDF) — **not** used for overview orientation |
+| `frontend/app/globals.css` | `.overview-chart-grid`, `.overview-dash-chart-card`, chart plot min-heights |
+| `frontend/contexts/chart-session-context.tsx` | `replaceAutoDashboardCharts`, snapshot storage for Charts tab |
+| `frontend/lib/semantic-metric-engine.ts` | `fromAutoDashboardChart` semantic context |
+| `frontend/lib/metric-value-format.ts` | Executive metric formatting, radial display rules |
+| `frontend/lib/metric-spread-gap.ts` | Top/Lowest/Gap insight chips on dashboard cards |
+| `frontend/lib/chart-quality-warnings.ts` | Rate >100% warning on dashboard cards |
+| `frontend/lib/chart-tooltip-format.ts` | Cartesian tooltip handlers for overview |
+| `frontend/lib/use-measured-element-width.ts` | Width measurement helper (if used by overview plots) |
+| `frontend/app/components/home/overview/` | Upload selected state, AI summary panel, landing sections |
+| `frontend/app/components/home/filter-panel.tsx` | Overview filters → `filtered-dashboard` |
+| `frontend/public/dashboard_showcase_dataset.csv` | Manual validation dataset (mirrors backend fixture) |
+
+### Overview components defined in `page.tsx`
+
+| Symbol | Role |
+|--------|------|
+| `computeOverviewDashboardChartPresentation()` | Overview-only chart kind resolver |
+| `OverviewAutoDashboardChartCard` | Card chrome, PNG button, offscreen export portal |
+| `OverviewDashboardChartSlot` | ResizeObserver wrapper, renderable guard |
+| `OverviewInlineKpiChip` | Compact KPI chips above chart grid |
 
 ---
 
-## Baseline documentation (stable behavior contracts)
+## Backend — Auto Dashboard
 
-| Doc | Topic |
-|-----|-------|
-| `AGENTS.md` | Agent rules — do not redesign working UI |
-| `UI_BASELINE_RULES.md` | Filter/chart/metadata rules |
-| `AI_INSIGHTS_STABLE_SUMMARY.md` | Insights behaviors |
-| `CHARTS_STABLE_SUMMARY.md` | Charts tab behaviors |
-| `CHARTS_STABLE_SUMMARY.md` | Chart types + layout |
-| `DATA_PREVIEW_STABLE_SUMMARY.md` | Preview table |
-| `PDF_EXPORT_STABLE_BASELINE.md` | PDF sections + capture |
-| `AI_VISUALIZATION_BEHAVIOR.md` | Viz alignment gates |
+| File | Purpose |
+|------|---------|
+| `backend/main.py` | `build_auto_dashboard()`, `build_auto_dashboard_charts()`, `_dash_series_payload`, `_dash_chart_title_by_dimension`, `POST /upload`, `POST /filtered-dashboard`, domain KPI builders |
+| `backend/services/auto_dashboard_opportunities.py` | **Core engine:** inventory, discovery, scoring, `select_diverse_charts` |
+| `backend/analytics_metadata.py` | `build_insight_title`, `build_metric_label` |
+| `backend/tests/test_auto_dashboard_opportunities.py` | Unit tests for opportunity engine |
+| `backend/tests/fixtures/dashboard_showcase_dataset.csv` | 500+ row showcase validation fixture |
+| `backend/tests/fixtures/retail_analytics_regression.csv` | Retail regression for chart diversity |
+
+### Key `main.py` symbols
+
+| Symbol | Role |
+|--------|------|
+| `infer_auto_dashboard_kind()` | Domain: sales, hr, operations, generic |
+| `calculate_kpis()` | Base KPI metrics |
+| `_dash_series_payload()` | labels/values/chartType payload builder |
+| `_finalize_auto_dashboard_charts()` | Legacy dedup helper |
+| `apply_dashboard_filters_to_df()` | Shared filter logic for dashboard + `/ask` |
 
 ---
 
-## Test files
+## PNG export files
 
-| Area | Location | Count (Jun 2026) |
-|------|----------|------------------|
-| Frontend unit | `frontend/lib/*.test.ts` | 36 files, **180 tests** |
-| Backend intent | `backend/tests/intent_engine/test_*.py` | 30+ files |
-| Backend infra | `backend/tests/test_*.py` | health, CORS, usage, follow-up |
-| Fixtures | `backend/tests/fixtures/*.csv` | Regression datasets |
+| File | Purpose |
+|------|---------|
+| `frontend/lib/chart-png-capture.ts` | Canvg SVG render, header/chips/footer canvas composite, `captureElementToPng` |
+| `frontend/lib/chart-png-export-layout.ts` | Canvas width/height by chart kind, `buildPresentationExportSpec` |
+| `frontend/lib/chart-png-export-session.ts` | `runChartPngExport`, offscreen wait, download trigger |
+| `frontend/lib/chart-png-offscreen-host.tsx` | React portal host at `-12000px` |
+| `frontend/lib/chart-png-export-text.ts` | Export text fill contrast |
+| `frontend/lib/chart-png-export-svg-polish.ts` | SVG pre-capture polish |
+| `frontend/lib/radial-export-layout.ts` | Donut/pie export radius, canvas height, legend row estimate |
+| `frontend/lib/chart-axis-theme.ts` | Resolved axis colors for export |
+
+---
+
+## Chart rendering files
+
+| File | Purpose |
+|------|---------|
+| `frontend/app/components/home/chart-renderer.tsx` | Shared Recharts renderer (pie, donut, scatter, bar, line, area, h-bar) |
+| `frontend/app/chart-types.ts` | `ChartKind`, `ChartRow` types |
+| `frontend/lib/chart-axis-layout.ts` | Margins, category axis plans, horizontal bar layout |
+| `frontend/lib/chart-axis-formatters.ts` | Axis tick formatters |
+| `frontend/lib/chart-time-x-axis.ts` | Trend x-axis ticks, chronological sort |
+| `frontend/lib/chart-layout-config.ts` | Viewport wrappers, layout mode |
+| `frontend/lib/trend-visualization.ts` | Trend bucket labels |
+| `frontend/lib/radial-chart-format.ts` | Donut share %, tooltip formatting |
+| `frontend/lib/selected-visualization.ts` | Visualization contract freeze, display titles |
+| `frontend/lib/insight-aligned-axis-merge.ts` | AI Insights axis alignment |
+| `frontend/app/components/chart-category-axis-tick.tsx` | Wrapped category Y-axis ticks (h-bar) |
+
+---
+
+## Utility files (cross-cutting)
+
+| File | Purpose |
+|------|---------|
+| `frontend/lib/api-base.ts` | `apiUrl()`, `NEXT_PUBLIC_API_BASE_URL` |
+| `frontend/lib/saas-session.ts` | `X-Session-Id`, `X-Plan-Tier` headers |
+| `frontend/lib/plan-limits.ts` | Client tier limits |
+| `frontend/lib/usage-api.ts` | `/usage` fetch, PDF quota reserve/refund |
+| `frontend/lib/usage-display.ts` | Usage dashboard row builder |
+| `frontend/lib/analytics-metadata.ts` | `polishMetricDisplay`, metric labels |
+| `frontend/lib/upload-auto-flow.ts` | Auto-upload after file pick |
+| `frontend/lib/smart-chart-intelligence.ts` | Chart metadata for AI/Charts tab |
+| `frontend/lib/normalized-viz-metadata.ts` | Normalized viz metadata |
+
+---
+
+## PDF export (shared chart capture)
+
+| File | Purpose |
+|------|---------|
+| `frontend/app/pdf-report.ts` | jsPDF engine, chart capture, pagination |
+| `frontend/lib/build-executive-pdf-input.ts` | PDF input contract from session/insights |
+| `frontend/lib/pdf-executive-content.ts` | Executive narrative blocks |
+| `frontend/lib/pdf-export-quota.ts` | Quota helpers |
+| `frontend/lib/pdf-export-sections.ts` | Section toggles |
+| `frontend/lib/pdf-enterprise-style.ts` | Print styling |
+
+---
+
+## AI Insights (reference — out of Auto Dashboard scope)
+
+| File | Purpose |
+|------|---------|
+| `backend/intent_engine/` | Routing, correlation, confidence, narratives |
+| `frontend/lib/ai-conversation-context.ts` | Thread context for `/ask` |
+| `frontend/lib/ai-follow-up-suggestions.ts` | Suggested follow-ups |
+| `frontend/app/components/SmartChartInsightPanel.tsx` | Insight panel UI |
+| `frontend/app/components/ai-executive-insights-panel.tsx` | Executive cards UI |
+
+---
+
+## Tests
+
+### Frontend (Vitest)
+
+| File | Focus |
+|------|-------|
+| `frontend/lib/overview-chart-grid-layout.test.ts` | Grid solo row 5/7/9 |
+| `frontend/lib/overview-dashboard-chart-renderable.test.ts` | Renderable filter |
+| `frontend/lib/overview-dashboard-export.test.ts` | Effective presentation kind |
+| `frontend/lib/overview-dashboard-plot-layout.test.ts` | H-bar detection |
+| `frontend/lib/canonical-chart-title.test.ts` | Title polish |
+| `frontend/lib/radial-chart-format.test.ts` | Share % sanity |
+| `frontend/lib/radial-export-layout.test.ts` | Donut export layout |
+| `frontend/lib/chart-png-export-layout.test.ts` | Export dimensions |
+| `frontend/lib/chart-png-export-session.test.ts` | Export session spec |
+| `frontend/lib/chart-png-capture.test.ts` | Capture helpers |
+| `frontend/lib/chart-png-offscreen-host.test.ts` | Offscreen root style |
+| `frontend/lib/chart-png-export-svg-polish.test.ts` | SVG polish |
+| `frontend/lib/chart-png-export-text.test.ts` | Text contrast |
+| `frontend/lib/chart-axis-layout.test.ts` | Axis layout |
+| `frontend/lib/chart-axis-theme.test.ts` | Theme + export text |
+| `frontend/lib/final-chart-presentation-rate.test.ts` | Rate chart presentation |
+| `frontend/lib/metric-spread-gap.test.ts` | Gap chip formatting |
+| `frontend/lib/metric-executive-percent.test.ts` | Executive % formatting |
+| `frontend/lib/chart-quality-warnings.test.ts` | Rate warnings |
+| `frontend/lib/chart-tooltip-format.test.ts` | Tooltip handlers |
+| `frontend/lib/chart-time-x-axis.test.ts` | Trend axis |
+| `frontend/lib/phase7-pdf-generate.test.ts` | PDF generation |
+
+### Backend (pytest / unittest)
+
+| File | Focus |
+|------|-------|
+| `backend/tests/test_auto_dashboard_opportunities.py` | Auto dashboard engine |
+| `backend/tests/test_usage_limits.py` | Plan limits |
+| `backend/tests/test_health_endpoints.py` | Health/ready |
+| `backend/tests/test_cors_config.py` | CORS |
+| `backend/tests/intent_engine/*` | AI routing, correlation, narratives |
 
 **Run:**
-
 ```bash
 cd frontend && npm run test
 cd backend && python run_tests.py -v
@@ -138,69 +184,13 @@ cd backend && python run_tests.py -v
 
 ---
 
-## Files safe to modify
+## Docs & validation artifacts
 
-Low regression risk when changes are scoped:
-
-| File / area | Safe for |
-|-------------|----------|
-| `frontend/lib/chart-png-*.ts` | PNG export polish only |
-| `frontend/lib/metric-*.ts` | Formatting / display labels |
-| `frontend/lib/chart-quality-warnings.ts` | Warning copy/styling hooks |
-| `frontend/lib/chart-tooltip-format.ts` | Tooltip text |
-| `frontend/lib/pilot-*.ts` | Landing / nav copy |
-| `frontend/lib/branding-config.ts` | PDF footer email, branding |
-| `backend/intent_engine/*.py` + matching tests | Routing rules (with tests) |
-| `backend/tests/intent_engine/` | New regression tests |
-| `docs/*` | Documentation |
-| `.env.example`, `render.yaml` | Deploy config |
-
----
-
-## Files high-risk to modify
-
-Touch only with narrow fix + tests + baseline doc review:
-
-| File | Risk | Why |
-|------|------|-----|
-| `frontend/app/page.tsx` | 🔴 **Very high** | 14k lines; all tabs; easy to break gates/filters/export |
-| `backend/main.py` | 🔴 **Very high** | 15.8k lines; routing order matters; globals |
-| `frontend/app/pdf-report.ts` | 🔴 High | PDF pagination, capture refs, quota interaction |
-| `frontend/app/components/home/chart-renderer.tsx` | 🟠 High | Shared by Charts, Insights, PNG offscreen |
-| `frontend/lib/final-chart-presentation.ts` | 🟠 High | Chart kind affects all surfaces |
-| `frontend/contexts/chart-session-context.tsx` | 🟠 High | Cross-tab chart history |
-| `frontend/app/globals.css` | 🟠 High | Shared tokens; chart shell spacing |
-| `backend/intent_engine/resolve_analysis_intent.py` | 🟠 High | Central routing |
-| `frontend/lib/ai-conversation-context.ts` | 🟡 Medium | Follow-up thread behavior |
-
----
-
-## Dependency graph (simplified)
-
-```
-page.tsx
- ├── chart-session-context
- ├── chart-renderer
- │    ├── chart-axis-layout
- │    ├── chart-time-x-axis
- │    └── final-chart-presentation
- ├── pdf-report.ts
- │    └── chart-png-capture.ts
- └── api-base / saas-session / plan-limits
-
-main.py
- ├── intent_engine/*
- ├── file_parsers
- ├── plan_limits / usage_tracker
- └── analytics_metadata
-```
-
----
-
-## Do not modify without explicit approval
-
-- Working Overview layout / filter bar / card chrome
-- `AiInsightChartShell` / `ChartInsightViewportWrapper` structure
-- Chart-type semantics across Overview / Insights / Charts / PDF
-- Horizontal bar orientation (must stay horizontal)
-- Backend pandas aggregation formulas (chart **calculations**)
+| Path | Purpose |
+|------|---------|
+| `docs/pdf-validation-screenshots/phase7-*.pdf` | PDF export validation outputs |
+| `docs/pdf-validation-screenshots/phase7-manifest.json` | PDF test manifest |
+| `docs/chart-polish/` | Chart polish before/after screenshots |
+| `docs/deployment-guide.md` | Deploy instructions |
+| `bug-inventory.md` | Full bug severity list |
+| `deployment-readiness.md` | Pilot vs prod readiness |

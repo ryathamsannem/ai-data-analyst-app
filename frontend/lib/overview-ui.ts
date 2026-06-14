@@ -29,7 +29,9 @@ export const ovInset =
   "rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-inset)]";
 
 export const ovChip =
-  "inline-flex items-center rounded-full border border-[color:var(--border-default)] bg-gradient-to-b from-[color:var(--surface-elevated)] to-[color:var(--surface-subtle)] px-2.5 py-0.5 text-[10px] font-medium text-[color:var(--text-muted)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-[color:var(--border-strong)] hover:shadow-[var(--shadow-md)]";
+  "overview-kpi-pill inline-flex items-center rounded-full border border-[color:var(--border-default)] bg-gradient-to-b from-[color:var(--surface-elevated)] to-[color:var(--surface-subtle)] px-2.5 py-0.5 text-[10px] font-medium text-[color:var(--text-muted)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-[color:var(--border-strong)] hover:shadow-[var(--shadow-md)]";
+
+export const ovChipText = "overview-kpi-pill__text";
 
 /** Compact dataset context row (non-Overview tabs). */
 export const ovDatasetContextRow =
@@ -183,7 +185,7 @@ export const ovChartGrid = "overview-chart-grid";
 
 export const ovChartCell = "overview-chart-grid__cell";
 
-/** Optional manual override; desktop solo-row widening is automatic in globals.css */
+/** Last odd chart in a 2-col grid — spans full row (see globals.css). */
 export const ovChartCellSoloRow =
   "overview-chart-grid__cell overview-chart-grid__cell--solo-row";
 

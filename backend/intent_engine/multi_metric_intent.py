@@ -202,9 +202,15 @@ def assess_unsupported_multi_metric_for_api(
     """
     Multi-metric compare (X vs Y) when an operand column is absent — no category fallback.
     """
-    from intent_engine.question_patterns import question_requests_multi_metric_comparison
+    from intent_engine.question_patterns import (
+        question_requests_grouped_dual_metric_compare,
+        question_requests_multi_metric_comparison,
+    )
 
-    if not question_requests_multi_metric_comparison(question):
+    if not (
+        question_requests_multi_metric_comparison(question)
+        or question_requests_grouped_dual_metric_compare(question)
+    ):
         return None
 
     payload = build_multi_metric_comparison(question, df, profile)

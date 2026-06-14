@@ -1,0 +1,11 @@
+incident_date,severity,priority,plant,downtime_minutes,root_cause
+2024-01-03,High,P1,Plant-A,180,Equipment failure
+2024-01-10,Medium,P2,Plant-A,45,Scheduled maintenance overrun
+2024-01-15,Low,P3,Plant-B,15,Operator error
+2024-01-22,Critical,P1,Plant-B,240,Power outage
+2024-02-01,High,P1,Plant-A,120,Conveyor jam
+2024-02-08,Medium,P2,Plant-C,60,Quality hold
+2024-02-14,High,P2,Plant-C,95,Material shortage
+2024-02-20,Low,P3,Plant-B,20,Minor calibration
+2024-03-05,Critical,P1,Plant-A,300,Line shutdown
+2024-03-12,Medium,P2,Plant-B,55,Vendor delay

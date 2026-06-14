@@ -5,6 +5,7 @@ Uses aggregation keys + column identifiers only — not question wording or vert
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Optional
 
@@ -129,6 +130,21 @@ def build_insight_title(
     if ct == "histogram":
         return f"Distribution — {met}"
     return f"{met} by {dim.lower()}"
+
+
+def format_executive_number(value: float) -> str:
+    """Human-facing numeric label — avoids scientific notation (e.g. 4.072e+04)."""
+    if value is None or not math.isfinite(float(value)):
+        return "—"
+    v = float(value)
+    av = abs(v)
+    if av >= 1000:
+        return f"{v:,.0f}"
+    if av >= 1:
+        text = f"{v:,.2f}".rstrip("0").rstrip(".")
+        return text if text else "0"
+    text = f"{v:.4f}".rstrip("0").rstrip(".")
+    return text if text else "0"
 
 
 def build_chart_subtitle(
