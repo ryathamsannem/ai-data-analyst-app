@@ -234,7 +234,7 @@ function strengthenBarSeries(svg: SVGSVGElement): void {
         ".recharts-bar-rectangle path, .recharts-bar-rectangle rect, .recharts-bar rect"
       )
       .forEach((el) => {
-        if (!(el instanceof SVGElement)) return;
+        if (!(el instanceof SVGGraphicsElement)) return;
         let box: DOMRect | SVGRect;
         try {
           box = el.getBBox();

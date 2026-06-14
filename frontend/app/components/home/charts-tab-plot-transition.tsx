@@ -45,7 +45,6 @@ export function ChartsTabPlotTransition({
       >
         <div
           className="charts-tab-preview-plot-wrap relative w-full min-h-0"
-          style={{ minHeight: plotHeightPx }}
         >
           {pending ? (
             <div

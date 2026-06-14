@@ -23,7 +23,7 @@ export const chartsTabDownloadBtn =
 
 /** Preview card header stack — tighter than full Insights viz card. */
 export const chartsTabVizHeaderZone =
-  "w-full min-w-0 space-y-2 pb-1 text-center sm:space-y-2.5";
+  "w-full min-w-0 space-y-1.5 pb-0.5 text-center sm:space-y-2";
 
 export const chartsTabVizKicker =
   "text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--text-subtle)] dark:text-[color:var(--insights-text-muted)]";

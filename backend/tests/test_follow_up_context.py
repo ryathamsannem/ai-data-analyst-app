@@ -95,6 +95,45 @@ class TestFollowUpContext(unittest.TestCase):
         )
         self.assertTrue(plan["conversation_sidecar"]["wasFollowUp"])
 
+    def test_compare_suggestion_is_fresh_root_not_follow_up(self) -> None:
+        ctx = ConversationContextPayload(
+            lastQuestion="How does growth rate trend over order date?",
+            rootQuestion="How does growth rate trend over order date?",
+            metricColumn="growth_rate",
+            categoryColumn="order_date",
+            aggregation="mean",
+            chartType="line",
+            lastChartTitle="Growth rate trend",
+            followUpChain=["How does growth rate trend over order date?"],
+            lastAiAnswer="Growth rate rises in Q4.",
+        )
+        parent = ParentAnalysisContextPayload(
+            rootQuestion="How does growth rate trend over order date?",
+            priorQuestion="How does growth rate trend over order date?",
+            metricColumn="growth_rate",
+            categoryColumn="order_date",
+            followUpChain=["How does growth rate trend over order date?"],
+            lastAiAnswer="Growth rate rises in Q4.",
+        )
+        chip = "Compare revenue and profit across order dates"
+        plan = resolve_follow_up_turn(
+            chip,
+            ctx,
+            continuation_intent=False,
+            parent_ctx=parent,
+        )
+        self.assertIsNone(plan.get("conversation_sidecar"))
+        self.assertEqual(plan["effective_question"], chip)
+
+    def test_why_west_highest_stays_follow_up_with_context(self) -> None:
+        ctx = self._base_ctx()
+        plan = resolve_follow_up_turn(
+            "Why is West highest?",
+            ctx,
+            continuation_intent=True,
+        )
+        self.assertTrue(plan["conversation_sidecar"]["wasFollowUp"])
+
 
 if __name__ == "__main__":
     unittest.main()

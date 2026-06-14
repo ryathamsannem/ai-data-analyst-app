@@ -3222,7 +3222,7 @@ def _dash_hr_dashboard_charts() -> List[Dict[str, Any]]:
                 _append_unique_dashboard_chart(
                     out_ch,
                     _dash_series_payload(
-                        f"Employee count trend ({tb})",
+                        f"Employee count Trend by {tb}",
                         g_series,
                         chart_type="line",
                         metric_column=_DASH_RECORD_METRIC_KEY,
@@ -3324,7 +3324,7 @@ def _dash_sales_dashboard_charts() -> List[Dict[str, Any]]:
                 _append_unique_dashboard_chart(
                     out_ch,
                     _dash_series_payload(
-                        f"{metric_lbl} trend ({tb})",
+                        f"{metric_lbl} Trend by {tb}",
                         g_series,
                         chart_type="line",
                         metric_column=sales_col,
@@ -3469,7 +3469,7 @@ def _dash_operations_dashboard_charts() -> List[Dict[str, Any]]:
                 _append_unique_dashboard_chart(
                     out_ch,
                     _dash_series_payload(
-                        f"{metric_lbl} trend ({tb})",
+                        f"{metric_lbl} Trend by {tb}",
                         g_series,
                         chart_type="line",
                         metric_column=metric_col,
@@ -3587,7 +3587,7 @@ def _dash_generic_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
             if g_series is not None and len(g_series) >= 2:
                 lbl = _pretty_label_text(num_for_trend)
                 tb = _freq_human_label(str(_tsm.get("timeBucket") or "M"))
-                tit = f"{lbl} trend ({tb})"
+                tit = f"{lbl} Trend by {tb}"
                 _append_unique_dashboard_chart(
                     out_ch,
                     _dash_series_payload(
@@ -6597,6 +6597,8 @@ def _question_requests_roi(q: str) -> bool:
     return bool(
         re.search(r"\broi\b", ql)
         or re.search(r"\breturn\s+on\s+investment\b", ql)
+        or re.search(r"\bcampaign\s+efficiency\b", ql)
+        or re.search(r"\bcampaign\s+roi\b", ql)
     )
 
 
@@ -7046,6 +7048,23 @@ def _best_numeric_column_for_question(q: str, numeric_cols: List[str]) -> Option
                 score -= 520
             if "risk" in cn and ("score" in cn or "index" in cn):
                 score += 460
+        try:
+            from intent_engine.banking_metric_resolve import (
+                penalize_spend_amount_fallback,
+                resolve_banking_metric_column,
+            )
+
+            global df, dataset_profile
+            if df is not None and not df.empty:
+                banking_col = resolve_banking_metric_column(
+                    q, df, dataset_profile or build_profile(df)
+                )
+                if banking_col and str(c) == str(banking_col):
+                    score += 720
+            if penalize_spend_amount_fallback(q, str(c)):
+                score -= 900
+        except Exception:
+            pass
         if score > best_score:
             best_score = score
             best = c
@@ -7213,6 +7232,8 @@ def _validate_chart_metric_alignment(
 ) -> Optional[str]:
     """Warn when chart metric/title disagrees with the question's explicit metric."""
     if not intent_debug or not chart_data:
+        return None
+    if intent_debug.get("dual_metric_compare"):
         return None
     if str(intent_debug.get("agg_key") or "").lower() == "scatter":
         return None
@@ -7710,6 +7731,14 @@ def _assess_unsupported_growth_analysis(
     """
     if not _question_requests_growth_intent(question):
         return None
+    if _question_requests_trend_intent(question):
+        date_col_early = (
+            _pick_date_column_for_trend(df, profile)
+            if df is not None and profile is not None
+            else None
+        )
+        if date_col_early and _distinct_date_period_count(df, str(date_col_early)) >= 2:
+            return None
     if _question_requests_correlation_routing(question):
         return None
 
@@ -8023,7 +8052,7 @@ def _try_build_trend_line_visualization(
     chart_data = _time_series_rows_from_grouped(g_series)
     tb_l = _freq_human_label(str(ts_meta.get("timeBucket") or force_freq or "M"))
     met_lbl = _business_metric_series_label(agg_key, agg_label, str(ncol))
-    title = f"{met_lbl} trend ({tb_l})"
+    title = f"{met_lbl} Trend by {tb_l}"
     intent_debug: Dict[str, Any] = {
         "group_col": dcol,
         "value_col": ncol,
@@ -8343,6 +8372,19 @@ def _pick_default_metric_column(
                 sc += 42
         if "performance" in ql and ("revenue" in n or "sales" in n or "conversion" in n):
             sc += 35
+        if re.search(r"\b(credit\s+risk|npl|delinquency|loan\s+balance|deposit)\b", ql):
+            if "npl" in n:
+                sc += 95
+            if "delinquency" in n:
+                sc += 95
+            if "loan" in n and "balance" in n:
+                sc += 90
+            if "deposit" in n and "balance" in n:
+                sc += 88
+            if "utilization" in n:
+                sc += 85
+            if n == "spend amount" or n.endswith("spend_amount"):
+                sc -= 120
         if re.search(r"\bproduction\s+loss\b", ql) or re.search(
             r"\bproduction[_\s]+loss\b", ql.replace("_", " ")
         ):
@@ -8434,6 +8476,52 @@ def _question_explicitly_groups_by_dimension(ql: str) -> bool:
     return bool(re.search(r"\bby\s+[a-z0-9]", str(ql).lower()))
 
 
+_CAT_OUTLIER_WHICH_RE = re.compile(
+    r"\bwhich\s+(?P<dim>[a-z][a-z0-9_\s]{1,48}?)\s+(?:is\s+an?\s+)?outliers?\b",
+    re.I,
+)
+
+
+def _question_asks_categorical_outlier_ranking(ql: str) -> bool:
+    """
+    Outlier by named category (which department is an outlier?) — bar ranking,
+    not a numeric value histogram.
+    """
+    s = str(ql).lower().strip()
+    if not _question_asks_outlier_analysis(s):
+        return False
+    if _CAT_OUTLIER_WHICH_RE.search(s):
+        return True
+    if re.search(
+        r"\b(department|product|region|campaign|territory|channel|branch|zone|"
+        r"city|segment|category|vendor|supplier|store|team|division)\b",
+        s,
+    ) and re.search(r"\boutliers?\b", s):
+        return True
+    return False
+
+
+def _resolve_categorical_outlier_dimension_column(
+    question: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+) -> Optional[str]:
+    """Resolve breakdown column for categorical outlier questions."""
+    ql = str(question or "").lower()
+    m = _CAT_OUTLIER_WHICH_RE.search(ql)
+    cand_dims = _dimension_pool_columns(df, profile)
+    pool = cand_dims or df.columns.tolist()
+    if m:
+        phrase = str(m.group("dim") or "").strip()
+        hit = _match_column_from_phrase(phrase, pool, profile)
+        if hit and str(hit) in df.columns:
+            return str(hit)
+    for col in pool:
+        if _question_explicitly_requests_dimension(ql, str(col)) and str(col) in df.columns:
+            return str(col)
+    return None
+
+
 def _question_asks_numeric_distribution_histogram(ql: str) -> bool:
     """User wants a numeric value distribution (histogram), not category share."""
     s = str(ql).lower()
@@ -8444,6 +8532,8 @@ def _question_asks_numeric_distribution_histogram(ql: str) -> bool:
             return False
     except Exception:
         pass
+    if _question_asks_categorical_outlier_ranking(s):
+        return False
     if _question_asks_outlier_analysis(s) and not _question_explicitly_groups_by_dimension(s):
         return True
     if re.search(r"\b(histogram|frequency|binning|bins?)\b", s):
@@ -8590,6 +8680,44 @@ def _try_outlier_visualization(
         return [], "", "", ""
 
     metric_label = _pretty_label_text(str(ncol))
+
+    if _question_asks_categorical_outlier_ranking(q):
+        dim_col = _resolve_categorical_outlier_dimension_column(question, df, profile)
+        if dim_col and str(dim_col) in df.columns:
+            cat_intent = {
+                "group_col": str(dim_col),
+                "value_col": str(ncol),
+                "agg_key": "sum",
+                "agg_label": "Total",
+            }
+            cat_rows, cat_type, cat_title, _cat_ts = _fallback_aggregate_chart(
+                cat_intent, question
+            )
+            if cat_rows and len(cat_rows) >= 2:
+                dim_human = _pretty_label_text(str(dim_col))
+                title = (
+                    cat_title.strip()
+                    if cat_title
+                    else f"{metric_label} outliers by {dim_human}"
+                )
+                ctype = (cat_type or "bar").strip() or "bar"
+                if trace is not None:
+                    trace.update(
+                        {
+                            "routing": "categorical_outlier",
+                            "category_column": str(dim_col),
+                            "numeric_column": str(ncol),
+                            "aggregation": "sum",
+                            "aggregation_key": "sum",
+                            "rows_analyzed": int(len(df)),
+                            "notes": (
+                                f"Categorical outlier view: {metric_label} by "
+                                f"{dim_human} (not histogram bins)."
+                            ),
+                            "outlier_view": True,
+                        }
+                    )
+                return cat_rows, ctype, title, subtitle
 
     h_rows, _h_title = _histogram_bucket_rows(df, str(ncol))
     if h_rows and len(h_rows) >= 3:
@@ -9992,11 +10120,25 @@ def analyze_data(question: str):
             "weekly",
             "quarter",
             "by date",
+            "month over month",
+            "week over week",
+            "year over year",
         )
-    ) or bool(re.search(r"\b(by|per)\s+(day|date|week|month|year|quarter)\b", q))
+    ) or bool(re.search(r"\b(by|per)\s+(day|date|week|month|year|quarter)\b", q)    ) or bool(
+        re.search(
+            r"\b(grew|growth)\b.*\b(over\s+time|month\s+over\s+month|week\s+over\s+week|year\s+over\s+year|mom|wow|yoy)\b",
+            q,
+        )
+        or re.search(
+            r"\b(increase\s+over\s+time|decline\s+over\s+time|month\s+over\s+month|week\s+over\s+week|year\s+over\s+year)\b",
+            q,
+        )
+    )
     if trend_q:
         cols_list = df.columns.tolist()
-        group_col = _resolve_by_column_from_question(q, cols_list, profile)
+        group_col = _pick_date_column_for_trend(df, profile)
+        if group_col is None:
+            group_col = _resolve_by_column_from_question(q, cols_list, profile)
         if group_col is None:
             group_col = _infer_dimension_column_from_question(question, df, profile)
         target_ts = find_target_numeric_column()
@@ -10634,7 +10776,23 @@ def _chart_selection_question_bucket(ql: str) -> str:
         pass
     if _question_asks_outlier_analysis(q) and not _question_explicitly_groups_by_dimension(q):
         return "outlier"
+    try:
+        from intent_engine.trend_date_resolve import question_requests_trend_intent
+
+        if question_requests_trend_intent(q):
+            return "trend"
+    except Exception:
+        pass
     if re.search(r"\b(vs\.?|versus|against)\b", q):
+        try:
+            from intent_engine.question_patterns import (
+                question_requests_grouped_dual_metric_compare,
+            )
+
+            if question_requests_grouped_dual_metric_compare(q):
+                return "compare"
+        except Exception:
+            pass
         try:
             from intent_engine.dimension_request import (
                 question_requests_dimension_value_compare,
@@ -10646,6 +10804,14 @@ def _chart_selection_question_bucket(ql: str) -> str:
             pass
         return "relationship"
     if _looks_like_ranking_question(q) or _extract_top_n(q) is not None:
+        return "ranking"
+    if re.search(
+        r"\b(?:which|what)\b.+\b(?:exceed|above|below|surpass|over|under)\b.+\b(?:average|mean)\b",
+        q,
+    ) or re.search(
+        r"\b(?:exceed|above|below|surpass)\b.+\b(?:average|mean)\b",
+        q,
+    ):
         return "ranking"
     if any(
         k in q
@@ -10757,8 +10923,32 @@ def _scatter_pair_from_question(q: str, numeric_cols: List[str]) -> Optional[Tup
     return None
 
 
+def _question_requests_explicit_dual_metric_by_dimension(q: str) -> bool:
+    """Revenue vs spend (or ROI by dimension) with an explicit breakdown dimension."""
+    ql = _norm_metric_phrase_for_match(q).strip()
+    if not re.search(r"\bby\s+", ql):
+        return False
+    if re.search(
+        r"\b(revenue|sales)\s+(?:vs\.?|versus)\s+(?:spend|cost|ad\s+spend)\b",
+        ql,
+    ) or re.search(
+        r"\b(spend|cost|ad\s+spend)\s+(?:vs\.?|versus)\s+(?:revenue|sales)\b",
+        ql,
+    ):
+        return True
+    if re.search(r"\bcompare\s+(?:campaign\s+)?roi\b", ql):
+        return True
+    if re.search(r"\bcampaign\s+(?:roi|efficiency)\b", ql) and re.search(
+        r"\b(revenue|spend|cost)\b", ql
+    ):
+        return True
+    return False
+
+
 def _question_requests_two_metric_compare(q: str) -> bool:
     """Compare two numeric measures within each category (e.g. revenue vs spend by campaign)."""
+    if _question_requests_explicit_dual_metric_by_dimension(q):
+        return True
     if _question_requests_roi(q) or _question_requests_profit_margin(q):
         return False
     ql = _norm_metric_phrase_for_match(q).strip()
@@ -12719,6 +12909,40 @@ def _build_unified_analysis_payload(
         "focusKpis": focus_kpis,
         **conf,
     }
+    if relationship_scatter and intent_debug:
+        x_col = intent_debug.get("scatter_x_column") or intent_debug.get("group_col")
+        y_col = intent_debug.get("scatter_y_column") or intent_debug.get("value_col")
+        if x_col and y_col:
+            driver_q = False
+            try:
+                from intent_engine.question_patterns import question_requests_driver_intent
+
+                driver_q = question_requests_driver_intent(question)
+            except Exception:
+                driver_q = False
+            try:
+                from intent_engine.correlation_analysis import (
+                    resolve_scatter_metric_columns_for_payload,
+                )
+
+                primary, secondary = resolve_scatter_metric_columns_for_payload(
+                    question,
+                    str(x_col),
+                    str(y_col),
+                    driver=driver_q,
+                    profile=profile_for_intent,
+                )
+            except Exception:
+                primary, secondary = str(x_col), str(y_col)
+            out["metricColumn"] = str(primary)
+            out["secondaryMetricColumn"] = str(secondary)
+            out["categoryColumn"] = str(secondary)
+            out["scatterXColumn"] = str(x_col)
+            out["scatterYColumn"] = str(y_col)
+            if intent_debug.get("relationship_measure_label"):
+                out["relationshipMeasureLabel"] = intent_debug[
+                    "relationship_measure_label"
+                ]
     if dual_compare:
         out["dualMetricCompare"] = True
         out["compareMetrics"] = compare_metrics
@@ -12856,6 +13080,10 @@ _THREAD_META_FOLLOW_UP = re.compile(
     r"how\s+should\s+we\s+proceed|"
     r"what\s+are\s+the\s+next\s+steps|"
     r"what\s+evidence\s+supports|"
+    r"what\s+caution\s+applies(?:\s+to\s+causation)?|"
+    r"\bcausation\b|"
+    r"(?:does|did)\s+(?:that|this|it)\s+cause|"
+    r"is\s+(?:that|this|it)\s+driving|"
     r"which\s+columns?\s+(?:were\s+)?(?:used|involved)|"
     r"show\s+the\s+calculations?\s+behind|"
     r"how\s+(?:was|were)\s+(?:this|these)\s+(?:calculated|computed)|"
@@ -13144,6 +13372,24 @@ def _try_build_follow_up_filtered_df(
     return out, labels
 
 
+def _looks_like_new_root_analysis(q: str) -> bool:
+    """Compare / trend / relationship questions must not inherit prior thread scope."""
+    s = (q or "").strip()
+    if not s:
+        return False
+    return bool(
+        re.search(
+            r"\bcompare\b|"
+            r"\b(correlat|correlation|relationship)\b|"
+            r"\bversus\b|\bvs\.?\b|"
+            r"\b(trend\b|over time|growth rate|seasonal|forecast)\b|"
+            r"\b(distribution|histogram|spread|frequency)\b",
+            s,
+            re.I,
+        )
+    )
+
+
 def resolve_follow_up_turn(
     raw_question: str,
     ctx: Optional[ConversationContextPayload],
@@ -13173,6 +13419,10 @@ def resolve_follow_up_turn(
     prior = (ctx.lastQuestion or "").strip() if ctx else ""
     if not prior and parent_ctx:
         prior = (parent_ctx.priorQuestion or parent_ctx.rootQuestion or "").strip()
+
+    if not continuation_intent and _looks_like_new_root_analysis(rq):
+        return out
+
     is_follow = bool(continuation_intent and prior)
     if not is_follow:
         is_follow = _looks_like_follow_up_question(rq, has_prior=bool(prior))

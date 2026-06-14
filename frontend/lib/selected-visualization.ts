@@ -9,6 +9,7 @@ import {
   computeFinalChartPresentation,
 } from "@/lib/final-chart-presentation";
 import { humanizeColumnName, polishMetricDisplay } from "@/lib/analytics-metadata";
+import { apiChartStringToKind } from "@/lib/smart-chart-intelligence";
 import { aggregationPrefixLabel, buildTrendDisplayTitle, metricStemFromRawTitle, normalizeCanonicalChartTitle } from "@/lib/canonical-chart-title";
 import { resolveTrendBucketLabel } from "@/lib/chart-semantic-metadata";
 import {
@@ -223,7 +224,9 @@ export function freezeVisualizationContract(args: {
 
   if (
     isTimeSeries &&
-    (chartType === "bar" || chartType === "bar_horizontal")
+    chartType === "bar" &&
+    args.chartKindPinned !== "bar_horizontal" &&
+    apiChartStringToKind(args.apiChartType) !== "bar_horizontal"
   ) {
     chartType = "line";
   }

@@ -448,6 +448,10 @@ body {
   box-shadow: none;
 }
 
+.pdf-chart-capture .ai-insights-viz-plot {
+  height: var(--insights-viz-plot-h, auto);
+}
+
 /* Session chart surface: smooth reveal on Charts tab (respect reduced motion). */
 @keyframes chart-surface-in {
   from {
@@ -2560,7 +2564,7 @@ body {
   border-radius: 1rem;
   border: 1px solid var(--card-border);
   background: var(--card);
-  padding: 1.25rem 1.5rem 1rem;
+  padding: 1rem 1.25rem 0.875rem;
   box-shadow: var(--shadow-card);
   transition:
     transform 0.2s ease,
@@ -2594,7 +2598,7 @@ body {
 }
 
 .ai-insights-page .ai-insights-viz-card .ai-insights-viz-header {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.375rem;
 }
 
 .overview-dash-chart-card__head {
@@ -3402,6 +3406,9 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.65),
     0 1px 2px rgba(15, 23, 42, 0.05);
   height: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .chart-viz-theme.ai-insights-viz .charts-session-viz-frame {
@@ -3422,7 +3429,7 @@ body {
   width: 100%;
   min-width: 0;
   min-height: 0;
-  height: var(--insights-viz-plot-h, auto);
+  height: var(--insights-viz-plot-h, clamp(460px, 52vh, 560px));
   box-sizing: border-box;
 }
 
@@ -3518,13 +3525,10 @@ body {
   background: color-mix(in srgb, #064e3b 48%, var(--insights-layer-inset));
 }
 
-/* Charts tab — responsive preview plot slot (less dead space at 80–125% zoom) */
+/* Charts tab — plot slot follows shared detail plot height (no separate clamp band). */
 .charts-tab-viz-plot-slot {
-  height: clamp(
-    242px,
-    var(--charts-tab-plot-h, 280px),
-    min(51vh, 550px)
-  );
+  width: 100%;
+  min-height: 0;
 }
 
 .chart-viz-theme.charts-tab-viz-preview .charts-tab-viz-plot-stage {
@@ -3540,10 +3544,4 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 100%;
-}
-
-.chart-viz-theme.charts-tab-viz-preview .charts-session-viz-frame .ai-insights-viz-plot-host {
-  max-width: 100%;
-  width: 100%;
 }

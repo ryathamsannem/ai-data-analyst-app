@@ -153,8 +153,8 @@ export function extractScatterXY(rows: ChartRow[]): {
   const xs: number[] = [];
   const ys: number[] = [];
   for (const row of rows) {
-    const y = row.value;
-    const x = row.x;
+    const y = Number(row.value);
+    const x = Number(row.x);
     if (!Number.isFinite(y) || !Number.isFinite(x)) continue;
     xs.push(x);
     ys.push(y);

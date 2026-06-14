@@ -37,9 +37,18 @@ import {
 } from "@/lib/ai-follow-up-suggestions";
 import {
   appendThreadMetaFollowUpChips,
+  buildAskContinuationPayload,
   buildParentAnalysisContext,
-  shouldSendFollowUpContinuation,
+  CHART_ENTRY_ASK_OPTS,
+  isFreshRootAskMode,
+  isFreshRootFromSuggestionMode,
+  resolveAskAiMode,
+  type AskAiContinuationOpts,
 } from "@/lib/ai-conversation-context";
+import {
+  resolveSuggestedChipAskOpts,
+  shouldStartFreshRootFromSuggestedChip,
+} from "@/lib/suggested-follow-up-continuation";
 import {
   buildRankedCategoryExecutiveCards,
   parseRankedExecutiveInsights,
@@ -123,12 +132,15 @@ import {
   buildFinalChartPresentationMeta,
   chartKindToApiChartType,
   chartKindToProvenanceLabel,
+  computeAutoDashboardChartPresentation,
   computeFinalChartPresentation,
   resolveInsightRenderedChartKind,
 } from "@/lib/final-chart-presentation";
+import { resolveSnapshotPresentationKind } from "@/lib/normalize-visualization-contract";
 import {
-  getInsightLayoutMetrics,
-  resolveChartsTabPreviewPlotHeight,
+  computeDetailViewCartesianPlan,
+  getSharedDetailLayoutMetrics,
+  resolveSharedDetailPlotHeight,
   timelineTypeToChartKind,
 } from "@/lib/chart-layout-config";
 import {
@@ -457,7 +469,10 @@ import {
   validateOverviewUploadPick,
 } from "@/lib/upload-auto-flow";
 import { OverviewAiSummaryPanel } from "./components/home/overview/overview-ai-summary";
-import { computeOverviewAiSummaryBullets } from "@/lib/overview-ai-summary";
+import {
+  computeOverviewAiSummaryBullets,
+  type OverviewAiSummaryProfile,
+} from "@/lib/overview-ai-summary";
 import { OverviewKpiCard } from "./components/home/overview/overview-kpi-card";
 import {
   formatOverviewFilenameMiddle,
@@ -550,6 +565,10 @@ import {
   computeSmartChartIntel,
 } from "@/lib/smart-chart-intelligence";
 import { chartSnapshotMatchesQuestionIntent } from "@/lib/chart-question-intent";
+import {
+  dashboardPrefillTitleMatchesChart,
+  extractDashboardChartTitleFromPrefillQuestion,
+} from "@/lib/dashboard-chart-prefill-match";
 import { getCanonicalChartTitle } from "@/lib/canonical-chart-title";
 import {
   apiChartTypeFromContract,
@@ -1189,13 +1208,6 @@ function resolveAnalyzedRowsForChartMetadata(args: {
   return (
     fromAligned ?? fromViz ?? fromProv ?? fromFiltered ?? fromFull ?? null
   );
-}
-
-function extractDashboardChartTitleFromPrefillQuestion(
-  question: string
-): string | null {
-  const m = /^Summarize what the chart "([^"]+)" shows/i.exec(question.trim());
-  return m?.[1]?.trim() || null;
 }
 
 function normalizeQuestionForMatch(q: string): string {
@@ -4223,68 +4235,6 @@ const OV_DASH_AXIS_LABEL_STYLE = {
   fontWeight: 600,
 } as const;
 
-function overviewDashLabelLooksTemporal(name: string): boolean {
-  const s = String(name ?? "").trim();
-  if (!s) return false;
-  if (/^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(s))
-    return true;
-  if (/\bq[1-4]\b(?:\s*[''\u2019]?|\/|\s|,)\s*\d{2,4}$/i.test(s)) return true;
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return true;
-  return !Number.isNaN(Date.parse(s));
-}
-
-function overviewRowsLookReadableTimeSeries(rows: ChartRow[]): boolean {
-  if (rows.length < 2 || rows.length > 28) return false;
-  const hits = rows.filter((r) =>
-    overviewDashLabelLooksTemporal(String(r.name ?? ""))
-  ).length;
-  return hits >= Math.max(2, Math.ceil(rows.length * 0.75));
-}
-
-/**
- * Overview-only chart kind: stricter bar orientation and readable line trends.
- * Does not alter Charts tab / AI / PDF presentation (`computeFinalChartPresentation`).
- */
-function computeOverviewDashboardChartPresentation(args: {
-  apiChartType: string;
-  title: string;
-  rows: ChartRow[];
-}): ChartKind {
-  const api = apiChartStringToKind(args.apiChartType);
-  const { rows } = args;
-
-  if (
-    api === "pie" ||
-    api === "donut" ||
-    api === "histogram" ||
-    api === "scatter"
-  ) {
-    return computeFinalChartPresentation(args);
-  }
-
-  if (api === "line" || api === "area") {
-    return overviewRowsLookReadableTimeSeries(rows) ? api : "bar_horizontal";
-  }
-
-  if (api === "bar_horizontal") return "bar_horizontal";
-
-  const fromRows = computeFinalChartPresentation(args);
-  if (fromRows === "line" || fromRows === "area") {
-    return overviewRowsLookReadableTimeSeries(rows)
-      ? fromRows
-      : "bar_horizontal";
-  }
-  if (fromRows !== "bar" && fromRows !== "bar_horizontal") return fromRows;
-
-  const labels = rows.map((r) => String(r.name ?? ""));
-  const n = labels.length;
-  const maxLen = Math.max(0, ...labels.map((s) => s.length));
-  const shortLabels = maxLen <= 14;
-
-  if (n <= 4 && shortLabels) return "bar";
-  return "bar_horizontal";
-}
-
 function overviewDashShortValueAxisLabel(title: string): string {
   const stripped = title
     .replace(/\s*\([^)]*\)\s*/g, " ")
@@ -4428,7 +4378,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 
   const displayKind = useMemo(
     () =>
-      computeOverviewDashboardChartPresentation({
+      computeAutoDashboardChartPresentation({
         apiChartType: chart.chartType,
         title: chart.title,
         rows: baseChartRows,
@@ -4837,7 +4787,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 <LabelList
                   dataKey="value"
                   position="insideRight"
-                  formatter={(v: number) => valueTickFormatter(Number(v))}
+                  formatter={(v) => valueTickFormatter(Number(v ?? 0))}
                   style={{
                     fill: "#e2e8f0",
                     fontSize: 13,
@@ -5118,7 +5068,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 <LabelList
                   dataKey="value"
                   position="top"
-                  formatter={(v: number) => valueTickFormatter(Number(v))}
+                  formatter={(v) => valueTickFormatter(Number(v ?? 0))}
                   style={{
                     fill: "#e2e8f0",
                     fontSize: 13,
@@ -6762,9 +6712,9 @@ function HomeInner() {
   const chartsSessionHeadingRef = useRef<HTMLDivElement | null>(null);
   const pendingChartsPreviewScrollRef = useRef(false);
   const pendingInsightAutoAskRef = useRef<string | null>(null);
-  const askAIImplRef = useRef<(overrideQuestion?: string) => Promise<void>>(
-    async () => {}
-  );
+  const askAIImplRef = useRef<
+    (overrideQuestion?: string, opts?: AskAiContinuationOpts) => Promise<void>
+  >(async () => {});
 
   const applyInsightBundleToLiveState = useCallback(
     (
@@ -6854,7 +6804,7 @@ function HomeInner() {
       return;
     }
     pendingInsightAutoAskRef.current = null;
-    void askAIImplRef.current(q);
+    void askAIImplRef.current(q, CHART_ENTRY_ASK_OPTS);
   }, [activeTab, loading, insightChartId, aiAnswerByChartId]);
 
   const openDashboardChartInChartsTab = useCallback(
@@ -6955,6 +6905,12 @@ function HomeInner() {
     ]
   );
 
+  const resetInsightConversationThread = useCallback(() => {
+    setConversationSnapshot(null);
+    setLastConversationMeta(null);
+    setAiConversationState(emptyAiConversationState());
+  }, []);
+
   const buildOverviewChartAskQuestion = useCallback((hit: ChartSnapshot) => {
     const exportTitle = getCanonicalChartTitle({
       rawTitle: hit.title,
@@ -6971,6 +6927,7 @@ function HomeInner() {
     (snapshotId: string) => {
       const hit = chartHistory.find((h) => h.id === snapshotId);
       if (!hit) return;
+      resetInsightConversationThread();
       pinnedInsightChartIdRef.current = hit.id;
       const q = buildOverviewChartAskQuestion(hit);
       selectChartWithInsightState(hit.id, {
@@ -6994,6 +6951,7 @@ function HomeInner() {
       selectChartWithInsightState,
       aiAnswerByChartId,
       buildOverviewChartAskQuestion,
+      resetInsightConversationThread,
     ]
   );
 
@@ -7317,9 +7275,7 @@ function HomeInner() {
 
   const resetAiConversation = useCallback(() => {
     setQuestion("");
-    setConversationSnapshot(null);
-    setLastConversationMeta(null);
-    setAiConversationState(emptyAiConversationState());
+    resetInsightConversationThread();
     setAnswer("");
     setHasValidAIAnswer(false);
     setLastAskedQuestion("");
@@ -7329,7 +7285,7 @@ function HomeInner() {
     setHowCalculatedOpen(false);
     setAiAnswerByChartId({});
     clearAiInsightSession();
-  }, [clearAiInsightSession]);
+  }, [clearAiInsightSession, resetInsightConversationThread]);
 
   const canAskAi = useMemo(
     () => Boolean(question.trim()) && !loading && columns.length > 0,
@@ -7366,7 +7322,7 @@ function HomeInner() {
 
   const askAI = async (
     overrideQuestion?: string,
-    opts?: { fromFollowUpChip?: boolean }
+    opts?: AskAiContinuationOpts
   ) => {
     const qRaw = (overrideQuestion ?? question).trim();
     if (!qRaw) {
@@ -7389,25 +7345,54 @@ function HomeInner() {
       return;
     }
 
-    const parentAnalysisContext = buildParentAnalysisContext({
+    let effectiveOpts = opts;
+    const parentForClassify = buildParentAnalysisContext({
       conversationSnapshot,
       alignedAnalysis,
       lastAskedQuestion,
       answer,
       aiConversationState,
     });
-    const continuationIntent = shouldSendFollowUpContinuation(
-      parentAnalysisContext,
-      {
-        fromFollowUpChip: opts?.fromFollowUpChip,
-        manualSubmit: Boolean(
-          parentAnalysisContext?.priorQuestion?.trim() &&
-            (conversationSnapshot?.lastQuestion?.trim() ||
-              aiConversationState.lastQuestion.trim() ||
-              hasValidAIAnswer)
-        ),
-      }
-    );
+    if (
+      !isFreshRootAskMode(effectiveOpts) &&
+      parentForClassify &&
+      shouldStartFreshRootFromSuggestedChip(qRaw, parentForClassify)
+    ) {
+      effectiveOpts = { mode: "fresh_root_from_suggestion" };
+    }
+
+    const askMode = resolveAskAiMode(effectiveOpts);
+    const freshRoot = isFreshRootAskMode(effectiveOpts);
+    const freshFromSuggestion = isFreshRootFromSuggestionMode(effectiveOpts);
+
+    if (freshRoot) {
+      resetInsightConversationThread();
+      setLastConversationMeta(null);
+    }
+    if (freshFromSuggestion) {
+      pinnedInsightChartIdRef.current = null;
+      clearInsightThread();
+    }
+
+    const { continuationIntent, parentAnalysisContext } =
+      buildAskContinuationPayload({
+        conversationSnapshot,
+        alignedAnalysis,
+        lastAskedQuestion,
+        answer,
+        aiConversationState,
+        opts: effectiveOpts,
+        hasValidAIAnswer,
+      });
+
+    if (process.env.NEXT_PUBLIC_AI_INSIGHTS_DEBUG === "true") {
+      console.info("[askAI continuation]", {
+        question: qRaw,
+        mode: askMode,
+        continuation_intent: continuationIntent,
+        parent_analysis_context: parentAnalysisContext,
+      });
+    }
 
     setError("");
     setAnswer("");
@@ -7418,8 +7403,17 @@ function HomeInner() {
     setAlignedAnalysis(null);
     setLoading(true);
 
-    let lineageParentChartId = insightChartId;
-    if (insightSnapshot?.source === "ai" && !continuationIntent) {
+    let lineageParentChartId =
+      askMode === "fresh_root_chart_entry"
+        ? pinnedInsightChartIdRef.current ?? insightChartId
+        : freshFromSuggestion
+          ? null
+          : insightChartId;
+    if (
+      !freshRoot &&
+      insightSnapshot?.source === "ai" &&
+      !continuationIntent
+    ) {
       const snapQ = normalizeQuestionForMatch(
         insightSnapshot.question ?? lastAskedQuestion
       );
@@ -7466,30 +7460,34 @@ function HomeInner() {
         })
         .filter(Boolean);
 
-      const conversationPayload =
-        conversationSnapshot &&
-        ({
-          ...conversationSnapshot,
-          rootQuestion:
-            conversationSnapshot.rootQuestion ??
-            parentAnalysisContext?.rootQuestion ??
-            conversationSnapshot.lastQuestion,
-          metricColumn:
-            conversationSnapshot.metricColumn ??
-            parentAnalysisContext?.metricColumn ??
-            undefined,
-          categoryColumn:
-            conversationSnapshot.categoryColumn ??
-            parentAnalysisContext?.categoryColumn ??
-            undefined,
-          lastInsightChartId:
-            insightChartId ?? conversationSnapshot.lastInsightChartId ?? undefined,
-          activeDrillPath:
-            drillLines.length > 0
-              ? drillLines
-              : conversationSnapshot.activeDrillPath ?? [],
-          activeDashboardFilters: dashboardFilterLines,
-        } as ConversationSnapshot);
+      const conversationPayload: ConversationSnapshot | null = freshRoot
+        ? null
+        : conversationSnapshot
+          ? ({
+              ...conversationSnapshot,
+              rootQuestion:
+                conversationSnapshot.rootQuestion ??
+                parentAnalysisContext?.rootQuestion ??
+                conversationSnapshot.lastQuestion,
+              metricColumn:
+                conversationSnapshot.metricColumn ??
+                parentAnalysisContext?.metricColumn ??
+                undefined,
+              categoryColumn:
+                conversationSnapshot.categoryColumn ??
+                parentAnalysisContext?.categoryColumn ??
+                undefined,
+              lastInsightChartId:
+                insightChartId ??
+                conversationSnapshot.lastInsightChartId ??
+                undefined,
+              activeDrillPath:
+                drillLines.length > 0
+                  ? drillLines
+                  : conversationSnapshot.activeDrillPath ?? [],
+              activeDashboardFilters: dashboardFilterLines,
+            } as ConversationSnapshot)
+          : null;
 
       const response = await fetch(apiUrl("/ask"), {
         method: "POST",
@@ -7572,16 +7570,20 @@ function HomeInner() {
       logAnalysisIntentToConsole(qRaw, parsedAnalysis?.analysisIntent);
       const followUpDetected = Boolean(meta?.followUpDetected);
       const preservePinnedChart = Boolean(
-        askPinnedSnapshot &&
+        !freshFromSuggestion &&
+          askPinnedSnapshot &&
           askPinnedSnapshot.chartData.length > 0 &&
           lineageParentChartId &&
           askPinnedSnapshot.id === lineageParentChartId &&
-          shouldPreservePinnedInsightChart({
+          (shouldPreservePinnedInsightChart({
             pinned: askPinnedSnapshot,
             question: qRaw,
             parsed: parsedAnalysis,
             followUpDetected,
-          })
+          }) ||
+            (askMode === "fresh_root_chart_entry" &&
+              askPinnedSnapshot.source === "auto_dashboard" &&
+              Boolean(extractDashboardChartTitleFromPrefillQuestion(qRaw))))
       );
       const pinnedContract = askPinnedSnapshot?.contract ?? null;
       const narrativeForPinned =
@@ -7826,6 +7828,37 @@ function HomeInner() {
     }
   };
   askAIImplRef.current = askAI;
+
+  const handleSuggestedChipAsk = useCallback(
+    (chip: string) => {
+      const parent = buildParentAnalysisContext({
+        conversationSnapshot,
+        alignedAnalysis,
+        lastAskedQuestion,
+        answer,
+        aiConversationState,
+      });
+      const opts = resolveSuggestedChipAskOpts(chip, parent);
+      if (isFreshRootAskMode(opts)) {
+        resetInsightConversationThread();
+        setLastConversationMeta(null);
+        if (isFreshRootFromSuggestionMode(opts)) {
+          pinnedInsightChartIdRef.current = null;
+          clearInsightThread();
+        }
+      }
+      void askAIImplRef.current(chip, opts);
+    },
+    [
+      conversationSnapshot,
+      alignedAnalysis,
+      lastAskedQuestion,
+      answer,
+      aiConversationState,
+      resetInsightConversationThread,
+      clearInsightThread,
+    ]
+  );
 
   const saveColumnMapping = async () => {
     if (columns.length === 0) {
@@ -8170,7 +8203,7 @@ function HomeInner() {
             rows,
             columns,
             autoDashboard,
-            profile,
+            profile: profile as OverviewAiSummaryProfile,
             primaryMetricColumn: effectiveSales,
             groupingColumn: effectiveProduct,
             dateColumn: effectiveDate,
@@ -8559,7 +8592,13 @@ function HomeInner() {
         lastAskedQuestion
       );
       return dashTitle
-        ? insightSnapshot.title.trim() === dashTitle
+        ? dashboardPrefillTitleMatchesChart({
+            snapshotTitle: insightSnapshot.title,
+            snapshotKind: insightSnapshot.chartKind,
+            snapshotContract: insightSnapshot.contract ?? null,
+            snapshotRows: insightSnapshot.chartData,
+            dashTitleFromQuestion: dashTitle,
+          })
         : false;
     }
 
@@ -8799,32 +8838,42 @@ function HomeInner() {
 
   const presentationChartKind = useMemo((): ChartKind => {
     if (!chartData.length) return "";
-    const fromContract = resolvePresentationKindFromContract(activeSnapshot);
-    if (fromContract) return fromContract;
-    const computed = computeFinalChartPresentation({
-      apiChartType: visualization?.chartType ?? "bar",
+    return resolveSnapshotPresentationKind({
       title: chartTitle,
-      question: lastAskedQuestion,
       rows: chartData,
+      question: lastAskedQuestion,
+      apiChartType: visualization?.chartType ?? "bar",
+      contract: activeSnapshot?.contract ?? null,
+      pinnedChartKind: activeSnapshot?.chartKind,
+      source:
+        activeSnapshot?.source === "auto_dashboard" ? "auto_dashboard" : "charts",
+      scatterXLabel: visualization?.scatterXLabel ?? null,
+      scatterYLabel: visualization?.scatterYLabel ?? null,
+      metricColumn:
+        visualization?.provenance?.numericColumn ??
+        activeSnapshot?.finalPresentation?.metric ??
+        null,
+      categoryColumn:
+        visualization?.provenance?.categoryColumn ??
+        activeSnapshot?.finalPresentation?.dimension ??
+        null,
+      categoryColumnDisplay:
+        visualization?.provenance?.categoryColumnDisplay ?? null,
     });
-    const pinnedKind = activeSnapshot?.chartKind;
-    if (pinnedKind === "pie" || pinnedKind === "donut") {
-      if (computed !== "pie" && computed !== "donut") return computed;
-      return pinnedKind;
-    }
-    if (pinnedKind) return pinnedKind;
-    if (chartType) return chartType;
-    const t = activeSnapshot?.timelineChartType;
-    if (t) return timelineTypeToChartKind(t);
-    return computed;
   }, [
     chartData,
     chartData.length,
     activeSnapshot?.chartKind,
     activeSnapshot?.contract,
-    chartType,
-    activeSnapshot?.timelineChartType,
+    activeSnapshot?.source,
+    activeSnapshot?.finalPresentation?.metric,
+    activeSnapshot?.finalPresentation?.dimension,
     visualization?.chartType,
+    visualization?.scatterXLabel,
+    visualization?.scatterYLabel,
+    visualization?.provenance?.numericColumn,
+    visualization?.provenance?.categoryColumn,
+    visualization?.provenance?.categoryColumnDisplay,
     chartTitle,
     lastAskedQuestion,
   ]);
@@ -8928,9 +8977,9 @@ function HomeInner() {
     visualization?.chartType,
   ]);
 
-  const chartHeightMain = useMemo(
+  const sessionDetailPlotHeight = useMemo(
     () =>
-      resolveChartsTabPreviewPlotHeight(
+      resolveSharedDetailPlotHeight(
         chartData.length,
         presentationChartKind,
         viewportH
@@ -8938,10 +8987,7 @@ function HomeInner() {
     [chartData.length, presentationChartKind, viewportH]
   );
 
-  sessionChartKindRef.current = presentationChartKind;
-
-  const activeSessionViewportW = sessionChartViewportW;
-  const activeChartHeightMain = chartHeightMain;
+  const activeChartHeightMain = sessionDetailPlotHeight;
 
   const chartsTabExportCartesianPlan = useMemo(
     () =>
@@ -8972,7 +9018,7 @@ function HomeInner() {
 
   const sessionCartesianPlan = useMemo(
     () =>
-      computeCartesianCategoryPlanForRender({
+      computeDetailViewCartesianPlan({
         rows: sortedChartData,
         kind: presentationChartKind,
         stackedBar: Boolean(
@@ -8980,9 +9026,6 @@ function HomeInner() {
             (visualization?.multiSeries?.seriesKeys?.length ?? 0) > 0
         ),
         chartHeight: activeChartHeightMain,
-        compact: false,
-        insightMode: false,
-        viewportWidthPx: activeSessionViewportW,
         axes: chartAxisLabels,
       }),
     [
@@ -8991,13 +9034,22 @@ function HomeInner() {
       visualization?.multiSeries?.layout,
       visualization?.multiSeries?.seriesKeys?.length,
       activeChartHeightMain,
-      activeSessionViewportW,
       chartAxisLabels.valueAxis,
       chartAxisLabels.valueAxisCompact,
+      chartAxisLabels.categoryAxis,
     ]
   );
 
-  const sessionRenderedChartKind = presentationChartKind;
+  const sessionRenderedChartKind = useMemo(
+    () =>
+      resolveInsightRenderedChartKind({
+        presentationKind: presentationChartKind,
+        categoryPlan: sessionCartesianPlan,
+      }),
+    [presentationChartKind, sessionCartesianPlan]
+  );
+
+  sessionChartKindRef.current = sessionRenderedChartKind;
 
   const sessionTrendBucketLabel = useMemo(() => {
     const c = activeSnapshot?.contract;
@@ -9179,32 +9231,45 @@ function HomeInner() {
 
   const insightPresentationChartKind = useMemo((): ChartKind => {
     if (!insightChartData.length) return "";
-    const fromContract = resolvePresentationKindFromContract(insightSnapshot);
-    if (fromContract) return fromContract;
-    const computed = computeFinalChartPresentation({
-      apiChartType: insightVisualization?.chartType ?? "bar",
+    return resolveSnapshotPresentationKind({
       title: insightChartTitle,
-      question: lastAskedQuestion,
       rows: insightChartData,
+      question: lastAskedQuestion,
+      apiChartType: insightVisualization?.chartType ?? "bar",
+      contract: insightSnapshot?.contract ?? null,
+      pinnedChartKind: insightSnapshot?.chartKind,
+      source:
+        insightSnapshot?.source === "auto_dashboard" ? "auto_dashboard" : "ai",
+      scatterXLabel: insightVisualization?.scatterXLabel ?? null,
+      scatterYLabel: insightVisualization?.scatterYLabel ?? null,
+      metricColumn:
+        insightVisualization?.provenance?.numericColumn ??
+        alignedAnalysis?.metricColumn ??
+        null,
+      categoryColumn:
+        insightVisualization?.provenance?.categoryColumn ??
+        alignedAnalysis?.categoryColumn ??
+        null,
+      categoryColumnDisplay:
+        insightVisualization?.provenance?.categoryColumnDisplay ??
+        alignedAnalysis?.categoryColumnDisplay ??
+        null,
     });
-    const pinnedKind = insightSnapshot?.chartKind;
-    if (pinnedKind === "pie" || pinnedKind === "donut") {
-      if (computed !== "pie" && computed !== "donut") return computed;
-      return pinnedKind;
-    }
-    if (pinnedKind) return pinnedKind;
-    if (insightChartType) return insightChartType;
-    const t = insightSnapshot?.timelineChartType;
-    if (t) return timelineTypeToChartKind(t);
-    return computed;
   }, [
     insightChartData,
     insightChartData.length,
     insightSnapshot?.chartKind,
     insightSnapshot?.contract,
-    insightChartType,
-    insightSnapshot?.timelineChartType,
+    insightSnapshot?.source,
     insightVisualization?.chartType,
+    insightVisualization?.scatterXLabel,
+    insightVisualization?.scatterYLabel,
+    insightVisualization?.provenance?.numericColumn,
+    insightVisualization?.provenance?.categoryColumn,
+    insightVisualization?.provenance?.categoryColumnDisplay,
+    alignedAnalysis?.metricColumn,
+    alignedAnalysis?.categoryColumn,
+    alignedAnalysis?.categoryColumnDisplay,
     insightChartTitle,
     lastAskedQuestion,
   ]);
@@ -9607,54 +9672,15 @@ function HomeInner() {
   ]);
 
   /** Plot height inside the AI Insight shell — from chart-type layout config. */
-  const insightLayoutMetrics = useMemo(
-    () => getInsightLayoutMetrics(insightPresentationChartKind),
-    [insightPresentationChartKind]
-  );
-
   const insightShellPlotHeight = useMemo(() => {
     const k = insightPresentationChartKind;
     const n = Math.max(1, insightChartData.length);
-    const { plotHeightMin, plotHeightMax } = insightLayoutMetrics;
-    if (k === "bar_horizontal") {
-      return clampChartHeightToViewport(
-        Math.min(
-          plotHeightMax,
-          Math.max(plotHeightMin, resolveChartDisplayHeight(n, k, false))
-        ),
-        viewportH
-      );
-    }
-    if (k === "line" || k === "area") {
-      return Math.min(
-        plotHeightMax,
-        Math.max(plotHeightMin, 336)
-      );
-    }
-    if (k === "bar" || k === "histogram") {
-      const cat = n;
-      const extra = Math.min(36, Math.max(0, cat - 5) * 6);
-      return Math.min(plotHeightMax, Math.max(plotHeightMin, 300 + extra));
-    }
-    return Math.min(
-      plotHeightMax,
-      Math.max(plotHeightMin, Math.round(viewportH * 0.36))
-    );
-  }, [
-    insightPresentationChartKind,
-    insightChartData.length,
-    viewportH,
-    insightLayoutMetrics,
-  ]);
-
-  const insightCategoryPlanViewportPx = useMemo(
-    () => insightLayoutMetrics.planViewportPx,
-    [insightLayoutMetrics]
-  );
+    return resolveSharedDetailPlotHeight(n, k, viewportH);
+  }, [insightPresentationChartKind, insightChartData.length, viewportH]);
 
   const insightCartesianPlanMain = useMemo(
     () =>
-      computeCartesianCategoryPlanForRender({
+      computeDetailViewCartesianPlan({
         rows: sortedInsightChartData,
         kind: insightPresentationChartKind,
         stackedBar: Boolean(
@@ -9662,9 +9688,6 @@ function HomeInner() {
             (insightVisualization?.multiSeries?.seriesKeys?.length ?? 0) > 0
         ),
         chartHeight: insightShellPlotHeight,
-        compact: false,
-        insightMode: true,
-        viewportWidthPx: insightCategoryPlanViewportPx,
         axes: insightChartAxisLabels,
       }),
     [
@@ -9673,9 +9696,9 @@ function HomeInner() {
       insightVisualization?.multiSeries?.layout,
       insightVisualization?.multiSeries?.seriesKeys?.length,
       insightShellPlotHeight,
-      insightCategoryPlanViewportPx,
       insightChartAxisLabels.valueAxis,
       insightChartAxisLabels.valueAxisCompact,
+      insightChartAxisLabels.categoryAxis,
     ]
   );
 
@@ -10971,28 +10994,38 @@ function HomeInner() {
   const renderDatasetChart = (
     chartHeight: number,
     compact = false,
-    insightMode = false
-  ) => (
-    <ChartRenderer
-      chartHeight={chartHeight}
-      compact={compact}
-      insightMode={insightMode}
-      pngCaptureMode={false}
-      chartRows={insightMode ? sortedInsightChartData : sortedChartData}
-      visualization={
-        (insightMode ? insightVisualization : visualization) as ChartRendererViz
-      }
-      presentationKind={
-        insightMode ? insightPresentationChartKind : presentationChartKind
-      }
-      axes={insightMode ? insightChartAxisLabels : chartAxisLabels}
-      viewportW={activeSessionViewportW}
-      sessionCartesianPlanMain={sessionCartesianPlan}
-      insightCartesianPlanMain={insightCartesianPlanMain}
-      tickTruncate={tickTruncate}
-      onInsightDrill={insightChartDrill}
-    />
-  );
+    insightMode = false,
+    detailViewLayout = false
+  ) => {
+    const renderedKind = insightMode
+      ? insightRenderedChartKind || insightPresentationChartKind
+      : sessionRenderedChartKind || presentationChartKind;
+    const layoutViewportW =
+      detailViewLayout || insightMode
+        ? getSharedDetailLayoutMetrics(renderedKind).planViewportPx
+        : sessionChartViewportW;
+
+    return (
+      <ChartRenderer
+        chartHeight={chartHeight}
+        compact={compact}
+        insightMode={insightMode}
+        detailViewLayout={detailViewLayout}
+        pngCaptureMode={false}
+        chartRows={insightMode ? sortedInsightChartData : sortedChartData}
+        visualization={
+          (insightMode ? insightVisualization : visualization) as ChartRendererViz
+        }
+        presentationKind={renderedKind}
+        axes={insightMode ? insightChartAxisLabels : chartAxisLabels}
+        viewportW={layoutViewportW}
+        sessionCartesianPlanMain={sessionCartesianPlan}
+        insightCartesianPlanMain={insightCartesianPlanMain}
+        tickTruncate={tickTruncate}
+        onInsightDrill={insightChartDrill}
+      />
+    );
+  };
 
   const sessionChartReason = useMemo(
     () =>
@@ -11038,7 +11071,7 @@ function HomeInner() {
 
   const chartHeadingBlock =
     sessionDisplayChartTitle || chartSubtitle ? (
-      <div className={chartsTabVizHeaderZone}>
+      <div className={aiInsightsVizHeadingWrap}>
         {sessionDisplayChartTitle ? (
           <h3 className={aiInsightsVizTitle}>{sessionDisplayChartTitle}</h3>
         ) : null}
@@ -11121,9 +11154,14 @@ function HomeInner() {
               {chartHeadingBlock}
               <div
                 className="w-full min-h-[280px]"
-                style={{ height: chartHeightMain }}
+                style={{ height: sessionDetailPlotHeight }}
               >
-                {renderDatasetChart(chartHeightMain, false, false)}
+                {renderDatasetChart(
+                  sessionDetailPlotHeight,
+                  false,
+                  false,
+                  true
+                )}
               </div>
             </div>
           )}
@@ -12263,67 +12301,54 @@ function HomeInner() {
                       <div className={chartsTabPreviewHeaderSticky}>
                         <div
                           ref={chartsSessionHeadingRef}
-                          className="w-full min-w-0 scroll-mt-28"
+                          className={`${aiInsightsVizHeaderZone} scroll-mt-28`}
                         >
-                          <div className="mx-auto min-w-0 max-w-4xl">
-                            {chartHeadingBlock ?? (
-                              <div className={chartsTabVizHeaderZone}>
-                                <p className={chartsTabVizKicker}>Chart preview</p>
-                                <h3 className={aiInsightsVizTitle}>Visualization</h3>
-                                {chartSubtitle ? (
-                                  <p className={aiInsightsVizSubtitle}>
-                                    {chartSubtitle}
-                                  </p>
-                                ) : null}
-                              </div>
-                            )}
+                          {chartHeadingBlock ?? (
+                            <div className={aiInsightsVizHeadingWrap}>
+                              <p className={aiInsightsVizKicker}>Chart preview</p>
+                              <h3 className={aiInsightsVizTitle}>Visualization</h3>
+                            </div>
+                          )}
+                          <div
+                            title={sessionChartMetadataLine}
+                            className={aiInsightsVizChipsWrap}
+                          >
+                            <ChartContextSummary
+                              renderedKind={sessionRenderedChartKind}
+                              metricLabel={chartAxisLabels.valueAxis}
+                              semanticHeader={sessionChartSemanticHeader}
+                              badgeCompact={sessionChartMetadataBadgeCompact}
+                              leadInsight={chartInsightBadge ?? undefined}
+                              qualityWarning={sessionChartRateWarning ?? undefined}
+                              compactChips
+                            />
                           </div>
-                        </div>
-                        <div
-                          title={sessionChartMetadataLine}
-                          className={`${aiInsightsVizChipsWrap} mt-1`}
-                        >
-                          <ChartContextSummary
-                            renderedKind={sessionRenderedChartKind}
-                            metricLabel={chartAxisLabels.valueAxis}
-                            semanticHeader={sessionChartSemanticHeader}
-                            badgeCompact={sessionChartMetadataBadgeCompact}
-                            leadInsight={chartInsightBadge ?? undefined}
-                            qualityWarning={sessionChartRateWarning ?? undefined}
-                            compactChips
+                          <ChartsTabChartReason
+                            chartId={activeChartId}
+                            reason={sessionChartReason}
                           />
                         </div>
-                        <ChartsTabChartReason
-                          chartId={activeChartId}
-                          reason={sessionChartReason}
-                        />
                       </div>
+                      <div className={aiInsightsVizChartStage}>
                       <ChartsTabPlotTransition
                         chartId={activeChartId}
                         plotHeightPx={activeChartHeightMain}
                       >
-                        <div
-                          className={chartsTabVizSessionFrame}
-                          style={
-                            {
-                              "--insights-viz-plot-h": `${activeChartHeightMain}px`,
-                            } as CSSProperties
-                          }
+                        <AiInsightChartShell
+                          chartKind={sessionRenderedChartKind}
+                          plotHeight={activeChartHeightMain}
                         >
-                          <ChartInsightViewportWrapper
-                            chartKind={sessionRenderedChartKind}
-                            sessionMode
-                          >
-                            <div className={chartsTabSessionPlotSurface}>
-                              {renderDatasetChart(
-                                activeChartHeightMain,
-                                false,
-                                false
-                              )}
-                            </div>
-                          </ChartInsightViewportWrapper>
-                        </div>
+                          <div className={aiInsightsVizPlotSurface}>
+                            {renderDatasetChart(
+                              activeChartHeightMain,
+                              false,
+                              false,
+                              true
+                            )}
+                          </div>
+                        </AiInsightChartShell>
                       </ChartsTabPlotTransition>
+                      </div>
                     </div>
 
                     {chartsTabOffscreenLayout ? (
@@ -12390,7 +12415,9 @@ function HomeInner() {
                                 visualization={
                                   visualization as ChartRendererViz
                                 }
-                                presentationKind={presentationChartKind}
+                                presentationKind={
+                                  sessionRenderedChartKind || presentationChartKind
+                                }
                                 axes={chartAxisLabels}
                                 viewportW={chartsTabOffscreenLayout.width}
                                 sessionCartesianPlanMain={chartsTabExportCartesianPlan}
@@ -12780,7 +12807,7 @@ function HomeInner() {
                     <div className="mb-3 h-3 w-28 animate-pulse rounded bg-slate-200/80 dark:bg-white/10" />
                     <div
                       className="animate-pulse rounded-xl border border-[color:var(--border-default)]/40 bg-slate-100/80 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)]"
-                      style={{ minHeight: `${Math.max(insightShellPlotHeight, 220)}px` }}
+                      style={{ minHeight: `${Math.max(Math.min(insightShellPlotHeight, 420), 200)}px` }}
                     />
                   </div>
                 ) : null}
@@ -12809,7 +12836,9 @@ function HomeInner() {
                     </div>
                     <div className={aiInsightsVizChartStage}>
                       <AiInsightChartShell
-                        chartKind={insightPresentationChartKind}
+                        chartKind={
+                          insightRenderedChartKind || insightPresentationChartKind
+                        }
                         plotHeight={insightShellPlotHeight}
                       >
                         <div
@@ -12952,11 +12981,11 @@ function HomeInner() {
                           type="button"
                           disabled={loading}
                           onClick={() => {
-                            void askAI(chip, { fromFollowUpChip: true });
+                            handleSuggestedChipAsk(chip);
                           }}
                           className={aiInsightsFollowupChip}
-                          title={`Ask follow-up: ${chip}`}
-                          aria-label={`Ask follow-up: ${chip}`}
+                          title={`Ask: ${chip}`}
+                          aria-label={`Ask: ${chip}`}
                         >
                           {chip}
                         </button>

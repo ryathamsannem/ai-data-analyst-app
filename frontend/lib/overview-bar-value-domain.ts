@@ -281,12 +281,12 @@ function clampDomainToBounds(
   domainMax: number,
   bounds: BoundedMetricBounds
 ): [number, number] {
-  let lo = Math.max(bounds.min, domainMin);
-  let hi = Math.min(bounds.max, domainMax);
-  if (hi <= lo) {
-    hi = Math.min(bounds.max, lo + Math.max((hi - lo) || 0.01, 1e-6));
+  const lo = Math.max(bounds.min, domainMin);
+  const hiRaw = Math.min(bounds.max, domainMax);
+  if (hiRaw <= lo) {
+    return [lo, Math.min(bounds.max, lo + Math.max((hiRaw - lo) || 0.01, 1e-6))];
   }
-  return [lo, hi];
+  return [lo, hiRaw];
 }
 
 /** Smart bar value-axis domain — tight scale for low-spread / percent metrics. */

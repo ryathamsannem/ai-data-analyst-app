@@ -198,6 +198,60 @@ def find_column_for_token(
                 return str(c)
         return None
 
+    if token_l in ("loan balance", "loan_balance", "loan") or (
+        "loan" in token_l and "balance" in token_l
+    ):
+        for c in pool:
+            cn = _norm_col(c)
+            if "loan" in cn and "balance" in cn:
+                return str(c)
+        for c in pool:
+            if _norm_col(c) == "loan balance":
+                return str(c)
+        return None
+
+    if token_l in ("deposit balance", "deposit_balance", "deposits", "deposit"):
+        for c in pool:
+            cn = _norm_col(c)
+            if "deposit" in cn and "balance" in cn:
+                return str(c)
+            if cn == "deposit balance":
+                return str(c)
+        return None
+
+    if "delinquency" in token_l or token_l in ("delinquency rate", "delinquency_rate"):
+        for c in pool:
+            cn = _norm_col(c)
+            if "delinquency" in cn:
+                return str(c)
+        return None
+
+    if token_l in ("npl amount", "npl_amount", "npl") or "npl" in token_l:
+        for c in pool:
+            cn = _norm_col(c)
+            if "npl" in cn:
+                return str(c)
+        return None
+
+    if token_l in ("interest income", "interest_income"):
+        for c in pool:
+            cn = _norm_col(c)
+            if "interest" in cn and "income" in cn:
+                return str(c)
+        return None
+
+    if token_l in ("spend amount", "spend_amount") or (
+        "spend" in token_l and "category" in token_l
+    ):
+        for c in pool:
+            cn = _norm_col(c)
+            if cn == "spend amount" or cn.endswith("spend_amount"):
+                return str(c)
+        for c in pool:
+            if "spend" in _norm_col(c) and "amount" in _norm_col(c):
+                return str(c)
+        return None
+
     if token_l in ("region", "regions"):
         for prefer in ("zone", "region", "territory", "area"):
             for c in pool:

@@ -280,7 +280,7 @@ export const chartVizThemeScope = "chart-viz-theme";
 
 /** Charts tab session preview card — same viz surface tokens as AI Insights; layout padding unchanged. */
 export const chartsTabVizPreviewCard =
-  `${chartVizThemeScope} charts-tab-viz-preview ai-insights-viz group/chart relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-[color:var(--border-default)]/75 bg-[color:var(--surface-elevated)] p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_22px_52px_-22px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.025] transition-[border-color,box-shadow] duration-300 ease-out hover:border-[color:color-mix(in_srgb,var(--accent)_14%,var(--border-default))] sm:p-4 md:pb-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-none dark:ring-white/[0.03] dark:hover:border-[color:var(--insights-border-medium)]`;
+  `${chartVizThemeScope} charts-tab-viz-preview ai-insights-viz group/chart relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-[color:var(--border-default)]/75 bg-[color:var(--surface-elevated)] p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_22px_52px_-22px_rgba(15,23,42,0.11)] ring-1 ring-slate-900/[0.025] transition-[border-color,box-shadow] duration-300 ease-out hover:border-[color:color-mix(in_srgb,var(--accent)_14%,var(--border-default))] sm:p-3.5 sm:pb-3 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)] dark:shadow-none dark:ring-white/[0.03] dark:hover:border-[color:var(--insights-border-medium)]`;
 
 /** Session chart frame (full width; no 960px insight cap). */
 export const chartsTabVizSessionFrame =
@@ -294,7 +294,7 @@ export const aiInsightsVizKicker =
   "text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-subtle)] dark:text-[color:var(--insights-text-muted)]";
 
 export const aiInsightsVizHeaderZone =
-  "ai-insights-viz-header w-full min-w-0 space-y-2 border-b border-[color:var(--border-default)] pb-2.5 sm:space-y-2.5 sm:pb-3 dark:border-[color:var(--insights-border-soft)]";
+  "ai-insights-viz-header w-full min-w-0 space-y-1.5 border-b border-[color:var(--border-default)] pb-2 sm:space-y-2 sm:pb-2.5 dark:border-[color:var(--insights-border-soft)]";
 
 export const aiInsightsVizChipsWrap =
   "ai-insights-viz-chips-wrap w-full min-w-0 px-0.5 sm:px-1";
@@ -337,7 +337,7 @@ export const aiInsightsVizMetaChipLeadSize =
   "max-w-[min(100%,20rem)] px-2.5 py-1 text-[10px]";
 
 export const aiInsightsVizChartStage =
-  "relative mt-2 w-full min-w-0 sm:mt-2.5";
+  "relative mt-1.5 w-full min-w-0 sm:mt-2";
 
 export const aiInsightsVizPlotSurface =
   "ai-insights-viz-plot animate-chart-surface-in motion-reduce:animate-none w-full min-w-0 overflow-visible rounded-xl border border-[color:var(--border-default)]/55 bg-[color:var(--surface-elevated)] px-2 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition-[border-color] duration-300 ease-out dark:border-[color:var(--insights-border-soft)] dark:bg-transparent dark:shadow-none";
