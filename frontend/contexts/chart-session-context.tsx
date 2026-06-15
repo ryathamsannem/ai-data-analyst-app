@@ -134,6 +134,8 @@ export type ChartSessionValue = {
   setActiveChart: (id: string | null) => void;
   /** User-selected chart: pins both Charts tab + AI Insights (export “insight” scope) to the same snapshot. */
   selectChart: (id: string | null) => void;
+  /** Charts-tab preview only — updates active selection without moving the AI insight pin. */
+  pinInsightChart: (id: string | null) => void;
   pushAIChart: (args: {
     title: string;
     subtitle: string;
@@ -179,6 +181,10 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
 
   const selectChart = useCallback((id: string | null) => {
     setActiveId(id);
+    setInsightChartId(id);
+  }, []);
+
+  const pinInsightChart = useCallback((id: string | null) => {
     setInsightChartId(id);
   }, []);
 
@@ -424,6 +430,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
       insightSnapshot,
       setActiveChart,
       selectChart,
+      pinInsightChart,
       pushAIChart,
       replaceAutoDashboardCharts,
       invalidateForDatasetChange,
@@ -439,6 +446,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
       insightSnapshot,
       setActiveChart,
       selectChart,
+      pinInsightChart,
       pushAIChart,
       replaceAutoDashboardCharts,
       invalidateForDatasetChange,

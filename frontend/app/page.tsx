@@ -13,7 +13,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import type { ChartKind, ChartRow } from "./chart-types";
 import { fallbackChartNumericDisplay } from "./chart-types";
 import {
@@ -563,6 +563,7 @@ import { ChartsTimelineAside } from "./components/home/charts-timeline-aside";
 import {
   apiChartStringToKind,
   computeSmartChartIntel,
+  type SmartChartIntel,
 } from "@/lib/smart-chart-intelligence";
 import { chartSnapshotMatchesQuestionIntent } from "@/lib/chart-question-intent";
 import {
@@ -668,6 +669,11 @@ import {
   sortRowsForPresentation,
   type PdfChartPrepContext,
 } from "@/lib/build-executive-pdf-input";
+import {
+  buildExportTabVisualizationPreview,
+  exportTabAiAnswerAvailable,
+} from "@/lib/export-tab-preview";
+import { resolvePdfExportContext } from "@/lib/resolve-pdf-export-context";
 import {
   BarChart,
   Bar,
@@ -6255,7 +6261,9 @@ function HomeInner() {
     activeId: activeChartId,
     insightSnapshot,
     insightChartId,
+    setActiveChart,
     selectChart,
+    pinInsightChart,
     pushAIChart,
     replaceAutoDashboardCharts,
     invalidateForDatasetChange,
@@ -6756,10 +6764,19 @@ function HomeInner() {
   const selectChartWithInsightState = useCallback(
     (
       id: string | null,
-      opts?: { restoreFromStore?: boolean; clearAnswerWhenMissing?: boolean }
+      opts?: {
+        restoreFromStore?: boolean;
+        clearAnswerWhenMissing?: boolean;
+        /** When true, pins AI Insights + PDF insight scope to this chart (default: Charts-tab browse only). */
+        pinAsInsight?: boolean;
+      }
     ) => {
-      selectChart(id);
-      pinnedInsightChartIdRef.current = id;
+      if (opts?.pinAsInsight) {
+        selectChart(id);
+        pinnedInsightChartIdRef.current = id;
+      } else {
+        setActiveChart(id);
+      }
       const restore = opts?.restoreFromStore !== false;
       if (!id || !restore) return;
       const bundle = getChartInsightAnswer(aiAnswerByChartId, id);
@@ -6774,7 +6791,7 @@ function HomeInner() {
         applyInsightBundleToLiveState(null, { clearWhenMissing: true });
       }
     },
-    [selectChart, aiAnswerByChartId, applyInsightBundleToLiveState]
+    [selectChart, setActiveChart, aiAnswerByChartId, applyInsightBundleToLiveState]
   );
 
   useLayoutEffect(() => {
@@ -6811,7 +6828,6 @@ function HomeInner() {
     (snapshotId: string) => {
       const hit = chartHistory.find((h) => h.id === snapshotId);
       if (hit) {
-        pinnedInsightChartIdRef.current = hit.id;
         selectChartWithInsightState(hit.id, {
           restoreFromStore: true,
           clearAnswerWhenMissing: true,
@@ -6933,6 +6949,7 @@ function HomeInner() {
       selectChartWithInsightState(hit.id, {
         restoreFromStore: true,
         clearAnswerWhenMissing: true,
+        pinAsInsight: true,
       });
       setQuestion(q);
 
@@ -10303,16 +10320,90 @@ function HomeInner() {
     insightProfitMarginLead,
   ]);
 
+  const pdfInsightExportSidecarRef = useRef({
+    insightExecutiveVizInsights: [] as ExecutiveVizInsightCard[],
+    insightExecutiveBrief: "",
+    insightSmartChartIntel: null as SmartChartIntel | null,
+    insightChartInsightBadge: null as string | null,
+    insightRenderedChartKind: "" as ChartKind,
+  });
+
+  useLayoutEffect(() => {
+    pdfInsightExportSidecarRef.current = {
+      insightExecutiveVizInsights,
+      insightExecutiveBrief,
+      insightSmartChartIntel,
+      insightChartInsightBadge,
+      insightRenderedChartKind,
+    };
+  }, [
+    insightExecutiveVizInsights,
+    insightExecutiveBrief,
+    insightSmartChartIntel,
+    insightChartInsightBadge,
+    insightRenderedChartKind,
+  ]);
+
+  const exportPdfPreviewContext = useMemo(
+    () =>
+      resolvePdfExportContext({
+        options: exportOptions,
+        chartHistory,
+        aiAnswerByChartId,
+        insightChartId,
+        pinnedInsightChartId: insightChartId,
+        activeChartId,
+        lastAskedQuestion,
+        question,
+        liveAnswer: answer,
+        liveAlignedAnalysis: alignedAnalysis,
+        insightChartMatchesCurrentQuestion,
+        insightChartDataLength: insightChartData.length,
+      }),
+    [
+      exportOptions,
+      chartHistory,
+      aiAnswerByChartId,
+      insightChartId,
+      activeChartId,
+      lastAskedQuestion,
+      question,
+      answer,
+      alignedAnalysis,
+      insightChartMatchesCurrentQuestion,
+      insightChartData.length,
+    ]
+  );
+
+  const exportVizPreview = useMemo(
+    () =>
+      buildExportTabVisualizationPreview(exportPdfPreviewContext, exportOptions),
+    [exportPdfPreviewContext, exportOptions.includeChart]
+  );
+
+  const exportAiAnswerAvailable = useMemo(
+    () =>
+      exportTabAiAnswerAvailable(exportPdfPreviewContext, exportOptions, answer),
+    [exportPdfPreviewContext, exportOptions.includeAIInsight, answer]
+  );
+
   const exportExecutiveInsightsPreview = useMemo(() => {
     if (!exportOptions.includeChart || !exportOptions.includeAIInsight) return null;
-    const scope =
-      exportOptions.chartScope ??
-      (insightChartMatchesCurrentQuestion && insightChartData.length > 0
-        ? "insight"
-        : "session");
+    const ctx = exportPdfPreviewContext;
+    const scope = ctx.chartScope;
+    const factsAlignWithResolvedChart =
+      ctx.chartId != null && ctx.chartId === insightChartId;
     const facts =
-      scope === "insight" ? insightExecutiveVizInsights : executiveVizInsights;
-    const brief = insightExecutiveBrief.trim();
+      scope === "insight"
+        ? factsAlignWithResolvedChart
+          ? insightExecutiveVizInsights
+          : []
+        : executiveVizInsights;
+    const brief =
+      scope === "insight" && ctx.insightAnswer.trim()
+        ? insightExecutiveBrief.trim() ||
+          ctx.insightAnswer.trim().slice(0, 280)
+        : insightExecutiveBrief.trim();
     if (!facts.length && !brief) return null;
     return {
       scopeLabel:
@@ -10325,7 +10416,8 @@ function HomeInner() {
   }, [
     exportOptions.includeChart,
     exportOptions.includeAIInsight,
-    exportOptions.chartScope,
+    exportPdfPreviewContext,
+    insightChartId,
     insightExecutiveVizInsights,
     executiveVizInsights,
     insightExecutiveBrief,
@@ -10342,17 +10434,6 @@ function HomeInner() {
     if (exportOptions.includeTechnicalAppendix) labels.push("Technical appendix");
     return labels;
   }, [exportOptions]);
-
-  const exportVizSummaryLabel = useMemo(() => {
-    if (!visualization || visualization.labels.length === 0) {
-      return "Not in session yet";
-    }
-    const kind = visualization.chartType?.trim() || "chart";
-    const title = visualization.title?.trim();
-    return title
-      ? `${visualization.labels.length} points · ${kind} — ${title}`
-      : `${visualization.labels.length} points · ${kind}`;
-  }, [visualization]);
 
   const chartHistoryAsideRef = useRef<HTMLDivElement | null>(null);
   const chartHistoryScrollRestore = useRef<number | null>(null);
@@ -10397,6 +10478,7 @@ function HomeInner() {
 
   downloadReportImplRef.current = async (options?: Partial<ExportOptions>) => {
       let pdfCaptureActive = false;
+      let insightPinRestored: string | null = null;
       try {
         setError("");
         const pdfRemaining = planUsage?.usage.pdf_exports_remaining;
@@ -10411,17 +10493,45 @@ function HomeInner() {
         ...exportOptions,
         ...options,
       };
-      const chartScope: "insight" | "session" =
-        resolved.chartScope ??
-        (insightChartMatchesCurrentQuestion && insightChartData.length > 0
-          ? "insight"
-          : "session");
+      const pdfExportCtx = resolvePdfExportContext({
+        options: resolved,
+        chartHistory,
+        aiAnswerByChartId,
+        insightChartId,
+        pinnedInsightChartId: pinnedInsightChartIdRef.current,
+        activeChartId,
+        lastAskedQuestion,
+        question,
+        liveAnswer: answer,
+        liveAlignedAnalysis: alignedAnalysis,
+        insightChartMatchesCurrentQuestion,
+        insightChartDataLength: insightChartData.length,
+      });
+      const chartScope = pdfExportCtx.chartScope;
       const pdfAlignedAnalysis =
-        chartScope === "insight" ? insightAnalysisForExport : alignedAnalysis;
-      const pdfInsightAnswer =
-        chartScope === "insight" ? insightAnswerForExport : answer;
-      const pdfSnap =
-        chartScope === "insight" ? insightSnapshot : activeSnapshot;
+        pdfExportCtx.alignedAnalysis as AlignedAnalysisContext | null;
+      const pdfInsightAnswer = pdfExportCtx.insightAnswer;
+      const pdfSnap = pdfExportCtx.snapshot;
+      const pdfExportLastAskedQuestion = pdfExportCtx.lastAskedQuestion;
+
+      if (
+        chartScope === "insight" &&
+        pdfSnap?.id &&
+        pdfSnap.id !== insightChartId
+      ) {
+        insightPinRestored = insightChartId;
+        flushSync(() => {
+          pinInsightChart(pdfSnap.id);
+        });
+      }
+      const pdfInsightSidecar = pdfInsightExportSidecarRef.current;
+      const pdfParsedInsightAnswer =
+        chartScope === "insight"
+          ? parseAnswerIntoSections(
+              pdfInsightAnswer,
+              pdfAlignedAnalysis?.insightSummary ?? undefined
+            )
+          : parsedInsightAnswer;
       const pdfChartDataRaw = pdfSnap?.chartData ?? [];
       const pdfChartTitle = pdfSnap?.title ?? "";
       const pdfChartSubtitle = pdfSnap?.subtitle ?? "";
@@ -10429,7 +10539,10 @@ function HomeInner() {
         (pdfSnap?.visualization ?? null) as StoredVisualization | null;
       const pdfPresentationKindBase =
         chartScope === "insight"
-          ? insightRenderedChartKind
+          ? pdfInsightExportSidecarRef.current.insightRenderedChartKind ||
+            pdfSnap?.chartKind ||
+            (pdfVizEarly?.chartType as ChartKind | undefined) ||
+            insightRenderedChartKind
           : sessionRenderedChartKind;
       const pdfPresentationKind = (() => {
         if (!pdfChartDataRaw.length || !pdfPresentationKindBase) {
@@ -10437,8 +10550,8 @@ function HomeInner() {
         }
         const q =
           chartScope === "insight"
-            ? lastAskedQuestion.trim() || question.trim()
-            : question.trim() || lastAskedQuestion.trim();
+            ? pdfExportLastAskedQuestion.trim() || question.trim()
+            : question.trim() || pdfExportLastAskedQuestion.trim();
         const recomputed = computeFinalChartPresentation({
           apiChartType:
             pdfVizEarly?.chartType ?? pdfPresentationKindBase ?? "bar",
@@ -10483,12 +10596,7 @@ function HomeInner() {
       const pdfAnalysisForSort =
         pdfSnap?.source === "auto_dashboard" || pdfTrendMode
           ? null
-          : chartScope === "insight"
-            ? pdfAlignedAnalysis
-            : activeSnapshot?.id === insightChartId &&
-                insightSnapshot?.source !== "auto_dashboard"
-              ? pdfAlignedAnalysis
-              : null;
+          : pdfAlignedAnalysis;
       const pdfSortAscending = pdfTrendMode
         ? null
         : isAscendingValueIntent(pdfAnalysisForSort, pdfViz);
@@ -10525,16 +10633,16 @@ function HomeInner() {
           : null;
       const pdfMetricColumn =
         pdfProv?.numericColumn?.trim() ||
-        alignedAnalysis?.metricColumn?.trim() ||
+        pdfAlignedAnalysis?.metricColumn?.trim() ||
         null;
       const pdfMetricDisplayRaw =
         pdfProv?.numericColumnDisplay?.trim() ||
-        alignedAnalysis?.metricColumnDisplay?.trim() ||
+        pdfAlignedAnalysis?.metricColumnDisplay?.trim() ||
         "";
       const pdfAggKey =
-        pdfProv?.aggregationKey ?? alignedAnalysis?.aggregationKey ?? null;
+        pdfProv?.aggregationKey ?? pdfAlignedAnalysis?.aggregationKey ?? null;
       const pdfAggregation =
-        pdfProv?.aggregation ?? alignedAnalysis?.aggregation ?? null;
+        pdfProv?.aggregation ?? pdfAlignedAnalysis?.aggregation ?? null;
 
       const pdfAlignedMetricDisplay =
         (pdfMetricDisplayRaw ? polishMetricDisplay(pdfMetricDisplayRaw) : "") ||
@@ -10546,13 +10654,13 @@ function HomeInner() {
               metricColumn: pdfMetricColumn,
             })
           : "") ||
-        (alignedAnalysis?.metricColumn
+        (pdfAlignedAnalysis?.metricColumn
           ? buildMetricLabel({
-              metricColumnDisplay: alignedAnalysis.metricColumnDisplay,
+              metricColumnDisplay: pdfAlignedAnalysis.metricColumnDisplay,
               aggregationKey:
-                alignedAnalysis.aggregationKey ?? alignedAnalysis.aggregation,
-              aggregationLabel: alignedAnalysis.aggregation,
-              metricColumn: alignedAnalysis.metricColumn,
+                pdfAlignedAnalysis.aggregationKey ?? pdfAlignedAnalysis.aggregation,
+              aggregationLabel: pdfAlignedAnalysis.aggregation,
+              metricColumn: pdfAlignedAnalysis.metricColumn,
             })
           : "") ||
         null;
@@ -10562,7 +10670,7 @@ function HomeInner() {
         const stats = buildChartSubtitle({
           rowsAnalyzed: resolveAnalyzedRowsForChartMetadata({
             preferAlignedAnalysis: true,
-            analysis: alignedAnalysis,
+            analysis: pdfAlignedAnalysis,
             prov: pdfProv ?? null,
             vizAnalyzedRows: (pdfViz as StoredVisualization | null)?.analyzedRows,
             filteredDatasetRows: rows,
@@ -10584,9 +10692,7 @@ function HomeInner() {
       const pdfSemanticsAnalysis =
         pdfSnap?.source === "auto_dashboard" || pdfTrendMode
           ? null
-          : chartScope === "insight"
-            ? alignedAnalysis
-            : pdfAnalysisForSort;
+          : pdfAlignedAnalysis;
 
       const pdfVizForSemantics = sanitizeVisualizationSemanticLabels(
         pdfViz,
@@ -10614,7 +10720,7 @@ function HomeInner() {
 
       const pdfChartInsightBadge =
         chartScope === "insight"
-          ? insightChartInsightBadge
+          ? pdfInsightSidecar.insightChartInsightBadge
           : chartInsightBadge;
 
       const includeConvPdf = resolved.includeConversationContext === true;
@@ -10622,7 +10728,7 @@ function HomeInner() {
       const pdfRowsResolved = pdfProv
         ? resolveAnalyzedRowsForChartMetadata({
             preferAlignedAnalysis: true,
-            analysis: alignedAnalysis,
+            analysis: pdfAlignedAnalysis,
             prov: pdfProv,
             vizAnalyzedRows: pdfViz?.analyzedRows,
             filteredDatasetRows: rows,
@@ -10674,16 +10780,12 @@ function HomeInner() {
       const pdfChartAxisLabels = resolved.includeChart
         ? (() => {
             const pdfMergeAnalysis =
-              pdfSnap?.source === "auto_dashboard"
-                ? null
-                : chartScope === "insight"
-                  ? alignedAnalysis
-                  : pdfAnalysisForSort;
+              pdfSnap?.source === "auto_dashboard" ? null : pdfAlignedAnalysis;
             const pdfMergePrefer = Boolean(pdfMergeAnalysis);
             const base = inferChartAxesFromContext(
               pdfNormMeta.titleForInference,
               pdfChartSubtitleMerged,
-              lastAskedQuestion,
+              pdfExportLastAskedQuestion,
               datasetKind || "generic"
             );
             const viz = pdfViz;
@@ -10910,16 +11012,25 @@ function HomeInner() {
           15
         ) as Record<string, unknown>[],
         kpis,
-        alignedAnalysis,
+        alignedAnalysis: pdfAlignedAnalysis,
         pdfAlignedAnalysis,
         question,
-        lastAskedQuestion,
+        lastAskedQuestion: pdfExportLastAskedQuestion,
         pdfInsightAnswer,
-        parsedInsightAnswer,
-        insightExecutiveBrief,
-        insightExecutiveVizInsights,
+        parsedInsightAnswer: pdfParsedInsightAnswer,
+        insightExecutiveBrief:
+          chartScope === "insight"
+            ? pdfInsightSidecar.insightExecutiveBrief
+            : insightExecutiveBrief,
+        insightExecutiveVizInsights:
+          chartScope === "insight"
+            ? pdfInsightSidecar.insightExecutiveVizInsights
+            : insightExecutiveVizInsights,
         executiveVizInsights,
-        insightSmartChartIntel,
+        insightSmartChartIntel:
+          chartScope === "insight"
+            ? pdfInsightSidecar.insightSmartChartIntel
+            : insightSmartChartIntel,
         sessionSmartChartIntel,
         displayKpiCards,
         primaryMetricColumn: effectiveSales,
@@ -10983,6 +11094,11 @@ function HomeInner() {
       setError("Unable to generate PDF report.");
     } finally {
       if (pdfCaptureActive) setPdfCaptureMounted(false);
+      if (insightPinRestored !== null) {
+        flushSync(() => {
+          pinInsightChart(insightPinRestored);
+        });
+      }
     }
   };
 
@@ -13561,25 +13677,27 @@ function HomeInner() {
                     <span className={exportTabSummaryChipLabel}>AI answer</span>
                     <span
                       className={
-                        answer.trim()
+                        exportAiAnswerAvailable
                           ? exportTabSummaryChipValue
                           : exportTabSummaryChipValueMuted
                       }
                     >
-                      {answer.trim() ? "Available" : "Not available yet"}
+                      {exportAiAnswerAvailable
+                        ? "Available"
+                        : "Not available yet"}
                     </span>
                   </div>
                   <div className={`${exportTabSummaryChip} ${exportTabSummaryChipSpan}`}>
                     <span className={exportTabSummaryChipLabel}>Visualization</span>
                     <span
                       className={
-                        visualization && visualization.labels.length > 0
+                        exportVizPreview.available
                           ? exportTabSummaryChipValue
                           : exportTabSummaryChipValueMuted
                       }
-                      title={exportVizSummaryLabel}
+                      title={exportVizPreview.titleTooltip}
                     >
-                      {exportVizSummaryLabel}
+                      {exportVizPreview.summaryLabel}
                     </span>
                   </div>
                   <div className={`${exportTabSummaryChip} ${exportTabSummaryChipSpan}`}>
