@@ -54,6 +54,21 @@ _SUPERLATIVE_METRIC_RE = re.compile(
     re.I,
 )
 
+_UNDERPERFORM_ON_RE = re.compile(
+    r"\bunderperform(?:s|ing)?\s+on\s+(.+?)(?:\?|\.|$)",
+    re.I,
+)
+
+_BUDGET_VARIANCE_RE = re.compile(
+    r"\b(?:"
+    r"budget\s+variance|largest\s+budget\s+variance|"
+    r"exceed(?:s|ed)?\s+(?:the\s+)?budget|over\s+budget|budget\s+overrun"
+    r")\b",
+    re.I,
+)
+
+_ACTUAL_COST_RE = re.compile(r"\bactual\s+cost\b", re.I)
+
 _BY_METRIC_SUFFIX_RE = re.compile(
     r"\bby\s+(headcount|patient\s+volumes?|fte)\b",
     re.I,
@@ -136,6 +151,14 @@ def extract_explicit_metric_phrases(question: str) -> List[str]:
     for m in _SUPERLATIVE_METRIC_RE.finditer(ql):
         _add(m.group(1))
 
+    m = _UNDERPERFORM_ON_RE.search(ql)
+    if m:
+        _add(m.group(1))
+
+    if _ACTUAL_COST_RE.search(ql):
+        _add("actual cost")
+        _add("actual")
+
     return sorted(phrases, key=lambda x: (-len(x), x))
 
 
@@ -168,6 +191,7 @@ def resolve_explicit_metric_column(
     nums = numeric_columns(cols, profile)
     if not nums:
         return None
+    ql = str(question or "").lower()
 
     try:
         from intent_engine.banking_metric_resolve import resolve_banking_metric_column
@@ -181,6 +205,18 @@ def resolve_explicit_metric_column(
     synonym = resolve_synonym_metric_column(question, df, profile)
     if synonym:
         return synonym
+
+    if _BUDGET_VARIANCE_RE.search(ql):
+        for hint in ("variance",):
+            for col in nums:
+                cn = str(col).lower().replace("_", " ")
+                if hint in cn:
+                    return str(col)
+        for hint in ("actual", "budget"):
+            for col in nums:
+                cn = str(col).lower().replace("_", " ")
+                if hint == cn or cn.endswith(f" {hint}") or cn.startswith(f"{hint} "):
+                    return str(col)
 
     best: Optional[str] = None
     best_score = 0
@@ -204,7 +240,6 @@ def resolve_explicit_metric_column(
                 best_score = sc
                 best = str(col)
 
-    ql = str(question or "").lower()
     for col in sorted(nums, key=lambda c: len(str(c)), reverse=True):
         cn = str(col).lower().replace("_", " ")
         if len(cn) < 3:
