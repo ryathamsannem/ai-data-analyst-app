@@ -5072,14 +5072,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const trendBottom = pngCapture
         ? Math.min(trendBottomRaw, trendBottomCap!)
         : trendBottomRaw;
-      const trendSide = pngCapture
-        ? balanceVerticalOuterMargins({
-            marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
-            chartLayoutMode: "compact",
-          })
-        : isOverviewLine
-          ? overviewTrendLiveSideMargins(vLay.yAxisWidth, { lineChart: true })
-          : overviewTrendLiveSideMargins(vLay.yAxisWidth);
+      const trendSideLive = isOverviewLine
+        ? overviewTrendLiveSideMargins(vLay.yAxisWidth, { lineChart: true })
+        : overviewTrendLiveSideMargins(vLay.yAxisWidth);
       const trendLiveMargins = pngCapture
         ? { top: plotMarginTop, bottom: trendBottom }
         : computeOverviewTrendLivePlotMargins({
@@ -5093,9 +5088,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           : dashGrid.opacity * 0.72;
       const plotMargin = {
         top: trendLiveMargins.top,
-        right: pngCapture ? plotMarginSide : trendSide.right,
+        right: pngCapture ? plotMarginSide : trendSideLive.right,
         bottom: trendLiveMargins.bottom,
-        left: pngCapture ? plotMarginSide : trendSide.left,
+        left: pngCapture ? plotMarginSide : trendSideLive.left,
       };
       return (
         <ResponsiveContainer
