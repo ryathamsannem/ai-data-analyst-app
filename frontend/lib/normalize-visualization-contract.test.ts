@@ -45,6 +45,52 @@ describe("computeAutoDashboardChartPresentation", () => {
       })
     ).toBe("bar_horizontal");
   });
+
+  it("preserves API donut for composition auto-dashboard charts without share phrasing in title", () => {
+    const rows = [
+      { name: "Electronics", value: 120000 },
+      { name: "Apparel", value: 95000 },
+      { name: "Home", value: 88000 },
+      { name: "Sports", value: 72000 },
+    ];
+    expect(
+      computeAutoDashboardChartPresentation({
+        apiChartType: "donut",
+        title: "Profit by Product",
+        rows,
+      })
+    ).toBe("donut");
+  });
+
+  it("preserves share-titled donut from backend composition titles", () => {
+    const rows = [
+      { name: "North", value: 120000 },
+      { name: "South", value: 95000 },
+      { name: "East", value: 88000 },
+    ];
+    expect(
+      computeAutoDashboardChartPresentation({
+        apiChartType: "donut",
+        title: "Profit Share by Region",
+        rows,
+      })
+    ).toBe("donut");
+  });
+
+  it("downgrades API donut to bar for rate metrics", () => {
+    const rows = [
+      { name: "Spring", value: 2.4 },
+      { name: "Summer", value: 3.1 },
+      { name: "Fall", value: 2.8 },
+    ];
+    const kind = computeAutoDashboardChartPresentation({
+      apiChartType: "donut",
+      title: "Conversion Rate by Campaign",
+      rows,
+    });
+    expect(kind === "donut" || kind === "pie").toBe(false);
+    expect(kind === "bar" || kind === "bar_horizontal").toBe(true);
+  });
 });
 
 describe("resolveSnapshotPresentationKind", () => {

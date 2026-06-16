@@ -63,7 +63,10 @@ _STRATEGY_RE = re.compile(
     r"management\s+focus|leadership\s+focus|executive\s+priority|"
     r"should\s+(?:we|management|leadership)\s+focus|what\s+to\s+prioriti[sz]e|"
     r"prioriti[sz]e|focus\s+on\s+first|where\s+should\s+we\s+focus|"
-    r"strategic\s+priority|top\s+priority"
+    r"strategic\s+priority|top\s+priority|"
+    r"strategic\s+recommendation|budget\s+allocation|allocate\s+budget|"
+    r"what\s+should\s+(?:the\s+)?[\w\s]{2,32}\s+focus|"
+    r"(?:sales|cro|ceo|cmo|cto|leader)\s+focus"
     r")\b",
     re.I,
 )
@@ -191,6 +194,56 @@ def _pick_revenue_col(df: pd.DataFrame, profile: Dict[str, Any]) -> Optional[str
                 return str(c)
     numeric = _numeric_cols(df, profile)
     return str(numeric[0]) if numeric else None
+
+
+def _find_numeric_by_hint(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    *hints: str,
+) -> Optional[str]:
+    nums = _numeric_cols(df, profile)
+    for hint in hints:
+        h = str(hint).lower().replace("_", " ")
+        for col in nums:
+            cn = str(col).lower().replace("_", " ")
+            if h == cn or h in cn.split():
+                return str(col)
+    return None
+
+
+def _pick_executive_risk_metric_column(
+    question: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    *,
+    profit_col: Optional[str],
+    revenue_col: Optional[str],
+    fallback: Optional[str],
+) -> Optional[str]:
+    """Risk lens: prefer explicit / variance / profit signals over revenue leaderboard."""
+    ql = (question or "").lower()
+
+    if re.search(r"\b(overrun|over\s+budget|cost\s+overrun)\b", ql):
+        hit = _find_numeric_by_hint(df, profile, "actual", "variance")
+        if hit:
+            return hit
+
+    explicit = _explicit_metric_from_question(question, {}, df, profile)
+    if explicit:
+        return explicit
+
+    if re.search(r"\b(fp&a|fpa|budget|variance)\b", ql):
+        hit = _find_numeric_by_hint(df, profile, "variance")
+        if hit:
+            return hit
+
+    if profit_col and re.search(
+        r"\b(risks?|problems?|threats?|exposure|concerns?)\b", ql
+    ):
+        if not re.search(r"\b(revenue|sales)\b", ql):
+            return profit_col
+
+    return fallback or revenue_col
 
 
 def pick_executive_breakdown_column(
@@ -408,6 +461,17 @@ def apply_executive_ambiguous_routing(
     intent["executive_lens"] = lens
     intent["group_col"] = gcol
 
+    try:
+        from intent_engine.executive_metric_resolve import (
+            resolve_executive_lens_metric_column,
+        )
+
+        resolved_metric = resolve_executive_lens_metric_column(
+            question, df, profile, lens=lens
+        )
+    except Exception:
+        resolved_metric = None
+
     if bucket == "executive_loss_profitability" and profit_col:
         intent["value_col"] = profit_col
         intent["agg_label"] = "Total"
@@ -416,12 +480,8 @@ def apply_executive_ambiguous_routing(
         intent["lossProfitabilityContext"] = build_loss_profitability_context(
             df, profile, group_col=gcol, profit_col=profit_col
         )
-    elif bucket == "executive_opportunity":
-        intent["value_col"] = revenue_col or intent.get("value_col")
-        intent["agg_label"] = "Total"
-        intent["agg_key"] = "sum"
-    elif bucket == "executive_risk":
-        metric_col = explicit_metric or intent.get("value_col") or revenue_col
+    elif resolved_metric:
+        metric_col = resolved_metric
         intent["value_col"] = metric_col
         if explicit_metric or intent.get("explicit_metric"):
             from intent_engine.column_resolve import column_prefers_mean_aggregation
@@ -435,6 +495,32 @@ def apply_executive_ambiguous_routing(
         else:
             intent["agg_label"] = "Total"
             intent["agg_key"] = "sum"
+        if bucket == "executive_risk":
+            intent["executiveRiskContext"] = build_executive_risk_context(
+                df,
+                profile,
+                group_col=gcol,
+                value_col=str(metric_col),
+                question=question,
+            )
+        elif bucket == "executive_outlier_standout":
+            intent["executive_standout_analysis"] = True
+    elif bucket == "executive_opportunity":
+        intent["value_col"] = revenue_col or intent.get("value_col")
+        intent["agg_label"] = "Total"
+        intent["agg_key"] = "sum"
+    elif bucket == "executive_risk":
+        metric_col = _pick_executive_risk_metric_column(
+            question,
+            df,
+            profile,
+            profit_col=profit_col,
+            revenue_col=revenue_col,
+            fallback=explicit_metric or intent.get("value_col"),
+        )
+        intent["value_col"] = metric_col
+        intent["agg_label"] = "Total"
+        intent["agg_key"] = "sum"
         if metric_col:
             intent["executiveRiskContext"] = build_executive_risk_context(
                 df,
@@ -444,17 +530,24 @@ def apply_executive_ambiguous_routing(
                 question=question,
             )
     elif bucket == "executive_strategy":
-        intent["value_col"] = revenue_col or intent.get("value_col")
+        intent["value_col"] = (
+            explicit_metric or revenue_col or intent.get("value_col")
+        )
         intent["agg_label"] = "Total"
         intent["agg_key"] = "sum"
     elif bucket == "executive_outlier_standout":
-        metric_col = explicit_metric or intent.get("value_col") or revenue_col
-        intent["value_col"] = metric_col
+        intent["value_col"] = explicit_metric or intent.get("value_col") or revenue_col
         intent["agg_label"] = "Total"
         intent["agg_key"] = "sum"
         intent["executive_standout_analysis"] = True
     else:
         intent["value_col"] = revenue_col or intent.get("value_col")
+
+    vc = intent.get("value_col")
+    if vc:
+        from intent_engine.legacy import pretty_label_text
+
+        intent["metricColumnDisplay"] = pretty_label_text(str(vc))
 
     intent.pop("secondary_group_col", None)
     return True

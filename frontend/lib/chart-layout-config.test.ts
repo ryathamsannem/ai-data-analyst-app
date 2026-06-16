@@ -3,12 +3,13 @@ import {
   resolveDetailPlotHeight,
   resolveChartsTabPreviewPlotHeight,
 } from "@/lib/chart-layout-config";
+import { SESSION_DETAIL_CONTINUOUS_PLOT_FLOOR_PX } from "@/lib/shared-chart-layout";
 
 describe("resolveDetailPlotHeight", () => {
-  it("keeps AI Insights scatter in the shared 480–540px desktop band", () => {
+  it("keeps AI Insights scatter in the plot-v4 continuous detail band", () => {
     const h = resolveDetailPlotHeight(12, "scatter", 900, "insights");
-    expect(h).toBeGreaterThanOrEqual(480);
-    expect(h).toBeLessThanOrEqual(540);
+    expect(h).toBe(SESSION_DETAIL_CONTINUOUS_PLOT_FLOOR_PX);
+    expect(h).toBeLessThanOrEqual(580);
   });
 
   it("uses the same height for Charts tab as AI Insights", () => {
@@ -21,8 +22,8 @@ describe("resolveDetailPlotHeight", () => {
     expect(manyCharts).toBeGreaterThanOrEqual(fewCharts);
   });
 
-  it("scales down on narrow viewports", () => {
-    const h = resolveDetailPlotHeight(8, "scatter", 640, "insights");
+  it("scales down on narrow viewports for non-continuous charts", () => {
+    const h = resolveDetailPlotHeight(8, "bar", 640, "insights");
     expect(h).toBeGreaterThanOrEqual(220);
     expect(h).toBeLessThan(480);
   });

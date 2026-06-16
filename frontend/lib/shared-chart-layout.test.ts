@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  getSharedDetailLayoutMetrics,
   resolveSharedDetailPlotHeight,
+  SESSION_DETAIL_CONTINUOUS_PLOT_FLOOR_PX,
   SHARED_CHART_LAYOUT,
 } from "@/lib/shared-chart-layout";
 import {
@@ -22,5 +24,18 @@ describe("resolveSharedDetailPlotHeight", () => {
     const h = resolveSharedDetailPlotHeight(12, "bar_horizontal", 900);
     expect(h).toBeLessThanOrEqual(SHARED_CHART_LAYOUT.horizontalBar.capPx);
     expect(h).toBeGreaterThanOrEqual(SHARED_CHART_LAYOUT.plotBand.desktopFloor);
+  });
+
+  it("boosts line, area, and scatter plot height inside the same shell width", () => {
+    const lineH = resolveSharedDetailPlotHeight(9, "line", 900);
+    const areaH = resolveSharedDetailPlotHeight(9, "area", 900);
+    const scatterH = resolveSharedDetailPlotHeight(9, "scatter", 900);
+    expect(areaH).toBe(lineH);
+    expect(lineH).toBe(scatterH);
+    expect(lineH).toBe(SESSION_DETAIL_CONTINUOUS_PLOT_FLOOR_PX);
+    expect(lineH).toBeLessThanOrEqual(580);
+    const lineMetrics = getSharedDetailLayoutMetrics("line");
+    expect(lineMetrics.planViewportPx).toBe(850);
+    expect(lineMetrics.plotHeightMax).toBe(580);
   });
 });

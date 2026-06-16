@@ -5936,6 +5936,21 @@ def _infer_dimension_column_from_question(
         if hit:
             return hit
 
+    mm_delivers = re.search(
+        r"\bwhich\s+([a-z0-9][a-z0-9_\s]{0,48}?)\s+(?:delivers?|drives?|generates?)\b",
+        ql,
+        re.I,
+    )
+    if mm_delivers:
+        raw_phrase = mm_delivers.group(1).strip().replace("-", "_")
+        hit = _match_column_from_phrase(raw_phrase, cand_dims or columns, profile)
+        if hit:
+            return hit
+        alt = raw_phrase.replace(" ", "_")
+        hit = _match_column_from_phrase(alt, cand_dims or columns, profile)
+        if hit:
+            return hit
+
     scored: List[Tuple[int, str]] = []
     for c in cand_dims:
         variants = (
@@ -6179,7 +6194,18 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
 
         geo_gcol = resolve_geographic_group_column(question_str, df, profile)
         if geo_gcol:
-            gcol = geo_gcol
+            explicit_named = next(
+                (
+                    str(c)
+                    for c in (cand_dims or cols)
+                    if _question_explicitly_requests_dimension(ql, str(c))
+                ),
+                None,
+            )
+            if explicit_named:
+                gcol = explicit_named
+            else:
+                gcol = geo_gcol
     except Exception:
         pass
 
@@ -7109,6 +7135,23 @@ def _looks_like_ranking_question(ql: str) -> bool:
         ql,
     ):
         return True
+    if re.search(
+        r"\b(?:drives?|delivers?|generates?)\s+the\s+most\b",
+        ql,
+    ):
+        return True
+    if re.search(r"\bunderperform", ql) and re.search(r"\bwhich\b", ql):
+        return True
+    if re.search(
+        r"\b(?:which|what)\b.+\b(?:longest|shortest|slowest|fastest)\b",
+        ql,
+    ):
+        return True
+    if re.search(
+        r"\b(?:which|what)\b.+\bexceeds?\b.+\bthe\s+most\b",
+        ql,
+    ) or re.search(r"\bexceeds?\s+\w+\s+the\s+most\b", ql):
+        return True
     return any(k in ql for k in ("ranking", "rank ", "rank,", "ranked"))
 
 
@@ -7327,10 +7370,14 @@ def _question_explicitly_requests_dimension(question_lower: str, col: str) -> bo
         raw.lower().replace("_", " "),
     }
     for v in variants:
-        if len(v) >= 3 and v in ql:
+        if len(v) >= 3 and re.search(
+            rf"(?<!\w){re.escape(v.replace(' ', '_'))}(?!\w)|"
+            rf"(?<!\w){re.escape(v.replace('_', ' '))}(?!\w)",
+            ql,
+        ):
             return True
     toks = [t for t in raw.lower().split("_") if len(t) >= 3]
-    return any(t in ql for t in toks)
+    return any(re.search(rf"(?<!\w){re.escape(t)}(?!\w)", ql) for t in toks)
 
 
 def _prefer_lower_cardinality_dimension(
@@ -7345,6 +7392,8 @@ def _prefer_lower_cardinality_dimension(
     and over extremely high-cardinality keys when the user did not name them explicitly.
     """
     if df is None or df.empty or not current:
+        return current
+    if _question_explicitly_requests_dimension(question_lower, current):
         return current
     try:
         from intent_engine.geographic_scope import (
@@ -7365,8 +7414,6 @@ def _prefer_lower_cardinality_dimension(
             return current
     except Exception:
         pass
-    if _question_explicitly_requests_dimension(question_lower, current):
-        return current
     try:
         nu_cur = int(df[str(current)].nunique(dropna=True))
     except Exception:
@@ -13763,6 +13810,16 @@ def compute_visualization_for_question(
             )
 
             apply_executive_ambiguous_routing(
+                question, cohort_df, profile_live, intent_debug
+            )
+        except Exception:
+            pass
+        try:
+            from intent_engine.executive_metric_resolve import (
+                apply_executive_metric_to_intent,
+            )
+
+            apply_executive_metric_to_intent(
                 question, cohort_df, profile_live, intent_debug
             )
         except Exception:

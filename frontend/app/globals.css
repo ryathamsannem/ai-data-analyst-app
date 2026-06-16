@@ -2471,6 +2471,7 @@ body {
 .overview-chart-grid__cell {
   display: flex;
   min-width: 0;
+  min-height: 0;
   width: 100%;
   max-width: 100%;
   align-self: stretch;
@@ -2742,6 +2743,12 @@ body {
   border-top: 1px solid var(--border-default);
 }
 
+/* Expanded live plot bands grow into h-full slack — footer stays flush below plot */
+.overview-dash-chart-card:has(.overview-chart-plot--continuous)
+  .overview-dash-chart-card__footer {
+  margin-top: 0;
+}
+
 .overview-chart-plot {
   display: flex;
   width: 100%;
@@ -2774,6 +2781,33 @@ body {
   height: 100% !important;
   min-width: 0 !important;
   min-height: var(--overview-chart-plot-min-h) !important;
+}
+
+/* Overview line / area / scatter / H-Bar — grow band, anchor plot flush above footer */
+.overview-chart-plot--continuous {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: var(--overview-chart-plot-min-h);
+  max-height: none;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.overview-chart-plot--continuous .overview-chart-plot-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  height: var(--overview-chart-plot-min-h);
+  min-height: var(--overview-chart-plot-min-h);
+  max-height: var(--overview-chart-plot-min-h);
+}
+
+.overview-chart-plot--continuous .overview-chart-plot-inner .recharts-responsive-container {
+  flex: 0 0 auto;
+  min-height: 0 !important;
+  height: var(--overview-chart-plot-min-h) !important;
 }
 
 /* Single-line pill text — truncation without layout shifts (pair with title for full value). */
