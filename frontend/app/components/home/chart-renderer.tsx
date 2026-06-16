@@ -48,6 +48,27 @@ import {
   formatAxisTickFromScatterX,
   formatChartAxisCategoryTick,
 } from "@/lib/chart-axis-formatters";
+import {
+  formatOverviewLineYAxisTick,
+  formatOverviewScatterAxisTick,
+  OVERVIEW_LINE_LIVE_MARKER_R_PX,
+  OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
+  OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
+  resolveSessionPremiumTrendAxisScale,
+  resolveSessionScatterPremiumAxes,
+  sessionLineAreaDetailBottomMargin,
+  sessionLineAreaDetailXAxisHeightPx,
+  sessionTrendDetailPlotMargins,
+} from "@/lib/overview-premium-axis-domain";
+import {
+  computeOverviewContinuousVerticalDashLayout,
+  computeOverviewScatterPremiumMargins,
+  OVERVIEW_SCATTER_POINT_FILL_OPACITY,
+  OVERVIEW_SCATTER_POINT_RADIUS_PX,
+  OVERVIEW_SCATTER_POINT_STROKE_COLOR,
+  OVERVIEW_SCATTER_POINT_STROKE_OPACITY,
+  OVERVIEW_SCATTER_POINT_STROKE_PX,
+} from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
 import { formatRadialTooltipValue } from "@/lib/radial-chart-format";
 import { buildChartCartesianTooltipHandlers, chartTooltipMetricLabel, formatChartTooltipCategoryLine } from "@/lib/chart-tooltip-format";
@@ -645,14 +666,44 @@ function ChartRendererInner({
   }
 
   if (rKind === "scatter") {
-    return (
-      <ResponsiveContainer
-        key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
-        width="100%"
-        height={chartHeight}
-      >
-        <ScatterChart
-          margin={pickCartesianMargin(
+    const scatterViewport = detailLayout ? detailLayoutViewportW : viewportW;
+    const scatterPremium = detailLayout
+      ? resolveSessionScatterPremiumAxes(rData)
+      : undefined;
+    const scatterXMetricCtx: MetricFormatContext = {
+      metricLabel: rAxes.categoryAxis,
+      chartTitle: metricTooltipCtx.chartTitle,
+      presentationKind: "scatter",
+    };
+    const detailScatterXTickFmt =
+      detailLayout && scatterPremium
+        ? (tick: number) =>
+            formatOverviewScatterAxisTick(tick, scatterXMetricCtx)
+        : scatterXTickFormatter;
+    const detailScatterYTickFmt =
+      detailLayout && scatterPremium
+        ? (tick: number) =>
+            formatOverviewScatterAxisTick(tick, metricTooltipCtx)
+        : valueTickFormatter;
+    const scatterYTickSamples = scatterPremium
+      ? scatterPremium.y.ticks.map((t) => detailScatterYTickFmt(t))
+      : collectSampleTickStrings(rData);
+    const scatterValueLayout =
+      detailLayout && scatterPremium
+        ? computeOverviewContinuousVerticalDashLayout(
+            rAxes.valueAxis,
+            scatterYTickSamples,
+            chartHeight
+          )
+        : verticalValueLayout;
+    const scatterMargins =
+      detailLayout && scatterPremium
+        ? {
+            ...computeOverviewScatterPremiumMargins(scatterValueLayout.yAxisWidth),
+            top: 2,
+            bottom: 20,
+          }
+        : pickCartesianMargin(
             Math.max(
               manyCategoryLegacy ? 56 : 42,
               computeCategoryAxisBottomMargin({
@@ -660,25 +711,43 @@ function ChartRendererInner({
                 angled: false,
               }) + 8
             )
-          )}
-        >
+          );
+    return (
+      <ResponsiveContainer
+        key={rechartsContainerKey(
+          rKind,
+          scatterViewport,
+          chartHeight,
+          pngCaptureMode
+        )}
+        width="100%"
+        height={chartHeight}
+      >
+        <ScatterChart margin={scatterMargins}>
           <CartesianGrid
             stroke={GRID_STROKE}
             strokeDasharray="4 12"
-            strokeOpacity={0.38}
+            strokeOpacity={detailLayout ? 0.32 : 0.38}
           />
           <XAxis
             type="number"
             dataKey="x"
             tick={{ fontSize: 11, fill: AXIS_TICK }}
-            tickFormatter={scatterXTickFormatter}
+            tickFormatter={detailScatterXTickFmt}
+            {...(scatterPremium
+              ? {
+                  domain: scatterPremium.x.domain,
+                  ticks: scatterPremium.x.ticks,
+                  allowDataOverflow: false,
+                }
+              : {})}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
           >
             <Label
               value={rAxes.categoryAxis}
               position="insideBottom"
-              offset={-6}
+              offset={detailLayout ? -4 : -6}
               content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
@@ -686,16 +755,23 @@ function ChartRendererInner({
             type="number"
             dataKey="value"
             tick={AXIS_Y_TICK_VAL}
-            tickFormatter={valueTickFormatter}
+            tickFormatter={detailScatterYTickFmt}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
-            width={verticalValueLayout.yAxisWidth}
+            width={scatterValueLayout.yAxisWidth}
+            {...(scatterPremium
+              ? {
+                  domain: scatterPremium.y.domain,
+                  ticks: scatterPremium.y.ticks,
+                  allowDataOverflow: false,
+                }
+              : {})}
             label={
-              verticalValueLayout.showValueAxisTitle
+              scatterValueLayout.showValueAxisTitle
                 ? {
                     content: createVerticalValueAxisLabel(
-                      verticalValueLayout.valueAxisTitleFull,
-                      verticalValueLayout.valueAxisTitleDisplay
+                      scatterValueLayout.valueAxisTitleFull,
+                      scatterValueLayout.valueAxisTitleDisplay
                     ),
                   }
                 : undefined
@@ -728,9 +804,40 @@ function ChartRendererInner({
             name="Points"
             data={rData}
             fill="#6366f1"
-            fillOpacity={0.88}
+            fillOpacity={
+              detailLayout
+                ? OVERVIEW_SCATTER_POINT_FILL_OPACITY
+                : 0.88
+            }
             isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
+            {...(detailLayout
+              ? {
+                  shape: (props: {
+                    cx?: number;
+                    cy?: number;
+                    fill?: string;
+                    fillOpacity?: number;
+                  }) => {
+                    const { cx, cy, fill, fillOpacity } = props;
+                    if (cx == null || cy == null) return <g />;
+                    return (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={OVERVIEW_SCATTER_POINT_RADIUS_PX}
+                        fill={fill ?? "#6366f1"}
+                        fillOpacity={
+                          fillOpacity ?? OVERVIEW_SCATTER_POINT_FILL_OPACITY
+                        }
+                        stroke={OVERVIEW_SCATTER_POINT_STROKE_COLOR}
+                        strokeOpacity={OVERVIEW_SCATTER_POINT_STROKE_OPACITY}
+                        strokeWidth={OVERVIEW_SCATTER_POINT_STROKE_PX}
+                      />
+                    );
+                  },
+                }
+              : {})}
           />
         </ScatterChart>
       </ResponsiveContainer>
@@ -934,13 +1041,21 @@ function ChartRendererInner({
     const temporalTickStrings = temporalTickStringsForChartRows(rData);
     const trendViewport = detailLayout ? detailLayoutViewportW : viewportW;
     const trendTickFs = lineAreaTickFontSizePx(compact, trendViewport);
-    const lineAreaBottomMargin = Math.ceil(
-      computeLineAreaChartBottomMargin({
-        temporalTickStrings,
-        tickFontSizePx: trendTickFs,
-        chartLayoutMode,
-      }) * (detailLayout ? 0.86 : 0.94)
-    );
+    const lineAreaBottomMargin = detailLayout
+      ? sessionLineAreaDetailBottomMargin(
+          computeLineAreaChartBottomMargin({
+            temporalTickStrings,
+            tickFontSizePx: trendTickFs,
+            chartLayoutMode,
+          })
+        )
+      : Math.ceil(
+          computeLineAreaChartBottomMargin({
+            temporalTickStrings,
+            tickFontSizePx: trendTickFs,
+            chartLayoutMode,
+          }) * 0.94
+        );
     const trendInterval = computeLineAreaXAxisInterval(rData.length, {
       compact,
       viewportWidthPx: trendViewport,
@@ -950,8 +1065,54 @@ function ChartRendererInner({
         formatTrendXAxisTickLabel(String(v)),
         compact
       );
-    const trendXAxisHeight = lineAreaXAxisHeightPx(compact);
+    const trendXAxisHeight = detailLayout
+      ? sessionLineAreaDetailXAxisHeightPx()
+      : lineAreaXAxisHeightPx(compact);
     const hideMarkers = rData.length > 45;
+    const trendPremiumY = detailLayout
+      ? resolveSessionPremiumTrendAxisScale(
+          rData.map((r) => r.value),
+          rKind
+        )
+      : undefined;
+    const trendYTickFormatter =
+      detailLayout && trendPremiumY
+        ? (tick: number) => formatOverviewLineYAxisTick(tick, metricTooltipCtx)
+        : valueTickFormatter;
+    const premiumTickSamples = trendPremiumY
+      ? trendPremiumY.ticks.map((t) => trendYTickFormatter(t))
+      : collectSampleTickStrings(rData);
+    const trendValueLayout =
+      detailLayout && trendPremiumY
+        ? computeVerticalValueAxisLayout({
+            valueAxisLabel: rAxes.valueAxisCompact,
+            valueAxisMeasureLabel: rAxes.valueAxis,
+            tickSampleStrings: premiumTickSamples,
+            chartLayoutMode: "full",
+            plotInnerHeightPx: Math.max(220, Math.floor(chartHeight * 0.94)),
+          })
+        : verticalValueLayout;
+    const plotMargin =
+      detailLayout && trendPremiumY
+        ? sessionTrendDetailPlotMargins({
+            computedBottom: lineAreaBottomMargin,
+            yAxisWidth: trendValueLayout.yAxisWidth,
+          })
+        : pickCartesianMargin(lineAreaBottomMargin);
+    const detailLineStroke =
+      detailLayout && rKind === "line"
+        ? OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX
+        : 2.5;
+    const detailDotR =
+      detailLayout && rKind === "line"
+        ? OVERVIEW_LINE_LIVE_MARKER_R_PX
+        : compact
+          ? 3.25
+          : 3.75;
+    const detailDotStroke =
+      detailLayout && rKind === "line"
+        ? OVERVIEW_LINE_LIVE_MARKER_STROKE_PX
+        : 2;
     return (
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, trendViewport, chartHeight, pngCaptureMode)}
@@ -960,14 +1121,14 @@ function ChartRendererInner({
       >
         <ChartBody
           data={rData}
-          margin={pickCartesianMargin(lineAreaBottomMargin)}
+          margin={plotMargin}
         >
           <CartesianGrid
             vertical={false}
             horizontal
             stroke={GRID_STROKE}
             strokeDasharray="4 12"
-            strokeOpacity={0.38}
+            strokeOpacity={detailLayout ? 0.32 : 0.38}
           />
           <XAxis
             dataKey="name"
@@ -980,7 +1141,7 @@ function ChartRendererInner({
             textAnchor="end"
             height={trendXAxisHeight}
             interval={trendInterval}
-            tickMargin={10}
+            tickMargin={detailLayout ? 6 : 10}
             minTickGap={compact ? 6 : detailLayout ? 26 : 16}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
@@ -988,22 +1149,29 @@ function ChartRendererInner({
             <Label
               value={rAxes.categoryAxis}
               position="insideBottom"
-              offset={detailLayout ? -14 : compact ? -20 : -24}
+              offset={detailLayout ? -8 : compact ? -20 : -24}
               content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
           <YAxis
             tick={AXIS_Y_TICK_VAL}
-            tickFormatter={valueTickFormatter}
+            tickFormatter={trendYTickFormatter}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
-            width={verticalValueLayout.yAxisWidth}
+            width={trendValueLayout.yAxisWidth}
+            {...(trendPremiumY
+              ? {
+                  domain: trendPremiumY.domain,
+                  ticks: trendPremiumY.ticks,
+                  allowDataOverflow: false,
+                }
+              : {})}
             label={
-              verticalValueLayout.showValueAxisTitle
+              trendValueLayout.showValueAxisTitle
                 ? {
                     content: createVerticalValueAxisLabel(
-                      verticalValueLayout.valueAxisTitleFull,
-                      verticalValueLayout.valueAxisTitleDisplay
+                      trendValueLayout.valueAxisTitleFull,
+                      trendValueLayout.valueAxisTitleDisplay
                     ),
                   }
                 : undefined
@@ -1047,15 +1215,15 @@ function ChartRendererInner({
               type="monotone"
               dataKey="value"
               stroke="#4f46e5"
-              strokeWidth={2.5}
+              strokeWidth={detailLineStroke}
               isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
               dot={
                 hideMarkers
                   ? false
                   : {
-                      r: compact ? 3.25 : 3.75,
-                      strokeWidth: 2,
+                      r: detailDotR,
+                      strokeWidth: detailDotStroke,
                       stroke: "#fff",
                       fill: "#4f46e5",
                     }

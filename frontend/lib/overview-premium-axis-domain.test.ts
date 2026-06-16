@@ -7,6 +7,10 @@ import {
   resolveOverviewPremiumAxisScale,
   resolveOverviewScatterPremiumAxes,
   resolveOverviewScatterPremiumAxisScale,
+  resolveSessionPremiumTrendAxisScale,
+  SESSION_DETAIL_TREND_PREMIUM_PAD_RATIO,
+  sessionLineAreaDetailBottomMargin,
+  sessionTrendDetailPlotMargins,
 } from "./overview-premium-axis-domain";
 
 describe("resolveOverviewPremiumAxisScale", () => {
@@ -69,6 +73,44 @@ describe("formatOverviewScatterAxisTick", () => {
   it("formats scatter axis ticks with compact K labels", () => {
     expect(formatOverviewScatterAxisTick(90_000)).toBe("90K");
     expect(formatOverviewScatterAxisTick(340_000)).toBe("340K");
+  });
+});
+
+describe("resolveSessionPremiumTrendAxisScale", () => {
+  it("uses tighter session pad with rounded premium ticks for monthly revenue trend", () => {
+    const values = [
+      620_000, 640_000, 660_000, 680_000, 700_000, 720_000, 740_000, 760_000,
+      825_000,
+    ];
+    const line = resolveSessionPremiumTrendAxisScale(values, "line");
+    const overview = resolveOverviewPremiumAxisScale(values, {
+      padRatio: SESSION_DETAIL_TREND_PREMIUM_PAD_RATIO,
+      minPadRatio: 0.04,
+    });
+    expect(line).toEqual(overview);
+    expect(line!.domain[0]).toBeGreaterThanOrEqual(600_000);
+    expect(line!.domain[0]).toBeLessThan(620_000);
+    expect(line!.domain[1]).toBeGreaterThan(825_000);
+    expect(line!.domain[1]).toBeLessThanOrEqual(850_000);
+  });
+});
+
+describe("sessionLineAreaDetailBottomMargin", () => {
+  it("compresses angled x-axis reserve for taller cartesian plot", () => {
+    expect(sessionLineAreaDetailBottomMargin(62)).toBeLessThanOrEqual(32);
+    expect(sessionLineAreaDetailBottomMargin(62)).toBeGreaterThanOrEqual(26);
+  });
+});
+
+describe("sessionTrendDetailPlotMargins", () => {
+  it("uses minimal top and capped bottom margins", () => {
+    const margins = sessionTrendDetailPlotMargins({
+      computedBottom: 62,
+      yAxisWidth: 52,
+    });
+    expect(margins.top).toBe(2);
+    expect(margins.bottom).toBeLessThanOrEqual(30);
+    expect(margins.bottom).toBeGreaterThanOrEqual(26);
   });
 });
 

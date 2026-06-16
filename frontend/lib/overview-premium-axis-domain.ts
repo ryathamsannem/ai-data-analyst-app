@@ -142,6 +142,74 @@ export function resolveOverviewPremiumAxisScale(
   return { domain: [domainMin, domainMax], ticks };
 }
 
+/** Charts tab + AI Insights detail trend plots — occupancy-tuned pad (rounded ticks preserved). */
+export const SESSION_DETAIL_TREND_PREMIUM_PAD_RATIO = 0.05;
+export const SESSION_DETAIL_TREND_PREMIUM_MIN_PAD_RATIO = 0.04;
+
+/** Session detail line/area — minimal Recharts margin caps inside the existing plot box. */
+export const SESSION_DETAIL_TREND_MARGIN_TOP_PX = 2;
+export const SESSION_DETAIL_TREND_MARGIN_BOTTOM_CAP_PX = 30;
+
+export function resolveSessionPremiumTrendAxisScale(
+  values: readonly number[],
+  kind: "line" | "area"
+): OverviewPremiumAxisScale | undefined {
+  return resolveOverviewPremiumAxisScale(values, {
+    padRatio:
+      kind === "line"
+        ? SESSION_DETAIL_TREND_PREMIUM_PAD_RATIO
+        : 0.08,
+    minPadRatio: SESSION_DETAIL_TREND_PREMIUM_MIN_PAD_RATIO,
+  });
+}
+
+/** Tighter optical side margins for session detail line/area (not Overview mini-cards). */
+export function sessionTrendDetailSideMargins(yAxisWidth: number): {
+  left: number;
+  right: number;
+} {
+  const baseLeft = Math.max(16, Math.ceil(yAxisWidth) + 4);
+  return {
+    left: Math.max(12, baseLeft - 8),
+    right: 10,
+  };
+}
+
+/** Bottom margin input for session detail line/area before outer cap. */
+export function sessionLineAreaDetailBottomMargin(computedBottom: number): number {
+  return Math.min(Math.max(Math.ceil(computedBottom * 0.68), 26), 32);
+}
+
+/** Recharts outer margins for session detail line/area — maximizes plot band without resizing the shell. */
+export function sessionTrendDetailPlotMargins(args: {
+  computedBottom: number;
+  yAxisWidth: number;
+}): { top: number; right: number; bottom: number; left: number } {
+  const side = sessionTrendDetailSideMargins(args.yAxisWidth);
+  const bottom = Math.min(
+    sessionLineAreaDetailBottomMargin(args.computedBottom),
+    SESSION_DETAIL_TREND_MARGIN_BOTTOM_CAP_PX
+  );
+  return {
+    top: SESSION_DETAIL_TREND_MARGIN_TOP_PX,
+    right: side.right,
+    bottom,
+    left: side.left,
+  };
+}
+
+/** X-axis band height for session detail line/area (angled ticks + title). */
+export function sessionLineAreaDetailXAxisHeightPx(): number {
+  return 44;
+}
+
+/** Session detail scatter — same premium rounded domains as Overview scatter. */
+export function resolveSessionScatterPremiumAxes(
+  rows: readonly ChartRow[]
+): ReturnType<typeof resolveOverviewScatterPremiumAxes> {
+  return resolveOverviewScatterPremiumAxes(rows);
+}
+
 /**
  * Human-friendly Y-axis labels for Overview line mini cards — 600K, 650K, etc.
  * Tick positions stay exact; only display is compact.
