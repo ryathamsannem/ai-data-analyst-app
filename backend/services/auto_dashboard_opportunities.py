@@ -640,6 +640,16 @@ def _executive_metric_by_dim_title(
     return normalize_canonical_chart_title(f"{met} by {dim}")
 
 
+def _executive_share_by_dim_title(
+    metric_col: str,
+    dim_col: str,
+    pretty_label: Callable[..., str],
+) -> str:
+    met = _title_case_phrase(pretty_label(metric_col))
+    dim = _title_case_phrase(pretty_label(dim_col))
+    return normalize_canonical_chart_title(f"{met} Share by {dim}")
+
+
 def _breakdown_dimension_eligible(
     dim_c: str,
     df: pd.DataFrame,
@@ -1439,7 +1449,7 @@ def discover_chart_opportunities(
             g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
             if g.empty or len(g) < 2 or not _composition_shares_valid(g):
                 continue
-            tit = _executive_metric_by_dim_title(num_c, dim_c, "sum", deps.pretty_label)
+            tit = _executive_share_by_dim_title(num_c, dim_c, deps.pretty_label)
             api_typ = "donut" if len(g) >= 3 else "pie"
             add(
                 deps.series_payload(

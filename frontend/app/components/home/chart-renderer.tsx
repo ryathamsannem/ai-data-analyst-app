@@ -37,6 +37,13 @@ import {
   resolveRadialChartRadii,
 } from "@/lib/radial-export-layout";
 import {
+  OVERVIEW_MINI_RADIAL_LEGEND_PADDING_TOP_PX,
+  OVERVIEW_MINI_RADIAL_SLICE_STROKE,
+  OVERVIEW_MINI_RADIAL_SLICE_STROKE_WIDTH,
+  scaleOverviewMiniRadialRadii,
+  tightenOverviewMiniRadialMargins,
+} from "@/lib/overview-mini-radial-polish";
+import {
   formatAxisTickFromRows,
   formatAxisTickFromScatterX,
   formatChartAxisCategoryTick,
@@ -152,6 +159,8 @@ export type ChartRendererProps = {
   onInsightDrill: (primaryValue: string, secondaryRaw?: string) => void;
   /** Off-screen presentation capture — disable animation for stable PNG/PDF SVG. */
   pngCaptureMode?: boolean;
+  /** Overview auto-dashboard mini-card radial polish (size, legend gap, slice stroke). */
+  overviewMiniRadial?: boolean;
 };
 
 function ChartRendererInner({
@@ -169,6 +178,7 @@ function ChartRendererInner({
   tickTruncate,
   onInsightDrill,
   pngCaptureMode = false,
+  overviewMiniRadial = false,
 }: ChartRendererProps) {
   useDevRenderCount("ChartRenderer");
   const rData = chartRows;
@@ -728,16 +738,31 @@ function ChartRendererInner({
   }
 
   if (rKind === "pie" || rKind === "donut") {
-    const radii = resolveRadialChartRadii({
+    const polishOverviewMini =
+      overviewMiniRadial && !insightMode && (rKind === "pie" || rKind === "donut");
+    let radii = resolveRadialChartRadii({
       kind: rKind,
       plotHeightPx: chartHeight,
       compact,
       pngCaptureMode,
     });
     const piePad = computePieChartMargins(rAxes.valueAxisCompact);
-    const margins = pngCaptureMode
+    let margins = pngCaptureMode
       ? radialChartExportOuterMargins(rKind, piePad)
       : radialChartOuterMargins(rKind, compact, piePad);
+    if (polishOverviewMini) {
+      radii = scaleOverviewMiniRadialRadii(radii);
+      margins = tightenOverviewMiniRadialMargins(margins);
+    }
+    const sliceStroke = polishOverviewMini
+      ? OVERVIEW_MINI_RADIAL_SLICE_STROKE
+      : "#fff";
+    const sliceStrokeWidth = polishOverviewMini
+      ? OVERVIEW_MINI_RADIAL_SLICE_STROKE_WIDTH
+      : 2;
+    const legendPaddingTop = polishOverviewMini
+      ? OVERVIEW_MINI_RADIAL_LEGEND_PADDING_TOP_PX
+      : 10;
     return (
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
@@ -754,8 +779,8 @@ function ChartRendererInner({
             innerRadius={radii.innerRadius}
             outerRadius={radii.outerRadius}
             paddingAngle={2}
-            stroke="#fff"
-            strokeWidth={2}
+            stroke={sliceStroke}
+            strokeWidth={sliceStrokeWidth}
             isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
             cursor={canInsightDrill ? "pointer" : "default"}
@@ -798,7 +823,7 @@ function ChartRendererInner({
             }}
           />
           <Legend
-            wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
+            wrapperStyle={{ fontSize: 11, paddingTop: legendPaddingTop }}
             iconType="circle"
             formatter={(v) => tickTruncate(v)}
           />

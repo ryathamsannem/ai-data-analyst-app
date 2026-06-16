@@ -212,6 +212,34 @@ function overviewRowsLookReadableTimeSeries(rows: ChartRow[]): boolean {
   return hits >= Math.max(2, Math.ceil(rows.length * 0.75));
 }
 
+/** Preserve backend-selected radial charts in Overview auto-dashboard. */
+function autoDashboardRadialPresentationAllowed(
+  title: string,
+  rows: ChartRow[]
+): boolean {
+  if (rankIntentFromText(title)) return false;
+  if (presentationMetricImpliesPercent(title)) return false;
+  if (rowsLookTemporal(rows)) return false;
+  const n = rows.length;
+  if (n < 2 || n > 8) return false;
+  const values = rows
+    .map((r) => r.value)
+    .filter((v): v is number => Number.isFinite(v));
+  if (values.length !== n) return false;
+  if (values.some((v) => v < 0)) return false;
+  return values.reduce((sum, v) => sum + v, 0) > 0;
+}
+
+function resolveAutoDashboardRadialKind(
+  api: ChartKind,
+  rows: ChartRow[]
+): ChartKind {
+  const n = rows.length;
+  if (n >= 3 && n <= 6) return "donut";
+  if (n === 2) return "pie";
+  return api === "pie" || api === "donut" ? api : "donut";
+}
+
 /**
  * Auto-dashboard chart kind — preserves API horizontalBar and Overview bar rules.
  * Shared by Overview mini-cards and Charts/Insights session sync.
@@ -222,14 +250,16 @@ export function computeAutoDashboardChartPresentation(args: {
   rows: ChartRow[];
 }): ChartKind {
   const api = apiChartStringToKind(args.apiChartType);
-  const { rows } = args;
+  const { rows, title } = args;
 
-  if (
-    api === "pie" ||
-    api === "donut" ||
-    api === "histogram" ||
-    api === "scatter"
-  ) {
+  if (api === "pie" || api === "donut") {
+    if (autoDashboardRadialPresentationAllowed(title, rows)) {
+      return resolveAutoDashboardRadialKind(api, rows);
+    }
+    return computeFinalChartPresentation(args);
+  }
+
+  if (api === "histogram" || api === "scatter") {
     return computeFinalChartPresentation(args);
   }
 

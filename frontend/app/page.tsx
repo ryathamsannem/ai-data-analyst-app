@@ -106,11 +106,35 @@ import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
 import {
   computeCartesianCategoryPlanForRender,
   computeOverviewBarCategoryBottom,
+  computeOverviewContinuousVerticalDashLayout,
   computeOverviewHorizontalDashLayout,
+  computeOverviewHBarLiveMargins,
   computeOverviewMiniCategoryPlan,
+  computeOverviewScatterDashMargins,
+  computeOverviewScatterPremiumMargins,
+  computeOverviewTrendLivePlotMargins,
   computeOverviewVerticalDashLayout,
+  overviewDashUsesExpandedPlotBand,
   overviewDashboardUsesHorizontalBars,
+  overviewTrendLiveSideMargins,
+  OVERVIEW_LINE_Y_AXIS_LEFT_TRIM_PX,
+  OVERVIEW_SCATTER_POINT_RADIUS_PX,
+  OVERVIEW_SCATTER_POINT_STROKE_PX,
+  OVERVIEW_SCATTER_POINT_STROKE_COLOR,
+  OVERVIEW_SCATTER_POINT_STROKE_OPACITY,
+  OVERVIEW_SCATTER_POINT_FILL_OPACITY,
+  resolveOverviewDashLivePlotHeight,
 } from "@/lib/overview-dashboard-plot-layout";
+import {
+  formatOverviewLineYAxisTick,
+  formatOverviewScatterAxisTick,
+  OVERVIEW_LINE_LIVE_MARKER_R_PX,
+  OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
+  OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
+  OVERVIEW_LINE_PREMIUM_PAD_RATIO,
+  resolveOverviewPremiumAxisScale,
+  resolveOverviewScatterPremiumAxes,
+} from "@/lib/overview-premium-axis-domain";
 import { ChartPngOffscreenHost } from "@/lib/chart-png-offscreen-host";
 import {
   formatExecutiveMetricValue,
@@ -126,7 +150,7 @@ import {
   RATE_EXCEEDS_100_WARNING,
 } from "@/lib/chart-quality-warnings";
 import { useMeasuredElementWidth } from "@/lib/use-measured-element-width";
-import { CartesianXAxisTitleLabelContent } from "@/app/components/chart-value-axis-title";
+import { CartesianXAxisTitleLabelContent, createVerticalValueAxisLabel } from "@/app/components/chart-value-axis-title";
 import {
   alignInsightProvenanceToPresentation,
   buildFinalChartPresentationMeta,
@@ -174,6 +198,7 @@ import { generateChartReason } from "@/lib/generate-chart-reason";
 import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
 import {
   formatAxisTickFromRows,
+  formatAxisTickFromScatterX,
 } from "@/lib/chart-axis-formatters";
 import type {
   ChartSemanticHeaderModel,
@@ -688,6 +713,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  ScatterChart,
+  Scatter,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -4574,6 +4601,16 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     ]
   );
 
+  const overviewPlotUsesExpandedBand = overviewDashUsesExpandedPlotBand(
+    displayKind,
+    renderBarAsHorizontal
+  );
+  const overviewLivePlotHeightPx = resolveOverviewDashLivePlotHeight(
+    displayKind,
+    plotHeightPx,
+    renderBarAsHorizontal
+  );
+
   if (chartRows.length === 0) return null;
 
   const tickTruncateLocal = (v: string | number) => {
@@ -4618,6 +4655,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     const plotHorizontal = pngCapture
       ? renderBarAsHorizontal
       : overviewDashboardUsesHorizontalBars(displayKind, localCategoryPlan);
+    const effectivePlotH =
+      pngCapture
+        ? plotH
+        : resolveOverviewDashLivePlotHeight(
+            displayKind,
+            plotH,
+            plotHorizontal
+          );
     const plotAnimOn =
       !pngCapture && chartRows.length <= RECHARTS_ANIMATION_MAX_POINTS;
     const plotAnimDuration = pngCapture ? 0 : undefined;
@@ -4625,10 +4670,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     if (displayKind === "pie" || displayKind === "donut") {
       return (
         <ChartRenderer
-          chartHeight={plotH}
+          chartHeight={effectivePlotH}
           compact
           insightMode={false}
           pngCaptureMode={pngCapture}
+          overviewMiniRadial
           chartRows={chartRows}
           visualization={{
             interaction: chart.interaction
@@ -4656,37 +4702,185 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "scatter") {
+      if (pngCapture) {
+        return (
+          <ChartRenderer
+            chartHeight={effectivePlotH}
+            compact
+            insightMode={false}
+            pngCaptureMode={pngCapture}
+            chartRows={chartRows}
+            visualization={{
+              scatterXLabel:
+                chart.xMetricLabel?.trim() ||
+                chart.scatterXLabel?.trim(),
+              scatterYLabel:
+                chart.yMetricLabel?.trim() ||
+                chart.scatterYLabel?.trim() ||
+                chart.metricColumn,
+              xColumn: chart.xColumn,
+              yColumn: chart.yColumn,
+              xMetricLabel: chart.xMetricLabel,
+              yMetricLabel: chart.yMetricLabel,
+              interaction: chart.interaction
+                ? { drillDimensions: chart.interaction.drillDimensions }
+                : null,
+            }}
+            presentationKind="scatter"
+            axes={miniAxes}
+            viewportW={viewW}
+            sessionCartesianPlanMain={null}
+            insightCartesianPlanMain={null}
+            tickTruncate={tickTruncateLocal}
+            onInsightDrill={() => {}}
+          />
+        );
+      }
+
+      const scatterPremium = resolveOverviewScatterPremiumAxes(chartRows);
+      const scatterXMetricCtx: MetricFormatContext = {
+        metricLabel:
+          chart.xMetricLabel?.trim() ||
+          chart.scatterXLabel?.trim() ||
+          miniAxes.categoryAxis,
+        chartTitle: chart.title,
+        presentationKind: "scatter",
+      };
+      const scatterXTickFormatter = (tick: number) =>
+        formatOverviewScatterAxisTick(tick, scatterXMetricCtx);
+      const scatterYTickFormatter = (tick: number) =>
+        formatOverviewScatterAxisTick(tick, overviewMetricCtx);
+      const scatterYTickSamples = scatterPremium
+        ? scatterPremium.y.ticks.map((t) => scatterYTickFormatter(t))
+        : dashTickSamples;
+      const scatterVLay = computeOverviewContinuousVerticalDashLayout(
+        miniAxes.valueAxis,
+        scatterYTickSamples,
+        effectivePlotH
+      );
+      const scatterMargins = scatterPremium
+        ? computeOverviewScatterPremiumMargins(scatterVLay.yAxisWidth)
+        : computeOverviewScatterDashMargins({
+            yAxisWidth: scatterVLay.yAxisWidth,
+            pngCapture: false,
+          });
+
       return (
-        <ChartRenderer
-          chartHeight={plotH}
-          compact
-          insightMode={false}
-          pngCaptureMode={pngCapture}
-          chartRows={chartRows}
-          visualization={{
-            scatterXLabel:
-              chart.xMetricLabel?.trim() ||
-              chart.scatterXLabel?.trim(),
-            scatterYLabel:
-              chart.yMetricLabel?.trim() ||
-              chart.scatterYLabel?.trim() ||
-              chart.metricColumn,
-            xColumn: chart.xColumn,
-            yColumn: chart.yColumn,
-            xMetricLabel: chart.xMetricLabel,
-            yMetricLabel: chart.yMetricLabel,
-            interaction: chart.interaction
-              ? { drillDimensions: chart.interaction.drillDimensions }
-              : null,
-          }}
-          presentationKind="scatter"
-          axes={miniAxes}
-          viewportW={viewW}
-          sessionCartesianPlanMain={null}
-          insightCartesianPlanMain={null}
-          tickTruncate={tickTruncateLocal}
-          onInsightDrill={() => {}}
-        />
+        <ResponsiveContainer
+          key={`ov-scatter-${chartLayoutWidthKey(viewW)}-live`}
+          width="100%"
+          height={effectivePlotH}
+          minWidth={0}
+          minHeight={effectivePlotH}
+        >
+          <ScatterChart data={chartRows} margin={scatterMargins}>
+            <CartesianGrid
+              stroke={dashGrid.stroke}
+              strokeDasharray={OV_DASH_GRID_DASHARRAY}
+              strokeOpacity={dashGrid.opacity}
+            />
+            <XAxis
+              type="number"
+              dataKey="x"
+              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK }}
+              tickFormatter={scatterXTickFormatter}
+              {...(scatterPremium
+                ? {
+                    domain: scatterPremium.x.domain,
+                    ticks: scatterPremium.x.ticks,
+                    allowDataOverflow: false,
+                  }
+                : {})}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+            >
+              <Label
+                value={miniAxes.categoryAxis}
+                position="insideBottom"
+                offset={-4}
+                content={CartesianXAxisTitleLabelContent}
+              />
+            </XAxis>
+            <YAxis
+              type="number"
+              dataKey="value"
+              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK, dx: 2 }}
+              tickFormatter={scatterYTickFormatter}
+              width={scatterVLay.yAxisWidth}
+              {...(scatterPremium
+                ? {
+                    domain: scatterPremium.y.domain,
+                    ticks: scatterPremium.y.ticks,
+                    allowDataOverflow: false,
+                  }
+                : {})}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+              label={
+                scatterVLay.showValueAxisTitle
+                  ? {
+                      content: createVerticalValueAxisLabel(
+                        scatterVLay.valueAxisTitleFull,
+                        scatterVLay.valueAxisTitleDisplay
+                      ),
+                    }
+                  : undefined
+              }
+            />
+            <Tooltip
+              {...CHART_TOOLTIP_FRAME}
+              formatter={(_v, _n, item) => {
+                const p = item?.payload as ChartRow;
+                const yd = p?.displayValue?.trim();
+                const xd = p?.displayX?.trim();
+                const yShow =
+                  yd ||
+                  (typeof p?.value === "number" ? String(p.value) : "—");
+                const xShow =
+                  xd ||
+                  (typeof p?.x === "number" ? String(p.x) : "—");
+                return [`${xShow} · ${yShow}`, "Values"];
+              }}
+              labelFormatter={(_, items) => {
+                const arr =
+                  items as unknown as readonly { payload?: ChartRow }[];
+                const p = arr?.[0]?.payload;
+                return p?.name
+                  ? `${miniAxes.categoryAxis} · ${String(p.name)}`
+                  : "Point";
+              }}
+            />
+            <Scatter
+              name="Points"
+              data={chartRows}
+              fill="#6366f1"
+              fillOpacity={OVERVIEW_SCATTER_POINT_FILL_OPACITY}
+              isAnimationActive={plotAnimOn}
+              animationDuration={plotAnimDuration}
+              shape={(props: {
+                cx?: number;
+                cy?: number;
+                fill?: string;
+                fillOpacity?: number;
+              }) => {
+                const { cx, cy, fill, fillOpacity } = props;
+                if (cx == null || cy == null) return <g />;
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={OVERVIEW_SCATTER_POINT_RADIUS_PX}
+                    fill={fill ?? "#6366f1"}
+                    fillOpacity={fillOpacity ?? OVERVIEW_SCATTER_POINT_FILL_OPACITY}
+                    stroke={OVERVIEW_SCATTER_POINT_STROKE_COLOR}
+                    strokeOpacity={OVERVIEW_SCATTER_POINT_STROKE_OPACITY}
+                    strokeWidth={OVERVIEW_SCATTER_POINT_STROKE_PX}
+                  />
+                );
+              }}
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
       );
     }
 
@@ -4712,13 +4906,16 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const hBarRightMargin = showBarEndLabels
         ? Math.max(hbBalanced.marginRight, 52)
         : hbBalanced.marginRight;
+      const hBarLiveMargins = pngCapture
+        ? { top: plotMarginTop, bottom: OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR }
+        : computeOverviewHBarLiveMargins(chartRows.length);
       return (
         <ResponsiveContainer
           key={`ov-hbar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
           width="100%"
-          height={plotH}
+          height={effectivePlotH}
           minWidth={0}
-          minHeight={plotH}
+          minHeight={effectivePlotH}
         >
           <BarChart
             layout="vertical"
@@ -4726,10 +4923,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             margin={{
               left: hbBalanced.marginLeft,
               right: hBarRightMargin,
-              top: plotMarginTop,
-              bottom: pngCapture
-                ? OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR
-                : 32,
+              top: hBarLiveMargins.top,
+              bottom: hBarLiveMargins.bottom,
             }}
           >
             <CartesianGrid
@@ -4808,12 +5003,35 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "line" || displayKind === "area") {
-      const vLay = computeOverviewVerticalDashLayout(
-        displayKind,
-        valueAxisTitle,
-        dashTickSamples,
-        plotH
-      );
+      const isOverviewLine = displayKind === "line";
+      const trendPremiumY = isOverviewLine
+        ? resolveOverviewPremiumAxisScale(chartRows.map((r) => r.value), {
+            padRatio: OVERVIEW_LINE_PREMIUM_PAD_RATIO,
+          })
+        : !pngCapture
+          ? resolveOverviewPremiumAxisScale(chartRows.map((r) => r.value))
+          : undefined;
+      const overviewLineYTickFormatter = (tick: number) =>
+        formatOverviewLineYAxisTick(tick, overviewMetricCtx);
+      const trendYTickSamples = trendPremiumY
+        ? trendPremiumY.ticks.map((t) =>
+            isOverviewLine
+              ? overviewLineYTickFormatter(t)
+              : valueTickFormatter(t)
+          )
+        : dashTickSamples;
+      const vLay = pngCapture
+        ? computeOverviewVerticalDashLayout(
+            displayKind,
+            valueAxisTitle,
+            dashTickSamples,
+            effectivePlotH
+          )
+        : computeOverviewContinuousVerticalDashLayout(
+            valueAxisTitle,
+            trendYTickSamples,
+            effectivePlotH
+          );
       if (!vLay) return null;
       const ChartWrap = displayKind === "area" ? AreaChart : LineChart;
       const trendTickFs = axisTickFs;
@@ -4838,39 +5056,60 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         chartRows.length > 6 ||
         maxTrendLabelLen > 9;
       const trendAngle = needsTrendAngle ? TREND_X_AXIS_ANGLE_DEG : 0;
-      const trendXHeight = lineAreaXAxisHeightPx(true);
+      const trendXHeight = pngCapture
+        ? lineAreaXAxisHeightPx(true)
+        : Math.max(40, lineAreaXAxisHeightPx(true) - 6);
       const trendBottomRaw = computeLineAreaChartBottomMargin({
         temporalTickStrings,
         tickFontSizePx: trendTickFs,
         chartLayoutMode: "compact",
       });
-      const trendBottom = Math.min(
-        trendBottomRaw,
-        needsTrendAngle ? 54 : 44
-      );
-      const trendMargins = balanceVerticalOuterMargins({
-        marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
-        chartLayoutMode: "compact",
-      });
+      const trendBottomCap = pngCapture
+        ? needsTrendAngle
+          ? 54
+          : 44
+        : undefined;
+      const trendBottom = pngCapture
+        ? Math.min(trendBottomRaw, trendBottomCap!)
+        : trendBottomRaw;
+      const trendSide = pngCapture
+        ? balanceVerticalOuterMargins({
+            marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
+            chartLayoutMode: "compact",
+          })
+        : isOverviewLine
+          ? overviewTrendLiveSideMargins(vLay.yAxisWidth, { lineChart: true })
+          : overviewTrendLiveSideMargins(vLay.yAxisWidth);
+      const trendLiveMargins = pngCapture
+        ? { top: plotMarginTop, bottom: trendBottom }
+        : computeOverviewTrendLivePlotMargins({
+            computedBottom: trendBottomRaw,
+            needsAngledTicks: needsTrendAngle,
+          });
+      const trendGridOpacity = pngCapture
+        ? exportGridOpacity
+        : isOverviewLine
+          ? dashGrid.opacity
+          : dashGrid.opacity * 0.72;
       const plotMargin = {
-        top: plotMarginTop,
-        right: pngCapture ? plotMarginSide : trendMargins.marginRight,
-        bottom: trendBottom,
-        left: pngCapture ? plotMarginSide : trendMargins.marginLeft,
+        top: trendLiveMargins.top,
+        right: pngCapture ? plotMarginSide : trendSide.right,
+        bottom: trendLiveMargins.bottom,
+        left: pngCapture ? plotMarginSide : trendSide.left,
       };
       return (
         <ResponsiveContainer
           key={`ov-trend-${chartLayoutWidthKey(viewW)}-${displayKind}-${pngCapture ? "cap" : "live"}`}
           width="100%"
-          height={plotH}
+          height={effectivePlotH}
           minWidth={0}
-          minHeight={plotH}
+          minHeight={effectivePlotH}
         >
           <ChartWrap data={chartRows} margin={plotMargin}>
             <CartesianGrid
               stroke={dashGrid.stroke}
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
-              strokeOpacity={pngCapture ? exportGridOpacity : dashGrid.opacity}
+              strokeOpacity={trendGridOpacity}
               vertical={false}
             />
             <XAxis
@@ -4884,22 +5123,32 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               textAnchor={trendAngle ? "end" : "middle"}
               height={trendXHeight}
               interval={trendInterval}
-              tickMargin={6}
-              minTickGap={trendCompact ? 6 : 12}
+              tickMargin={pngCapture ? 6 : 4}
+              minTickGap={trendCompact ? 6 : 10}
+              padding={pngCapture ? undefined : { left: 2, right: 2 }}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             >
               <Label
                 value={categoryAxisLabel}
                 position="insideBottom"
-                offset={-6}
+                offset={pngCapture ? -6 : -4}
                 content={CartesianXAxisTitleLabelContent}
               />
             </XAxis>
             <YAxis
               tick={{ fontSize: trendTickFs, fill: OV_AXIS_TICK, dx: 2 }}
-              tickFormatter={valueTickFormatter}
+              tickFormatter={
+                isOverviewLine ? overviewLineYTickFormatter : valueTickFormatter
+              }
               width={vLay.yAxisWidth}
+              {...(trendPremiumY
+                ? {
+                    domain: trendPremiumY.domain,
+                    ticks: trendPremiumY.ticks,
+                    allowDataOverflow: false,
+                  }
+                : {})}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             />
@@ -4934,15 +5183,23 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 type="monotone"
                 dataKey="value"
                 stroke="#4f46e5"
-                strokeWidth={pngCapture ? OVERVIEW_PNG_EXPORT_LINE_STROKE_PX : 2.5}
+                strokeWidth={
+                  pngCapture
+                    ? OVERVIEW_PNG_EXPORT_LINE_STROKE_PX
+                    : OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX
+                }
                 isAnimationActive={plotAnimOn}
                 animationDuration={plotAnimDuration}
                 dot={
                   chartRows.length > 28
                     ? false
                     : {
-                        r: pngCapture ? OVERVIEW_PNG_EXPORT_MARKER_R_PX : 4,
-                        strokeWidth: 1,
+                        r: pngCapture
+                          ? OVERVIEW_PNG_EXPORT_MARKER_R_PX
+                          : OVERVIEW_LINE_LIVE_MARKER_R_PX,
+                        strokeWidth: pngCapture
+                          ? 1.5
+                          : OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
                         stroke: "#fff",
                         fill: "#4f46e5",
                       }
@@ -4992,9 +5249,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         <ResponsiveContainer
           key={`ov-bar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
           width="100%"
-          height={plotH}
+          height={effectivePlotH}
           minWidth={0}
-          minHeight={plotH}
+          minHeight={effectivePlotH}
         >
           <BarChart
             data={chartRows}
@@ -5211,10 +5468,19 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           }
         }}
         className={`${ovDashChartPlot} ${
+          overviewPlotUsesExpandedBand ? "overview-chart-plot--continuous" : ""
+        } ${
           onViewInChartsTab && snapshotId
             ? "cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/45"
             : ""
         }`}
+        style={
+          overviewPlotUsesExpandedBand
+            ? ({
+                "--overview-chart-plot-min-h": `${overviewLivePlotHeightPx}px`,
+              } as CSSProperties)
+            : undefined
+        }
         title={
           onViewInChartsTab && snapshotId
             ? "Open this chart in the Charts tab"
@@ -5316,7 +5582,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   if (!overviewChartHasRenderableData(chart)) return null;
 
   return (
-    <div ref={wrapRef} className="w-full min-w-0 max-w-full">
+    <div ref={wrapRef} className="w-full min-w-0 max-w-full h-full">
       <OverviewAutoDashboardChartCard
         chart={chart}
         canonicalTitle={canonicalTitle}
