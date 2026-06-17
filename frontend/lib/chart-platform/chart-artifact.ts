@@ -2,12 +2,13 @@ import type { ChartKind } from "@/app/chart-types";
 import type { PresentationExportSpec } from "@/lib/chart-png-export-layout";
 import type { OverviewDashboardExportParityResult } from "@/lib/overview-dashboard-export";
 import type { ChartPresentationContract } from "@/lib/chart-platform/chart-presentation-contract";
+import type { ChartPresentationProfile } from "@/lib/chart-platform/chart-presentation-profile";
 
 export type ChartArtifactFormat = "png";
 
-export type ChartArtifactProfile = "overviewPng" | "chartsPng";
+export type ChartArtifactProfile = "overviewPng" | "chartsPng" | "pdfChart";
 
-export type ChartCaptureSourceSurface = "overview" | "charts";
+export type ChartCaptureSourceSurface = "overview" | "charts" | "pdf";
 
 export type ChartCaptureStatus =
   | "idle"
@@ -27,6 +28,9 @@ export type ChartCaptureFailureReason =
   | "host_not_mounted"
   | "zero_dimensions"
   | "missing_svg"
+  | "zero_svg_dimensions"
+  | "missing_marks"
+  | "unstable_layout"
   | "timeout"
   | "capture_failed"
   | "cancelled";
@@ -41,8 +45,16 @@ export type ChartCaptureDiagnostics = {
   statusTimeline: ChartCaptureTimelineEntry[];
   resolvedKind: ChartKind;
   svgCount: number;
+  markCount: number;
   measuredWidthPx: number;
   measuredHeightPx: number;
+  rootWidthPx: number;
+  rootHeightPx: number;
+  svgWidthPx: number;
+  svgHeightPx: number;
+  responsiveContainerWidthPx: number;
+  responsiveContainerHeightPx: number;
+  layoutSampleCount: number;
   retries: number;
   failureReason?: ChartCaptureFailureReason;
 };
@@ -59,6 +71,7 @@ export type ChartPngCaptureRequest = {
   scale: number;
   spec: PresentationExportSpec;
   layout: Pick<PresentationExportSpec, "width" | "height">;
+  presentationProfile: ChartPresentationProfile;
 };
 
 export type ChartArtifact = {
@@ -70,6 +83,7 @@ export type ChartArtifact = {
   widthPx: number;
   heightPx: number;
   contractVersion: number;
+  presentationProfile?: ChartPresentationProfile;
   capturedAt: number;
   diagnostics: ChartCaptureDiagnostics;
   parity?: OverviewDashboardExportParityResult;

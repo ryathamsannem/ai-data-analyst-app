@@ -25,6 +25,10 @@ import {
   ChartCaptureReadinessError,
   waitForBasicChartCaptureReady,
 } from "@/lib/chart-platform/chart-capture-readiness";
+import {
+  buildChartPresentationProfile,
+  logChartPresentationProfileDiagnostics,
+} from "@/lib/chart-platform/chart-presentation-profile";
 
 export type CreateChartPngCaptureRequestArgs = {
   contract: ChartPresentationContract;
@@ -50,6 +54,13 @@ export function createChartPngCaptureRequest({
   spec,
 }: CreateChartPngCaptureRequestArgs): ChartPngCaptureRequest {
   const exportSpec = spec ?? buildPresentationExportSpec(kind, { categoryCount });
+  const presentationProfile = buildChartPresentationProfile({
+    id: profile,
+    contract,
+    kind,
+    categoryCount,
+    spec: exportSpec,
+  });
   return {
     requestId: createChartCaptureRequestId(profile),
     contract,
@@ -65,6 +76,7 @@ export function createChartPngCaptureRequest({
       width: exportSpec.width,
       height: exportSpec.height,
     },
+    presentationProfile,
   };
 }
 
@@ -125,7 +137,7 @@ export async function captureChartPngArtifact({
       footerText: buildPngExportFooterText(request.datasetName),
     });
     pushChartCaptureStatus(ready.diagnostics.statusTimeline, "complete");
-    return {
+    const artifact: ChartArtifact = {
       requestId: request.requestId,
       chartId: request.contract.identity.chartId,
       profile: request.profile,
@@ -134,10 +146,17 @@ export async function captureChartPngArtifact({
       widthPx: png.width,
       heightPx: png.height,
       contractVersion: request.contract.version,
+      presentationProfile: request.presentationProfile,
       capturedAt: Date.now(),
       diagnostics: ready.diagnostics,
       parity: parityResult,
     };
+    logChartPresentationProfileDiagnostics({
+      profile: request.presentationProfile,
+      artifactWidthPx: artifact.widthPx,
+      artifactHeightPx: artifact.heightPx,
+    });
+    return artifact;
   } catch (err) {
     pushChartCaptureStatus(
       ready.diagnostics.statusTimeline,

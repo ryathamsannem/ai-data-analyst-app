@@ -1,71 +1,119 @@
 # Current Status
 
-**Snapshot date:** June 16, 2026
+**Snapshot date:** June 17, 2026  
+**Branch:** `DEV`  
+**Latest commit at snapshot time:** `39d1065` — `Introduce unified PNG capture host`
 
 ---
 
-## Git state
+## Stable Product Areas
 
-| Item | Value |
-|------|-------|
-| **Branch** | `DEV` |
-| **Latest commit** | `8cddf08` — *Clean unused files and update validation after chart polish* (2026-06-16) |
-| **Remote** | `origin/DEV` — **ahead by 1 commit** (not pushed at snapshot time) |
-| **Merge base** | In sync with `origin/DEV` ancestry; local tip is one commit ahead |
-
-### Recent commits (newest first)
-
-| Commit | Summary |
-|--------|---------|
-| `8cddf08` | Phase A cleanup + test/build fixes after chart polish |
-| `0956e35` | Chart UI polish baseline — plot-v4 internals (Y-axis, line styling, 580px continuous plots) |
-| `319481f` | Overview dashboard fixes |
-| `4247ef3` | Stable testing checkpoint — bulk performance still pending |
+- **Overview:** upload, KPI cards, filters, auto-dashboard cards, drill path, and per-card PNG export are functional.
+- **Data Preview:** paginated preview, schema/quality metadata, search/sort, and profile popovers are stable.
+- **AI Insights:** Ask AI, chart alignment gates, suggested questions, executive cards, AI Read, and insight PDF export remain active.
+- **Charts tab:** timeline, selected chart preview, chart reason strip, SmartChartInsightPanel, and PNG export are functional.
+- **Export/PDF:** executive PDF generation is functional and now consumes chart artifacts before falling back to legacy DOM capture.
 
 ---
 
-## What is stable now
+## Chart Platform Status
 
-- **Overview** — KPI cards, auto-dashboard grid, mini charts, filters, drill-down, per-card PNG
-- **Data Preview** — paginated table, schema/quality headers, search/sort
-- **AI Insights** — Ask AI, alignment gates, executive insights, PDF export button when aligned
-- **Charts tab** — timeline, session preview, PNG download, SmartChartInsightPanel
-- **Export tab** — executive PDF with section toggles and branding
-- **Chart rendering (session detail)** — full-width shells (960px frame); plot-v4 internals for line/area/scatter; H-Bar/Donut unchanged
-- **Backend routing** — intent engine + regression test pack green
-- **Frontend validation** — all tests and production build passing
+The chart system now has three parallel platform layers:
 
----
+1. **Presentation contract** — `ChartPresentationContract`
+   - Owns chart identity, resolved kind, story, semantic labels, data metadata, and metadata chips.
+   - Attached to chart session snapshots.
+   - Consumed by UI metadata rows and PDF-native chips.
 
-## What changed recently (chart polish + cleanup)
+2. **Capture artifact platform** — `ChartPngCaptureRequest` + `ChartArtifact`
+   - Used by Overview PNG, Charts PNG, and PDF chart image capture.
+   - Provides readiness diagnostics and image artifacts.
+   - Legacy export/capture paths remain as fallbacks where needed.
 
-### Chart UI polish (`0956e35`)
-
-- **Line/area/scatter (Charts + AI Insights detail only):** 580px plot allocation (560px floor), premium rounded Y-axis (5% pad), tighter Recharts margins (top 2px, bottom ≤30px, X-band 44px), 3px line stroke, r=5 markers
-- **H-Bar / Donut / Overview:** layout paths preserved; no shell max-width experiments restored
-- **Rejected experiments not restored:** narrow viewport (520–640px), centered chart island, shell/CSS width changes
-
-### Phase A cleanup + fixes (`8cddf08`)
-
-- Deleted unused `charts-tab-intelligence-strip.tsx`, stale root `requirements.txt` / `package-lock.json`, lint scratch files, empty `__mocks__`
-- Removed dead `chartsTabIntel*` CSS exports
-- Fixed stale test expectations (`chart-layout-config.test.ts`) and TypeScript union in `page.tsx` (overview trend margins)
+3. **Presentation profile** — `ChartPresentationProfile`
+   - Read-only profile layer for surfaces: `overviewLive`, `overviewPng`, `chartsLive`, `chartsPng`, `aiInsightsLive`, `pdfChart`.
+   - Describes capture/canvas dimensions, metadata mode, axis policy id, aspect policy, and PDF embed policy.
+   - Used for diagnostics and PDF artifact embed sizing only; it does not change chart rendering or axes.
 
 ---
 
-## Test / build status
+## Completed Phases
 
-| Command | Result (post-fix) |
-|---------|-------------------|
-| `cd frontend && npm run test` | **465 / 465 passed** (63 files) |
-| `cd frontend && npm run build` | **Success** — TypeScript + static generation |
+### Phase 2A/2B — Unified PNG Capture Platform
 
-Backend: `python -m pytest tests/intent_engine/` — not re-run for this snapshot; last stable checkpoint reports green.
+- Added chart artifact/request types.
+- Added capture controller.
+- Added unified capture host.
+- Routed Overview PNG and Charts PNG through the same request/artifact flow.
+- Kept existing renderers and chart kinds unchanged.
+
+### Phase 2C — Chart-Kind-Aware PNG Readiness
+
+- Replaced basic SVG-exists readiness with stronger readiness:
+  - mounted host
+  - current request
+  - non-zero root/container/SVG dimensions
+  - visible chart-kind marks
+  - stable layout across frames
+- Added diagnostics: mark count, SVG/root/container dimensions, timeline, failure reason.
+
+### Phase 2D — PDF Consumes ChartArtifact
+
+- Added `pdfChart` artifact profile/source.
+- PDF export captures a chart artifact before input assembly.
+- `pdf-report.ts` prefers valid artifact images and falls back to legacy capture.
+- Blank PDF charts are no longer expected when artifact capture succeeds.
+
+### Phase 3A — ChartPresentationProfile
+
+- Added read-only profile resolver.
+- Added dev-only profile diagnostics:
+  - Overview PNG vs Charts PNG
+  - Charts PNG vs PDF
+  - axis policy mismatch
+  - metadata mode mismatch
+  - artifact dimensions by kind
+
+### Phase 3C — PDF Metadata Chip Parity
+
+- PDF chart section now receives `contract.metadata.chips`.
+- PDF renders native chip pills in the chart header panel.
+- Existing PDF page structure and chart artifact image remain unchanged.
+
+### Phase 3D — PDF Embed Sizing By Chart Kind
+
+- Added `pdfEmbed` policy to `pdfChart` profiles.
+- PDF image placement uses chart-kind-aware embed policies:
+  - H-Bar stable/current
+  - Donut/Pie smaller
+  - Line/Area wider
+  - Scatter larger/balanced
+  - Bar near current
 
 ---
 
-## Deployment notes
+## Validation Status
 
-- **Backend deps:** `backend/requirements.txt` (Render `rootDir: backend`)
-- **Frontend deps:** `frontend/package-lock.json`
-- **Export/PDF:** functional; product polish phase not finalized (see `open-issues.md`)
+Latest frontend validation after Phase 3D:
+
+| Command | Result |
+|---------|--------|
+| `cd frontend && npm run test` | Passed — 67 files / 501 tests |
+| `cd frontend && npm run build` | Passed |
+
+Manual validation reported:
+
+- Overview PNG no longer blanks.
+- Charts PNG no longer blanks.
+- PDF chart images no longer blank.
+- PDF H-Bar remains stable.
+- PDF chips are visible.
+- PDF chart placement is now profile-aware by kind.
+
+---
+
+## Current Working Tree Notes
+
+The working tree contains current phase changes plus regenerated PDF validation artifacts under `docs/pdf-validation-screenshots/*.pdf` from `npm run test`.
+
+Do not revert unrelated generated/user files without explicit approval.

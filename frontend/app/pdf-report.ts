@@ -5,6 +5,8 @@
 
 import { Canvg } from "canvg";
 import type { ChartKind, ChartRow } from "./chart-types";
+import type { ChartArtifact } from "@/lib/chart-platform/chart-artifact";
+import type { ChartPresentationMetadataChip } from "@/lib/chart-platform/chart-presentation-contract";
 import { isNumberedExecutiveBrief } from "@/lib/executive-insights-brief";
 import {
   formatExecutiveMetricValue,
@@ -934,6 +936,8 @@ export type ExecutivePdfExportInput = {
     data: ChartRow[];
     title: string;
     subtitle: string;
+    metadataChips?: ChartPresentationMetadataChip[] | null;
+    chartArtifact?: ChartArtifact | null;
     captureEl: HTMLElement | null;
     alignedMetric?: string | null;
     alignedMetricDisplay?: string | null;
@@ -1103,6 +1107,23 @@ function sanitizeExecutivePdfExportInput(
           : null
       ),
       subtitle: sanitizeUserFacingReportText(chart.subtitle),
+      metadataChips:
+        chart.metadataChips
+          ?.map((chip) => ({
+            ...chip,
+            label:
+              chip.label != null
+                ? sanitizeUserFacingReportText(chip.label)
+                : chip.label,
+            value: sanitizeUserFacingReportText(chip.value),
+            title:
+              chip.title != null
+                ? sanitizeUserFacingReportText(chip.title)
+                : chip.title,
+          }))
+          .filter((chip) => chip.value.trim())
+          .slice(0, 6) ?? null,
+      chartArtifact: chart.chartArtifact ?? null,
       alignedMetric: chart.alignedMetric
         ? sanitizeUserFacingReportText(chart.alignedMetric)
         : chart.alignedMetric,
@@ -1654,6 +1675,65 @@ async function captureChartPlotToPng(
     width: Math.max(1, Math.round(canvas.width / scale)),
     height: Math.max(1, Math.round(canvas.height / scale)),
   };
+}
+
+export type PdfChartImageCandidate =
+  | {
+      source: "artifact";
+      dataUrl: string;
+      width: number;
+      height: number;
+    }
+  | { source: "legacy"; captureEl: HTMLElement }
+  | { source: "empty" };
+
+export function isValidPdfChartArtifact(
+  artifact: ChartArtifact | null | undefined
+): artifact is ChartArtifact {
+  return Boolean(
+    artifact &&
+      artifact.format === "png" &&
+      artifact.dataUrl.startsWith("data:image/png") &&
+      Number.isFinite(artifact.widthPx) &&
+      Number.isFinite(artifact.heightPx) &&
+      artifact.widthPx > 2 &&
+      artifact.heightPx > 2 &&
+      artifact.diagnostics.markCount > 0 &&
+      !artifact.diagnostics.failureReason
+  );
+}
+
+export function resolvePdfChartImageCandidate(args: {
+  artifact?: ChartArtifact | null;
+  captureEl: HTMLElement | null;
+}): PdfChartImageCandidate {
+  if (isValidPdfChartArtifact(args.artifact)) {
+    return {
+      source: "artifact",
+      dataUrl: args.artifact.dataUrl,
+      width: args.artifact.widthPx,
+      height: args.artifact.heightPx,
+    };
+  }
+  return args.captureEl
+    ? { source: "legacy", captureEl: args.captureEl }
+    : { source: "empty" };
+}
+
+export function pdfChartMetadataChipText(
+  chip: ChartPresentationMetadataChip
+): string {
+  const label = chip.label?.trim();
+  const value = chip.value.trim();
+  return label ? `${label}: ${value}` : value;
+}
+
+export function normalizePdfChartMetadataChips(
+  chips: readonly ChartPresentationMetadataChip[] | null | undefined
+): ChartPresentationMetadataChip[] {
+  return (chips ?? [])
+    .filter((chip) => chip.value.trim())
+    .slice(0, 6);
 }
 
 function _sanitizeFileBase(s: string): string {
@@ -3843,6 +3923,7 @@ export async function runExecutivePdfExport(
 
     const drawChartPresentationHeader = () => {
       const subtitle = ch.subtitle.trim();
+      const metadataChips = normalizePdfChartMetadataChips(ch.metadataChips);
       const attr =
         ch.data.length === 0 && ch.chartAttribution?.trim()
           ? ch.chartAttribution.trim()
@@ -3862,10 +3943,41 @@ export async function runExecutivePdfExport(
       }
       const lhT = pdfLineHeight(PDF_TYPE.chartTitle);
       const lhS = subLines.length ? pdfLineHeight(PDF_TYPE.caption) : 0;
+      const chipGap = 2;
+      const chipH = 5.8;
+      const chipRowGap = 1.8;
+      const chipPadX = 2.4;
+      const chipMaxW = contentWidth - 12;
+      const chipRows: { chip: ChartPresentationMetadataChip; text: string; w: number }[][] = [];
+      if (metadataChips.length) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.4);
+        let row: { chip: ChartPresentationMetadataChip; text: string; w: number }[] = [];
+        let rowW = 0;
+        for (const chip of metadataChips) {
+          const text = pdfChartMetadataChipText(chip);
+          const w = Math.min(
+            chipMaxW,
+            doc.getTextWidth(text) + chipPadX * 2
+          );
+          if (row.length && rowW + chipGap + w > chipMaxW) {
+            chipRows.push(row);
+            row = [];
+            rowW = 0;
+          }
+          row.push({ chip, text, w });
+          rowW += (rowW ? chipGap : 0) + w;
+        }
+        if (row.length) chipRows.push(row);
+      }
+      const chipsH = chipRows.length
+        ? chipRows.length * chipH + Math.max(0, chipRows.length - 1) * chipRowGap
+        : 0;
       const boxH =
         PDF_SPACING.panelPad +
         titleLines.length * lhT +
         (subLines.length ? 2 + subLines.length * lhS : 0) +
+        (chipsH ? 3 + chipsH : 0) +
         PDF_SPACING.panelPad;
       ensurePageSpace(boxH + PDF_SPACING.chartHeaderAfter);
       pdfDrawEnterprisePanel(doc, margin, y, contentWidth, boxH, {
@@ -3890,6 +4002,40 @@ export async function runExecutivePdfExport(
         subLines.slice(0, 3).forEach((ln: string) => {
           doc.text(ln, margin + 5, cy);
           cy += lhS;
+        });
+      }
+      if (chipRows.length) {
+        cy += 3;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.4);
+        chipRows.forEach((row) => {
+          let cx = margin + 5;
+          row.forEach(({ chip, text, w }) => {
+            const fill =
+              chip.kind === "lead"
+                ? ([239, 246, 255] as const)
+                : ([255, 255, 255] as const);
+            const border =
+              chip.kind === "lead"
+                ? ([147, 197, 253] as const)
+                : ([226, 232, 240] as const);
+            doc.setFillColor(fill[0], fill[1], fill[2]);
+            doc.setDrawColor(border[0], border[1], border[2]);
+            doc.setLineWidth(0.18);
+            doc.roundedRect(cx, cy - 3.6, w, chipH, 1.6, 1.6, "FD");
+            doc.setTextColor(
+              theme.body[0],
+              theme.body[1],
+              theme.body[2]
+            );
+            const clipped =
+              doc.getTextWidth(text) > w - chipPadX * 2
+                ? `${text.slice(0, 38).trim()}…`
+                : text;
+            doc.text(clipped, cx + chipPadX, cy);
+            cx += w + chipGap;
+          });
+          cy += chipH + chipRowGap;
         });
       }
       y += boxH + PDF_SPACING.chartHeaderAfter;
@@ -3963,11 +4109,17 @@ export async function runExecutivePdfExport(
       return h + 2;
     };
 
-    const embedCenteredChartImage = async (cap: HTMLElement) => {
+    const embedCenteredChartImage = async (
+      candidate: Exclude<PdfChartImageCandidate, { source: "empty" }>
+    ) => {
       const insightsReserve = estimateVizInsightsBlockMm();
       const availableMm = footerY - y - insightsReserve - 5;
+      const pdfEmbed =
+        candidate.source === "artifact"
+          ? ch.chartArtifact?.presentationProfile?.pdfEmbed
+          : null;
       const maxImgH = Math.min(
-        158,
+        pdfEmbed?.maxHeightMm ?? 158,
         Math.max(
           88,
           availableMm > 48 ? availableMm : Math.max(72, footerY - y - 12)
@@ -3979,7 +4131,12 @@ export async function runExecutivePdfExport(
           pxW,
           pxH,
           contentWidth,
-          maxImgH
+          maxImgH,
+          pdfEmbed?.minWidthRatio ?? 0.74,
+          {
+            minAspectRatio: pdfEmbed?.minAspectRatio,
+            maxAspectRatio: pdfEmbed?.maxAspectRatio,
+          }
         );
         const imgWidth = sized.widthMm;
         const imgHeight = sized.heightMm;
@@ -4020,7 +4177,14 @@ export async function runExecutivePdfExport(
           y += PDF_SPACING.chartRuleAfter;
         }
       };
-      const png = await captureChartPlotToPng(cap, PDF_CHART_CAPTURE_SCALE);
+      if (candidate.source === "artifact") {
+        placeImage(candidate.dataUrl, candidate.width, candidate.height);
+        return;
+      }
+      const png = await captureChartPlotToPng(
+        candidate.captureEl,
+        PDF_CHART_CAPTURE_SCALE
+      );
       placeImage(png.dataUrl, png.width, png.height);
     };
 
@@ -4036,21 +4200,39 @@ export async function runExecutivePdfExport(
         );
       });
       await new Promise<void>((resolve) => setTimeout(resolve, 150));
-      const cap = ch.captureEl;
-      if (!cap) {
+      const imageCandidate = resolvePdfChartImageCandidate({
+        artifact: ch.chartArtifact,
+        captureEl: ch.captureEl,
+      });
+      if (imageCandidate.source === "empty") {
         drawPremiumEmptyState(
           PDF_EMPTY_STATES.chartCapture.title,
           PDF_EMPTY_STATES.chartCapture.body
         );
       } else {
         try {
-          await embedCenteredChartImage(cap);
+          await embedCenteredChartImage(imageCandidate);
         } catch (fallbackErr) {
           console.warn("Chart image embed failed:", fallbackErr);
-          drawPremiumEmptyState(
-            PDF_EMPTY_STATES.chartEmbedFailed.title,
-            PDF_EMPTY_STATES.chartEmbedFailed.body
-          );
+          if (imageCandidate.source === "artifact" && ch.captureEl) {
+            try {
+              await embedCenteredChartImage({
+                source: "legacy",
+                captureEl: ch.captureEl,
+              });
+            } catch (legacyErr) {
+              console.warn("Legacy chart image embed failed:", legacyErr);
+              drawPremiumEmptyState(
+                PDF_EMPTY_STATES.chartEmbedFailed.title,
+                PDF_EMPTY_STATES.chartEmbedFailed.body
+              );
+            }
+          } else {
+            drawPremiumEmptyState(
+              PDF_EMPTY_STATES.chartEmbedFailed.title,
+              PDF_EMPTY_STATES.chartEmbedFailed.body
+            );
+          }
         }
       }
     }

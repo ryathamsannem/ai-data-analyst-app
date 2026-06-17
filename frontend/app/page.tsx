@@ -131,7 +131,10 @@ import {
   createChartPngCaptureRequest,
   downloadChartArtifact,
 } from "@/lib/chart-platform/chart-capture-controller";
-import type { ChartPngCaptureRequest } from "@/lib/chart-platform/chart-artifact";
+import type {
+  ChartArtifact,
+  ChartPngCaptureRequest,
+} from "@/lib/chart-platform/chart-artifact";
 import {
   formatExecutiveMetricValue,
   formatMetricSpreadGap,
@@ -11125,14 +11128,60 @@ function HomeInner() {
         : null;
 
       let captureEl: HTMLDivElement | null = null;
+      let chartArtifact: ChartArtifact | null = null;
       if (resolved.includeChart) {
         setPdfCaptureMounted(true);
         pdfCaptureActive = true;
-        captureEl = await waitForHiddenChartCapture(() =>
+        const getPdfCaptureRoot = () =>
           chartScope === "insight"
             ? chartCaptureInsightRef.current
-            : chartCaptureSessionRef.current
-        );
+            : chartCaptureSessionRef.current;
+        if (pdfChartData.length > 0 && pdfPresentationKind) {
+          try {
+            const artifactContract =
+              pdfSnap?.presentationContract ??
+              buildChartPresentationContract({
+                chartId: pdfSnap?.id ?? "pdf-chart",
+                source:
+                  pdfSnap?.source === "auto_dashboard"
+                    ? "auto_dashboard"
+                    : "ai_insights",
+                apiChartType:
+                  String(pdfVizEarly?.chartType ?? pdfPresentationKind) ||
+                  pdfPresentationKind,
+                resolvedKind: pdfPresentationKind,
+                title: pdfExportDisplayTitle || pdfChartTitle || "Chart",
+                subtitle: pdfChartSubtitleMerged,
+                rows: pdfChartData,
+                question: pdfExportLastAskedQuestion || question,
+                dashboardChartKey: pdfSnap?.dashboardChartKey ?? null,
+                metricLabel: pdfChartAxisLabels?.value ?? null,
+                categoryLabel: pdfChartAxisLabels?.category ?? null,
+                legacyVisualizationContract: pdfContract ?? null,
+              });
+            const request = createChartPngCaptureRequest({
+              contract: artifactContract,
+              profile: "pdfChart",
+              sourceSurface: "pdf",
+              kind: pdfPresentationKind,
+              categoryCount: pdfChartData.length,
+              filename: sanitizeChartExportFilename(
+                pdfExportDisplayTitle || pdfChartTitle || "chart"
+              ),
+              datasetName: uploadMeta?.name,
+            });
+            chartArtifact = await captureChartPngArtifact({
+              request,
+              getExportRoot: getPdfCaptureRoot,
+            });
+          } catch (artifactErr) {
+            console.warn("[PDF export] chart artifact capture failed", artifactErr);
+          }
+        }
+        captureEl = getPdfCaptureRoot();
+        if (!captureEl) {
+          captureEl = await waitForHiddenChartCapture(getPdfCaptureRoot);
+        }
       }
 
       const chartPrep: PdfChartPrepContext | null = resolved.includeChart
@@ -11153,6 +11202,8 @@ function HomeInner() {
             aggregation: pdfAggregation,
             chartInsightBadge: pdfChartInsightBadge,
             chartAxisLabels: pdfChartAxisLabels,
+            metadataChips: pdfSnap?.presentationContract?.metadata.chips ?? null,
+            chartArtifact,
             captureEl,
             chartAttribution: chartExportAttribution,
             provenanceSlice,
