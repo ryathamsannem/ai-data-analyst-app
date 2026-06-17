@@ -3683,21 +3683,29 @@ def build_auto_dashboard_charts(
     )
 
 
-def build_auto_dashboard() -> Dict[str, Any]:
+def build_auto_dashboard(
+    *,
+    profile: Optional[Dict[str, Any]] = None,
+    kp: Optional[Dict[str, Any]] = None,
+    exec_domain: Optional[str] = None,
+    exec_cards: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     global df, dataset_profile
     if df is None:
         return {"kind": "generic", "type_label": AUTO_DASHBOARD_LABELS["generic"], "cards": [], "charts": []}
 
-    profile = dataset_profile or build_profile(df)
+    profile = profile if profile is not None else (dataset_profile or build_profile(df))
     columns = df.columns.tolist()
-    exec_domain = infer_executive_domain(columns)
+    exec_domain = (
+        exec_domain if exec_domain is not None else infer_executive_domain(columns)
+    )
     kind = executive_domain_to_auto_kind(exec_domain)
     label = EXECUTIVE_DASHBOARD_LABELS.get(exec_domain, AUTO_DASHBOARD_LABELS.get(kind, "Generic"))
 
     out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": [], "charts": []}
 
     ct = profile.get("column_types", {})
-    kp = calculate_kpis()
+    kp = kp if kp is not None else calculate_kpis()
 
     cat_type_count = sum(
         1 for col in columns if ct.get(col) in ("category", "text")
@@ -3742,7 +3750,11 @@ def build_auto_dashboard() -> Dict[str, Any]:
                 trimmed.append(pc)
         return trimmed[:6]
 
-    cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
+    cards = (
+        exec_cards
+        if exec_cards is not None
+        else build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
+    )
     out["cards"] = clamp_cards(cards)
     out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
     return out
@@ -5007,9 +5019,19 @@ def build_dimension_catalog_for_ui(
 def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
     global df, selected_sheet_name, column_mapping, uploaded_file_name, uploaded_file_bytes, dataset_profile, column_mapping_metadata
 
-    kpi_cards, dataset_kind = build_kpi_cards()
-    auto_dashboard = build_auto_dashboard()
     prof = dataset_profile or build_profile(df)
+    kp = calculate_kpis()
+    columns = df.columns.tolist()
+    exec_domain = infer_executive_domain(columns)
+    exec_cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(prof, kp))
+    kpi_cards = exec_cards[:5]
+    dataset_kind = executive_domain_to_kpi_domain(exec_domain)
+    auto_dashboard = build_auto_dashboard(
+        profile=prof,
+        kp=kp,
+        exec_domain=exec_domain,
+        exec_cards=exec_cards,
+    )
     dim_opts = build_dimension_catalog_for_ui(df, prof)
     bc = build_filter_breadcrumb(df, prof, [], None)
     payload = {
@@ -5023,7 +5045,7 @@ def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
         "sheets": sheet_names,
         "selected_sheet": selected_sheet_name,
         "profile": prof,
-        "kpis": calculate_kpis(),
+        "kpis": kp,
         "kpi_cards": kpi_cards,
         "dataset_kind": dataset_kind,
         "auto_dashboard": auto_dashboard,
