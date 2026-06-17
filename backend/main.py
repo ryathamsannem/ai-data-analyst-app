@@ -325,6 +325,9 @@ _DATE_COL_NAME_HINT = re.compile(
 )
 
 
+_DATETIME_PARSE_RATIO_EARLY_RETURN = 0.9
+
+
 def _datetime_parse_ratio(series: pd.Series) -> float:
     """Fraction of non-null values that parse as datetimes (mixed formats)."""
     non_null = series.dropna()
@@ -335,6 +338,8 @@ def _datetime_parse_ratio(series: pd.Series) -> float:
     except TypeError:
         dt = pd.to_datetime(non_null, errors="coerce")
     r1 = float(dt.notna().mean())
+    if r1 >= _DATETIME_PARSE_RATIO_EARLY_RETURN:
+        return r1
     try:
         dt2 = pd.to_datetime(
             non_null.astype(str).str.strip(), errors="coerce", format="mixed"
@@ -410,13 +415,14 @@ def detect_column_types(input_df: pd.DataFrame):
         )
         numeric_ratio = float(numeric.notna().mean()) if len(non_null) else 0.0
 
+        if numeric_ratio >= 0.9:
+            result[col] = "number"
+            continue
+
         # Date: mixed-format parsing + optional boost when the header looks temporal.
         date_ratio = _datetime_parse_ratio(s)
         date_named = bool(_DATE_COL_NAME_HINT.search(str(col)))
 
-        if numeric_ratio >= 0.9:
-            result[col] = "number"
-            continue
         if date_ratio >= 0.9:
             result[col] = "date"
             continue
