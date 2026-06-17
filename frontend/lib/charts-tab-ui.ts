@@ -48,31 +48,6 @@ export const chartsTabEmptyState =
 export const chartsTabEmptyTitle =
   "text-base font-semibold tracking-tight text-[var(--foreground)]";
 
-/** Compact intelligence row (above plot). */
-export const chartsTabIntelStrip =
-  "charts-tab-intel-strip mb-2.5 flex w-full min-w-0 flex-col gap-2 rounded-xl border border-[color:var(--border-default)]/40 bg-[color:color-mix(in_srgb,var(--surface-subtle)_42%,var(--surface-elevated))] px-3 py-2 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] sm:mb-3";
-
-export const chartsTabIntelRow =
-  "flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-1.5";
-
-export const chartsTabIntelItem =
-  "inline-flex max-w-full min-w-0 items-center gap-1 text-[10px] sm:text-[11px]";
-
-export const chartsTabIntelLabel =
-  "shrink-0 font-medium uppercase tracking-wide text-[color:var(--text-subtle)] dark:text-[color:var(--insights-answer-label)]";
-
-export const chartsTabIntelValue =
-  "min-w-0 truncate font-medium text-[var(--foreground)] dark:text-[color:var(--insights-answer-body)]";
-
-export const chartsTabIntelDivider =
-  "hidden h-3 w-px shrink-0 bg-[color:var(--border-default)]/70 sm:block dark:bg-[color:var(--insights-border-soft)]";
-
-export const chartsTabIntelHighlight =
-  "inline-flex max-w-[min(100%,16rem)] items-center rounded-full border border-emerald-200/50 bg-emerald-50/60 px-2 py-0.5 text-[10px] font-medium leading-snug text-emerald-900/90 dark:border-emerald-400/35 dark:bg-emerald-950/45 dark:text-emerald-50";
-
-export const chartsTabIntelNote =
-  "text-center text-[11px] leading-snug text-[color:var(--text-muted)] dark:text-[color:var(--insights-text-muted)]";
-
 /** Compact “Why this chart?” strip — below metadata / intel, above plot. */
 export const chartsTabChartReasonStrip =
   "charts-tab-chart-reason charts-tab-chart-reason-enter mb-1 flex w-full min-w-0 items-start justify-center gap-2 rounded-lg border border-[color:var(--border-default)]/35 bg-[color:color-mix(in_srgb,var(--surface-subtle)_38%,transparent)] px-2.5 py-2 text-center sm:mb-1.5 sm:px-3 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:color-mix(in_srgb,var(--insights-layer-inset)_55%,transparent)]";

@@ -33,6 +33,11 @@ export const SHARED_CHART_LAYOUT = {
   barGapThreshold: 6,
 } as const;
 
+/** Extra ResponsiveContainer height for session line/area/scatter — plot allocation only, not shell width. */
+export const SESSION_DETAIL_CONTINUOUS_PLOT_BOOST_PX = 40;
+/** Minimum plot height for session continuous charts (matches H-Bar visual weight). */
+export const SESSION_DETAIL_CONTINUOUS_PLOT_FLOOR_PX = 560;
+
 export type SharedDetailLayoutMetrics = {
   planViewportPx: number;
   outerShellMinHeight: number;
@@ -62,7 +67,7 @@ export function getSharedDetailLayoutMetrics(
       planViewportPx: 760,
       outerShellMinHeight: 520,
       plotHeightMin: 480,
-      plotHeightMax: 540,
+      plotHeightMax: 580,
     };
   }
   if (kind === "bar_horizontal") {
@@ -78,7 +83,7 @@ export function getSharedDetailLayoutMetrics(
       planViewportPx: 850,
       outerShellMinHeight: 520,
       plotHeightMin: 480,
-      plotHeightMax: 540,
+      plotHeightMax: 580,
     };
   }
   return {
@@ -105,7 +110,13 @@ export function resolveSharedDetailPlotHeight(
   }
 
   if (kind === "scatter" || kind === "line" || kind === "area") {
-    return band;
+    return Math.min(
+      Math.max(
+        band + SESSION_DETAIL_CONTINUOUS_PLOT_BOOST_PX,
+        SESSION_DETAIL_CONTINUOUS_PLOT_FLOOR_PX
+      ),
+      SHARED_CHART_LAYOUT.horizontalBar.capPx
+    );
   }
 
   if (kind === "pie" || kind === "donut") {

@@ -206,6 +206,30 @@ def _numeric_series_from_frame(df: pd.DataFrame, column_name: str) -> pd.Series:
     )
 
 
+def _unique_count_for_column(
+    df: pd.DataFrame,
+    col: str,
+    profile: Optional[Dict[str, Any]] = None,
+    *,
+    string_normalized: bool = False,
+    memo: Optional[Dict[str, int]] = None,
+) -> int:
+    """Column cardinality; prefers profile unique_counts, optional per-pass memo."""
+    memo_key = f"{col}:{'str' if string_normalized else 'raw'}"
+    if memo is not None and memo_key in memo:
+        return memo[memo_key]
+    uc = (profile or {}).get("unique_counts") or {}
+    if col in uc:
+        nu = int(uc[col])
+    elif string_normalized:
+        nu = int(df[col].dropna().astype(str).nunique())
+    else:
+        nu = int(df[col].nunique(dropna=True))
+    if memo is not None:
+        memo[memo_key] = nu
+    return nu
+
+
 def classify_columns(
     df: pd.DataFrame,
     profile: Dict[str, Any],
@@ -233,7 +257,9 @@ def classify_columns(
                 inv.percentages.append(c)
             continue
         if tp in ("category", "text"):
-            nu = int(df[c].dropna().astype(str).nunique())
+            nu = _unique_count_for_column(
+                df, c, profile, string_normalized=True
+            )
             if nu < 2 or nu > 60:
                 continue
             if _is_geographic_name(c):
@@ -364,9 +390,17 @@ def _coverage_bucket(chart: Dict[str, Any]) -> str:
     return opp
 
 
-def _dimension_cardinality(df: pd.DataFrame, dim_c: str) -> int:
+def _dimension_cardinality(
+    df: pd.DataFrame,
+    dim_c: str,
+    profile: Optional[Dict[str, Any]] = None,
+    *,
+    memo: Optional[Dict[str, int]] = None,
+) -> int:
     try:
-        return int(df[dim_c].dropna().astype(str).nunique())
+        return _unique_count_for_column(
+            df, dim_c, profile, string_normalized=True, memo=memo
+        )
     except Exception:
         return 0
 
@@ -390,11 +424,25 @@ def _ordered_breakdown_dimensions(
     df: pd.DataFrame,
     inv: ColumnInventory,
     id_like_fn: Callable[[Optional[str]], bool],
+    profile: Optional[Dict[str, Any]] = None,
+    *,
+    cardinality_memo: Optional[Dict[str, int]] = None,
 ) -> List[str]:
     pool = _dedupe_preserve(inv.geographic + inv.categories)
-    pool = [c for c in pool if _breakdown_dimension_eligible(c, df, id_like_fn)]
+    pool = [
+        c
+        for c in pool
+        if _breakdown_dimension_eligible(
+            c, df, id_like_fn, profile, cardinality_memo=cardinality_memo
+        )
+    ]
     scored = [
-        (col, _dimension_priority(col, _dimension_cardinality(df, col)))
+        (
+            col,
+            _dimension_priority(
+                col, _dimension_cardinality(df, col, profile, memo=cardinality_memo)
+            ),
+        )
         for col in pool
     ]
     scored.sort(key=lambda t: (-t[1], t[0].lower()))
@@ -405,10 +453,13 @@ def _composition_eligible_dim(
     df: pd.DataFrame,
     dim_c: str,
     id_like_fn: Callable[[Optional[str]], bool],
+    profile: Optional[Dict[str, Any]] = None,
+    *,
+    cardinality_memo: Optional[Dict[str, int]] = None,
 ) -> bool:
     if id_like_fn(dim_c):
         return False
-    nu = _dimension_cardinality(df, dim_c)
+    nu = _dimension_cardinality(df, dim_c, profile, memo=cardinality_memo)
     if nu < 2 or nu > 8:
         return False
     n = _norm_col(dim_c)
@@ -640,10 +691,23 @@ def _executive_metric_by_dim_title(
     return normalize_canonical_chart_title(f"{met} by {dim}")
 
 
+def _executive_share_by_dim_title(
+    metric_col: str,
+    dim_col: str,
+    pretty_label: Callable[..., str],
+) -> str:
+    met = _title_case_phrase(pretty_label(metric_col))
+    dim = _title_case_phrase(pretty_label(dim_col))
+    return normalize_canonical_chart_title(f"{met} Share by {dim}")
+
+
 def _breakdown_dimension_eligible(
     dim_c: str,
     df: pd.DataFrame,
     id_like_fn: Callable[[Optional[str]], bool],
+    profile: Optional[Dict[str, Any]] = None,
+    *,
+    cardinality_memo: Optional[Dict[str, int]] = None,
 ) -> bool:
     if not is_valid_subtitle_dimension(dim_c):
         return False
@@ -653,7 +717,7 @@ def _breakdown_dimension_eligible(
     if any(tok in n for tok in _FORBIDDEN_BREAKDOWN_DIM_TOKENS):
         if not any(ok in n for ok in ("campaign", "issue", "ticket", "product", "category")):
             return False
-    if _dimension_cardinality(df, dim_c) < 2:
+    if _dimension_cardinality(df, dim_c, profile, memo=cardinality_memo) < 2:
         return False
     return True
 
@@ -1325,11 +1389,37 @@ def discover_chart_opportunities(
     profile: Dict[str, Any],
     kind: str,
     deps: DashboardDeps,
+    *,
+    inv: Optional[ColumnInventory] = None,
 ) -> List[Dict[str, Any]]:
     """Generate scored chart candidates from column inventory."""
-    inv = classify_columns(
-        df, profile, id_like_fn=deps.id_like_column, numeric_series_fn=deps.numeric_series
+    cardinality_memo: Dict[str, int] = {}
+    numeric_memo: Dict[str, pd.Series] = {}
+
+    def memo_numeric(col: str) -> pd.Series:
+        if col not in numeric_memo:
+            numeric_memo[col] = deps.numeric_series(col)
+        return numeric_memo[col]
+
+    discover_deps = DashboardDeps(
+        numeric_series=memo_numeric,
+        time_series_grouped=deps.time_series_grouped,
+        series_payload=deps.series_payload,
+        pretty_label=deps.pretty_label,
+        chart_title_by_dimension=deps.chart_title_by_dimension,
+        freq_human_label=deps.freq_human_label,
+        id_like_column=deps.id_like_column,
+        priority_metrics=deps.priority_metrics,
+        record_metric_key=deps.record_metric_key,
     )
+
+    if inv is None:
+        inv = classify_columns(
+            df,
+            profile,
+            id_like_fn=deps.id_like_column,
+            numeric_series_fn=memo_numeric,
+        )
     primary, secondary, _ = deps.priority_metrics(kind)
     prefer_metrics = [m for m in (primary, secondary) if m]
     numerics = _pick_numeric(inv, prefer=prefer_metrics)
@@ -1338,7 +1428,13 @@ def discover_chart_opportunities(
 
     out: List[Dict[str, Any]] = []
     used_pairs: Set[Tuple[str, str, str]] = set()
-    breakdown_dims = _ordered_breakdown_dimensions(df, inv, deps.id_like_column)
+    breakdown_dims = _ordered_breakdown_dimensions(
+        df,
+        inv,
+        deps.id_like_column,
+        profile,
+        cardinality_memo=cardinality_memo,
+    )
 
     def add(payload: Optional[Dict[str, Any]], opp_type: str, score: int) -> None:
         if not payload:
@@ -1395,9 +1491,9 @@ def discover_chart_opportunities(
         try:
             agg = _metric_agg_key(num_c, inv)
             sub = df[[dim_c, num_c]].copy()
-            sub["_v"] = deps.numeric_series(num_c)
+            sub["_v"] = discover_deps.numeric_series(num_c)
             sub = sub.dropna(subset=[dim_c, "_v"])
-            nu = _dimension_cardinality(df, dim_c)
+            nu = _dimension_cardinality(df, dim_c, profile, memo=cardinality_memo)
             if sub.empty or nu < 3 or nu > 20:
                 continue
             g = sub.groupby(dim_c)["_v"].agg(agg).sort_values(ascending=False).head(10)
@@ -1423,7 +1519,9 @@ def discover_chart_opportunities(
 
     # C. Composition donuts — low cardinality only, part-to-whole
     for di, dim_c in enumerate(breakdown_dims[:8]):
-        if not _composition_eligible_dim(df, dim_c, deps.id_like_column):
+        if not _composition_eligible_dim(
+            df, dim_c, deps.id_like_column, profile, cardinality_memo=cardinality_memo
+        ):
             continue
         num_c = numerics[0 if di % 2 else min(1, len(numerics) - 1)]
         if not _metric_eligible_for_composition(num_c, inv):
@@ -1433,13 +1531,13 @@ def discover_chart_opportunities(
             continue
         try:
             sub = df[[dim_c, num_c]].copy()
-            sub["_v"] = deps.numeric_series(num_c)
+            sub["_v"] = discover_deps.numeric_series(num_c)
             sub = sub.dropna(subset=[dim_c, "_v"])
             g = sub.groupby(dim_c)["_v"].sum().sort_values(ascending=False).head(8)
             g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
             if g.empty or len(g) < 2 or not _composition_shares_valid(g):
                 continue
-            tit = _executive_metric_by_dim_title(num_c, dim_c, "sum", deps.pretty_label)
+            tit = _executive_share_by_dim_title(num_c, dim_c, deps.pretty_label)
             api_typ = "donut" if len(g) >= 3 else "pie"
             add(
                 deps.series_payload(
@@ -1465,7 +1563,7 @@ def discover_chart_opportunities(
         for yc in corr_cols[i + 1 :]:
             if pairs_done >= 2 or xc == yc:
                 continue
-            payload = _build_scatter_payload(df, xc, yc, deps)
+            payload = _build_scatter_payload(df, xc, yc, discover_deps)
             if payload:
                 add(payload, "correlation", 78 + pairs_done)
                 pairs_done += 1
@@ -1478,9 +1576,9 @@ def discover_chart_opportunities(
             continue
         try:
             sub = df[[dim_c, num_c]].copy()
-            sub["_v"] = deps.numeric_series(num_c)
+            sub["_v"] = discover_deps.numeric_series(num_c)
             sub = sub.dropna(subset=[dim_c, "_v"])
-            nu = _dimension_cardinality(df, dim_c)
+            nu = _dimension_cardinality(df, dim_c, profile, memo=cardinality_memo)
             if sub.empty or nu < 2 or nu > 18:
                 continue
             agg = _metric_agg_key(num_c, inv)
@@ -1508,9 +1606,13 @@ def discover_chart_opportunities(
 
     # F. Record distribution (low-cardinality categories only)
     for dim_c in inv.categories[:3]:
-        if not _composition_eligible_dim(df, dim_c, deps.id_like_column):
+        if not _composition_eligible_dim(
+            df, dim_c, deps.id_like_column, profile, cardinality_memo=cardinality_memo
+        ):
             continue
-        if not _breakdown_dimension_eligible(dim_c, df, deps.id_like_column):
+        if not _breakdown_dimension_eligible(
+            dim_c, df, deps.id_like_column, profile, cardinality_memo=cardinality_memo
+        ):
             continue
         if _stronger_metric_exists_for_dimension(out, dim_c, deps.record_metric_key):
             continue
@@ -1566,7 +1668,7 @@ def build_dashboard_charts_from_opportunities(
     inv = classify_columns(df, profile, id_like_fn=bound.id_like_column)
     max_charts = target_chart_count(inv, len(df))
     kpi_context = extract_kpi_chart_context(kpi_cards)
-    discovered = discover_chart_opportunities(df, profile, kind, bound)
+    discovered = discover_chart_opportunities(df, profile, kind, bound, inv=inv)
     merged: List[Dict[str, Any]] = []
     seen_titles: Set[str] = set()
     for src in discovered + (seed_candidates or []):

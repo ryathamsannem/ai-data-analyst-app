@@ -13,7 +13,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import type { ChartKind, ChartRow } from "./chart-types";
 import { fallbackChartNumericDisplay } from "./chart-types";
 import {
@@ -106,11 +106,35 @@ import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
 import {
   computeCartesianCategoryPlanForRender,
   computeOverviewBarCategoryBottom,
+  computeOverviewContinuousVerticalDashLayout,
   computeOverviewHorizontalDashLayout,
+  computeOverviewHBarLiveMargins,
   computeOverviewMiniCategoryPlan,
+  computeOverviewScatterDashMargins,
+  computeOverviewScatterPremiumMargins,
+  computeOverviewTrendLivePlotMargins,
   computeOverviewVerticalDashLayout,
+  overviewDashUsesExpandedPlotBand,
   overviewDashboardUsesHorizontalBars,
+  overviewTrendLiveSideMargins,
+  OVERVIEW_LINE_Y_AXIS_LEFT_TRIM_PX,
+  OVERVIEW_SCATTER_POINT_RADIUS_PX,
+  OVERVIEW_SCATTER_POINT_STROKE_PX,
+  OVERVIEW_SCATTER_POINT_STROKE_COLOR,
+  OVERVIEW_SCATTER_POINT_STROKE_OPACITY,
+  OVERVIEW_SCATTER_POINT_FILL_OPACITY,
+  resolveOverviewDashLivePlotHeight,
 } from "@/lib/overview-dashboard-plot-layout";
+import {
+  formatOverviewLineYAxisTick,
+  formatOverviewScatterAxisTick,
+  OVERVIEW_LINE_LIVE_MARKER_R_PX,
+  OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
+  OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
+  OVERVIEW_LINE_PREMIUM_PAD_RATIO,
+  resolveOverviewPremiumAxisScale,
+  resolveOverviewScatterPremiumAxes,
+} from "@/lib/overview-premium-axis-domain";
 import { ChartPngOffscreenHost } from "@/lib/chart-png-offscreen-host";
 import {
   formatExecutiveMetricValue,
@@ -126,7 +150,7 @@ import {
   RATE_EXCEEDS_100_WARNING,
 } from "@/lib/chart-quality-warnings";
 import { useMeasuredElementWidth } from "@/lib/use-measured-element-width";
-import { CartesianXAxisTitleLabelContent } from "@/app/components/chart-value-axis-title";
+import { CartesianXAxisTitleLabelContent, createVerticalValueAxisLabel } from "@/app/components/chart-value-axis-title";
 import {
   alignInsightProvenanceToPresentation,
   buildFinalChartPresentationMeta,
@@ -174,6 +198,7 @@ import { generateChartReason } from "@/lib/generate-chart-reason";
 import { ChartInsightViewportWrapper } from "@/app/components/home/chart-insight-viewport-wrapper";
 import {
   formatAxisTickFromRows,
+  formatAxisTickFromScatterX,
 } from "@/lib/chart-axis-formatters";
 import type {
   ChartSemanticHeaderModel,
@@ -563,6 +588,7 @@ import { ChartsTimelineAside } from "./components/home/charts-timeline-aside";
 import {
   apiChartStringToKind,
   computeSmartChartIntel,
+  type SmartChartIntel,
 } from "@/lib/smart-chart-intelligence";
 import { chartSnapshotMatchesQuestionIntent } from "@/lib/chart-question-intent";
 import {
@@ -669,6 +695,11 @@ import {
   type PdfChartPrepContext,
 } from "@/lib/build-executive-pdf-input";
 import {
+  buildExportTabVisualizationPreview,
+  exportTabAiAnswerAvailable,
+} from "@/lib/export-tab-preview";
+import { resolvePdfExportContext } from "@/lib/resolve-pdf-export-context";
+import {
   BarChart,
   Bar,
   LineChart,
@@ -682,6 +713,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  ScatterChart,
+  Scatter,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -4568,6 +4601,16 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     ]
   );
 
+  const overviewPlotUsesExpandedBand = overviewDashUsesExpandedPlotBand(
+    displayKind,
+    renderBarAsHorizontal
+  );
+  const overviewLivePlotHeightPx = resolveOverviewDashLivePlotHeight(
+    displayKind,
+    plotHeightPx,
+    renderBarAsHorizontal
+  );
+
   if (chartRows.length === 0) return null;
 
   const tickTruncateLocal = (v: string | number) => {
@@ -4612,6 +4655,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     const plotHorizontal = pngCapture
       ? renderBarAsHorizontal
       : overviewDashboardUsesHorizontalBars(displayKind, localCategoryPlan);
+    const effectivePlotH =
+      pngCapture
+        ? plotH
+        : resolveOverviewDashLivePlotHeight(
+            displayKind,
+            plotH,
+            plotHorizontal
+          );
     const plotAnimOn =
       !pngCapture && chartRows.length <= RECHARTS_ANIMATION_MAX_POINTS;
     const plotAnimDuration = pngCapture ? 0 : undefined;
@@ -4619,10 +4670,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     if (displayKind === "pie" || displayKind === "donut") {
       return (
         <ChartRenderer
-          chartHeight={plotH}
+          chartHeight={effectivePlotH}
           compact
           insightMode={false}
           pngCaptureMode={pngCapture}
+          overviewMiniRadial
           chartRows={chartRows}
           visualization={{
             interaction: chart.interaction
@@ -4650,37 +4702,185 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "scatter") {
+      if (pngCapture) {
+        return (
+          <ChartRenderer
+            chartHeight={effectivePlotH}
+            compact
+            insightMode={false}
+            pngCaptureMode={pngCapture}
+            chartRows={chartRows}
+            visualization={{
+              scatterXLabel:
+                chart.xMetricLabel?.trim() ||
+                chart.scatterXLabel?.trim(),
+              scatterYLabel:
+                chart.yMetricLabel?.trim() ||
+                chart.scatterYLabel?.trim() ||
+                chart.metricColumn,
+              xColumn: chart.xColumn,
+              yColumn: chart.yColumn,
+              xMetricLabel: chart.xMetricLabel,
+              yMetricLabel: chart.yMetricLabel,
+              interaction: chart.interaction
+                ? { drillDimensions: chart.interaction.drillDimensions }
+                : null,
+            }}
+            presentationKind="scatter"
+            axes={miniAxes}
+            viewportW={viewW}
+            sessionCartesianPlanMain={null}
+            insightCartesianPlanMain={null}
+            tickTruncate={tickTruncateLocal}
+            onInsightDrill={() => {}}
+          />
+        );
+      }
+
+      const scatterPremium = resolveOverviewScatterPremiumAxes(chartRows);
+      const scatterXMetricCtx: MetricFormatContext = {
+        metricLabel:
+          chart.xMetricLabel?.trim() ||
+          chart.scatterXLabel?.trim() ||
+          miniAxes.categoryAxis,
+        chartTitle: chart.title,
+        presentationKind: "scatter",
+      };
+      const scatterXTickFormatter = (tick: number) =>
+        formatOverviewScatterAxisTick(tick, scatterXMetricCtx);
+      const scatterYTickFormatter = (tick: number) =>
+        formatOverviewScatterAxisTick(tick, overviewMetricCtx);
+      const scatterYTickSamples = scatterPremium
+        ? scatterPremium.y.ticks.map((t) => scatterYTickFormatter(t))
+        : dashTickSamples;
+      const scatterVLay = computeOverviewContinuousVerticalDashLayout(
+        miniAxes.valueAxis,
+        scatterYTickSamples,
+        effectivePlotH
+      );
+      const scatterMargins = scatterPremium
+        ? computeOverviewScatterPremiumMargins(scatterVLay.yAxisWidth)
+        : computeOverviewScatterDashMargins({
+            yAxisWidth: scatterVLay.yAxisWidth,
+            pngCapture: false,
+          });
+
       return (
-        <ChartRenderer
-          chartHeight={plotH}
-          compact
-          insightMode={false}
-          pngCaptureMode={pngCapture}
-          chartRows={chartRows}
-          visualization={{
-            scatterXLabel:
-              chart.xMetricLabel?.trim() ||
-              chart.scatterXLabel?.trim(),
-            scatterYLabel:
-              chart.yMetricLabel?.trim() ||
-              chart.scatterYLabel?.trim() ||
-              chart.metricColumn,
-            xColumn: chart.xColumn,
-            yColumn: chart.yColumn,
-            xMetricLabel: chart.xMetricLabel,
-            yMetricLabel: chart.yMetricLabel,
-            interaction: chart.interaction
-              ? { drillDimensions: chart.interaction.drillDimensions }
-              : null,
-          }}
-          presentationKind="scatter"
-          axes={miniAxes}
-          viewportW={viewW}
-          sessionCartesianPlanMain={null}
-          insightCartesianPlanMain={null}
-          tickTruncate={tickTruncateLocal}
-          onInsightDrill={() => {}}
-        />
+        <ResponsiveContainer
+          key={`ov-scatter-${chartLayoutWidthKey(viewW)}-live`}
+          width="100%"
+          height={effectivePlotH}
+          minWidth={0}
+          minHeight={effectivePlotH}
+        >
+          <ScatterChart data={chartRows} margin={scatterMargins}>
+            <CartesianGrid
+              stroke={dashGrid.stroke}
+              strokeDasharray={OV_DASH_GRID_DASHARRAY}
+              strokeOpacity={dashGrid.opacity}
+            />
+            <XAxis
+              type="number"
+              dataKey="x"
+              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK }}
+              tickFormatter={scatterXTickFormatter}
+              {...(scatterPremium
+                ? {
+                    domain: scatterPremium.x.domain,
+                    ticks: scatterPremium.x.ticks,
+                    allowDataOverflow: false,
+                  }
+                : {})}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+            >
+              <Label
+                value={miniAxes.categoryAxis}
+                position="insideBottom"
+                offset={-4}
+                content={CartesianXAxisTitleLabelContent}
+              />
+            </XAxis>
+            <YAxis
+              type="number"
+              dataKey="value"
+              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK, dx: 2 }}
+              tickFormatter={scatterYTickFormatter}
+              width={scatterVLay.yAxisWidth}
+              {...(scatterPremium
+                ? {
+                    domain: scatterPremium.y.domain,
+                    ticks: scatterPremium.y.ticks,
+                    allowDataOverflow: false,
+                  }
+                : {})}
+              axisLine={{ stroke: OV_AXIS_LINE }}
+              tickLine={{ stroke: OV_AXIS_LINE }}
+              label={
+                scatterVLay.showValueAxisTitle
+                  ? {
+                      content: createVerticalValueAxisLabel(
+                        scatterVLay.valueAxisTitleFull,
+                        scatterVLay.valueAxisTitleDisplay
+                      ),
+                    }
+                  : undefined
+              }
+            />
+            <Tooltip
+              {...CHART_TOOLTIP_FRAME}
+              formatter={(_v, _n, item) => {
+                const p = item?.payload as ChartRow;
+                const yd = p?.displayValue?.trim();
+                const xd = p?.displayX?.trim();
+                const yShow =
+                  yd ||
+                  (typeof p?.value === "number" ? String(p.value) : "—");
+                const xShow =
+                  xd ||
+                  (typeof p?.x === "number" ? String(p.x) : "—");
+                return [`${xShow} · ${yShow}`, "Values"];
+              }}
+              labelFormatter={(_, items) => {
+                const arr =
+                  items as unknown as readonly { payload?: ChartRow }[];
+                const p = arr?.[0]?.payload;
+                return p?.name
+                  ? `${miniAxes.categoryAxis} · ${String(p.name)}`
+                  : "Point";
+              }}
+            />
+            <Scatter
+              name="Points"
+              data={chartRows}
+              fill="#6366f1"
+              fillOpacity={OVERVIEW_SCATTER_POINT_FILL_OPACITY}
+              isAnimationActive={plotAnimOn}
+              animationDuration={plotAnimDuration}
+              shape={(props: {
+                cx?: number;
+                cy?: number;
+                fill?: string;
+                fillOpacity?: number;
+              }) => {
+                const { cx, cy, fill, fillOpacity } = props;
+                if (cx == null || cy == null) return <g />;
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={OVERVIEW_SCATTER_POINT_RADIUS_PX}
+                    fill={fill ?? "#6366f1"}
+                    fillOpacity={fillOpacity ?? OVERVIEW_SCATTER_POINT_FILL_OPACITY}
+                    stroke={OVERVIEW_SCATTER_POINT_STROKE_COLOR}
+                    strokeOpacity={OVERVIEW_SCATTER_POINT_STROKE_OPACITY}
+                    strokeWidth={OVERVIEW_SCATTER_POINT_STROKE_PX}
+                  />
+                );
+              }}
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
       );
     }
 
@@ -4706,13 +4906,16 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const hBarRightMargin = showBarEndLabels
         ? Math.max(hbBalanced.marginRight, 52)
         : hbBalanced.marginRight;
+      const hBarLiveMargins = pngCapture
+        ? { top: plotMarginTop, bottom: OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR }
+        : computeOverviewHBarLiveMargins(chartRows.length);
       return (
         <ResponsiveContainer
           key={`ov-hbar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
           width="100%"
-          height={plotH}
+          height={effectivePlotH}
           minWidth={0}
-          minHeight={plotH}
+          minHeight={effectivePlotH}
         >
           <BarChart
             layout="vertical"
@@ -4720,10 +4923,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             margin={{
               left: hbBalanced.marginLeft,
               right: hBarRightMargin,
-              top: plotMarginTop,
-              bottom: pngCapture
-                ? OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR
-                : 32,
+              top: hBarLiveMargins.top,
+              bottom: hBarLiveMargins.bottom,
             }}
           >
             <CartesianGrid
@@ -4802,12 +5003,35 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "line" || displayKind === "area") {
-      const vLay = computeOverviewVerticalDashLayout(
-        displayKind,
-        valueAxisTitle,
-        dashTickSamples,
-        plotH
-      );
+      const isOverviewLine = displayKind === "line";
+      const trendPremiumY = isOverviewLine
+        ? resolveOverviewPremiumAxisScale(chartRows.map((r) => r.value), {
+            padRatio: OVERVIEW_LINE_PREMIUM_PAD_RATIO,
+          })
+        : !pngCapture
+          ? resolveOverviewPremiumAxisScale(chartRows.map((r) => r.value))
+          : undefined;
+      const overviewLineYTickFormatter = (tick: number) =>
+        formatOverviewLineYAxisTick(tick, overviewMetricCtx);
+      const trendYTickSamples = trendPremiumY
+        ? trendPremiumY.ticks.map((t) =>
+            isOverviewLine
+              ? overviewLineYTickFormatter(t)
+              : valueTickFormatter(t)
+          )
+        : dashTickSamples;
+      const vLay = pngCapture
+        ? computeOverviewVerticalDashLayout(
+            displayKind,
+            valueAxisTitle,
+            dashTickSamples,
+            effectivePlotH
+          )
+        : computeOverviewContinuousVerticalDashLayout(
+            valueAxisTitle,
+            trendYTickSamples,
+            effectivePlotH
+          );
       if (!vLay) return null;
       const ChartWrap = displayKind === "area" ? AreaChart : LineChart;
       const trendTickFs = axisTickFs;
@@ -4832,39 +5056,55 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         chartRows.length > 6 ||
         maxTrendLabelLen > 9;
       const trendAngle = needsTrendAngle ? TREND_X_AXIS_ANGLE_DEG : 0;
-      const trendXHeight = lineAreaXAxisHeightPx(true);
+      const trendXHeight = pngCapture
+        ? lineAreaXAxisHeightPx(true)
+        : Math.max(40, lineAreaXAxisHeightPx(true) - 6);
       const trendBottomRaw = computeLineAreaChartBottomMargin({
         temporalTickStrings,
         tickFontSizePx: trendTickFs,
         chartLayoutMode: "compact",
       });
-      const trendBottom = Math.min(
-        trendBottomRaw,
-        needsTrendAngle ? 54 : 44
-      );
-      const trendMargins = balanceVerticalOuterMargins({
-        marginLeft: overviewDashPlotMarginLeft(vLay.yAxisWidth),
-        chartLayoutMode: "compact",
-      });
+      const trendBottomCap = pngCapture
+        ? needsTrendAngle
+          ? 54
+          : 44
+        : undefined;
+      const trendBottom = pngCapture
+        ? Math.min(trendBottomRaw, trendBottomCap!)
+        : trendBottomRaw;
+      const trendSideLive = isOverviewLine
+        ? overviewTrendLiveSideMargins(vLay.yAxisWidth, { lineChart: true })
+        : overviewTrendLiveSideMargins(vLay.yAxisWidth);
+      const trendLiveMargins = pngCapture
+        ? { top: plotMarginTop, bottom: trendBottom }
+        : computeOverviewTrendLivePlotMargins({
+            computedBottom: trendBottomRaw,
+            needsAngledTicks: needsTrendAngle,
+          });
+      const trendGridOpacity = pngCapture
+        ? exportGridOpacity
+        : isOverviewLine
+          ? dashGrid.opacity
+          : dashGrid.opacity * 0.72;
       const plotMargin = {
-        top: plotMarginTop,
-        right: pngCapture ? plotMarginSide : trendMargins.marginRight,
-        bottom: trendBottom,
-        left: pngCapture ? plotMarginSide : trendMargins.marginLeft,
+        top: trendLiveMargins.top,
+        right: pngCapture ? plotMarginSide : trendSideLive.right,
+        bottom: trendLiveMargins.bottom,
+        left: pngCapture ? plotMarginSide : trendSideLive.left,
       };
       return (
         <ResponsiveContainer
           key={`ov-trend-${chartLayoutWidthKey(viewW)}-${displayKind}-${pngCapture ? "cap" : "live"}`}
           width="100%"
-          height={plotH}
+          height={effectivePlotH}
           minWidth={0}
-          minHeight={plotH}
+          minHeight={effectivePlotH}
         >
           <ChartWrap data={chartRows} margin={plotMargin}>
             <CartesianGrid
               stroke={dashGrid.stroke}
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
-              strokeOpacity={pngCapture ? exportGridOpacity : dashGrid.opacity}
+              strokeOpacity={trendGridOpacity}
               vertical={false}
             />
             <XAxis
@@ -4878,22 +5118,32 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               textAnchor={trendAngle ? "end" : "middle"}
               height={trendXHeight}
               interval={trendInterval}
-              tickMargin={6}
-              minTickGap={trendCompact ? 6 : 12}
+              tickMargin={pngCapture ? 6 : 4}
+              minTickGap={trendCompact ? 6 : 10}
+              padding={pngCapture ? undefined : { left: 2, right: 2 }}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             >
               <Label
                 value={categoryAxisLabel}
                 position="insideBottom"
-                offset={-6}
+                offset={pngCapture ? -6 : -4}
                 content={CartesianXAxisTitleLabelContent}
               />
             </XAxis>
             <YAxis
               tick={{ fontSize: trendTickFs, fill: OV_AXIS_TICK, dx: 2 }}
-              tickFormatter={valueTickFormatter}
+              tickFormatter={
+                isOverviewLine ? overviewLineYTickFormatter : valueTickFormatter
+              }
               width={vLay.yAxisWidth}
+              {...(trendPremiumY
+                ? {
+                    domain: trendPremiumY.domain,
+                    ticks: trendPremiumY.ticks,
+                    allowDataOverflow: false,
+                  }
+                : {})}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             />
@@ -4928,15 +5178,23 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 type="monotone"
                 dataKey="value"
                 stroke="#4f46e5"
-                strokeWidth={pngCapture ? OVERVIEW_PNG_EXPORT_LINE_STROKE_PX : 2.5}
+                strokeWidth={
+                  pngCapture
+                    ? OVERVIEW_PNG_EXPORT_LINE_STROKE_PX
+                    : OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX
+                }
                 isAnimationActive={plotAnimOn}
                 animationDuration={plotAnimDuration}
                 dot={
                   chartRows.length > 28
                     ? false
                     : {
-                        r: pngCapture ? OVERVIEW_PNG_EXPORT_MARKER_R_PX : 4,
-                        strokeWidth: 1,
+                        r: pngCapture
+                          ? OVERVIEW_PNG_EXPORT_MARKER_R_PX
+                          : OVERVIEW_LINE_LIVE_MARKER_R_PX,
+                        strokeWidth: pngCapture
+                          ? 1.5
+                          : OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
                         stroke: "#fff",
                         fill: "#4f46e5",
                       }
@@ -4986,9 +5244,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         <ResponsiveContainer
           key={`ov-bar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
           width="100%"
-          height={plotH}
+          height={effectivePlotH}
           minWidth={0}
-          minHeight={plotH}
+          minHeight={effectivePlotH}
         >
           <BarChart
             data={chartRows}
@@ -5205,10 +5463,19 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           }
         }}
         className={`${ovDashChartPlot} ${
+          overviewPlotUsesExpandedBand ? "overview-chart-plot--continuous" : ""
+        } ${
           onViewInChartsTab && snapshotId
             ? "cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/45"
             : ""
         }`}
+        style={
+          overviewPlotUsesExpandedBand
+            ? ({
+                "--overview-chart-plot-min-h": `${overviewLivePlotHeightPx}px`,
+              } as CSSProperties)
+            : undefined
+        }
         title={
           onViewInChartsTab && snapshotId
             ? "Open this chart in the Charts tab"
@@ -5310,7 +5577,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   if (!overviewChartHasRenderableData(chart)) return null;
 
   return (
-    <div ref={wrapRef} className="w-full min-w-0 max-w-full">
+    <div ref={wrapRef} className="w-full min-w-0 max-w-full h-full">
       <OverviewAutoDashboardChartCard
         chart={chart}
         canonicalTitle={canonicalTitle}
@@ -6255,7 +6522,9 @@ function HomeInner() {
     activeId: activeChartId,
     insightSnapshot,
     insightChartId,
+    setActiveChart,
     selectChart,
+    pinInsightChart,
     pushAIChart,
     replaceAutoDashboardCharts,
     invalidateForDatasetChange,
@@ -6301,6 +6570,12 @@ function HomeInner() {
   const [howCalculatedOpen, setHowCalculatedOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [insightAskLoadingChart, setInsightAskLoadingChart] = useState(false);
+  const [insightAskLoadingNarrative, setInsightAskLoadingNarrative] =
+    useState(false);
+  const insightAskRequestNonceRef = useRef(0);
+  const insightAskInFlightTurnIdRef = useRef<string | null>(null);
+  const insightAskBusy = insightAskLoadingChart || insightAskLoadingNarrative;
   const [uploadMessage, setUploadMessage] = useState("");
   const [error, setError] = useState("");
   const uploadSuccessHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -6756,10 +7031,19 @@ function HomeInner() {
   const selectChartWithInsightState = useCallback(
     (
       id: string | null,
-      opts?: { restoreFromStore?: boolean; clearAnswerWhenMissing?: boolean }
+      opts?: {
+        restoreFromStore?: boolean;
+        clearAnswerWhenMissing?: boolean;
+        /** When true, pins AI Insights + PDF insight scope to this chart (default: Charts-tab browse only). */
+        pinAsInsight?: boolean;
+      }
     ) => {
-      selectChart(id);
-      pinnedInsightChartIdRef.current = id;
+      if (opts?.pinAsInsight) {
+        selectChart(id);
+        pinnedInsightChartIdRef.current = id;
+      } else {
+        setActiveChart(id);
+      }
       const restore = opts?.restoreFromStore !== false;
       if (!id || !restore) return;
       const bundle = getChartInsightAnswer(aiAnswerByChartId, id);
@@ -6774,7 +7058,7 @@ function HomeInner() {
         applyInsightBundleToLiveState(null, { clearWhenMissing: true });
       }
     },
-    [selectChart, aiAnswerByChartId, applyInsightBundleToLiveState]
+    [selectChart, setActiveChart, aiAnswerByChartId, applyInsightBundleToLiveState]
   );
 
   useLayoutEffect(() => {
@@ -6796,7 +7080,7 @@ function HomeInner() {
 
   useEffect(() => {
     const q = pendingInsightAutoAskRef.current;
-    if (activeTab !== "insights" || !q?.trim() || loading) return;
+    if (activeTab !== "insights" || !q?.trim() || insightAskBusy) return;
     const chartId = pinnedInsightChartIdRef.current ?? insightChartId;
     const stored = getChartInsightAnswer(aiAnswerByChartId, chartId);
     if (stored?.hasValidAIAnswer && stored.answer.trim()) {
@@ -6805,13 +7089,12 @@ function HomeInner() {
     }
     pendingInsightAutoAskRef.current = null;
     void askAIImplRef.current(q, CHART_ENTRY_ASK_OPTS);
-  }, [activeTab, loading, insightChartId, aiAnswerByChartId]);
+  }, [activeTab, insightAskBusy, insightChartId, aiAnswerByChartId]);
 
   const openDashboardChartInChartsTab = useCallback(
     (snapshotId: string) => {
       const hit = chartHistory.find((h) => h.id === snapshotId);
       if (hit) {
-        pinnedInsightChartIdRef.current = hit.id;
         selectChartWithInsightState(hit.id, {
           restoreFromStore: true,
           clearAnswerWhenMissing: true,
@@ -6933,6 +7216,7 @@ function HomeInner() {
       selectChartWithInsightState(hit.id, {
         restoreFromStore: true,
         clearAnswerWhenMissing: true,
+        pinAsInsight: true,
       });
       setQuestion(q);
 
@@ -7288,8 +7572,11 @@ function HomeInner() {
   }, [clearAiInsightSession, resetInsightConversationThread]);
 
   const canAskAi = useMemo(
-    () => Boolean(question.trim()) && !loading && columns.length > 0,
-    [question, loading, columns.length]
+    () =>
+      Boolean(question.trim()) &&
+      !insightAskLoadingChart &&
+      columns.length > 0,
+    [question, insightAskLoadingChart, columns.length]
   );
 
   const hasActiveAiConversation = useMemo(() => {
@@ -7394,6 +7681,9 @@ function HomeInner() {
       });
     }
 
+    const requestNonce = ++insightAskRequestNonceRef.current;
+    insightAskInFlightTurnIdRef.current = null;
+
     setError("");
     setAnswer("");
     setHasValidAIAnswer(false);
@@ -7401,7 +7691,8 @@ function HomeInner() {
     setLastAskedQuestion(qRaw);
     setHowCalculatedOpen(false);
     setAlignedAnalysis(null);
-    setLoading(true);
+    setInsightAskLoadingChart(true);
+    setInsightAskLoadingNarrative(false);
 
     let lineageParentChartId =
       askMode === "fresh_root_chart_entry"
@@ -7424,6 +7715,25 @@ function HomeInner() {
         lineageParentChartId = null;
       }
     }
+
+    const isStaleAsk = () => requestNonce !== insightAskRequestNonceRef.current;
+
+    const finishAskLoading = () => {
+      if (!isStaleAsk()) {
+        setInsightAskLoadingChart(false);
+        setInsightAskLoadingNarrative(false);
+      }
+    };
+
+    const applyPlanFromAskData = (data: Record<string, unknown>) => {
+      if (data.plan && typeof data.plan === "object") {
+        applyPlanEnvelope(data.plan as PlanUsageResponse);
+      } else {
+        fetchPlanUsage()
+          .then((payload) => setPlanUsage(payload))
+          .catch(() => {});
+      }
+    };
 
     try {
       const chartHistorySnapshot = chartHistory;
@@ -7489,43 +7799,47 @@ function HomeInner() {
             } as ConversationSnapshot)
           : null;
 
-      const response = await fetch(apiUrl("/ask"), {
+      const askRequestBody = {
+        question: qRaw,
+        conversation_context: conversationPayload,
+        parent_analysis_context: parentAnalysisContext
+          ? {
+              rootQuestion: parentAnalysisContext.rootQuestion,
+              priorQuestion: parentAnalysisContext.priorQuestion,
+              metricColumn: parentAnalysisContext.metricColumn,
+              categoryColumn: parentAnalysisContext.categoryColumn,
+              metricColumnDisplay: parentAnalysisContext.metricColumnDisplay,
+              categoryColumnDisplay:
+                parentAnalysisContext.categoryColumnDisplay,
+              aggregation: parentAnalysisContext.aggregation,
+              chartType: parentAnalysisContext.chartType,
+              chartTitle: parentAnalysisContext.chartTitle,
+              intentBucket: parentAnalysisContext.intentBucket,
+              routingIntent: parentAnalysisContext.routingIntent,
+              followUpChain: parentAnalysisContext.followUpChain,
+              lastAiAnswer: parentAnalysisContext.lastAiAnswer,
+              turnId: parentAnalysisContext.turnId,
+            }
+          : null,
+        continuation_intent: continuationIntent,
+        dashboard_filters: dashboardFilters,
+        date_range: dateAskPayload,
+      };
+
+      const chartResponse = await fetch(apiUrl("/ask"), {
         method: "POST",
         headers: saasRequestHeaders({
           "Content-Type": "application/json",
         }),
-        body: JSON.stringify({
-          question: qRaw,
-          conversation_context: conversationPayload,
-          parent_analysis_context: parentAnalysisContext
-            ? {
-                rootQuestion: parentAnalysisContext.rootQuestion,
-                priorQuestion: parentAnalysisContext.priorQuestion,
-                metricColumn: parentAnalysisContext.metricColumn,
-                categoryColumn: parentAnalysisContext.categoryColumn,
-                metricColumnDisplay: parentAnalysisContext.metricColumnDisplay,
-                categoryColumnDisplay:
-                  parentAnalysisContext.categoryColumnDisplay,
-                aggregation: parentAnalysisContext.aggregation,
-                chartType: parentAnalysisContext.chartType,
-                chartTitle: parentAnalysisContext.chartTitle,
-                intentBucket: parentAnalysisContext.intentBucket,
-                routingIntent: parentAnalysisContext.routingIntent,
-                followUpChain: parentAnalysisContext.followUpChain,
-                lastAiAnswer: parentAnalysisContext.lastAiAnswer,
-                turnId: parentAnalysisContext.turnId,
-              }
-            : null,
-          continuation_intent: continuationIntent,
-          dashboard_filters: dashboardFilters,
-          date_range: dateAskPayload,
-        }),
+        body: JSON.stringify({ ...askRequestBody, phase: "chart" }),
       });
 
-      if (!response.ok) {
-        let detail: unknown = `AI request failed (${response.status})`;
+      if (isStaleAsk()) return;
+
+      if (!chartResponse.ok) {
+        let detail: unknown = `AI request failed (${chartResponse.status})`;
         try {
-          const errBody = (await response.json()) as { detail?: unknown };
+          const errBody = (await chartResponse.json()) as { detail?: unknown };
           detail = errBody.detail ?? detail;
         } catch {
           /* ignore parse errors */
@@ -7536,25 +7850,15 @@ function HomeInner() {
         throw new Error(extractApiErrorMessage(detail));
       }
 
-      const data = await response.json();
-      if (data.plan && typeof data.plan === "object") {
-        applyPlanEnvelope(data.plan as PlanUsageResponse);
-      } else {
-        fetchPlanUsage()
-          .then((payload) => setPlanUsage(payload))
-          .catch(() => {});
+      const chartData = (await chartResponse.json()) as Record<string, unknown>;
+      applyPlanFromAskData(chartData);
+
+      if (typeof chartData.filter_breadcrumb === "string") {
+        setFilterBreadcrumb(chartData.filter_breadcrumb);
       }
 
-      if (typeof data.filter_breadcrumb === "string") {
-        setFilterBreadcrumb(data.filter_breadcrumb);
-      }
-
-      const cleanedAnswer = String(data.answer || "")
-        .replace(/#/g, "")
-        .replace(/\*\*/g, "");
-
-      const nextSnap = parseConversationSnapshot(data.conversation_context);
-      const meta = parseConversationMeta(data.conversation_meta);
+      const nextSnap = parseConversationSnapshot(chartData.conversation_context);
+      const meta = parseConversationMeta(chartData.conversation_meta);
       setLastConversationMeta(meta);
 
       const qTrim = qRaw;
@@ -7565,8 +7869,8 @@ function HomeInner() {
         });
       }
 
-      const hydrated = hydrateVisualizationFromApi(data.visualization);
-      const parsedAnalysis = parseAlignedAnalysis(data.analysis);
+      const hydrated = hydrateVisualizationFromApi(chartData.visualization);
+      const parsedAnalysis = parseAlignedAnalysis(chartData.analysis);
       logAnalysisIntentToConsole(qRaw, parsedAnalysis?.analysisIntent);
       const followUpDetected = Boolean(meta?.followUpDetected);
       const preservePinnedChart = Boolean(
@@ -7585,43 +7889,8 @@ function HomeInner() {
               askPinnedSnapshot.source === "auto_dashboard" &&
               Boolean(extractDashboardChartTitleFromPrefillQuestion(qRaw))))
       );
-      const pinnedContract = askPinnedSnapshot?.contract ?? null;
-      const narrativeForPinned =
-        preservePinnedChart && pinnedContract
-          ? narrativeCopyForContract(pinnedContract)
-          : null;
 
-      let answerForBundle = cleanedAnswer;
-      let validForBundle = Boolean(cleanedAnswer.trim());
-      let analysisForBundle: AlignedAnalysisContext | null = parsedAnalysis;
-
-      if (preservePinnedChart && pinnedContract) {
-        const sanitizedAnswer = sanitizeNarrativeForTrendContract(
-          cleanedAnswer,
-          pinnedContract
-        );
-        answerForBundle = sanitizedAnswer;
-        validForBundle = Boolean(sanitizedAnswer.trim());
-        analysisForBundle = parsedAnalysis
-          ? {
-              ...parsedAnalysis,
-              chartTitle: pinnedContract.displayTitle,
-              categoryColumn: null,
-              categoryColumnDisplay: pinnedContract.timeBucketLabel,
-              chartTypeInternal: pinnedContract.chartType,
-              insightSummary: sanitizeNarrativeForTrendContract(
-                parsedAnalysis.insightSummary?.trim() ||
-                  narrativeForPinned ||
-                  cleanedAnswer,
-                pinnedContract
-              ),
-            }
-          : parsedAnalysis;
-      }
-
-      setAnswer(answerForBundle);
-      setHasValidAIAnswer(validForBundle);
-      setAlignedAnalysis(analysisForBundle);
+      setAlignedAnalysis(parsedAnalysis);
       setLastAskVisualizationHydrated(
         preservePinnedChart ? true : Boolean(hydrated)
       );
@@ -7629,7 +7898,7 @@ function HomeInner() {
       if (nextSnap) {
         setConversationSnapshot(
           enrichConversationSnapshotForNextTurn(nextSnap, {
-            cleanedAnswer,
+            cleanedAnswer: "",
             hydrated,
             datasetKind,
             productColumn,
@@ -7641,10 +7910,6 @@ function HomeInner() {
             dashboardFilters,
           })
         );
-        const frame =
-          parsedAnalysis?.insightSummary?.trim() ||
-          cleanedAnswer.replace(/\s+/g, " ").slice(0, 360).trim() ||
-          null;
         setAiConversationState({
           lastQuestion: nextSnap.lastQuestion,
           lastMetric: nextSnap.metricColumn,
@@ -7655,7 +7920,7 @@ function HomeInner() {
             nextSnap.activeDrillPath && nextSnap.activeDrillPath.length > 0
               ? nextSnap.activeDrillPath
               : drillLines,
-          lastResultFrame: frame,
+          lastResultFrame: null,
           lastInsightChartId: null,
           turnId: nextSnap.turnId ?? null,
           parentTurnId: meta?.parentTurnId ?? null,
@@ -7811,6 +8076,182 @@ function HomeInner() {
 
       const bundleChartId =
         pushedInsightChartId ?? lineageParentChartId ?? insightChartId;
+
+      const turnId =
+        typeof chartData.turn_id === "string" ? chartData.turn_id.trim() : "";
+      const narrativePending = chartData.narrative_status === "pending";
+      const terminalAnswer = String(chartData.answer || "")
+        .replace(/#/g, "")
+        .replace(/\*\*/g, "")
+        .trim();
+
+      if (!turnId || !narrativePending) {
+        if (terminalAnswer) {
+          setAnswer(terminalAnswer);
+          setHasValidAIAnswer(true);
+        }
+        if (bundleChartId) {
+          saveInsightBundleForChart(bundleChartId, {
+            answer: terminalAnswer,
+            lastAskedQuestion: qRaw,
+            hasValidAIAnswer: Boolean(terminalAnswer),
+            alignedAnalysis: parsedAnalysis,
+          });
+        }
+        return;
+      }
+
+      if (isStaleAsk()) return;
+
+      insightAskInFlightTurnIdRef.current = turnId;
+      setInsightAskLoadingChart(false);
+      setInsightAskLoadingNarrative(true);
+
+      if (bundleChartId) {
+        saveInsightBundleForChart(bundleChartId, {
+          answer: "",
+          lastAskedQuestion: qRaw,
+          hasValidAIAnswer: false,
+          alignedAnalysis: parsedAnalysis,
+        });
+      }
+
+      const narrativeResponse = await fetch(apiUrl("/ask"), {
+        method: "POST",
+        headers: saasRequestHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          question: qRaw,
+          phase: "narrative",
+          turn_id: turnId,
+        }),
+      });
+
+      if (isStaleAsk()) return;
+      if (insightAskInFlightTurnIdRef.current !== turnId) return;
+
+      if (!narrativeResponse.ok) {
+        let detail: unknown = `AI narrative request failed (${narrativeResponse.status})`;
+        try {
+          const errBody = (await narrativeResponse.json()) as {
+            detail?: unknown;
+          };
+          detail = errBody.detail ?? detail;
+        } catch {
+          /* ignore parse errors */
+        }
+        if (narrativeResponse.status === 410) {
+          setError("Insight narrative expired. Please ask again.");
+          return;
+        }
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        setError(
+          "Unable to generate the insight narrative. Your chart is still available below."
+        );
+        return;
+      }
+
+      const narrativeData = (await narrativeResponse.json()) as Record<
+        string,
+        unknown
+      >;
+      applyPlanFromAskData(narrativeData);
+
+      if (typeof narrativeData.filter_breadcrumb === "string") {
+        setFilterBreadcrumb(narrativeData.filter_breadcrumb);
+      }
+
+      const narrSnap = parseConversationSnapshot(
+        narrativeData.conversation_context
+      );
+      const narrMeta = parseConversationMeta(narrativeData.conversation_meta);
+      setLastConversationMeta(narrMeta);
+
+      const cleanedAnswer = String(narrativeData.answer || "")
+        .replace(/#/g, "")
+        .replace(/\*\*/g, "");
+
+      const pinnedContract = askPinnedSnapshot?.contract ?? null;
+      const narrativeForPinned =
+        preservePinnedChart && pinnedContract
+          ? narrativeCopyForContract(pinnedContract)
+          : null;
+
+      let answerForBundle = cleanedAnswer;
+      let validForBundle = Boolean(cleanedAnswer.trim());
+      let analysisForBundle: AlignedAnalysisContext | null = parsedAnalysis;
+
+      if (preservePinnedChart && pinnedContract) {
+        const sanitizedAnswer = sanitizeNarrativeForTrendContract(
+          cleanedAnswer,
+          pinnedContract
+        );
+        answerForBundle = sanitizedAnswer;
+        validForBundle = Boolean(sanitizedAnswer.trim());
+        analysisForBundle = parsedAnalysis
+          ? {
+              ...parsedAnalysis,
+              chartTitle: pinnedContract.displayTitle,
+              categoryColumn: null,
+              categoryColumnDisplay: pinnedContract.timeBucketLabel,
+              chartTypeInternal: pinnedContract.chartType,
+              insightSummary: sanitizeNarrativeForTrendContract(
+                parsedAnalysis.insightSummary?.trim() ||
+                  narrativeForPinned ||
+                  cleanedAnswer,
+                pinnedContract
+              ),
+            }
+          : parsedAnalysis;
+      }
+
+      if (isStaleAsk()) return;
+      if (insightAskInFlightTurnIdRef.current !== turnId) return;
+
+      setAnswer(answerForBundle);
+      setHasValidAIAnswer(validForBundle);
+      setAlignedAnalysis(analysisForBundle);
+
+      if (narrSnap) {
+        setConversationSnapshot(
+          enrichConversationSnapshotForNextTurn(narrSnap, {
+            cleanedAnswer,
+            hydrated,
+            datasetKind,
+            productColumn,
+            salesColumn,
+            regionColumn,
+            customerColumn,
+            profitColumn,
+            dateColumn,
+            dashboardFilters,
+          })
+        );
+        const frame =
+          analysisForBundle?.insightSummary?.trim() ||
+          cleanedAnswer.replace(/\s+/g, " ").slice(0, 360).trim() ||
+          null;
+        setAiConversationState({
+          lastQuestion: narrSnap.lastQuestion,
+          lastMetric: narrSnap.metricColumn,
+          lastDimension: narrSnap.categoryColumn,
+          lastChartType: narrSnap.chartType,
+          activeFilters: [...(narrSnap.filtersApplied ?? [])],
+          activeDrillPath:
+            narrSnap.activeDrillPath && narrSnap.activeDrillPath.length > 0
+              ? narrSnap.activeDrillPath
+              : drillLines,
+          lastResultFrame: frame,
+          lastInsightChartId: null,
+          turnId: narrSnap.turnId ?? null,
+          parentTurnId: narrMeta?.parentTurnId ?? null,
+          followUpChain: narrSnap.followUpChain ?? [],
+        });
+      }
+
       if (bundleChartId) {
         saveInsightBundleForChart(bundleChartId, {
           answer: answerForBundle,
@@ -7820,11 +8261,13 @@ function HomeInner() {
         });
       }
     } catch {
-      setAlignedAnalysis(null);
-      setHasValidAIAnswer(false);
-      setError("Unable to get AI response. Please check backend/API key.");
+      if (!isStaleAsk()) {
+        setAlignedAnalysis(null);
+        setHasValidAIAnswer(false);
+        setError("Unable to get AI response. Please check backend/API key.");
+      }
     } finally {
-      setLoading(false);
+      finishAskLoading();
     }
   };
   askAIImplRef.current = askAI;
@@ -10303,16 +10746,90 @@ function HomeInner() {
     insightProfitMarginLead,
   ]);
 
+  const pdfInsightExportSidecarRef = useRef({
+    insightExecutiveVizInsights: [] as ExecutiveVizInsightCard[],
+    insightExecutiveBrief: "",
+    insightSmartChartIntel: null as SmartChartIntel | null,
+    insightChartInsightBadge: null as string | null,
+    insightRenderedChartKind: "" as ChartKind,
+  });
+
+  useLayoutEffect(() => {
+    pdfInsightExportSidecarRef.current = {
+      insightExecutiveVizInsights,
+      insightExecutiveBrief,
+      insightSmartChartIntel,
+      insightChartInsightBadge,
+      insightRenderedChartKind,
+    };
+  }, [
+    insightExecutiveVizInsights,
+    insightExecutiveBrief,
+    insightSmartChartIntel,
+    insightChartInsightBadge,
+    insightRenderedChartKind,
+  ]);
+
+  const exportPdfPreviewContext = useMemo(
+    () =>
+      resolvePdfExportContext({
+        options: exportOptions,
+        chartHistory,
+        aiAnswerByChartId,
+        insightChartId,
+        pinnedInsightChartId: insightChartId,
+        activeChartId,
+        lastAskedQuestion,
+        question,
+        liveAnswer: answer,
+        liveAlignedAnalysis: alignedAnalysis,
+        insightChartMatchesCurrentQuestion,
+        insightChartDataLength: insightChartData.length,
+      }),
+    [
+      exportOptions,
+      chartHistory,
+      aiAnswerByChartId,
+      insightChartId,
+      activeChartId,
+      lastAskedQuestion,
+      question,
+      answer,
+      alignedAnalysis,
+      insightChartMatchesCurrentQuestion,
+      insightChartData.length,
+    ]
+  );
+
+  const exportVizPreview = useMemo(
+    () =>
+      buildExportTabVisualizationPreview(exportPdfPreviewContext, exportOptions),
+    [exportPdfPreviewContext, exportOptions.includeChart]
+  );
+
+  const exportAiAnswerAvailable = useMemo(
+    () =>
+      exportTabAiAnswerAvailable(exportPdfPreviewContext, exportOptions, answer),
+    [exportPdfPreviewContext, exportOptions.includeAIInsight, answer]
+  );
+
   const exportExecutiveInsightsPreview = useMemo(() => {
     if (!exportOptions.includeChart || !exportOptions.includeAIInsight) return null;
-    const scope =
-      exportOptions.chartScope ??
-      (insightChartMatchesCurrentQuestion && insightChartData.length > 0
-        ? "insight"
-        : "session");
+    const ctx = exportPdfPreviewContext;
+    const scope = ctx.chartScope;
+    const factsAlignWithResolvedChart =
+      ctx.chartId != null && ctx.chartId === insightChartId;
     const facts =
-      scope === "insight" ? insightExecutiveVizInsights : executiveVizInsights;
-    const brief = insightExecutiveBrief.trim();
+      scope === "insight"
+        ? factsAlignWithResolvedChart
+          ? insightExecutiveVizInsights
+          : []
+        : executiveVizInsights;
+    const brief =
+      scope === "insight" && ctx.insightAnswer.trim()
+        ? insightExecutiveBrief.trim() ||
+          ctx.insightAnswer.trim().slice(0, 280)
+        : insightExecutiveBrief.trim();
     if (!facts.length && !brief) return null;
     return {
       scopeLabel:
@@ -10325,7 +10842,8 @@ function HomeInner() {
   }, [
     exportOptions.includeChart,
     exportOptions.includeAIInsight,
-    exportOptions.chartScope,
+    exportPdfPreviewContext,
+    insightChartId,
     insightExecutiveVizInsights,
     executiveVizInsights,
     insightExecutiveBrief,
@@ -10342,17 +10860,6 @@ function HomeInner() {
     if (exportOptions.includeTechnicalAppendix) labels.push("Technical appendix");
     return labels;
   }, [exportOptions]);
-
-  const exportVizSummaryLabel = useMemo(() => {
-    if (!visualization || visualization.labels.length === 0) {
-      return "Not in session yet";
-    }
-    const kind = visualization.chartType?.trim() || "chart";
-    const title = visualization.title?.trim();
-    return title
-      ? `${visualization.labels.length} points · ${kind} — ${title}`
-      : `${visualization.labels.length} points · ${kind}`;
-  }, [visualization]);
 
   const chartHistoryAsideRef = useRef<HTMLDivElement | null>(null);
   const chartHistoryScrollRestore = useRef<number | null>(null);
@@ -10397,6 +10904,7 @@ function HomeInner() {
 
   downloadReportImplRef.current = async (options?: Partial<ExportOptions>) => {
       let pdfCaptureActive = false;
+      let insightPinRestored: string | null = null;
       try {
         setError("");
         const pdfRemaining = planUsage?.usage.pdf_exports_remaining;
@@ -10411,17 +10919,45 @@ function HomeInner() {
         ...exportOptions,
         ...options,
       };
-      const chartScope: "insight" | "session" =
-        resolved.chartScope ??
-        (insightChartMatchesCurrentQuestion && insightChartData.length > 0
-          ? "insight"
-          : "session");
+      const pdfExportCtx = resolvePdfExportContext({
+        options: resolved,
+        chartHistory,
+        aiAnswerByChartId,
+        insightChartId,
+        pinnedInsightChartId: pinnedInsightChartIdRef.current,
+        activeChartId,
+        lastAskedQuestion,
+        question,
+        liveAnswer: answer,
+        liveAlignedAnalysis: alignedAnalysis,
+        insightChartMatchesCurrentQuestion,
+        insightChartDataLength: insightChartData.length,
+      });
+      const chartScope = pdfExportCtx.chartScope;
       const pdfAlignedAnalysis =
-        chartScope === "insight" ? insightAnalysisForExport : alignedAnalysis;
-      const pdfInsightAnswer =
-        chartScope === "insight" ? insightAnswerForExport : answer;
-      const pdfSnap =
-        chartScope === "insight" ? insightSnapshot : activeSnapshot;
+        pdfExportCtx.alignedAnalysis as AlignedAnalysisContext | null;
+      const pdfInsightAnswer = pdfExportCtx.insightAnswer;
+      const pdfSnap = pdfExportCtx.snapshot;
+      const pdfExportLastAskedQuestion = pdfExportCtx.lastAskedQuestion;
+
+      if (
+        chartScope === "insight" &&
+        pdfSnap?.id &&
+        pdfSnap.id !== insightChartId
+      ) {
+        insightPinRestored = insightChartId;
+        flushSync(() => {
+          pinInsightChart(pdfSnap.id);
+        });
+      }
+      const pdfInsightSidecar = pdfInsightExportSidecarRef.current;
+      const pdfParsedInsightAnswer =
+        chartScope === "insight"
+          ? parseAnswerIntoSections(
+              pdfInsightAnswer,
+              pdfAlignedAnalysis?.insightSummary ?? undefined
+            )
+          : parsedInsightAnswer;
       const pdfChartDataRaw = pdfSnap?.chartData ?? [];
       const pdfChartTitle = pdfSnap?.title ?? "";
       const pdfChartSubtitle = pdfSnap?.subtitle ?? "";
@@ -10429,7 +10965,10 @@ function HomeInner() {
         (pdfSnap?.visualization ?? null) as StoredVisualization | null;
       const pdfPresentationKindBase =
         chartScope === "insight"
-          ? insightRenderedChartKind
+          ? pdfInsightExportSidecarRef.current.insightRenderedChartKind ||
+            pdfSnap?.chartKind ||
+            (pdfVizEarly?.chartType as ChartKind | undefined) ||
+            insightRenderedChartKind
           : sessionRenderedChartKind;
       const pdfPresentationKind = (() => {
         if (!pdfChartDataRaw.length || !pdfPresentationKindBase) {
@@ -10437,8 +10976,8 @@ function HomeInner() {
         }
         const q =
           chartScope === "insight"
-            ? lastAskedQuestion.trim() || question.trim()
-            : question.trim() || lastAskedQuestion.trim();
+            ? pdfExportLastAskedQuestion.trim() || question.trim()
+            : question.trim() || pdfExportLastAskedQuestion.trim();
         const recomputed = computeFinalChartPresentation({
           apiChartType:
             pdfVizEarly?.chartType ?? pdfPresentationKindBase ?? "bar",
@@ -10483,12 +11022,7 @@ function HomeInner() {
       const pdfAnalysisForSort =
         pdfSnap?.source === "auto_dashboard" || pdfTrendMode
           ? null
-          : chartScope === "insight"
-            ? pdfAlignedAnalysis
-            : activeSnapshot?.id === insightChartId &&
-                insightSnapshot?.source !== "auto_dashboard"
-              ? pdfAlignedAnalysis
-              : null;
+          : pdfAlignedAnalysis;
       const pdfSortAscending = pdfTrendMode
         ? null
         : isAscendingValueIntent(pdfAnalysisForSort, pdfViz);
@@ -10525,16 +11059,16 @@ function HomeInner() {
           : null;
       const pdfMetricColumn =
         pdfProv?.numericColumn?.trim() ||
-        alignedAnalysis?.metricColumn?.trim() ||
+        pdfAlignedAnalysis?.metricColumn?.trim() ||
         null;
       const pdfMetricDisplayRaw =
         pdfProv?.numericColumnDisplay?.trim() ||
-        alignedAnalysis?.metricColumnDisplay?.trim() ||
+        pdfAlignedAnalysis?.metricColumnDisplay?.trim() ||
         "";
       const pdfAggKey =
-        pdfProv?.aggregationKey ?? alignedAnalysis?.aggregationKey ?? null;
+        pdfProv?.aggregationKey ?? pdfAlignedAnalysis?.aggregationKey ?? null;
       const pdfAggregation =
-        pdfProv?.aggregation ?? alignedAnalysis?.aggregation ?? null;
+        pdfProv?.aggregation ?? pdfAlignedAnalysis?.aggregation ?? null;
 
       const pdfAlignedMetricDisplay =
         (pdfMetricDisplayRaw ? polishMetricDisplay(pdfMetricDisplayRaw) : "") ||
@@ -10546,13 +11080,13 @@ function HomeInner() {
               metricColumn: pdfMetricColumn,
             })
           : "") ||
-        (alignedAnalysis?.metricColumn
+        (pdfAlignedAnalysis?.metricColumn
           ? buildMetricLabel({
-              metricColumnDisplay: alignedAnalysis.metricColumnDisplay,
+              metricColumnDisplay: pdfAlignedAnalysis.metricColumnDisplay,
               aggregationKey:
-                alignedAnalysis.aggregationKey ?? alignedAnalysis.aggregation,
-              aggregationLabel: alignedAnalysis.aggregation,
-              metricColumn: alignedAnalysis.metricColumn,
+                pdfAlignedAnalysis.aggregationKey ?? pdfAlignedAnalysis.aggregation,
+              aggregationLabel: pdfAlignedAnalysis.aggregation,
+              metricColumn: pdfAlignedAnalysis.metricColumn,
             })
           : "") ||
         null;
@@ -10562,7 +11096,7 @@ function HomeInner() {
         const stats = buildChartSubtitle({
           rowsAnalyzed: resolveAnalyzedRowsForChartMetadata({
             preferAlignedAnalysis: true,
-            analysis: alignedAnalysis,
+            analysis: pdfAlignedAnalysis,
             prov: pdfProv ?? null,
             vizAnalyzedRows: (pdfViz as StoredVisualization | null)?.analyzedRows,
             filteredDatasetRows: rows,
@@ -10584,9 +11118,7 @@ function HomeInner() {
       const pdfSemanticsAnalysis =
         pdfSnap?.source === "auto_dashboard" || pdfTrendMode
           ? null
-          : chartScope === "insight"
-            ? alignedAnalysis
-            : pdfAnalysisForSort;
+          : pdfAlignedAnalysis;
 
       const pdfVizForSemantics = sanitizeVisualizationSemanticLabels(
         pdfViz,
@@ -10614,7 +11146,7 @@ function HomeInner() {
 
       const pdfChartInsightBadge =
         chartScope === "insight"
-          ? insightChartInsightBadge
+          ? pdfInsightSidecar.insightChartInsightBadge
           : chartInsightBadge;
 
       const includeConvPdf = resolved.includeConversationContext === true;
@@ -10622,7 +11154,7 @@ function HomeInner() {
       const pdfRowsResolved = pdfProv
         ? resolveAnalyzedRowsForChartMetadata({
             preferAlignedAnalysis: true,
-            analysis: alignedAnalysis,
+            analysis: pdfAlignedAnalysis,
             prov: pdfProv,
             vizAnalyzedRows: pdfViz?.analyzedRows,
             filteredDatasetRows: rows,
@@ -10674,16 +11206,12 @@ function HomeInner() {
       const pdfChartAxisLabels = resolved.includeChart
         ? (() => {
             const pdfMergeAnalysis =
-              pdfSnap?.source === "auto_dashboard"
-                ? null
-                : chartScope === "insight"
-                  ? alignedAnalysis
-                  : pdfAnalysisForSort;
+              pdfSnap?.source === "auto_dashboard" ? null : pdfAlignedAnalysis;
             const pdfMergePrefer = Boolean(pdfMergeAnalysis);
             const base = inferChartAxesFromContext(
               pdfNormMeta.titleForInference,
               pdfChartSubtitleMerged,
-              lastAskedQuestion,
+              pdfExportLastAskedQuestion,
               datasetKind || "generic"
             );
             const viz = pdfViz;
@@ -10910,16 +11438,25 @@ function HomeInner() {
           15
         ) as Record<string, unknown>[],
         kpis,
-        alignedAnalysis,
+        alignedAnalysis: pdfAlignedAnalysis,
         pdfAlignedAnalysis,
         question,
-        lastAskedQuestion,
+        lastAskedQuestion: pdfExportLastAskedQuestion,
         pdfInsightAnswer,
-        parsedInsightAnswer,
-        insightExecutiveBrief,
-        insightExecutiveVizInsights,
+        parsedInsightAnswer: pdfParsedInsightAnswer,
+        insightExecutiveBrief:
+          chartScope === "insight"
+            ? pdfInsightSidecar.insightExecutiveBrief
+            : insightExecutiveBrief,
+        insightExecutiveVizInsights:
+          chartScope === "insight"
+            ? pdfInsightSidecar.insightExecutiveVizInsights
+            : insightExecutiveVizInsights,
         executiveVizInsights,
-        insightSmartChartIntel,
+        insightSmartChartIntel:
+          chartScope === "insight"
+            ? pdfInsightSidecar.insightSmartChartIntel
+            : insightSmartChartIntel,
         sessionSmartChartIntel,
         displayKpiCards,
         primaryMetricColumn: effectiveSales,
@@ -10983,6 +11520,11 @@ function HomeInner() {
       setError("Unable to generate PDF report.");
     } finally {
       if (pdfCaptureActive) setPdfCaptureMounted(false);
+      if (insightPinRestored !== null) {
+        flushSync(() => {
+          pinInsightChart(insightPinRestored);
+        });
+      }
     }
   };
 
@@ -12569,7 +13111,7 @@ function HomeInner() {
                 ) : null}
                 <div
                   className={aiInsightsAskInputBlock}
-                  aria-busy={loading || undefined}
+                  aria-busy={insightAskBusy || undefined}
                 >
                   <label className={aiInsightsAskQuestionLabel} htmlFor="ai-insights-question">
                     Your question
@@ -12581,11 +13123,11 @@ function HomeInner() {
                       onChange={(e) => setQuestionAndResetInsightState(e.target.value)}
                       className={aiInsightsAskTextarea}
                       placeholder="Ask about trends, rankings, or comparisons in your data…"
-                      disabled={loading}
+                      disabled={insightAskLoadingChart}
                       aria-describedby={
                         error && activeTab === "insights"
                           ? "ai-insights-ask-error"
-                          : loading
+                          : insightAskBusy
                             ? "ai-insights-ask-loading"
                             : undefined
                       }
@@ -12596,11 +13138,17 @@ function HomeInner() {
                         onClick={() => void askAI()}
                         disabled={!canAskAi}
                         className={aiInsightsAskSubmitBtn}
-                        aria-label={loading ? "Generating AI insight" : "Ask AI"}
+                        aria-label={
+                          insightAskBusy ? "Generating AI insight" : "Ask AI"
+                        }
                       >
-                        {loading ? "Thinking…" : "Ask AI"}
+                        {insightAskLoadingChart
+                          ? "Building chart…"
+                          : insightAskLoadingNarrative
+                            ? "Generating insight…"
+                            : "Ask AI"}
                       </button>
-                      {loading ? (
+                      {insightAskBusy ? (
                         <div
                           id="ai-insights-ask-loading"
                           className={aiInsightsAskLoading}
@@ -12611,7 +13159,11 @@ function HomeInner() {
                             className="inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-[color:var(--accent)]/25 border-t-[color:var(--accent)]"
                             aria-hidden
                           />
-                          <span>Generating answer and chart…</span>
+                          <span>
+                            {insightAskLoadingChart
+                              ? "Building chart…"
+                              : "Generating insight…"}
+                          </span>
                         </div>
                       ) : null}
                     </div>
@@ -12654,7 +13206,7 @@ function HomeInner() {
 
                 {insightSnapshot &&
                 !hasValidAIAnswer &&
-                !loading &&
+                !insightAskBusy &&
                 !answer.trim() ? (
                   <div className="mt-3 rounded-xl border border-indigo-100/70 bg-indigo-50/35 px-3.5 py-3 text-sm text-slate-700 leading-snug dark:border-indigo-400/18 dark:bg-[color:var(--insights-wash-followup)] dark:text-[color:var(--insights-text-secondary)]">
                     This chart is selected. Click{" "}
@@ -12664,13 +13216,15 @@ function HomeInner() {
                 ) : null}
 
                 <div className={aiInsightsResultsStack}>
-                {(hasValidAIAnswer || loading || answer.trim()) ? (
+                {(hasValidAIAnswer ||
+                  insightAskLoadingNarrative ||
+                  answer.trim()) ? (
                 <div className={aiInsightsAnswerCard}>
                   <div className={aiInsightsAnswerHeader}>
                     <p className={aiInsightsAnswerKicker}>Executive analysis</p>
                     <h3 className={aiInsightsAnswerTitle}>AI Answer</h3>
                   </div>
-                  {answer.trim() || loading ? (
+                  {answer.trim() || insightAskLoadingNarrative ? (
                     <div className={aiInsightsAnswerStack}>
                       {(() => {
                         const lead = aiAnswerLeadIn(
@@ -12787,7 +13341,7 @@ function HomeInner() {
                       ) : null}
                       </div>
                     </div>
-                  ) : loading ? (
+                  ) : insightAskLoadingNarrative ? (
                     <p className={`${aiInsightsBodyText} mt-2`} role="status">
                       Generating insight…
                     </p>
@@ -12799,7 +13353,9 @@ function HomeInner() {
                 </div>
                 ) : null}
 
-                {loading && !insightHasRenderableVisualization && !hasValidAIAnswer ? (
+                {insightAskLoadingChart &&
+                !insightHasRenderableVisualization &&
+                !hasValidAIAnswer ? (
                   <div
                     className="w-full min-w-0 overflow-hidden rounded-2xl border border-[color:var(--border-default)]/60 bg-[color:var(--surface-subtle)] p-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)]"
                     aria-hidden
@@ -12979,7 +13535,7 @@ function HomeInner() {
                         <button
                           key={chip}
                           type="button"
-                          disabled={loading}
+                          disabled={insightAskBusy}
                           onClick={() => {
                             handleSuggestedChipAsk(chip);
                           }}
@@ -13561,25 +14117,27 @@ function HomeInner() {
                     <span className={exportTabSummaryChipLabel}>AI answer</span>
                     <span
                       className={
-                        answer.trim()
+                        exportAiAnswerAvailable
                           ? exportTabSummaryChipValue
                           : exportTabSummaryChipValueMuted
                       }
                     >
-                      {answer.trim() ? "Available" : "Not available yet"}
+                      {exportAiAnswerAvailable
+                        ? "Available"
+                        : "Not available yet"}
                     </span>
                   </div>
                   <div className={`${exportTabSummaryChip} ${exportTabSummaryChipSpan}`}>
                     <span className={exportTabSummaryChipLabel}>Visualization</span>
                     <span
                       className={
-                        visualization && visualization.labels.length > 0
+                        exportVizPreview.available
                           ? exportTabSummaryChipValue
                           : exportTabSummaryChipValueMuted
                       }
-                      title={exportVizSummaryLabel}
+                      title={exportVizPreview.titleTooltip}
                     >
-                      {exportVizSummaryLabel}
+                      {exportVizPreview.summaryLabel}
                     </span>
                   </div>
                   <div className={`${exportTabSummaryChip} ${exportTabSummaryChipSpan}`}>

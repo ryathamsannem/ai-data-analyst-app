@@ -326,11 +326,20 @@ _RANK_DIM_RE = re.compile(
     re.I,
 )
 
+_WHICH_SUPERLATIVE_DIM_RE = re.compile(
+    r"\bwhich\s+([a-z0-9][a-z0-9_\s]{0,48}?)\s+(?:delivers?|drives?|generates?)\s+the\s+most\b",
+    re.I,
+)
+
 
 def extract_rank_dimension_phrase(question: str) -> Optional[str]:
-    """Dimension token from 'rank {dim} by {metric}' phrasing."""
-    m = _RANK_DIM_RE.search(str(question or ""))
-    return m.group(1).strip() if m else None
+    """Dimension token from ranking phrasing (rank X by …, which X drives the most …)."""
+    q = str(question or "")
+    m = _RANK_DIM_RE.search(q)
+    if m:
+        return m.group(1).strip()
+    m2 = _WHICH_SUPERLATIVE_DIM_RE.search(q)
+    return m2.group(1).strip() if m2 else None
 
 
 def question_requests_concentration_analysis(question: str) -> bool:

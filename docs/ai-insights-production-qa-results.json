@@ -1,6 +1,6 @@
 {
-  "executed_at": "2026-06-13T18:21:48Z",
-  "duration_sec": 17.0,
+  "executed_at": "2026-06-15T07:26:12Z",
+  "duration_sec": 6.0,
   "wave": "all",
   "waves": [
     1,
@@ -168,7 +168,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue trend (weekly). 2023-12-26/2024-01-01 leads with 19465480.0. Score 66/100 (medium) from 5 evidence factor(s); 360 row(s), 3 chart group(s). Revenue Concentration: 45%. Recent Change: 66%. Revenue Gap: 14.5M.",
+        "answer_excerpt": "Total revenue Trend by weekly. 2023-12-26/2024-01-01 leads with 19465480.0. Score 66/100 (medium) from 5 evidence factor(s); 360 row(s), 3 chart group(s). Revenue Concentration: 45%. Recent Change: 66%. Revenue Gap: 14.5M.",
         "chart_labels_sample": [
           "2023-12-26/2024-01-01",
           "2024-01-30/2024-02-05",
@@ -279,7 +279,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 10.0,
+        "intent_detection": 6.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -288,14 +288,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.25,
+      "avg": 7.75,
       "severity": "low",
       "notes": [
+        "Metric hint revenue not in profit",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "revenue",
+        "metricColumn": "profit",
         "categoryColumn": "region",
         "chartType": "bar",
         "confidence": "medium",
@@ -312,7 +313,7 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by region. North leads with 15521958.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 4 chart group(s). Revenue Gap: 6,505,126. Revenue Gap: 6.5M. Revenue Share: 33%.",
+        "answer_excerpt": "Total profit by region. North leads with 3575171.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 4 chart group(s). Profit Gap: 1,508,592. Profit Gap: 1.5M. Profit Share: 33%.",
         "chart_labels_sample": [
           "North",
           "South",
@@ -327,7 +328,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -336,15 +337,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint profit not in revenue",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "revenue",
+        "metricColumn": "profit",
         "categoryColumn": "city",
         "chartType": "horizontalBar",
         "confidence": "medium",
@@ -361,11 +361,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by city. Delhi leads with 6327280.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 12 chart group(s). Primary concern: Growth Risk: Bhubaneswar. Top City: Delhi.",
+        "answer_excerpt": "Total profit by city. Delhi leads with 1426290.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 12 chart group(s). Primary concern: Growth Risk: Bhubaneswar. Top City: Delhi.",
         "chart_labels_sample": [
           "Delhi",
-          "Jaipur",
-          "Mumbai"
+          "Bengaluru",
+          "Jaipur"
         ]
       }
     },
@@ -611,7 +611,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Average growth rate trend (weekly). 2023-12-26/2024-01-01 leads with 0.1. Score 66/100 (medium) from 5 evidence factor(s); 360 row(s), 3 chart group(s). Growth Rate Concentration: 40%. Recent Change: 50%. Growth Rate Gap: 0.1.",
+        "answer_excerpt": "Average growth rate Trend by weekly. 2023-12-26/2024-01-01 leads with 0.1. Score 66/100 (medium) from 5 evidence factor(s); 360 row(s), 3 chart group(s). Growth Rate Concentration: 40%. Recent Change: 50%. Growth Rate Gap: 0.1.",
         "chart_labels_sample": [
           "2023-12-26/2024-01-01",
           "2024-01-30/2024-02-05",
@@ -719,7 +719,7 @@
       "pattern": "ranking",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 7.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 5.0,
         "executive_summary_quality": 8.5,
@@ -728,15 +728,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.88,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for ranking",
         "Chart top 'Desk' vs pandas top 'Electronics'",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "ranking",
         "metricColumn": "orders",
         "categoryColumn": "product",
         "chartType": "horizontalBar",
@@ -920,7 +919,7 @@
       "is_follow_up": false,
       "scores": {
         "intent_detection": 6.0,
-        "chart_selection": 10.0,
+        "chart_selection": 4.0,
         "data_grounding": 5.0,
         "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
@@ -928,18 +927,20 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 7.0,
       "severity": "low",
       "notes": [
         "Metric hint revenue not in orders",
-        "Chart top 'Chennai' vs pandas top 'Delhi'",
+        "Dimension hint city not in order_date",
+        "Chart family 'line' vs expected {'bar'}",
+        "Chart top '2023-12-26/2024-01-01' vs pandas top 'Delhi'",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "compare",
         "metricColumn": "orders",
-        "categoryColumn": "city",
-        "chartType": "horizontalBar",
+        "categoryColumn": "order_date",
+        "chartType": "line",
         "confidence": "medium",
         "supportStatus": null
       },
@@ -957,11 +958,11 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Average orders by city. Chennai leads with 204.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 12 chart group(s). Orders Gap: 65.0. Top City: Chennai.",
+        "answer_excerpt": "orders over time (weekly). 2023-12-26/2024-01-01 leads with 169.0. Score 66/100 (medium) from 5 evidence factor(s); 360 row(s), 3 chart group(s). Orders Share: 35%. Recent Change: 12%.",
         "chart_labels_sample": [
-          "Chennai",
-          "Bhubaneswar",
-          "Patna"
+          "2023-12-26/2024-01-01",
+          "2024-01-30/2024-02-05",
+          "2024-02-27/2024-03-04"
         ]
       }
     },
@@ -1413,11 +1414,12 @@
       "severity": "low",
       "notes": [
         "Intent mismatch: got 'executive', expected ('compare',)",
+        "Metric hint revenue not in profit",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "revenue",
+        "metricColumn": "profit",
         "categoryColumn": "city",
         "chartType": "horizontalBar",
         "confidence": "medium",
@@ -1433,11 +1435,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by city. Delhi leads with 6327280.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 12 chart group(s). Primary concern: Growth Risk: Bhubaneswar. Top City: Delhi.",
+        "answer_excerpt": "Total profit by city. Delhi leads with 1426290.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 12 chart group(s). Primary concern: Growth Risk: Bhubaneswar. Top City: Delhi.",
         "chart_labels_sample": [
           "Delhi",
-          "Jaipur",
-          "Mumbai"
+          "Bengaluru",
+          "Jaipur"
         ]
       }
     },
@@ -1632,7 +1634,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Average satisfaction score trend (monthly). 2024-01 leads with 3.9. Score 65/100 (medium) from 5 evidence factor(s); 320 row(s), 7 chart group(s). Top Report Date: 2024-03.",
+        "answer_excerpt": "Average satisfaction score Trend by monthly. 2024-01 leads with 3.9. Score 65/100 (medium) from 5 evidence factor(s); 320 row(s), 7 chart group(s). Top Report Date: 2024-03.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -1744,7 +1746,7 @@
       "pattern": "ranking",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 6.5,
         "executive_summary_quality": 8.5,
@@ -1753,17 +1755,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.94,
+      "avg": 8.44,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for ranking",
-        "Metric hint satisfaction not in revenue",
         "Answer may omit top entity Paid Social",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
-        "metricColumn": "revenue",
+        "intent": "ranking",
+        "metricColumn": "satisfaction_score",
         "categoryColumn": "channel",
         "chartType": "bar",
         "confidence": "medium",
@@ -1782,11 +1782,11 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue by channel. Affiliate leads with 115252428.0. Score 69/100 (medium) from 6 evidence factor(s); 320 row(s), 6 chart group(s). Revenue Share: 22%. Revenue Gap: 45.4M.",
+        "answer_excerpt": "Average satisfaction score by channel. Paid Search leads with 4.0. Score 69/100 (medium) from 6 evidence factor(s); 320 row(s), 6 chart group(s). Top Channel: Paid Search.",
         "chart_labels_sample": [
-          "Affiliate",
+          "Paid Search",
           "Paid Social",
-          "Display"
+          "Affiliate"
         ]
       }
     },
@@ -1895,24 +1895,23 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint satisfaction not in revenue",
-        "Executive question lacks actionable recommendation"
+        "Recommendation without much hedging"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "revenue",
+        "metricColumn": "satisfaction_score",
         "categoryColumn": "channel",
         "chartType": "bar",
         "confidence": "medium",
@@ -1928,11 +1927,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by channel. Affiliate leads with 115252428.0. Score 69/100 (medium) from 6 evidence factor(s); 320 row(s), 6 chart group(s). Primary concern: Underperformer: Organic. Revenue Share: 22%.",
+        "answer_excerpt": "Total satisfaction score by channel. Paid Social leads with 211.8. Score 69/100 (medium) from 6 evidence factor(s); 320 row(s), 6 chart group(s). Primary concern: Underperformer: Display. Top Channel: Paid Social.",
         "chart_labels_sample": [
-          "Affiliate",
           "Paid Social",
-          "Display"
+          "Affiliate",
+          "Organic"
         ]
       }
     },
@@ -2173,7 +2172,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue trend (monthly). 2024-01 leads with 43325230.0. Score 65/100 (medium) from 5 evidence factor(s); 320 row(s), 7 chart group(s). Recent Change: 17%. Revenue Share: 21%. Revenue Gap: 70M.",
+        "answer_excerpt": "Total revenue Trend by monthly. 2024-01 leads with 43325230.0. Score 65/100 (medium) from 5 evidence factor(s); 320 row(s), 7 chart group(s). Recent Change: 17%. Revenue Share: 21%. Revenue Gap: 70M.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -2337,7 +2336,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -2346,16 +2345,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for executive",
-        "Metric hint spend not in revenue",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
-        "intent": "compare",
-        "metricColumn": "revenue",
+        "intent": "executive",
+        "metricColumn": "spend",
         "categoryColumn": "channel",
         "chartType": "bar",
         "confidence": "medium",
@@ -2372,11 +2369,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by channel. Affiliate leads with 115252428.0. Score 69/100 (medium) from 6 evidence factor(s); 320 row(s), 6 chart group(s). Revenue Share: 22%. Revenue Gap: 45.4M.",
+        "answer_excerpt": "Total spend by channel. Organic leads with 2052848.0. Score 69/100 (medium) from 6 evidence factor(s); 320 row(s), 6 chart group(s). Spend Gap: 351,289. Primary concern: Underperformer: Paid Search. Top Channel: Organic.",
         "chart_labels_sample": [
-          "Affiliate",
-          "Paid Social",
-          "Display"
+          "Organic",
+          "Display",
+          "Paid Social"
         ]
       }
     },
@@ -3007,7 +3004,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue trend (monthly). 2024-01 leads with 11723917.0. Score 65/100 (medium) from 5 evidence factor(s); 340 row(s), 8 chart group(s). Recent Change: 21%. Revenue Gap: 4.6M. Top Report Date: 2024-07.",
+        "answer_excerpt": "Total revenue Trend by monthly. 2024-01 leads with 11723917.0. Score 65/100 (medium) from 5 evidence factor(s); 340 row(s), 8 chart group(s). Recent Change: 21%. Revenue Gap: 4.6M. Top Report Date: 2024-07.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -3069,28 +3066,25 @@
       "pattern": "ranking",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 5.0,
+        "data_grounding": 8.5,
         "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.69,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for ranking",
-        "Dimension hint territory not in region",
-        "Chart top 'North' vs pandas top 'W-T3'",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "ranking",
         "metricColumn": "revenue",
-        "categoryColumn": "region",
-        "chartType": "bar",
+        "categoryColumn": "territory",
+        "chartType": "horizontalBar",
         "confidence": "medium",
         "supportStatus": null
       },
@@ -3107,11 +3101,11 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue by region. North leads with 25473805.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 4 chart group(s). Revenue Share: 28%. Revenue Gap: 8.6M.",
+        "answer_excerpt": "Total revenue by territory. W-T3 leads with 9491242.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 11 chart group(s). Revenue Gap: 2.2M. Top Territory: W-T3.",
         "chart_labels_sample": [
-          "North",
-          "West",
-          "South"
+          "W-T3",
+          "N-T1",
+          "E-T1"
         ]
       }
     },
@@ -3220,7 +3214,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 10.0,
+        "intent_detection": 6.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -3229,14 +3223,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.25,
+      "avg": 7.75,
       "severity": "low",
       "notes": [
+        "Metric hint revenue not in attainment_pct",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "revenue",
+        "metricColumn": "attainment_pct",
         "categoryColumn": "region",
         "chartType": "bar",
         "confidence": "medium",
@@ -3252,11 +3247,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by region. North leads with 25473805.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 4 chart group(s). Revenue Gap: 8,573,643. Revenue Gap: 8.6M. Revenue Share: 28%.",
+        "answer_excerpt": "Total attainment pct by region. South leads with 9200.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 4 chart group(s). Attainment Pct Gap: 3,446. Attainment Pct Gap: 3,445. Attainment Pct Share: 28%.",
         "chart_labels_sample": [
+          "South",
           "North",
-          "West",
-          "South"
+          "West"
         ]
       }
     },
@@ -3267,7 +3262,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 10.0,
+        "intent_detection": 6.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -3276,14 +3271,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.25,
+      "avg": 7.75,
       "severity": "low",
       "notes": [
+        "Metric hint revenue not in cost",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "revenue",
+        "metricColumn": "cost",
         "categoryColumn": "region",
         "chartType": "bar",
         "confidence": "medium",
@@ -3299,10 +3295,10 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by region. North leads with 25473805.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 4 chart group(s). Primary concern: Underperformer: East. Revenue Share: 28%.",
+        "answer_excerpt": "Total cost by region. West leads with 13959388.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 4 chart group(s). Primary concern: Underperformer: East. Cost Share: 28%.",
         "chart_labels_sample": [
-          "North",
           "West",
+          "North",
           "South"
         ]
       }
@@ -3407,7 +3403,7 @@
       "pattern": "ranking",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 7.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 8.5,
         "executive_summary_quality": 8.5,
@@ -3416,14 +3412,13 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.31,
+      "avg": 8.69,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for ranking",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "ranking",
         "metricColumn": "revenue",
         "categoryColumn": "product_line",
         "chartType": "horizontalBar",
@@ -3543,7 +3538,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue trend (monthly). 2024-01 leads with 11723917.0. Score 65/100 (medium) from 5 evidence factor(s); 340 row(s), 8 chart group(s). Recent Change: 21%. Revenue Gap: 4.6M. Top Report Date: 2024-07.",
+        "answer_excerpt": "Total revenue Trend by monthly. 2024-01 leads with 11723917.0. Score 65/100 (medium) from 5 evidence factor(s); 340 row(s), 8 chart group(s). Recent Change: 21%. Revenue Gap: 4.6M. Top Report Date: 2024-07.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -3706,7 +3701,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 7.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -3715,17 +3710,16 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.88,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for executive",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "executive",
         "metricColumn": "revenue",
-        "categoryColumn": "product_line",
-        "chartType": "horizontalBar",
+        "categoryColumn": "region",
+        "chartType": "bar",
         "confidence": "medium",
         "supportStatus": null
       },
@@ -3739,11 +3733,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by product line. SMB Starter leads with 24880644.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 4 chart group(s). Revenue Share: 27%.",
+        "answer_excerpt": "Total revenue by region. North leads with 25473805.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 4 chart group(s). Revenue Gap: 8,573,643. Primary concern: Underperformer: East. Revenue Share: 28%.",
         "chart_labels_sample": [
-          "SMB Starter",
-          "Add-On Services",
-          "Mid-Market Core"
+          "North",
+          "West",
+          "South"
         ]
       }
     },
@@ -4225,7 +4219,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue trend (monthly). 2024-01 leads with 12578202.0. Score 65/100 (medium) from 5 evidence factor(s); 300 row(s), 6 chart group(s). Recent Change: 68%. Revenue Share: 22%. Revenue Gap: 11.5M.",
+        "answer_excerpt": "Total revenue Trend by monthly. 2024-01 leads with 12578202.0. Score 65/100 (medium) from 5 evidence factor(s); 300 row(s), 6 chart group(s). Recent Change: 68%. Revenue Share: 22%. Revenue Gap: 11.5M.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -5267,12 +5261,13 @@
       "severity": "low",
       "notes": [
         "Intent mismatch: got 'executive', expected ('compare',)",
+        "Metric hint revenue not in profit",
         "Dimension hint zone not in city",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "revenue",
+        "metricColumn": "profit",
         "categoryColumn": "city",
         "chartType": "horizontalBar",
         "confidence": "medium",
@@ -5288,11 +5283,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by city. Amritsar leads with 4331281.0. Score 57/100 (medium) from 7 evidence factor(s); 300 row(s), 11 chart group(s). Revenue Concentration: 44%. Primary concern: Growth Risk: Chennai. Secondary concern: Margin Risk: Kolkata.",
+        "answer_excerpt": "Total profit by city. Amritsar leads with 782658.0. Score 57/100 (medium) from 7 evidence factor(s); 300 row(s), 11 chart group(s). Profit Concentration: 43%. Primary concern: Growth Risk: Chennai. Secondary concern: Underperformer: Bengaluru.",
         "chart_labels_sample": [
           "Amritsar",
-          "Chandigarh",
-          "Coimbatore"
+          "Delhi",
+          "Lucknow"
         ]
       }
     },
@@ -5488,7 +5483,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total deposit balance trend (weekly). 2023-12-26/2024-01-01 leads with 248635362.0. Score 66/100 (medium) from 5 evidence factor(s); 360 row(s), 3 chart group(s). Deposit Balance Share: 35%.",
+        "answer_excerpt": "Total deposit balance Trend by weekly. 2023-12-26/2024-01-01 leads with 248635362.0. Score 66/100 (medium) from 5 evidence factor(s); 360 row(s), 3 chart group(s). Deposit Balance Share: 35%.",
         "chart_labels_sample": [
           "2023-12-26/2024-01-01",
           "2024-01-30/2024-02-05",
@@ -5986,7 +5981,7 @@
       "pattern": "compare",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 7.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 8.5,
         "executive_summary_quality": 8.5,
@@ -5995,14 +5990,13 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.31,
+      "avg": 8.69,
       "severity": "low",
       "notes": [
-        "Intent 'ranking' acceptable fallback for compare",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "ranking",
+        "intent": "distribution",
         "metricColumn": "spend_amount",
         "categoryColumn": "spend_category",
         "chartType": "donut",
@@ -6072,7 +6066,7 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total delinquency rate by customer segment. Mass Affluent leads with 2.9. Score 76/100 (high) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Largest gap: 23%. High outlier: Mass Affluent. Low outlier: Corporate.",
+        "answer_excerpt": "Average delinquency rate by customer segment. Mass Affluent leads with 0.0. Score 76/100 (high) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Largest gap: 23%. High outlier: Mass Affluent. Low outlier: Corporate.",
         "chart_labels_sample": [
           "Mass Affluent",
           "Retail",
@@ -6087,7 +6081,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 7.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -6096,16 +6090,15 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.88,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for executive",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "executive",
         "metricColumn": "npl_amount",
-        "categoryColumn": "product_type",
+        "categoryColumn": "customer_segment",
         "chartType": "bar",
         "confidence": "medium",
         "supportStatus": null
@@ -6120,11 +6113,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total npl amount by product type. Mortgage leads with 4946056.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Npl Amount Share: 24%. Npl Amount Gap: 1.2M.",
+        "answer_excerpt": "Total npl amount by customer segment. Retail leads with 4447672.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Primary concern: Underperformer: Premium. Npl Amount Share: 22%.",
         "chart_labels_sample": [
-          "Mortgage",
-          "Personal Loan",
-          "Credit Card"
+          "Retail",
+          "SME",
+          "Mass Affluent"
         ]
       }
     },
@@ -6485,13 +6478,13 @@
       "severity": "low",
       "notes": [
         "Intent mismatch: got 'executive', expected ('compare',)",
-        "Metric hint deposit_balance not in spend_amount",
+        "Metric hint deposit_balance not in npl_amount",
         "Dimension hint region not in customer_segment",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "spend_amount",
+        "metricColumn": "npl_amount",
         "categoryColumn": "customer_segment",
         "chartType": "bar",
         "confidence": "medium",
@@ -6507,11 +6500,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total spend amount by customer segment. Retail leads with 4223900.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Primary concern: Underperformer: Mass Affluent. Spend Amount Share: 22%.",
+        "answer_excerpt": "Total npl amount by customer segment. Retail leads with 4447672.0. Score 70/100 (medium) from 6 evidence factor(s); 360 row(s), 5 chart group(s). Primary concern: Underperformer: Premium. Npl Amount Share: 22%.",
         "chart_labels_sample": [
           "Retail",
-          "Corporate",
-          "SME"
+          "SME",
+          "Mass Affluent"
         ]
       }
     },
@@ -6660,7 +6653,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total revenue trend (monthly). 2024-01 leads with 3585220.0. Score 65/100 (medium) from 5 evidence factor(s); 330 row(s), 10 chart group(s). Recent Change: 14%. Revenue Gap: 2M. Top Report Date: 2024-03.",
+        "answer_excerpt": "Total revenue Trend by monthly. 2024-01 leads with 3585220.0. Score 65/100 (medium) from 5 evidence factor(s); 330 row(s), 10 chart group(s). Recent Change: 14%. Revenue Gap: 2M. Top Report Date: 2024-03.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -6824,7 +6817,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -6833,15 +6826,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint variance not in revenue",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "revenue",
+        "metricColumn": "variance",
         "categoryColumn": "category",
         "chartType": "bar",
         "confidence": "medium",
@@ -6857,11 +6849,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total revenue by category. Contractors leads with 8423133.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 5 chart group(s). Primary concern: Underperformer: Travel. Revenue Share: 22%.",
+        "answer_excerpt": "Total variance by category. Facilities leads with 438191.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 5 chart group(s). Variance Share: 30%. Primary concern: Underperformer: Personnel.",
         "chart_labels_sample": [
+          "Facilities",
           "Contractors",
-          "Software",
-          "Personnel"
+          "Travel"
         ]
       }
     },
@@ -6872,7 +6864,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -6881,15 +6873,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint actual not in cost",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "cost",
+        "metricColumn": "actual",
         "categoryColumn": "category",
         "chartType": "bar",
         "confidence": "medium",
@@ -6905,7 +6896,7 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total cost by category. Facilities leads with 9523201.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 5 chart group(s). Primary concern: Underperformer: Travel. Cost Share: 22%.",
+        "answer_excerpt": "Total actual by category. Facilities leads with 9523201.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 5 chart group(s). Primary concern: Underperformer: Travel. Actual Share: 22%.",
         "chart_labels_sample": [
           "Facilities",
           "Personnel",
@@ -7015,26 +7006,23 @@
       "pattern": "ranking",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
-        "data_grounding": 5.0,
+        "data_grounding": 8.5,
         "executive_summary_quality": 8.5,
         "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.69,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for ranking",
-        "Metric hint variance not in budget",
-        "Chart top 'CC-SAL-2' vs pandas top 'CC-FIN-1'",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
-        "metricColumn": "budget",
+        "intent": "ranking",
+        "metricColumn": "variance",
         "categoryColumn": "cost_center",
         "chartType": "horizontalBar",
         "confidence": "medium",
@@ -7053,11 +7041,11 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total budget by cost center. CC-SAL-2 leads with 3655926.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 14 chart group(s). Budget Gap: 1.4M. Top Cost Center: CC-SAL-2.",
+        "answer_excerpt": "Total variance by cost center. CC-FIN-1 leads with 243972.0. Score 69/100 (medium) from 6 evidence factor(s); 330 row(s), 14 chart group(s). Variance Gap: 283,728. Top Cost Center: CC-FIN-1.",
         "chart_labels_sample": [
-          "CC-SAL-2",
-          "CC-MAR-1",
-          "CC-OPE-1"
+          "CC-FIN-1",
+          "CC-FIN-2",
+          "CC-HR-1"
         ]
       }
     },
@@ -7450,7 +7438,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total units produced trend (monthly). 2024-01 leads with 490429.0. Score 65/100 (medium) from 5 evidence factor(s); 310 row(s), 4 chart group(s). Units Produced Share: 32%. Recent Change: 87%. Units Produced Gap: 432,588.",
+        "answer_excerpt": "Total units produced Trend by monthly. 2024-01 leads with 490429.0. Score 65/100 (medium) from 5 evidence factor(s); 310 row(s), 4 chart group(s). Units Produced Share: 32%. Recent Change: 87%. Units Produced Gap: 432,588.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -7659,7 +7647,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -7668,15 +7656,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint cost not in units_produced",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "units_produced",
+        "metricColumn": "cost",
         "categoryColumn": "department",
         "chartType": "bar",
         "confidence": "medium",
@@ -7692,11 +7679,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total units produced by department. Maintenance leads with 322227.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Primary concern: Underperformer: Packaging. Units Produced Share: 21%.",
+        "answer_excerpt": "Total cost by department. Logistics leads with 5655906.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 5 chart group(s). Primary concern: Underperformer: Packaging. Cost Share: 22%.",
         "chart_labels_sample": [
-          "Maintenance",
+          "Logistics",
           "Assembly",
-          "Logistics"
+          "Maintenance"
         ]
       }
     },
@@ -7707,7 +7694,7 @@
       "pattern": "summary",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -7716,14 +7703,12 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
-      "notes": [
-        "Metric hint units_produced not in downtime_hours"
-      ],
+      "notes": [],
       "routing": {
         "intent": "summary",
-        "metricColumn": "downtime_hours",
+        "metricColumn": "units_produced",
         "categoryColumn": "production_line",
         "chartType": "bar",
         "confidence": "medium",
@@ -7739,11 +7724,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Average downtime hours by production line. Line-1 leads with 7.8. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 4 chart group(s). Top Production Line: Line-1. Downtime Hours Concentration: 26%. Downtime Hours Share: 26%.",
+        "answer_excerpt": "Average units produced by production line. Line-1 leads with 4946.0. Score 69/100 (medium) from 6 evidence factor(s); 310 row(s), 4 chart group(s). Top Production Line: Line-1. Units Produced Concentration: 25%. Units Produced Share: 25%.",
         "chart_labels_sample": [
           "Line-1",
-          "Line-2",
-          "Line-4"
+          "Line-3",
+          "Line-2"
         ]
       }
     },
@@ -8043,7 +8028,7 @@
       "pattern": "ranking",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 7.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 8.5,
         "executive_summary_quality": 8.5,
@@ -8052,14 +8037,13 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.31,
+      "avg": 8.69,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for ranking",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "ranking",
         "metricColumn": "avg_resolution_hours",
         "categoryColumn": "ticket_category",
         "chartType": "bar",
@@ -8180,7 +8164,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total tickets opened trend (monthly). 2024-01 leads with 7375.0. Score 65/100 (medium) from 5 evidence factor(s); 300 row(s), 10 chart group(s). Tickets Opened Gap: 1,684. Top Report Date: 2024-07.",
+        "answer_excerpt": "Total tickets opened Trend by monthly. 2024-01 leads with 7375.0. Score 65/100 (medium) from 5 evidence factor(s); 300 row(s), 10 chart group(s). Tickets Opened Gap: 1,684. Top Report Date: 2024-07.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -8342,7 +8326,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -8351,15 +8335,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint escalations not in tickets_opened",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "tickets_opened",
+        "metricColumn": "escalations",
         "categoryColumn": "ticket_category",
         "chartType": "bar",
         "confidence": "medium",
@@ -8375,7 +8358,7 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total tickets opened by ticket category. Onboarding leads with 15705.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Primary concern: Underperformer: Account. Tickets Opened Share: 19%.",
+        "answer_excerpt": "Total escalations by ticket category. Onboarding leads with 1309.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Primary concern: Underperformer: Billing. Top Ticket Category: Onboarding.",
         "chart_labels_sample": [
           "Onboarding",
           "Feature Request",
@@ -8390,24 +8373,23 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
-        "recommendation_quality": 5.0,
+        "recommendation_quality": 7.0,
         "confidence_explanation": 9.0,
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.5,
       "severity": "low",
       "notes": [
-        "Metric hint satisfaction not in tickets_opened",
-        "Executive question lacks actionable recommendation"
+        "Recommendation without much hedging"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "tickets_opened",
+        "metricColumn": "satisfaction_score",
         "categoryColumn": "ticket_category",
         "chartType": "bar",
         "confidence": "medium",
@@ -8423,11 +8405,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Average tickets opened by ticket category. Onboarding leads with 314.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Tickets Opened Gap: 2,637. Tickets Opened Gap: 53.0. Tickets Opened Share: 19%.",
+        "answer_excerpt": "Average satisfaction score by ticket category. Feature Request leads with 4.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Ticket Category: Feature Request.",
         "chart_labels_sample": [
-          "Onboarding",
           "Feature Request",
-          "Bug"
+          "Onboarding",
+          "Account"
         ]
       }
     },
@@ -8438,7 +8420,7 @@
       "pattern": "summary",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -8447,14 +8429,12 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
-      "notes": [
-        "Metric hint tickets_resolved not in tickets_opened"
-      ],
+      "notes": [],
       "routing": {
         "intent": "summary",
-        "metricColumn": "tickets_opened",
+        "metricColumn": "tickets_resolved",
         "categoryColumn": "ticket_category",
         "chartType": "bar",
         "confidence": "medium",
@@ -8470,7 +8450,7 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Average tickets opened by ticket category. Onboarding leads with 314.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Ticket Category: Onboarding. Tickets Opened Share: 19%. Tickets Opened Gap: 17%.",
+        "answer_excerpt": "Average tickets resolved by ticket category. Onboarding leads with 274.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Ticket Category: Onboarding. Tickets Resolved Share: 18%. Tickets Resolved Gap: 15%.",
         "chart_labels_sample": [
           "Onboarding",
           "Feature Request",
@@ -8533,7 +8513,7 @@
       "pattern": "ranking",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 7.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 8.5,
         "executive_summary_quality": 8.5,
@@ -8542,14 +8522,13 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.31,
+      "avg": 8.69,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for ranking",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "ranking",
         "metricColumn": "escalations",
         "categoryColumn": "priority",
         "chartType": "bar",
@@ -8584,7 +8563,7 @@
       "pattern": "ranking",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 7.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 8.5,
         "executive_summary_quality": 8.5,
@@ -8593,14 +8572,13 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.31,
+      "avg": 8.69,
       "severity": "low",
       "notes": [
-        "Intent 'compare' acceptable fallback for ranking",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "ranking",
         "metricColumn": "avg_resolution_hours",
         "categoryColumn": "ticket_category",
         "chartType": "bar",
@@ -8635,7 +8613,7 @@
       "pattern": "follow_up",
       "is_follow_up": true,
       "scores": {
-        "intent_detection": 5.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -8644,14 +8622,13 @@
         "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
+      "avg": 8.75,
       "severity": "low",
       "notes": [
-        "Intent mismatch: got 'compare', expected ('ranking',)",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "ranking",
         "metricColumn": "avg_resolution_hours",
         "categoryColumn": "ticket_category",
         "chartType": "bar",
@@ -8683,7 +8660,7 @@
       "pattern": "follow_up",
       "is_follow_up": true,
       "scores": {
-        "intent_detection": 5.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -8692,14 +8669,13 @@
         "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
+      "avg": 8.75,
       "severity": "low",
       "notes": [
-        "Intent mismatch: got 'compare', expected ('ranking',)",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "ranking",
         "metricColumn": "avg_resolution_hours",
         "categoryColumn": "ticket_category",
         "chartType": "bar",
@@ -8731,7 +8707,7 @@
       "pattern": "follow_up",
       "is_follow_up": true,
       "scores": {
-        "intent_detection": 5.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -8740,14 +8716,13 @@
         "follow_up_continuity": 9.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.12,
+      "avg": 8.75,
       "severity": "low",
       "notes": [
-        "Intent mismatch: got 'compare', expected ('ranking',)",
         "N/A \u2014 not recommendation-focused question"
       ],
       "routing": {
-        "intent": "compare",
+        "intent": "ranking",
         "metricColumn": "avg_resolution_hours",
         "categoryColumn": "ticket_category",
         "chartType": "bar",
@@ -8914,7 +8889,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total headcount trend (monthly). 2024-01 leads with 2860.0. Score 65/100 (medium) from 5 evidence factor(s); 300 row(s), 8 chart group(s). Recent Change: 87%. Headcount Gap: 2,692. Top Report Date: 2024-02.",
+        "answer_excerpt": "Total headcount Trend by monthly. 2024-01 leads with 2860.0. Score 65/100 (medium) from 5 evidence factor(s); 300 row(s), 8 chart group(s). Recent Change: 87%. Headcount Gap: 2,692. Top Report Date: 2024-02.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -9077,7 +9052,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -9086,15 +9061,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint attrition not in headcount",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "headcount",
+        "metricColumn": "attrition_rate",
         "categoryColumn": "department",
         "chartType": "horizontalBar",
         "confidence": "medium",
@@ -9110,11 +9084,11 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total headcount by department. Finance leads with 3101.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 7 chart group(s). Primary concern: Underperformer: HR. Top Department: Finance.",
+        "answer_excerpt": "Total attrition rate by department. Marketing leads with 1.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 7 chart group(s). Primary concern: Underperformer: HR. Top Department: Marketing.",
         "chart_labels_sample": [
-          "Finance",
+          "Marketing",
           "Engineering",
-          "Marketing"
+          "Support"
         ]
       }
     },
@@ -9172,7 +9146,7 @@
       "pattern": "summary",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -9181,14 +9155,12 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
-      "notes": [
-        "Metric hint personnel_cost not in headcount"
-      ],
+      "notes": [],
       "routing": {
         "intent": "summary",
-        "metricColumn": "headcount",
+        "metricColumn": "personnel_cost",
         "categoryColumn": "location",
         "chartType": "bar",
         "confidence": "medium",
@@ -9204,10 +9176,10 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total headcount by location. Remote-EMEA leads with 3463.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Location: Remote-EMEA. Headcount Gap: 17%. Trend direction: Directional.",
+        "answer_excerpt": "Total personnel cost by location. HQ leads with 5456756.0. Score 69/100 (medium) from 6 evidence factor(s); 300 row(s), 6 chart group(s). Top Location: HQ. Trend direction: Directional.",
         "chart_labels_sample": [
+          "HQ",
           "Remote-EMEA",
-          "Bengaluru",
           "London"
         ]
       }
@@ -9644,7 +9616,7 @@
         }
       },
       "actual": {
-        "answer_excerpt": "Total admissions trend (monthly). 2024-01 leads with 22226.0. Score 65/100 (medium) from 5 evidence factor(s); 340 row(s), 12 chart group(s). Recent Change: 71%. Admissions Gap: 18,353. Top Report Date: 2024-05.",
+        "answer_excerpt": "Total admissions Trend by monthly. 2024-01 leads with 22226.0. Score 65/100 (medium) from 5 evidence factor(s); 340 row(s), 12 chart group(s). Recent Change: 71%. Admissions Gap: 18,353. Top Report Date: 2024-05.",
         "chart_labels_sample": [
           "2024-01",
           "2024-02",
@@ -9808,7 +9780,7 @@
       "pattern": "executive",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -9817,15 +9789,14 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 7.75,
+      "avg": 8.25,
       "severity": "low",
       "notes": [
-        "Metric hint readmissions not in patient_volume",
         "Executive question lacks actionable recommendation"
       ],
       "routing": {
         "intent": "executive",
-        "metricColumn": "patient_volume",
+        "metricColumn": "readmissions",
         "categoryColumn": "region",
         "chartType": "bar",
         "confidence": "medium",
@@ -9841,7 +9812,7 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total patient volume by region. Rural leads with 129282.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 3 chart group(s). Primary concern: Patient Volume Concentration: 38%. Patient Volume Share: 38%. Secondary concern: Underperformer: Suburban.",
+        "answer_excerpt": "Total readmissions by region. Rural leads with 8430.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 3 chart group(s). Primary concern: Readmissions Concentration: 39%. Readmissions Share: 39%. Secondary concern: Underperformer: Suburban.",
         "chart_labels_sample": [
           "Rural",
           "Metro",
@@ -9903,7 +9874,7 @@
       "pattern": "summary",
       "is_follow_up": false,
       "scores": {
-        "intent_detection": 6.0,
+        "intent_detection": 10.0,
         "chart_selection": 10.0,
         "data_grounding": 7.0,
         "executive_summary_quality": 8.5,
@@ -9912,14 +9883,12 @@
         "follow_up_continuity": 7.0,
         "hallucination_resistance": 9.5
       },
-      "avg": 8.0,
+      "avg": 8.5,
       "severity": "low",
-      "notes": [
-        "Metric hint cost not in patient_volume"
-      ],
+      "notes": [],
       "routing": {
         "intent": "summary",
-        "metricColumn": "patient_volume",
+        "metricColumn": "cost",
         "categoryColumn": "region",
         "chartType": "bar",
         "confidence": "medium",
@@ -9935,7 +9904,7 @@
         "ground": {}
       },
       "actual": {
-        "answer_excerpt": "Total patient volume by region. Rural leads with 129282.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 3 chart group(s). Patient Volume Share: 38%. Top Region: Rural. Patient Volume Concentration: 38%.",
+        "answer_excerpt": "Total cost by region. Rural leads with 153025189.0. Score 69/100 (medium) from 6 evidence factor(s); 340 row(s), 3 chart group(s). Cost Share: 39%. Top Region: Rural. Cost Concentration: 39%.",
         "chart_labels_sample": [
           "Rural",
           "Metro",

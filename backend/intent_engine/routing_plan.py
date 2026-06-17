@@ -90,7 +90,7 @@ def normalize_routing_intent(
         "rank": ("ranking", None),
         "ranking": ("ranking", None),
         "outlier": ("outlier", lens or "standout"),
-        "distribution": ("ranking", None),
+        "distribution": ("distribution", None),
         "kpi": ("fallback", None),
         "summary": ("summary", None),
         "derived_metric": ("compare", None),
@@ -289,7 +289,15 @@ def build_routing_plan_from_analysis(
     elif unsupported and intent == "fallback":
         pass
     elif unsupported and not analysis.get("chartPointCount"):
-        intent = "fallback"
+        exec_goals = {
+            "executive_strategy",
+            "executive_risk",
+            "executive_opportunity",
+            "executive_outlier_standout",
+            "loss_profitability",
+        }
+        if str(primary_goal or "").lower() not in exec_goals:
+            intent = "fallback"
 
     return RoutingPlan(
         intent=intent,

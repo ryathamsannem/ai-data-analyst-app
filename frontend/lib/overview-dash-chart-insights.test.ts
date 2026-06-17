@@ -221,6 +221,24 @@ describe("formatOverviewMiniInsightChips trend wording", () => {
     expect(chips[1]?.text).toMatch(/^Lowest: /);
   });
 
+  it("uses share-aware chips for overview donut charts", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "Electronics", value: 360000 },
+        { name: "Clothing", value: 180000 },
+        { name: "Furniture", value: 120000 },
+      ],
+      {
+        chartTitle: "Revenue Share by Product Category",
+        presentationKind: "donut",
+      }
+    );
+    expect(chips[0]?.text).toMatch(/^Largest: Electronics /);
+    expect(chips[0]?.text).toMatch(/%$/);
+    expect(chips[1]?.text).toMatch(/^Smallest: Furniture /);
+    expect(chips[2]?.text).toBe("Total: 100%");
+  });
+
   it("preserves small score gaps in breakdown chips", () => {
     const chips = formatOverviewMiniInsightChips(
       [

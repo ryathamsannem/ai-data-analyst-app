@@ -12,6 +12,7 @@ import {
   metricFormatUsesPercent,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
+import { radialSharePercent, radialSliceTotal } from "@/lib/radial-chart-format";
 
 export type OverviewMiniInsightChip = {
   key: "top" | "lowest" | "gap" | "relationship";
@@ -263,6 +264,32 @@ function formatScatterInsightChips(
   return chips;
 }
 
+function formatShareInsightChips(
+  rows: ChartRow[],
+  hi: ChartRow,
+  lo: ChartRow
+): OverviewMiniInsightChip[] {
+  const total = radialSliceTotal(rows);
+  if (total <= 0) return [];
+  const hiPct = radialSharePercent(hi.value, total);
+  const loPct = radialSharePercent(lo.value, total);
+  const hiShare =
+    hiPct == null ? "—" : `${Math.round(hiPct)}%`;
+  const loShare =
+    loPct == null ? "—" : `${Math.round(loPct)}%`;
+  return [
+    {
+      key: "top",
+      text: `Largest: ${String(hi.name)} ${hiShare}`,
+    },
+    {
+      key: "lowest",
+      text: `Smallest: ${String(lo.name)} ${loShare}`,
+    },
+    { key: "gap", text: "Total: 100%" },
+  ];
+}
+
 /** Structured insight pills for overview mini charts (avoids merged single-line text). */
 export function formatOverviewMiniInsightChips(
   rows: ChartRow[],
@@ -284,6 +311,12 @@ export function formatOverviewMiniInsightChips(
     if (r.value < lo.value) lo = r;
   }
   if (String(hi.name) === String(lo.name)) return [];
+
+  const isRadialShare =
+    opts?.presentationKind === "donut" || opts?.presentationKind === "pie";
+  if (isRadialShare) {
+    return formatShareInsightChips(rows, hi, lo);
+  }
 
   const isScatter =
     opts?.isScatterChart === true || opts?.presentationKind === "scatter";
