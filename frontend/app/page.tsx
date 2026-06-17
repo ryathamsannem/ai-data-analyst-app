@@ -202,12 +202,16 @@ import {
 } from "@/lib/chart-semantic-metadata";
 import {
   buildChartMetadataBadgeCompact,
-  buildChartMetadataChipSpecs,
   buildChartMetadataLine,
   chartTypeShortLabel,
   inferAutoDashboardMetricFromTitle,
   resolveAnalyzedRowsForChartMetadata,
 } from "@/lib/chart-metadata-chips";
+import {
+  buildChartPresentationContract,
+  withChartPresentationMetadata,
+} from "@/lib/chart-platform/build-chart-contract";
+import type { ChartPresentationContract } from "@/lib/chart-platform/chart-presentation-contract";
 import {
   logDashboardCoverageTelemetry,
   parseDashboardCoverageTelemetry,
@@ -978,6 +982,7 @@ function computeChartInsightBadge(
 }
 
 const ChartContextSummary = memo(function ChartContextSummary(props: {
+  presentationContract?: ChartPresentationContract | null;
   renderedKind: ChartKind;
   metricLabel: string;
   /** Axis / dimension line — replaces the old fixed “Dimension · …” chip. */
@@ -989,27 +994,43 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
   /** Tighter pills for AI Insights chart header. */
   compactChips?: boolean;
 }) {
-  const chipSpecs = useMemo(
-    () =>
-      buildChartMetadataChipSpecs({
-        renderedKind: props.renderedKind,
+  const metadataContract = useMemo(
+    () => {
+      const base =
+        props.presentationContract ??
+        buildChartPresentationContract({
+          chartId: "metadata-preview",
+          source: "manual",
+          apiChartType: chartKindToApiChartType(props.renderedKind),
+          resolvedKind: props.renderedKind,
+          title: "Chart",
+          rows: [],
+        });
+      return withChartPresentationMetadata(base, {
         metricLabel: props.metricLabel,
         semanticHeader: props.semanticHeader,
         badgeCompact: props.badgeCompact,
         leadInsight: props.leadInsight,
-      }),
+        warning: props.qualityWarning,
+      });
+    },
     [
+      props.presentationContract,
       props.renderedKind,
       props.metricLabel,
       props.semanticHeader,
       props.badgeCompact,
       props.leadInsight,
+      props.qualityWarning,
     ]
   );
 
   return (
     <>
-      <ChartMetadataChipRow specs={chipSpecs} compact={props.compactChips} />
+      <ChartMetadataChipRow
+        specs={metadataContract.metadata.chips}
+        compact={props.compactChips}
+      />
       {props.qualityWarning ? (
         <p
           className={`${chartRateQualityWarningClass} w-full basis-full text-center`}
@@ -4311,21 +4332,34 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [effectivePresentationKind, chartRows.length]
   );
 
-  const overviewMetadataChipSpecs = useMemo(
+  const overviewPresentationContract = useMemo(
     () =>
-      buildChartMetadataChipSpecs({
-        renderedKind: effectivePresentationKind,
+      buildChartPresentationContract({
+        chartId: snapshotId ?? `overview-${canonicalTitle}`,
+        source: "auto_dashboard",
+        apiChartType: chart.chartType,
+        resolvedKind: effectivePresentationKind,
+        title: canonicalTitle || chart.title,
+        subtitle: "Auto dashboard",
+        rows: chartRows,
         metricLabel: overviewMetricLabel,
         semanticHeader: overviewSemanticHeader,
         badgeCompact: overviewMetadataBadgeCompact,
       }),
     [
+      snapshotId,
+      canonicalTitle,
+      chart.chartType,
+      chart.title,
+      chartRows,
       effectivePresentationKind,
       overviewMetricLabel,
       overviewSemanticHeader,
       overviewMetadataBadgeCompact,
     ]
   );
+
+  const overviewMetadataChipSpecs = overviewPresentationContract.metadata.chips;
 
   const overviewMetadataLine = useMemo(
     () =>
@@ -12533,6 +12567,7 @@ function HomeInner() {
                             className={aiInsightsVizChipsWrap}
                           >
                             <ChartContextSummary
+                              presentationContract={activeSnapshot?.presentationContract}
                               renderedKind={sessionRenderedChartKind}
                               metricLabel={chartAxisLabels.valueAxis}
                               semanticHeader={sessionChartSemanticHeader}
@@ -12597,6 +12632,7 @@ function HomeInner() {
                             className={`${aiInsightsVizChipsWrap} mt-1`}
                           >
                             <ChartContextSummary
+                              presentationContract={activeSnapshot?.presentationContract}
                               renderedKind={sessionRenderedChartKind}
                               metricLabel={chartAxisLabels.valueAxis}
                               semanticHeader={sessionChartSemanticHeader}
@@ -13057,6 +13093,7 @@ function HomeInner() {
                         className={aiInsightsVizChipsWrap}
                       >
                         <ChartContextSummary
+                          presentationContract={insightSnapshot?.presentationContract}
                           renderedKind={insightRenderedChartKind}
                           metricLabel={insightChartMeasureLabel}
                           semanticHeader={insightChartSemanticHeader}

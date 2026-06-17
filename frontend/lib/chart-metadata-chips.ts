@@ -5,6 +5,7 @@ import {
   resolveHistogramMeasureChipLabel,
   type ChartSemanticVizLike,
 } from "@/lib/chart-semantic-metadata";
+import type { ChartPresentationMetadataChip } from "@/lib/chart-platform/chart-presentation-contract";
 
 type InsightProvenance = {
   aggregation?: string | null;
@@ -35,13 +36,7 @@ type StoredVisualization = {
 /** Unified metadata chip contract — UI, PNG composite, and PDF appendix. */
 export type ChartMetadataChipKind = "labeled" | "mono" | "lead";
 
-export type ChartMetadataChipSpec = {
-  id: string;
-  kind: ChartMetadataChipKind;
-  label?: string;
-  value: string;
-  title?: string;
-};
+export type ChartMetadataChipSpec = ChartPresentationMetadataChip;
 
 export type ExportChipLike = {
   label: string;
