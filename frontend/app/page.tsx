@@ -85,7 +85,6 @@ import {
 } from "@/lib/chart-time-x-axis";
 import { chartLayoutWidthKey } from "@/lib/chart-axis-theme";
 import {
-  buildPresentationExportSpec,
   presentationCapturePlotStyle,
 } from "@/lib/chart-png-export-layout";
 import {
@@ -126,7 +125,13 @@ import {
   OVERVIEW_LINE_PREMIUM_PAD_RATIO,
   resolveOverviewPremiumAxisScale,
 } from "@/lib/overview-premium-axis-domain";
-import { ChartPngOffscreenHost } from "@/lib/chart-png-offscreen-host";
+import { ChartCaptureHost } from "@/app/components/chart-platform/ChartCaptureHost";
+import {
+  captureChartPngArtifact,
+  createChartPngCaptureRequest,
+  downloadChartArtifact,
+} from "@/lib/chart-platform/chart-capture-controller";
+import type { ChartPngCaptureRequest } from "@/lib/chart-platform/chart-artifact";
 import {
   formatExecutiveMetricValue,
   formatMetricSpreadGap,
@@ -4133,9 +4138,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 }) {
   const offscreenExportRef = useRef<HTMLDivElement | null>(null);
   const [exportingPng, setExportingPng] = useState(false);
-  const [offscreenExportLayout, setOffscreenExportLayout] = useState<ReturnType<
-    typeof buildPresentationExportSpec
-  > | null>(null);
+  const [overviewPngCaptureRequest, setOverviewPngCaptureRequest] =
+    useState<ChartPngCaptureRequest | null>(null);
   const dashGrid = dashGridStyle;
   const drillPrimary = chart.interaction?.drillDimensions.find(
     (d) => d.role === "primary"
@@ -4185,8 +4189,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chart.chartType, chart.title, baseChartRows]
   );
 
-  const exportPlotWidth = offscreenExportLayout?.width ?? viewportWidthPx;
-  const exportPlotHeight = offscreenExportLayout?.height ?? plotHeightPx;
+  const exportPlotWidth = overviewPngCaptureRequest?.layout.width ?? viewportWidthPx;
+  const exportPlotHeight = overviewPngCaptureRequest?.layout.height ?? plotHeightPx;
 
   const overviewMetricLabel = useMemo(
     () =>
@@ -5105,20 +5109,23 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             disabled={exportingPng}
             onClick={async () => {
               setExportingPng(true);
-              const spec = buildPresentationExportSpec(effectivePresentationKind, {
+              const request = createChartPngCaptureRequest({
+                contract: overviewPresentationContract,
+                profile: "overviewPng",
+                sourceSurface: "overview",
+                kind: effectivePresentationKind,
                 categoryCount: chartRows.length,
+                filename: sanitizeChartExportFilename(canonicalTitle),
+                datasetName: exportFooterHint,
               });
               try {
-                setOffscreenExportLayout(spec);
-                const { runChartPngExport } = await import(
-                  "@/lib/chart-png-export-session"
-                );
-                await runChartPngExport({
+                setOverviewPngCaptureRequest(request);
+                const artifact = await captureChartPngArtifact({
+                  request,
                   getExportRoot: () => offscreenExportRef.current,
-                  kind: effectivePresentationKind,
-                  categoryCount: chartRows.length,
-                  filename: sanitizeChartExportFilename(canonicalTitle),
-                  datasetName: exportFooterHint,
+                  isCurrent: (requestId) =>
+                    offscreenExportRef.current?.dataset.chartCaptureRequestId ===
+                    requestId,
                   parity: {
                     displayKind,
                     renderBarAsHorizontal,
@@ -5126,6 +5133,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                     expectedMetadataChipCount: overviewMetadataChipSpecs.length,
                   },
                 });
+                downloadChartArtifact(artifact, request.filename);
               } catch (err) {
                 onChartExportError?.(
                   err instanceof Error
@@ -5133,7 +5141,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                     : "Unable to export chart image."
                 );
               } finally {
-                setOffscreenExportLayout(null);
+                setOverviewPngCaptureRequest(null);
                 setExportingPng(false);
               }
             }}
@@ -5184,9 +5192,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       </div>
       {exportFooter}
 
-      {offscreenExportLayout ? (
-        <ChartPngOffscreenHost
-          layout={offscreenExportLayout}
+      {overviewPngCaptureRequest ? (
+        <ChartCaptureHost
+          request={overviewPngCaptureRequest}
           exportRef={offscreenExportRef}
           rootClassName={overviewPngExportRoot}
         >
@@ -5204,7 +5212,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           </header>
           <div
             className={`${ovDashChartPlot} ${ovDashChartPlotInner} ${chartsTabVizPlotStage}`}
-            style={presentationCapturePlotStyle(offscreenExportLayout)}
+            style={presentationCapturePlotStyle(overviewPngCaptureRequest.layout)}
           >
             {buildOverviewDashboardPlot(
               exportPlotWidth,
@@ -5213,7 +5221,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             )}
           </div>
           {exportFooter}
-        </ChartPngOffscreenHost>
+        </ChartCaptureHost>
       ) : null}
     </div>
   );
@@ -6125,9 +6133,9 @@ function HomeInner() {
   const [pdfCaptureMounted, setPdfCaptureMounted] = useState(false);
   const skipFilteredDashboardOnceRef = useRef(false);
   const chartsTabOffscreenExportRef = useRef<HTMLDivElement | null>(null);
-  const [chartsTabOffscreenLayout, setChartsTabOffscreenLayout] = useState<
-    ReturnType<typeof buildPresentationExportSpec> | null
-  >(null);
+  const [chartsTabPngCaptureRequest, setChartsTabPngCaptureRequest] =
+    useState<ChartPngCaptureRequest | null>(null);
+  const chartsTabOffscreenLayout = chartsTabPngCaptureRequest?.layout ?? null;
   const [exportingChartsTabPng, setExportingChartsTabPng] = useState(false);
   const sessionChartKindRef = useRef<ChartKind>("bar");
   const [question, setQuestion] = useState("");
@@ -6844,29 +6852,51 @@ function HomeInner() {
       return;
     }
 
-    const spec = buildPresentationExportSpec(sessionChartKindRef.current, {
+    const contract =
+      activeSnapshot?.presentationContract ??
+      buildChartPresentationContract({
+        chartId: activeChartId || "charts-tab-active",
+        source: "charts",
+        apiChartType: sessionChartKindRef.current,
+        resolvedKind: sessionChartKindRef.current,
+        title: chartTitle || "Chart",
+        rows: chartData,
+      });
+    const request = createChartPngCaptureRequest({
+      contract,
+      profile: "chartsPng",
+      sourceSurface: "charts",
+      kind: sessionChartKindRef.current,
       categoryCount: chartData.length,
+      filename: sanitizeChartExportFilename(chartTitle || "chart"),
+      datasetName: uploadMeta?.name,
     });
     try {
       setError("");
       setExportingChartsTabPng(true);
-      setChartsTabOffscreenLayout(spec);
-      const { runChartPngExport } = await import("@/lib/chart-png-export-session");
-      await runChartPngExport({
+      setChartsTabPngCaptureRequest(request);
+      const artifact = await captureChartPngArtifact({
+        request,
         getExportRoot: () => chartsTabOffscreenExportRef.current,
-        kind: sessionChartKindRef.current,
-        categoryCount: chartData.length,
-        filename: sanitizeChartExportFilename(chartTitle || "chart"),
-        datasetName: uploadMeta?.name,
+        isCurrent: (requestId) =>
+          chartsTabOffscreenExportRef.current?.dataset.chartCaptureRequestId ===
+          requestId,
       });
+      downloadChartArtifact(artifact, request.filename);
     } catch (err) {
       console.error("Chart PNG download failed:", err);
       setError("Unable to download chart image.");
     } finally {
-      setChartsTabOffscreenLayout(null);
+      setChartsTabPngCaptureRequest(null);
       setExportingChartsTabPng(false);
     }
-  }, [chartTitle, chartData.length, uploadMeta?.name]);
+  }, [
+    activeChartId,
+    activeSnapshot?.presentationContract,
+    chartData,
+    chartTitle,
+    uploadMeta?.name,
+  ]);
 
   const setQuestionAndResetInsightState = useCallback(
     (value: string) => {
@@ -12605,9 +12635,9 @@ function HomeInner() {
                       </div>
                     </div>
 
-                    {chartsTabOffscreenLayout ? (
-                      <ChartPngOffscreenHost
-                        layout={chartsTabOffscreenLayout}
+                    {chartsTabPngCaptureRequest && chartsTabOffscreenLayout ? (
+                      <ChartCaptureHost
+                        request={chartsTabPngCaptureRequest}
                         exportRef={chartsTabOffscreenExportRef}
                         rootClassName={chartsTabPngExportRoot}
                       >
@@ -12683,7 +12713,7 @@ function HomeInner() {
                             </div>
                           </ChartInsightViewportWrapper>
                         </div>
-                      </ChartPngOffscreenHost>
+                      </ChartCaptureHost>
                     ) : null}
 
                     <div className={chartsTabSmartReadWrap}>
