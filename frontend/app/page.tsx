@@ -6570,6 +6570,12 @@ function HomeInner() {
   const [howCalculatedOpen, setHowCalculatedOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [insightAskLoadingChart, setInsightAskLoadingChart] = useState(false);
+  const [insightAskLoadingNarrative, setInsightAskLoadingNarrative] =
+    useState(false);
+  const insightAskRequestNonceRef = useRef(0);
+  const insightAskInFlightTurnIdRef = useRef<string | null>(null);
+  const insightAskBusy = insightAskLoadingChart || insightAskLoadingNarrative;
   const [uploadMessage, setUploadMessage] = useState("");
   const [error, setError] = useState("");
   const uploadSuccessHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -7074,7 +7080,7 @@ function HomeInner() {
 
   useEffect(() => {
     const q = pendingInsightAutoAskRef.current;
-    if (activeTab !== "insights" || !q?.trim() || loading) return;
+    if (activeTab !== "insights" || !q?.trim() || insightAskBusy) return;
     const chartId = pinnedInsightChartIdRef.current ?? insightChartId;
     const stored = getChartInsightAnswer(aiAnswerByChartId, chartId);
     if (stored?.hasValidAIAnswer && stored.answer.trim()) {
@@ -7083,7 +7089,7 @@ function HomeInner() {
     }
     pendingInsightAutoAskRef.current = null;
     void askAIImplRef.current(q, CHART_ENTRY_ASK_OPTS);
-  }, [activeTab, loading, insightChartId, aiAnswerByChartId]);
+  }, [activeTab, insightAskBusy, insightChartId, aiAnswerByChartId]);
 
   const openDashboardChartInChartsTab = useCallback(
     (snapshotId: string) => {
@@ -7566,8 +7572,11 @@ function HomeInner() {
   }, [clearAiInsightSession, resetInsightConversationThread]);
 
   const canAskAi = useMemo(
-    () => Boolean(question.trim()) && !loading && columns.length > 0,
-    [question, loading, columns.length]
+    () =>
+      Boolean(question.trim()) &&
+      !insightAskLoadingChart &&
+      columns.length > 0,
+    [question, insightAskLoadingChart, columns.length]
   );
 
   const hasActiveAiConversation = useMemo(() => {
@@ -7672,6 +7681,9 @@ function HomeInner() {
       });
     }
 
+    const requestNonce = ++insightAskRequestNonceRef.current;
+    insightAskInFlightTurnIdRef.current = null;
+
     setError("");
     setAnswer("");
     setHasValidAIAnswer(false);
@@ -7679,7 +7691,8 @@ function HomeInner() {
     setLastAskedQuestion(qRaw);
     setHowCalculatedOpen(false);
     setAlignedAnalysis(null);
-    setLoading(true);
+    setInsightAskLoadingChart(true);
+    setInsightAskLoadingNarrative(false);
 
     let lineageParentChartId =
       askMode === "fresh_root_chart_entry"
@@ -7702,6 +7715,25 @@ function HomeInner() {
         lineageParentChartId = null;
       }
     }
+
+    const isStaleAsk = () => requestNonce !== insightAskRequestNonceRef.current;
+
+    const finishAskLoading = () => {
+      if (!isStaleAsk()) {
+        setInsightAskLoadingChart(false);
+        setInsightAskLoadingNarrative(false);
+      }
+    };
+
+    const applyPlanFromAskData = (data: Record<string, unknown>) => {
+      if (data.plan && typeof data.plan === "object") {
+        applyPlanEnvelope(data.plan as PlanUsageResponse);
+      } else {
+        fetchPlanUsage()
+          .then((payload) => setPlanUsage(payload))
+          .catch(() => {});
+      }
+    };
 
     try {
       const chartHistorySnapshot = chartHistory;
@@ -7767,43 +7799,47 @@ function HomeInner() {
             } as ConversationSnapshot)
           : null;
 
-      const response = await fetch(apiUrl("/ask"), {
+      const askRequestBody = {
+        question: qRaw,
+        conversation_context: conversationPayload,
+        parent_analysis_context: parentAnalysisContext
+          ? {
+              rootQuestion: parentAnalysisContext.rootQuestion,
+              priorQuestion: parentAnalysisContext.priorQuestion,
+              metricColumn: parentAnalysisContext.metricColumn,
+              categoryColumn: parentAnalysisContext.categoryColumn,
+              metricColumnDisplay: parentAnalysisContext.metricColumnDisplay,
+              categoryColumnDisplay:
+                parentAnalysisContext.categoryColumnDisplay,
+              aggregation: parentAnalysisContext.aggregation,
+              chartType: parentAnalysisContext.chartType,
+              chartTitle: parentAnalysisContext.chartTitle,
+              intentBucket: parentAnalysisContext.intentBucket,
+              routingIntent: parentAnalysisContext.routingIntent,
+              followUpChain: parentAnalysisContext.followUpChain,
+              lastAiAnswer: parentAnalysisContext.lastAiAnswer,
+              turnId: parentAnalysisContext.turnId,
+            }
+          : null,
+        continuation_intent: continuationIntent,
+        dashboard_filters: dashboardFilters,
+        date_range: dateAskPayload,
+      };
+
+      const chartResponse = await fetch(apiUrl("/ask"), {
         method: "POST",
         headers: saasRequestHeaders({
           "Content-Type": "application/json",
         }),
-        body: JSON.stringify({
-          question: qRaw,
-          conversation_context: conversationPayload,
-          parent_analysis_context: parentAnalysisContext
-            ? {
-                rootQuestion: parentAnalysisContext.rootQuestion,
-                priorQuestion: parentAnalysisContext.priorQuestion,
-                metricColumn: parentAnalysisContext.metricColumn,
-                categoryColumn: parentAnalysisContext.categoryColumn,
-                metricColumnDisplay: parentAnalysisContext.metricColumnDisplay,
-                categoryColumnDisplay:
-                  parentAnalysisContext.categoryColumnDisplay,
-                aggregation: parentAnalysisContext.aggregation,
-                chartType: parentAnalysisContext.chartType,
-                chartTitle: parentAnalysisContext.chartTitle,
-                intentBucket: parentAnalysisContext.intentBucket,
-                routingIntent: parentAnalysisContext.routingIntent,
-                followUpChain: parentAnalysisContext.followUpChain,
-                lastAiAnswer: parentAnalysisContext.lastAiAnswer,
-                turnId: parentAnalysisContext.turnId,
-              }
-            : null,
-          continuation_intent: continuationIntent,
-          dashboard_filters: dashboardFilters,
-          date_range: dateAskPayload,
-        }),
+        body: JSON.stringify({ ...askRequestBody, phase: "chart" }),
       });
 
-      if (!response.ok) {
-        let detail: unknown = `AI request failed (${response.status})`;
+      if (isStaleAsk()) return;
+
+      if (!chartResponse.ok) {
+        let detail: unknown = `AI request failed (${chartResponse.status})`;
         try {
-          const errBody = (await response.json()) as { detail?: unknown };
+          const errBody = (await chartResponse.json()) as { detail?: unknown };
           detail = errBody.detail ?? detail;
         } catch {
           /* ignore parse errors */
@@ -7814,25 +7850,15 @@ function HomeInner() {
         throw new Error(extractApiErrorMessage(detail));
       }
 
-      const data = await response.json();
-      if (data.plan && typeof data.plan === "object") {
-        applyPlanEnvelope(data.plan as PlanUsageResponse);
-      } else {
-        fetchPlanUsage()
-          .then((payload) => setPlanUsage(payload))
-          .catch(() => {});
+      const chartData = (await chartResponse.json()) as Record<string, unknown>;
+      applyPlanFromAskData(chartData);
+
+      if (typeof chartData.filter_breadcrumb === "string") {
+        setFilterBreadcrumb(chartData.filter_breadcrumb);
       }
 
-      if (typeof data.filter_breadcrumb === "string") {
-        setFilterBreadcrumb(data.filter_breadcrumb);
-      }
-
-      const cleanedAnswer = String(data.answer || "")
-        .replace(/#/g, "")
-        .replace(/\*\*/g, "");
-
-      const nextSnap = parseConversationSnapshot(data.conversation_context);
-      const meta = parseConversationMeta(data.conversation_meta);
+      const nextSnap = parseConversationSnapshot(chartData.conversation_context);
+      const meta = parseConversationMeta(chartData.conversation_meta);
       setLastConversationMeta(meta);
 
       const qTrim = qRaw;
@@ -7843,8 +7869,8 @@ function HomeInner() {
         });
       }
 
-      const hydrated = hydrateVisualizationFromApi(data.visualization);
-      const parsedAnalysis = parseAlignedAnalysis(data.analysis);
+      const hydrated = hydrateVisualizationFromApi(chartData.visualization);
+      const parsedAnalysis = parseAlignedAnalysis(chartData.analysis);
       logAnalysisIntentToConsole(qRaw, parsedAnalysis?.analysisIntent);
       const followUpDetected = Boolean(meta?.followUpDetected);
       const preservePinnedChart = Boolean(
@@ -7863,43 +7889,8 @@ function HomeInner() {
               askPinnedSnapshot.source === "auto_dashboard" &&
               Boolean(extractDashboardChartTitleFromPrefillQuestion(qRaw))))
       );
-      const pinnedContract = askPinnedSnapshot?.contract ?? null;
-      const narrativeForPinned =
-        preservePinnedChart && pinnedContract
-          ? narrativeCopyForContract(pinnedContract)
-          : null;
 
-      let answerForBundle = cleanedAnswer;
-      let validForBundle = Boolean(cleanedAnswer.trim());
-      let analysisForBundle: AlignedAnalysisContext | null = parsedAnalysis;
-
-      if (preservePinnedChart && pinnedContract) {
-        const sanitizedAnswer = sanitizeNarrativeForTrendContract(
-          cleanedAnswer,
-          pinnedContract
-        );
-        answerForBundle = sanitizedAnswer;
-        validForBundle = Boolean(sanitizedAnswer.trim());
-        analysisForBundle = parsedAnalysis
-          ? {
-              ...parsedAnalysis,
-              chartTitle: pinnedContract.displayTitle,
-              categoryColumn: null,
-              categoryColumnDisplay: pinnedContract.timeBucketLabel,
-              chartTypeInternal: pinnedContract.chartType,
-              insightSummary: sanitizeNarrativeForTrendContract(
-                parsedAnalysis.insightSummary?.trim() ||
-                  narrativeForPinned ||
-                  cleanedAnswer,
-                pinnedContract
-              ),
-            }
-          : parsedAnalysis;
-      }
-
-      setAnswer(answerForBundle);
-      setHasValidAIAnswer(validForBundle);
-      setAlignedAnalysis(analysisForBundle);
+      setAlignedAnalysis(parsedAnalysis);
       setLastAskVisualizationHydrated(
         preservePinnedChart ? true : Boolean(hydrated)
       );
@@ -7907,7 +7898,7 @@ function HomeInner() {
       if (nextSnap) {
         setConversationSnapshot(
           enrichConversationSnapshotForNextTurn(nextSnap, {
-            cleanedAnswer,
+            cleanedAnswer: "",
             hydrated,
             datasetKind,
             productColumn,
@@ -7919,10 +7910,6 @@ function HomeInner() {
             dashboardFilters,
           })
         );
-        const frame =
-          parsedAnalysis?.insightSummary?.trim() ||
-          cleanedAnswer.replace(/\s+/g, " ").slice(0, 360).trim() ||
-          null;
         setAiConversationState({
           lastQuestion: nextSnap.lastQuestion,
           lastMetric: nextSnap.metricColumn,
@@ -7933,7 +7920,7 @@ function HomeInner() {
             nextSnap.activeDrillPath && nextSnap.activeDrillPath.length > 0
               ? nextSnap.activeDrillPath
               : drillLines,
-          lastResultFrame: frame,
+          lastResultFrame: null,
           lastInsightChartId: null,
           turnId: nextSnap.turnId ?? null,
           parentTurnId: meta?.parentTurnId ?? null,
@@ -8089,6 +8076,182 @@ function HomeInner() {
 
       const bundleChartId =
         pushedInsightChartId ?? lineageParentChartId ?? insightChartId;
+
+      const turnId =
+        typeof chartData.turn_id === "string" ? chartData.turn_id.trim() : "";
+      const narrativePending = chartData.narrative_status === "pending";
+      const terminalAnswer = String(chartData.answer || "")
+        .replace(/#/g, "")
+        .replace(/\*\*/g, "")
+        .trim();
+
+      if (!turnId || !narrativePending) {
+        if (terminalAnswer) {
+          setAnswer(terminalAnswer);
+          setHasValidAIAnswer(true);
+        }
+        if (bundleChartId) {
+          saveInsightBundleForChart(bundleChartId, {
+            answer: terminalAnswer,
+            lastAskedQuestion: qRaw,
+            hasValidAIAnswer: Boolean(terminalAnswer),
+            alignedAnalysis: parsedAnalysis,
+          });
+        }
+        return;
+      }
+
+      if (isStaleAsk()) return;
+
+      insightAskInFlightTurnIdRef.current = turnId;
+      setInsightAskLoadingChart(false);
+      setInsightAskLoadingNarrative(true);
+
+      if (bundleChartId) {
+        saveInsightBundleForChart(bundleChartId, {
+          answer: "",
+          lastAskedQuestion: qRaw,
+          hasValidAIAnswer: false,
+          alignedAnalysis: parsedAnalysis,
+        });
+      }
+
+      const narrativeResponse = await fetch(apiUrl("/ask"), {
+        method: "POST",
+        headers: saasRequestHeaders({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          question: qRaw,
+          phase: "narrative",
+          turn_id: turnId,
+        }),
+      });
+
+      if (isStaleAsk()) return;
+      if (insightAskInFlightTurnIdRef.current !== turnId) return;
+
+      if (!narrativeResponse.ok) {
+        let detail: unknown = `AI narrative request failed (${narrativeResponse.status})`;
+        try {
+          const errBody = (await narrativeResponse.json()) as {
+            detail?: unknown;
+          };
+          detail = errBody.detail ?? detail;
+        } catch {
+          /* ignore parse errors */
+        }
+        if (narrativeResponse.status === 410) {
+          setError("Insight narrative expired. Please ask again.");
+          return;
+        }
+        if (handleApiLimitDetail(detail)) {
+          throw new Error(extractApiErrorMessage(detail));
+        }
+        setError(
+          "Unable to generate the insight narrative. Your chart is still available below."
+        );
+        return;
+      }
+
+      const narrativeData = (await narrativeResponse.json()) as Record<
+        string,
+        unknown
+      >;
+      applyPlanFromAskData(narrativeData);
+
+      if (typeof narrativeData.filter_breadcrumb === "string") {
+        setFilterBreadcrumb(narrativeData.filter_breadcrumb);
+      }
+
+      const narrSnap = parseConversationSnapshot(
+        narrativeData.conversation_context
+      );
+      const narrMeta = parseConversationMeta(narrativeData.conversation_meta);
+      setLastConversationMeta(narrMeta);
+
+      const cleanedAnswer = String(narrativeData.answer || "")
+        .replace(/#/g, "")
+        .replace(/\*\*/g, "");
+
+      const pinnedContract = askPinnedSnapshot?.contract ?? null;
+      const narrativeForPinned =
+        preservePinnedChart && pinnedContract
+          ? narrativeCopyForContract(pinnedContract)
+          : null;
+
+      let answerForBundle = cleanedAnswer;
+      let validForBundle = Boolean(cleanedAnswer.trim());
+      let analysisForBundle: AlignedAnalysisContext | null = parsedAnalysis;
+
+      if (preservePinnedChart && pinnedContract) {
+        const sanitizedAnswer = sanitizeNarrativeForTrendContract(
+          cleanedAnswer,
+          pinnedContract
+        );
+        answerForBundle = sanitizedAnswer;
+        validForBundle = Boolean(sanitizedAnswer.trim());
+        analysisForBundle = parsedAnalysis
+          ? {
+              ...parsedAnalysis,
+              chartTitle: pinnedContract.displayTitle,
+              categoryColumn: null,
+              categoryColumnDisplay: pinnedContract.timeBucketLabel,
+              chartTypeInternal: pinnedContract.chartType,
+              insightSummary: sanitizeNarrativeForTrendContract(
+                parsedAnalysis.insightSummary?.trim() ||
+                  narrativeForPinned ||
+                  cleanedAnswer,
+                pinnedContract
+              ),
+            }
+          : parsedAnalysis;
+      }
+
+      if (isStaleAsk()) return;
+      if (insightAskInFlightTurnIdRef.current !== turnId) return;
+
+      setAnswer(answerForBundle);
+      setHasValidAIAnswer(validForBundle);
+      setAlignedAnalysis(analysisForBundle);
+
+      if (narrSnap) {
+        setConversationSnapshot(
+          enrichConversationSnapshotForNextTurn(narrSnap, {
+            cleanedAnswer,
+            hydrated,
+            datasetKind,
+            productColumn,
+            salesColumn,
+            regionColumn,
+            customerColumn,
+            profitColumn,
+            dateColumn,
+            dashboardFilters,
+          })
+        );
+        const frame =
+          analysisForBundle?.insightSummary?.trim() ||
+          cleanedAnswer.replace(/\s+/g, " ").slice(0, 360).trim() ||
+          null;
+        setAiConversationState({
+          lastQuestion: narrSnap.lastQuestion,
+          lastMetric: narrSnap.metricColumn,
+          lastDimension: narrSnap.categoryColumn,
+          lastChartType: narrSnap.chartType,
+          activeFilters: [...(narrSnap.filtersApplied ?? [])],
+          activeDrillPath:
+            narrSnap.activeDrillPath && narrSnap.activeDrillPath.length > 0
+              ? narrSnap.activeDrillPath
+              : drillLines,
+          lastResultFrame: frame,
+          lastInsightChartId: null,
+          turnId: narrSnap.turnId ?? null,
+          parentTurnId: narrMeta?.parentTurnId ?? null,
+          followUpChain: narrSnap.followUpChain ?? [],
+        });
+      }
+
       if (bundleChartId) {
         saveInsightBundleForChart(bundleChartId, {
           answer: answerForBundle,
@@ -8098,11 +8261,13 @@ function HomeInner() {
         });
       }
     } catch {
-      setAlignedAnalysis(null);
-      setHasValidAIAnswer(false);
-      setError("Unable to get AI response. Please check backend/API key.");
+      if (!isStaleAsk()) {
+        setAlignedAnalysis(null);
+        setHasValidAIAnswer(false);
+        setError("Unable to get AI response. Please check backend/API key.");
+      }
     } finally {
-      setLoading(false);
+      finishAskLoading();
     }
   };
   askAIImplRef.current = askAI;
@@ -12946,7 +13111,7 @@ function HomeInner() {
                 ) : null}
                 <div
                   className={aiInsightsAskInputBlock}
-                  aria-busy={loading || undefined}
+                  aria-busy={insightAskBusy || undefined}
                 >
                   <label className={aiInsightsAskQuestionLabel} htmlFor="ai-insights-question">
                     Your question
@@ -12958,11 +13123,11 @@ function HomeInner() {
                       onChange={(e) => setQuestionAndResetInsightState(e.target.value)}
                       className={aiInsightsAskTextarea}
                       placeholder="Ask about trends, rankings, or comparisons in your data…"
-                      disabled={loading}
+                      disabled={insightAskLoadingChart}
                       aria-describedby={
                         error && activeTab === "insights"
                           ? "ai-insights-ask-error"
-                          : loading
+                          : insightAskBusy
                             ? "ai-insights-ask-loading"
                             : undefined
                       }
@@ -12973,11 +13138,17 @@ function HomeInner() {
                         onClick={() => void askAI()}
                         disabled={!canAskAi}
                         className={aiInsightsAskSubmitBtn}
-                        aria-label={loading ? "Generating AI insight" : "Ask AI"}
+                        aria-label={
+                          insightAskBusy ? "Generating AI insight" : "Ask AI"
+                        }
                       >
-                        {loading ? "Thinking…" : "Ask AI"}
+                        {insightAskLoadingChart
+                          ? "Building chart…"
+                          : insightAskLoadingNarrative
+                            ? "Generating insight…"
+                            : "Ask AI"}
                       </button>
-                      {loading ? (
+                      {insightAskBusy ? (
                         <div
                           id="ai-insights-ask-loading"
                           className={aiInsightsAskLoading}
@@ -12988,7 +13159,11 @@ function HomeInner() {
                             className="inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-[color:var(--accent)]/25 border-t-[color:var(--accent)]"
                             aria-hidden
                           />
-                          <span>Generating answer and chart…</span>
+                          <span>
+                            {insightAskLoadingChart
+                              ? "Building chart…"
+                              : "Generating insight…"}
+                          </span>
                         </div>
                       ) : null}
                     </div>
@@ -13031,7 +13206,7 @@ function HomeInner() {
 
                 {insightSnapshot &&
                 !hasValidAIAnswer &&
-                !loading &&
+                !insightAskBusy &&
                 !answer.trim() ? (
                   <div className="mt-3 rounded-xl border border-indigo-100/70 bg-indigo-50/35 px-3.5 py-3 text-sm text-slate-700 leading-snug dark:border-indigo-400/18 dark:bg-[color:var(--insights-wash-followup)] dark:text-[color:var(--insights-text-secondary)]">
                     This chart is selected. Click{" "}
@@ -13041,13 +13216,15 @@ function HomeInner() {
                 ) : null}
 
                 <div className={aiInsightsResultsStack}>
-                {(hasValidAIAnswer || loading || answer.trim()) ? (
+                {(hasValidAIAnswer ||
+                  insightAskLoadingNarrative ||
+                  answer.trim()) ? (
                 <div className={aiInsightsAnswerCard}>
                   <div className={aiInsightsAnswerHeader}>
                     <p className={aiInsightsAnswerKicker}>Executive analysis</p>
                     <h3 className={aiInsightsAnswerTitle}>AI Answer</h3>
                   </div>
-                  {answer.trim() || loading ? (
+                  {answer.trim() || insightAskLoadingNarrative ? (
                     <div className={aiInsightsAnswerStack}>
                       {(() => {
                         const lead = aiAnswerLeadIn(
@@ -13164,7 +13341,7 @@ function HomeInner() {
                       ) : null}
                       </div>
                     </div>
-                  ) : loading ? (
+                  ) : insightAskLoadingNarrative ? (
                     <p className={`${aiInsightsBodyText} mt-2`} role="status">
                       Generating insight…
                     </p>
@@ -13176,7 +13353,9 @@ function HomeInner() {
                 </div>
                 ) : null}
 
-                {loading && !insightHasRenderableVisualization && !hasValidAIAnswer ? (
+                {insightAskLoadingChart &&
+                !insightHasRenderableVisualization &&
+                !hasValidAIAnswer ? (
                   <div
                     className="w-full min-w-0 overflow-hidden rounded-2xl border border-[color:var(--border-default)]/60 bg-[color:var(--surface-subtle)] p-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)]"
                     aria-hidden
@@ -13356,7 +13535,7 @@ function HomeInner() {
                         <button
                           key={chip}
                           type="button"
-                          disabled={loading}
+                          disabled={insightAskBusy}
                           onClick={() => {
                             handleSuggestedChipAsk(chip);
                           }}

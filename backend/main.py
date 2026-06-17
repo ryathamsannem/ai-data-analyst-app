@@ -15,7 +15,7 @@ from anthropic import (
 from dotenv import load_dotenv
 import os
 from io import BytesIO
-from typing import Optional, List, Dict, Any, Tuple, Callable
+from typing import Optional, List, Dict, Any, Tuple, Callable, Literal
 from contextlib import contextmanager
 import re
 import math
@@ -57,6 +57,12 @@ from services.saas_context import (
     resolve_session_id,
 )
 from services.usage_tracker import usage_tracker
+from services.ask_turn_cache import AskTurnCacheEntry, ask_turn_cache
+from services.ask_narrative_phase import (
+    build_ask_narrative_prompt,
+    handle_ask_narrative_phase,
+    produce_ask_narrative_answer,
+)
 from services.auto_dashboard_opportunities import (
     DashboardDeps,
     build_dashboard_charts_from_opportunities,
@@ -242,6 +248,9 @@ class DashboardDateRangeModel(BaseModel):
     end: Optional[str] = Field(default=None, description="ISO date string inclusive")
 
 
+AskPhase = Literal["full", "chart", "narrative"]
+
+
 class QuestionRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -251,6 +260,8 @@ class QuestionRequest(BaseModel):
     continuation_intent: bool = False
     dashboard_filters: List[DashboardFilterEntryModel] = Field(default_factory=list)
     date_range: Optional[DashboardDateRangeModel] = None
+    phase: AskPhase = "full"
+    turn_id: Optional[str] = None
 
 
 class FilteredDashboardRequest(BaseModel):
@@ -325,6 +336,9 @@ _DATE_COL_NAME_HINT = re.compile(
 )
 
 
+_DATETIME_PARSE_RATIO_EARLY_RETURN = 0.9
+
+
 def _datetime_parse_ratio(series: pd.Series) -> float:
     """Fraction of non-null values that parse as datetimes (mixed formats)."""
     non_null = series.dropna()
@@ -335,6 +349,8 @@ def _datetime_parse_ratio(series: pd.Series) -> float:
     except TypeError:
         dt = pd.to_datetime(non_null, errors="coerce")
     r1 = float(dt.notna().mean())
+    if r1 >= _DATETIME_PARSE_RATIO_EARLY_RETURN:
+        return r1
     try:
         dt2 = pd.to_datetime(
             non_null.astype(str).str.strip(), errors="coerce", format="mixed"
@@ -410,13 +426,14 @@ def detect_column_types(input_df: pd.DataFrame):
         )
         numeric_ratio = float(numeric.notna().mean()) if len(non_null) else 0.0
 
+        if numeric_ratio >= 0.9:
+            result[col] = "number"
+            continue
+
         # Date: mixed-format parsing + optional boost when the header looks temporal.
         date_ratio = _datetime_parse_ratio(s)
         date_named = bool(_DATE_COL_NAME_HINT.search(str(col)))
 
-        if numeric_ratio >= 0.9:
-            result[col] = "number"
-            continue
         if date_ratio >= 0.9:
             result[col] = "date"
             continue
@@ -3677,21 +3694,29 @@ def build_auto_dashboard_charts(
     )
 
 
-def build_auto_dashboard() -> Dict[str, Any]:
+def build_auto_dashboard(
+    *,
+    profile: Optional[Dict[str, Any]] = None,
+    kp: Optional[Dict[str, Any]] = None,
+    exec_domain: Optional[str] = None,
+    exec_cards: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     global df, dataset_profile
     if df is None:
         return {"kind": "generic", "type_label": AUTO_DASHBOARD_LABELS["generic"], "cards": [], "charts": []}
 
-    profile = dataset_profile or build_profile(df)
+    profile = profile if profile is not None else (dataset_profile or build_profile(df))
     columns = df.columns.tolist()
-    exec_domain = infer_executive_domain(columns)
+    exec_domain = (
+        exec_domain if exec_domain is not None else infer_executive_domain(columns)
+    )
     kind = executive_domain_to_auto_kind(exec_domain)
     label = EXECUTIVE_DASHBOARD_LABELS.get(exec_domain, AUTO_DASHBOARD_LABELS.get(kind, "Generic"))
 
     out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": [], "charts": []}
 
     ct = profile.get("column_types", {})
-    kp = calculate_kpis()
+    kp = kp if kp is not None else calculate_kpis()
 
     cat_type_count = sum(
         1 for col in columns if ct.get(col) in ("category", "text")
@@ -3736,7 +3761,11 @@ def build_auto_dashboard() -> Dict[str, Any]:
                 trimmed.append(pc)
         return trimmed[:6]
 
-    cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
+    cards = (
+        exec_cards
+        if exec_cards is not None
+        else build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
+    )
     out["cards"] = clamp_cards(cards)
     out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
     return out
@@ -5001,9 +5030,19 @@ def build_dimension_catalog_for_ui(
 def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
     global df, selected_sheet_name, column_mapping, uploaded_file_name, uploaded_file_bytes, dataset_profile, column_mapping_metadata
 
-    kpi_cards, dataset_kind = build_kpi_cards()
-    auto_dashboard = build_auto_dashboard()
     prof = dataset_profile or build_profile(df)
+    kp = calculate_kpis()
+    columns = df.columns.tolist()
+    exec_domain = infer_executive_domain(columns)
+    exec_cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(prof, kp))
+    kpi_cards = exec_cards[:5]
+    dataset_kind = executive_domain_to_kpi_domain(exec_domain)
+    auto_dashboard = build_auto_dashboard(
+        profile=prof,
+        kp=kp,
+        exec_domain=exec_domain,
+        exec_cards=exec_cards,
+    )
     dim_opts = build_dimension_catalog_for_ui(df, prof)
     bc = build_filter_breadcrumb(df, prof, [], None)
     payload = {
@@ -5017,7 +5056,7 @@ def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
         "sheets": sheet_names,
         "selected_sheet": selected_sheet_name,
         "profile": prof,
-        "kpis": calculate_kpis(),
+        "kpis": kp,
         "kpi_cards": kpi_cards,
         "dataset_kind": dataset_kind,
         "auto_dashboard": auto_dashboard,
@@ -15651,6 +15690,94 @@ def _compute_visualization_for_question_body(
     return exact_result, visualization, fin(analysis_ctx)
 
 
+def _build_ask_conversation_out(
+    *,
+    plan: Dict[str, Any],
+    data: QuestionRequest,
+    eff_q: str,
+    analysis_ctx: Dict[str, Any],
+    visualization: Optional[Dict[str, Any]],
+    prev_filters: List[str],
+    filter_added: List[str],
+    turn_id_session: str,
+    follow_chain_session: List[str],
+    lic_id_session: Optional[str],
+    drill_path_session: List[str],
+) -> Dict[str, Any]:
+    chart_rec_out = (
+        analysis_ctx.get("chartRecommendation")
+        if isinstance(analysis_ctx.get("chartRecommendation"), dict)
+        else {}
+    )
+    viz_title = ""
+    if visualization and isinstance(visualization.get("title"), str):
+        viz_title = visualization["title"].strip()
+    conv_scope_q = str(plan.get("scope_question") or "").strip()
+    conv_root_q = (
+        conv_scope_q
+        or (
+            data.conversation_context.rootQuestion
+            if data.conversation_context
+            and (data.conversation_context.rootQuestion or "").strip()
+            else None
+        )
+        or eff_q
+    )
+    conv_last_q = (
+        conv_scope_q if plan.get("scoped_follow_up") and conv_scope_q else eff_q
+    )
+    return {
+        "lastQuestion": conv_last_q,
+        "rootQuestion": conv_root_q,
+        "lastChartTitle": viz_title
+        or str(analysis_ctx.get("chartTitle") or "").strip(),
+        "metricColumn": analysis_ctx.get("metricColumn"),
+        "categoryColumn": analysis_ctx.get("categoryColumn"),
+        "aggregation": analysis_ctx.get("aggregation"),
+        "chartType": analysis_ctx.get("chartType"),
+        "intentBucket": chart_rec_out.get("detectedIntent"),
+        "filtersApplied": prev_filters + filter_added,
+        "turnId": turn_id_session,
+        "followUpChain": follow_chain_session,
+        "lastInsightChartId": lic_id_session,
+        "activeDrillPath": drill_path_session,
+    }
+
+
+def _ask_request_snapshot(data: QuestionRequest) -> Dict[str, Any]:
+    return {
+        "question": data.question,
+        "continuation_intent": data.continuation_intent,
+        "conversation_context": (
+            data.conversation_context.model_dump()
+            if data.conversation_context is not None
+            else None
+        ),
+        "parent_analysis_context": (
+            data.parent_analysis_context.model_dump()
+            if data.parent_analysis_context is not None
+            else None
+        ),
+        "dashboard_filters": [f.model_dump() for f in data.dashboard_filters],
+        "date_range": (
+            data.date_range.model_dump() if data.date_range is not None else None
+        ),
+    }
+
+
+def _ask_plan_snapshot(
+    plan: Dict[str, Any], sidecar: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
+    return {
+        "ai_context_block": plan.get("ai_context_block"),
+        "follow_up_ops": plan.get("follow_up_ops"),
+        "scoped_follow_up": plan.get("scoped_follow_up"),
+        "scope_question": plan.get("scope_question"),
+        "effective_question": plan.get("effective_question"),
+        "conversation_sidecar": plan.get("conversation_sidecar") or sidecar,
+    }
+
+
 @app.post("/ask")
 def ask_question(data: QuestionRequest, request: Request):
     global df, dataset_profile
@@ -15663,6 +15790,10 @@ def ask_question(data: QuestionRequest, request: Request):
         }
 
     session_id = resolve_session_id(request)
+
+    if data.phase == "narrative":
+        return handle_ask_narrative_phase(data, request, session_id)
+
     tier = resolve_plan_tier(request)
     ai_ok, ai_msg = usage_tracker.check_ai_question(session_id, tier)
     if not ai_ok:
@@ -15694,7 +15825,10 @@ def ask_question(data: QuestionRequest, request: Request):
             }
         )
 
-    usage_tracker.record_ai_question(session_id)
+    phase = data.phase
+
+    if phase == "full":
+        usage_tracker.record_ai_question(session_id)
 
     prev_filters: List[str] = []
     if data.conversation_context and data.conversation_context.filtersApplied:
@@ -15888,448 +16022,105 @@ def ask_question(data: QuestionRequest, request: Request):
                 prov2["dashboardFiltersApplied"] = all_row_scope
                 visualization["provenance"] = prov2
 
-        viz_anchor = ""
-        viz_rule = ""
-        if visualization:
-            ctype = visualization.get("chartType", "")
-            npts = len(visualization.get("labels", []))
-            viz_anchor = (
-                "\nChart values generated from pandas (AUTHORITATIVE for prose — cite these amounts exactly):\n"
-                + build_visualization_anchor_for_prompt(visualization)
-                + "\n"
-            )
-            viz_rule = (
-                f"A {ctype} visualization with {npts} points accompanies this reply. "
-                "Your explanation MUST use ONLY the labeled amounts in the authoritative chart-values block above "
-                "(same rounding string). Do not recalculate totals or averages from prose.\n"
-            )
-
-        trend_rule = ""
-        if visualization and visualization.get("chartType") in ("line", "area"):
-            trend_rule = "- Focus on the trajectory over periods shown in the calculated result.\n"
-
-        focus_line = ""
-        is_rel_viz = (
-            visualization
-            and str(visualization.get("chartType") or "").lower() == "scatter"
-        )
-        if is_rel_viz:
-            x_lab = _title_case_words(
-                str(visualization.get("scatterXLabel") or analysis_ctx.get("categoryColumn") or "")
-            )
-            y_lab = _title_case_words(
-                str(visualization.get("scatterYLabel") or analysis_ctx.get("metricColumn") or "")
-            )
-            rel_ml = (
-                visualization.get("relationshipMeasureLabel")
-                or _relationship_measure_label(
-                    str(analysis_ctx.get("categoryColumn") or ""),
-                    str(analysis_ctx.get("metricColumn") or ""),
-                )
-            )
-            focus_line = (
-                "\nDetected question focus (relationship / correlation scatter):\n"
-                f"- X-axis metric: {x_lab}\n"
-                f"- Y-axis metric: {y_lab}\n"
-                f"- Relationship label (use in prose): {rel_ml}\n"
-                "- Do not cite row numbers, Point N, or internal point labels.\n"
-            )
-        elif analysis_ctx.get("metricColumn"):
-            m_disp_line = ""
-            m_disp = analysis_ctx.get("metricColumnDisplay")
-            if isinstance(m_disp, str) and m_disp.strip():
-                m_disp_line = f"- Metric label (use in prose): {m_disp.strip()}\n"
-            focus_line = (
-                "\nDetected question focus (do not substitute a different metric or column):\n"
-                f"- Metric column: {analysis_ctx.get('metricColumn')}\n"
-                f"{m_disp_line}"
-                f"- Breakdown dimension: {analysis_ctx.get('categoryColumn')}\n"
-                f"- Aggregation: {analysis_ctx.get('aggregation')} ({analysis_ctx.get('aggregationKey')})\n"
-                "- When stating totals, averages, or counts, use the metric label above — "
-                "do not drop the aggregation word (Total, Average, Count, etc.).\n"
-            )
-            sec_g = analysis_ctx.get("secondaryGroupColumn")
-            if sec_g:
-                focus_line += f"- Secondary breakdown dimension: {sec_g}\n"
-            if analysis_ctx.get("dualMetricCompare"):
-                cm = analysis_ctx.get("compareMetrics")
-                sec_m = analysis_ctx.get("secondaryMetricColumn")
-                if isinstance(cm, list) and len(cm) >= 2:
-                    focus_line += (
-                        "- Dual-metric comparison (mandatory): discuss BOTH metrics — "
-                        f"{_pretty_label_text(str(cm[0]))} AND "
-                        f"{_pretty_label_text(str(cm[1]))} — for each relevant category "
-                        "using the authoritative chart-values block. Do not focus on only "
-                        "one metric.\n"
-                    )
-                elif sec_m:
-                    focus_line += (
-                        "- Dual-metric comparison: include both the primary metric and "
-                        f"{_pretty_label_text(str(sec_m))} in your answer.\n"
-                    )
-            entity_col = analysis_ctx.get("entityFilterColumn")
-            entity_val = analysis_ctx.get("entityFilterValue")
-            explain_mode = str(analysis_ctx.get("entityExplainMode") or "").strip().lower()
-            if entity_col and entity_val:
-                entity_col_lbl = _pretty_label_text(str(entity_col))
-                focus_line += (
-                    f"\nEntity focus (mandatory):\n"
-                    f"- Focused entity: {entity_val} ({entity_col_lbl})\n"
-                )
-                if explain_mode == "peer_compare":
-                    focus_line += (
-                        "- Compare this entity against peer "
-                        f"{entity_col_lbl.lower()}s using the chart values. "
-                        "Do not claim the entity cannot be isolated — it is highlighted in the chart.\n"
-                        "- Do not answer with a global product-only ranking across all rows.\n"
-                    )
-                else:
-                    focus_line += (
-                        "- Break down performance within this entity cohort using the chart breakdown dimension.\n"
-                        "- Do not answer with a global ranking that ignores the focused entity.\n"
-                    )
-
-        conv_block = plan.get("ai_context_block") or ""
-        if sidecar and isinstance(sidecar.get("contextUsedLine"), str):
-            conv_block = (
-                f"{conv_block}\nContext used (for your reasoning — user-visible in the app):\n"
-                f"{sidecar.get('contextUsedLine')}\n"
-            ).strip()
-        if dash_labs:
-            conv_block = (
-                f"{conv_block}\nActive dashboard filters (row subset):\n"
-                + "\n".join(f"- {ln}" for ln in dash_labs)
-            ).strip()
-
-        ctx = get_ai_context(sample_rows=10, question=eff_q or data.question)
-        evidence_line = ""
-        esl = analysis_ctx.get("evidenceSummaryLine")
-        if isinstance(esl, str) and esl.strip():
-            evidence_line = f"\nEvidence scope (use verbatim when discussing sample size):\n{esl.strip()}\n"
-        rationale_line = ""
-        icr = analysis_ctx.get("insightConfidenceRationale")
-        if isinstance(icr, str) and icr.strip():
-            rationale_line = f"\nHeuristic confidence note: {icr.strip()}\n"
-
-        unsupported_requested_metric: Optional[Dict[str, Any]] = None
-        guard_block = ""
-        concentration_risk_question = False
-        try:
-            from intent_engine.narrative_guardrails import (
-                assess_unsupported_requested_metric,
-                build_unsupported_requested_metric_context,
-                narrative_guardrails_prompt_block,
-            )
-
-            unsupported_requested_metric = assess_unsupported_requested_metric(
-                question=data.question,
-                df=df,
-                profile=dataset_profile,
+        if phase == "chart":
+            conv_out = _build_ask_conversation_out(
+                plan=plan,
+                data=data,
+                eff_q=eff_q,
                 analysis_ctx=analysis_ctx,
+                visualization=visualization,
+                prev_filters=prev_filters,
+                filter_added=filter_added,
+                turn_id_session=turn_id_session,
+                follow_chain_session=follow_chain_session,
+                lic_id_session=lic_id_session,
+                drill_path_session=drill_path_session,
             )
-            concentration_risk_question = bool(
-                str(analysis_ctx.get("executiveAmbiguousBucket") or "")
-                in ("executive_risk", "executive_strategy")
-                or re.search(
-                    r"\b(risk|concentrat|dependency|portfolio|exposure)\b",
-                    str(data.question or ""),
-                    re.I,
-                )
-            )
-            guard_block = narrative_guardrails_prompt_block(
-                question=data.question,
-                df=df,
-                profile=dataset_profile,
-                analysis_ctx=analysis_ctx,
-                unsupported_requested=unsupported_requested_metric,
-            )
-            if guard_block:
-                guard_block = f"\n{guard_block}\n"
-            if (
-                unsupported_requested_metric
-                and unsupported_requested_metric.get("active")
-            ):
-                lim_ctx = build_unsupported_requested_metric_context(
-                    unsupported_requested_metric
-                )
-                exact_result = f"{lim_ctx}\n\n{exact_result}".strip()
-        except Exception:
-            pass
-
-        polish_block = ""
-        executive_narrative = False
-        try:
-            from intent_engine.narrative_polish import (
-                executive_narrative_prompt_block,
-                follow_up_narrative_prompt_block,
-                is_executive_narrative_question,
-            )
-
-            executive_narrative = is_executive_narrative_question(
-                data.question, analysis_ctx
-            )
-            exec_polish = executive_narrative_prompt_block(
-                data.question, analysis_ctx
-            )
-            fu_polish = follow_up_narrative_prompt_block(
-                data.question,
-                sidecar=sidecar if isinstance(sidecar, dict) else None,
-                analysis_ctx=analysis_ctx,
-            )
-            parts = [p for p in (exec_polish, fu_polish) if p]
-            if parts:
-                polish_block = "\n\n" + "\n\n".join(parts) + "\n"
-        except Exception:
-            pass
-
-        conf_prompt = _confidence_answer_prompt_block(
-            {
-                "analysisRowCount": int(analysis_ctx.get("analysisRowCount") or 0),
-                "chartSeriesPointCount": int(
-                    analysis_ctx.get("chartSeriesPointCount")
-                    or analysis_ctx.get("chartPointCount")
-                    or 0
+            conversation_meta_ok = _conversation_meta_payload(
+                sidecar=sidecar,
+                filter_added=filter_added,
+                turn_id=turn_id_session,
+                parent_tid=parent_tid_session,
+                using_summary=(
+                    _format_using_context_summary(data.conversation_context)
+                    if is_fu_session and data.conversation_context
+                    else ""
                 ),
-                "smallSampleCohort": bool(analysis_ctx.get("smallSampleCohort")),
-                "cautiousNarrativeRequired": bool(
-                    analysis_ctx.get("cautiousNarrativeRequired")
-                ),
-                "mappingConfidenceLevel": analysis_ctx.get("mappingConfidenceLevel"),
-                "insightConfidenceLevel": str(
-                    analysis_ctx.get("insightConfidenceLevel") or "low"
-                ),
-                "growthRequestUnsatisfied": bool(
-                    analysis_ctx.get("growthRequestUnsatisfied")
-                    or (
-                        isinstance(analysis_ctx.get("unsupportedGrowthAnalysis"), dict)
-                        and analysis_ctx["unsupportedGrowthAnalysis"].get("active")
-                    )
-                ),
-                "multiMetricRequestUnsatisfied": bool(
-                    analysis_ctx.get("multiMetricRequestUnsatisfied")
-                    or (
-                        isinstance(
-                            analysis_ctx.get("unsupportedMultiMetricAnalysis"), dict
-                        )
-                        and analysis_ctx["unsupportedMultiMetricAnalysis"].get("active")
-                    )
-                ),
-                "unsupportedRequestedMetric": bool(
-                    unsupported_requested_metric
-                    and unsupported_requested_metric.get("active")
-                ),
-                "concentrationRiskQuestion": concentration_risk_question,
-                "executiveAmbiguousBucket": analysis_ctx.get(
-                    "executiveAmbiguousBucket"
-                ),
-                "executiveNarrative": executive_narrative,
-                "relationshipScatter": bool(
-                    str(analysis_ctx.get("chartTypeInternal") or "").lower() == "scatter"
-                    or (
-                        isinstance(analysis_ctx.get("intent"), dict)
-                        and (analysis_ctx.get("intent") or {}).get("primaryGoal")
-                        == "relationship"
-                    )
-                ),
-                "derivedProfitMargin": bool(analysis_ctx.get("derivedProfitMargin")),
-                "profitMarginUnavailable": bool(
-                    analysis_ctx.get("profitMarginUnavailable")
-                ),
-                "forecastProjectionLow": bool(
-                    isinstance(analysis_ctx.get("forecastGuardrails"), dict)
-                    and analysis_ctx["forecastGuardrails"].get("active")
-                    and not analysis_ctx["forecastGuardrails"].get("canForecast")
-                ),
-            }
-        )
-        geo_block = ""
-        try:
-            from intent_engine.geographic_scope import geographic_scope_prompt_block
-
-            gcol_geo = None
-            if isinstance(analysis_ctx, dict):
-                intent_geo = analysis_ctx.get("intent") or {}
-                gcol_geo = (
-                    analysis_ctx.get("categoryColumn")
-                    or intent_geo.get("geographic_scope_column")
-                    or intent_geo.get("group_col")
-                )
-            geo_block = geographic_scope_prompt_block(
-                data.question, gcol_geo, dataset_profile
+                is_follow_up=is_fu_session,
             )
-            if geo_block:
-                geo_block = f"\n{geo_block}\n"
-        except Exception:
-            pass
-
-        outlier_block = ""
-        try:
-            from intent_engine.categorical_outlier_narrative import (
-                categorical_outlier_prompt_block,
-            )
-
-            coi_prompt = None
-            if visualization and isinstance(visualization.get("categoricalOutlierInsights"), dict):
-                coi_prompt = visualization["categoricalOutlierInsights"]
-            elif isinstance(analysis_ctx.get("categoricalOutlierInsights"), dict):
-                coi_prompt = analysis_ctx["categoricalOutlierInsights"]
-            outlier_block = categorical_outlier_prompt_block(coi_prompt)
-            if outlier_block:
-                outlier_block = f"\n{outlier_block}\n"
-        except Exception:
-            pass
-
-        forecast_block = ""
-        try:
-            from intent_engine.forecast_guardrails import (
-                forecast_guardrails_prompt_block,
-            )
-
-            fg = analysis_ctx.get("forecastGuardrails")
-            forecast_block = forecast_guardrails_prompt_block(
-                fg if isinstance(fg, dict) else None
-            )
-            if forecast_block:
-                forecast_block = f"\n{forecast_block}\n"
-        except Exception:
-            pass
-
-        exec_rank_block = ""
-        try:
-            from intent_engine.executive_insight_ranking import (
-                executive_insight_prompt_block,
-            )
-
-            ranked_raw = None
-            if visualization and isinstance(
-                visualization.get("rankedExecutiveInsights"), list
-            ):
-                ranked_raw = visualization["rankedExecutiveInsights"]
-            elif isinstance(analysis_ctx.get("rankedExecutiveInsights"), list):
-                ranked_raw = analysis_ctx["rankedExecutiveInsights"]
-            exec_rank_block = executive_insight_prompt_block(
-                ranked_raw or [],
-                cohort_row_count=int(analysis_ctx.get("analysisRowCount") or 0) or None,
-                executive_lens=analysis_ctx.get("executiveLens"),
-            )
-            if exec_rank_block:
-                exec_rank_block = f"\n{exec_rank_block}\n"
-        except Exception:
-            pass
-
-        semantic_correction = _semantic_intent_correction_prompt_block(data.question)
-        needs_cautious = bool(
-            analysis_ctx.get("cautiousNarrativeRequired")
-            or analysis_ctx.get("smallSampleCohort")
-        )
-        insight_style_line = (
-            "- Favor cautious, exploratory language over definitive business claims; "
-            "lead with what the numbers show, then what they may suggest.\n"
-            if needs_cautious
-            else "- Mention a clear, evidence-backed takeaway if the numbers support it.\n"
-        )
-
-        prompt = f"""
-You are a business data analyst for small and medium businesses.
-
-{conv_block}
-
-User question:
-{data.question}
-
-Dataset context (use this, do not invent columns):
-{ctx}
-
-Exact calculated result (ground truth metrics / table):
-{exact_result}
-{focus_line}
-{geo_block}
-{outlier_block}
-{forecast_block}
-{exec_rank_block}
-{guard_block}
-{polish_block}
-{viz_anchor}
-{evidence_line}{rationale_line}
-Rules:
-{viz_rule}- Explain in simple business language.
-- Do not use markdown symbols like # or **.
-- Keep the answer concise but complete enough to include the three labeled sections when asked below.
-{insight_style_line}
-{conf_prompt}
-{semantic_correction}
-{trend_rule}"""
-
-        try:
-            answer_text = _generate_insight_narrative(prompt)
-            try:
-                from intent_engine.narrative_guardrails import sanitize_narrative_answer
-
-                answer_text = sanitize_narrative_answer(
-                    answer_text,
-                    df,
-                    dataset_profile,
-                    data.question,
-                    unsupported_requested_metric,
-                    analysis_ctx,
-                )
-                from intent_engine.narrative_polish import polish_narrative_answer
-
-                answer_text = polish_narrative_answer(
-                    answer_text,
+            ask_turn_cache.store(
+                session_id,
+                turn_id_session,
+                AskTurnCacheEntry(
                     question=data.question,
+                    effective_question=eff_q,
+                    exact_result=exact_result,
+                    visualization=visualization,
                     analysis_ctx=analysis_ctx,
                     sidecar=sidecar if isinstance(sidecar, dict) else None,
-                    executive=executive_narrative,
-                    df=df,
-                    profile=dataset_profile,
-                )
-            except Exception:
-                pass
-        except Exception as exc:
-            logger.warning("Claude narrative unavailable: %s", exc, exc_info=True)
-            answer_text = _claude_narrative_fallback_answer(exc)
-
-        chart_rec_out = (
-            analysis_ctx.get("chartRecommendation")
-            if isinstance(analysis_ctx.get("chartRecommendation"), dict)
-            else {}
-        )
-        viz_title = ""
-        if visualization and isinstance(visualization.get("title"), str):
-            viz_title = visualization["title"].strip()
-        conv_scope_q = str(plan.get("scope_question") or "").strip()
-        conv_root_q = (
-            conv_scope_q
-            or (
-                data.conversation_context.rootQuestion
-                if data.conversation_context
-                and (data.conversation_context.rootQuestion or "").strip()
-                else None
+                    plan_snapshot=_ask_plan_snapshot(plan, sidecar),
+                    request_snapshot=_ask_request_snapshot(data),
+                    dash_labs=list(dash_labs),
+                    filter_added=list(filter_added),
+                    prev_filters=list(prev_filters),
+                    is_follow_up=is_fu_session,
+                    parent_turn_id=parent_tid_session,
+                    analysis_profile=dict(dataset_profile or {}),
+                    filter_breadcrumb=bc_full,
+                    follow_chain_session=list(follow_chain_session),
+                    lic_id_session=lic_id_session,
+                    drill_path_session=list(drill_path_session),
+                ),
             )
-            or eff_q
+            usage_tracker.record_ai_question(session_id)
+            return _json_safe(
+                {
+                    "answer": "",
+                    "visualization": visualization,
+                    "analysis": analysis_ctx,
+                    "conversation_context": conv_out,
+                    "conversation_meta": conversation_meta_ok,
+                    "dashboard_filter_summary": dash_labs,
+                    "filter_breadcrumb": bc_full,
+                    "narrative_status": "pending",
+                    "turn_id": turn_id_session,
+                }
+            )
+
+        narrative_assembly, _ = build_ask_narrative_prompt(
+            question=data.question,
+            eff_q=eff_q,
+            exact_result=exact_result,
+            visualization=visualization,
+            analysis_ctx=analysis_ctx,
+            plan=plan,
+            sidecar=sidecar,
+            dash_labs=dash_labs,
+            df=df,
+            dataset_profile=dataset_profile,
         )
-        conv_last_q = (
-            conv_scope_q
-            if plan.get("scoped_follow_up") and conv_scope_q
-            else eff_q
+        answer_text = produce_ask_narrative_answer(
+            narrative_assembly,
+            question=data.question,
+            analysis_ctx=analysis_ctx,
+            sidecar=sidecar,
+            df=df,
+            dataset_profile=dataset_profile,
         )
-        conv_out = {
-            "lastQuestion": conv_last_q,
-            "rootQuestion": conv_root_q,
-            "lastChartTitle": viz_title
-            or str(analysis_ctx.get("chartTitle") or "").strip(),
-            "metricColumn": analysis_ctx.get("metricColumn"),
-            "categoryColumn": analysis_ctx.get("categoryColumn"),
-            "aggregation": analysis_ctx.get("aggregation"),
-            "chartType": analysis_ctx.get("chartType"),
-            "intentBucket": chart_rec_out.get("detectedIntent"),
-            "filtersApplied": prev_filters + filter_added,
-            "turnId": turn_id_session,
-            "followUpChain": follow_chain_session,
-            "lastInsightChartId": lic_id_session,
-            "activeDrillPath": drill_path_session,
-        }
+
+        conv_out = _build_ask_conversation_out(
+            plan=plan,
+            data=data,
+            eff_q=eff_q,
+            analysis_ctx=analysis_ctx,
+            visualization=visualization,
+            prev_filters=prev_filters,
+            filter_added=filter_added,
+            turn_id_session=turn_id_session,
+            follow_chain_session=follow_chain_session,
+            lic_id_session=lic_id_session,
+            drill_path_session=drill_path_session,
+        )
 
         conversation_meta_ok = _conversation_meta_payload(
             sidecar=sidecar,
