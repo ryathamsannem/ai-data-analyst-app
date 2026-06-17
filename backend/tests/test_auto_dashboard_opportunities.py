@@ -16,8 +16,10 @@ import main  # noqa: E402
 from services.auto_dashboard_opportunities import (  # noqa: E402
     DashboardDeps,
     MAX_DONUT_CHARTS,
+    build_dashboard_charts_bundle,
     build_dashboard_charts_from_opportunities,
     classify_columns,
+    compute_dashboard_coverage_telemetry,
     evaluate_chart_visual_quality,
     extract_kpi_chart_context,
     target_chart_count,
@@ -175,6 +177,36 @@ class TestAutoDashboardOpportunities(unittest.TestCase):
             len(charts),
             "dashboard should not be entirely department breakdowns",
         )
+
+    def test_coverage_telemetry_reports_filled_and_missing_buckets(self) -> None:
+        df = pd.read_csv(FIXTURE, parse_dates=["date"])
+        profile = main.build_profile(df)
+        main.df = df
+        main.dataset_profile = profile
+        try:
+            charts, telemetry = build_dashboard_charts_bundle(
+                df, profile, "sales", _deps(), seed_candidates=[]
+            )
+        finally:
+            main.df = None
+            main.dataset_profile = None
+
+        self.assertGreaterEqual(len(charts), 4)
+        self.assertEqual(telemetry["selectedCount"], len(charts))
+        self.assertGreater(telemetry["maxCharts"], 0)
+        self.assertIsInstance(telemetry["bucketsFilled"], list)
+        self.assertIsInstance(telemetry["bucketsMissing"], list)
+        self.assertGreaterEqual(len(telemetry["bucketsFilled"]), 1)
+        self.assertGreater(len(telemetry["bucketsInDiscovery"]), 1)
+        inv = classify_columns(df, profile, id_like_fn=main._id_like_column_name)
+        direct = compute_dashboard_coverage_telemetry(
+            selected=charts,
+            discovered=[],
+            merged_count=len(charts),
+            max_charts=telemetry["maxCharts"],
+            inv=inv,
+        )
+        self.assertEqual(direct["bucketsFilled"], telemetry["bucketsFilled"])
 
     def test_kpi_deduplication_skips_redundant_top_dimension_charts(self) -> None:
         df = pd.read_csv(FIXTURE, parse_dates=["date"])

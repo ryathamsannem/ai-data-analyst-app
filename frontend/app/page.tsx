@@ -110,30 +110,21 @@ import {
   computeOverviewHorizontalDashLayout,
   computeOverviewHBarLiveMargins,
   computeOverviewMiniCategoryPlan,
-  computeOverviewScatterDashMargins,
-  computeOverviewScatterPremiumMargins,
   computeOverviewTrendLivePlotMargins,
   computeOverviewVerticalDashLayout,
   overviewDashUsesExpandedPlotBand,
   overviewDashboardUsesHorizontalBars,
   overviewTrendLiveSideMargins,
   OVERVIEW_LINE_Y_AXIS_LEFT_TRIM_PX,
-  OVERVIEW_SCATTER_POINT_RADIUS_PX,
-  OVERVIEW_SCATTER_POINT_STROKE_PX,
-  OVERVIEW_SCATTER_POINT_STROKE_COLOR,
-  OVERVIEW_SCATTER_POINT_STROKE_OPACITY,
-  OVERVIEW_SCATTER_POINT_FILL_OPACITY,
   resolveOverviewDashLivePlotHeight,
 } from "@/lib/overview-dashboard-plot-layout";
 import {
   formatOverviewLineYAxisTick,
-  formatOverviewScatterAxisTick,
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
   OVERVIEW_LINE_PREMIUM_PAD_RATIO,
   resolveOverviewPremiumAxisScale,
-  resolveOverviewScatterPremiumAxes,
 } from "@/lib/overview-premium-axis-domain";
 import { ChartPngOffscreenHost } from "@/lib/chart-png-offscreen-host";
 import {
@@ -209,6 +200,20 @@ import {
   resolveHistogramMeasureChipLabel,
   resolveSemanticCategoryAxisForCharts,
 } from "@/lib/chart-semantic-metadata";
+import {
+  buildChartMetadataBadgeCompact,
+  buildChartMetadataChipSpecs,
+  buildChartMetadataLine,
+  chartTypeShortLabel,
+  inferAutoDashboardMetricFromTitle,
+  resolveAnalyzedRowsForChartMetadata,
+} from "@/lib/chart-metadata-chips";
+import {
+  logDashboardCoverageTelemetry,
+  parseDashboardCoverageTelemetry,
+  type DashboardCoverageTelemetry,
+} from "@/lib/chart-coverage-telemetry";
+import { ChartMetadataChipRow } from "@/app/components/home/chart-metadata-chip-row";
 import {
   buildNormalizedVizMetadata,
   normalizeAlignedAnalysisChartTitle,
@@ -351,18 +356,6 @@ import {
   aiInsightsVizChipsWrap,
   chartsTabVizPreviewCard,
   chartsTabVizSessionFrame,
-  aiInsightsVizMetaChipBase,
-  aiInsightsVizMetaChipCompactSize,
-  aiInsightsVizMetaChipLabel,
-  aiInsightsVizMetaChipLabelCompact,
-  aiInsightsVizMetaChipLead,
-  aiInsightsVizMetaChipLeadCompactSize,
-  aiInsightsVizMetaChipLeadSize,
-  aiInsightsVizMetaChipMono,
-  aiInsightsVizMetaChipMonoCompactSize,
-  aiInsightsVizMetaChipMonoSize,
-  aiInsightsVizMetaChipSize,
-  aiInsightsVizMetaChipValue,
   aiInsightsVizHeaderZone,
   aiInsightsVizHeadingWrap,
   aiInsightsVizKicker,
@@ -713,8 +706,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  ScatterChart,
-  Scatter,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -986,17 +977,6 @@ function computeChartInsightBadge(
   return `Highest: ${top.name}`;
 }
 
-function presentationKindUiLabel(kind: ChartKind): string {
-  if (kind === "line") return "Line";
-  if (kind === "area") return "Area";
-  if (kind === "pie") return "Pie";
-  if (kind === "donut") return "Donut";
-  if (kind === "scatter") return "Scatter";
-  if (kind === "histogram") return "Histogram";
-  if (kind === "bar_horizontal") return "Horizontal";
-  return "Bar";
-}
-
 const ChartContextSummary = memo(function ChartContextSummary(props: {
   renderedKind: ChartKind;
   metricLabel: string;
@@ -1009,67 +989,27 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
   /** Tighter pills for AI Insights chart header. */
   compactChips?: boolean;
 }) {
-  const typeLbl = presentationKindUiLabel(props.renderedKind);
-  const c = props.compactChips;
-  const chip = `${aiInsightsVizMetaChipBase} ${c ? aiInsightsVizMetaChipCompactSize : aiInsightsVizMetaChipSize}`;
-  const chipMuted = c ? aiInsightsVizMetaChipLabelCompact : aiInsightsVizMetaChipLabel;
-  const chipValue = aiInsightsVizMetaChipValue;
-  const monoChip = `${aiInsightsVizMetaChipMono} ${c ? aiInsightsVizMetaChipMonoCompactSize : aiInsightsVizMetaChipMonoSize}`;
-  const leadChip = `${aiInsightsVizMetaChipLead} ${c ? aiInsightsVizMetaChipLeadCompactSize : aiInsightsVizMetaChipLeadSize}`;
+  const chipSpecs = useMemo(
+    () =>
+      buildChartMetadataChipSpecs({
+        renderedKind: props.renderedKind,
+        metricLabel: props.metricLabel,
+        semanticHeader: props.semanticHeader,
+        badgeCompact: props.badgeCompact,
+        leadInsight: props.leadInsight,
+      }),
+    [
+      props.renderedKind,
+      props.metricLabel,
+      props.semanticHeader,
+      props.badgeCompact,
+      props.leadInsight,
+    ]
+  );
+
   return (
-    <div
-      className={`flex flex-wrap items-center justify-center ${c ? "gap-x-2 gap-y-1.5 sm:gap-x-2.5 sm:gap-y-2" : "mt-3 gap-2 px-1 sm:gap-2.5"} ${c ? "" : ""}`}
-    >
-      <span className={`${chip} items-center`}>
-        <span className={chipMuted}>View</span>
-        <span className={chipValue}>{typeLbl}</span>
-      </span>
-      <span className={`${chip} items-center`}>
-        <span className={chipMuted}>Measure</span>
-        <span
-          className={`max-w-[14rem] truncate ${chipValue}`}
-          title={props.metricLabel}
-        >
-          {props.metricLabel}
-        </span>
-      </span>
-      {props.semanticHeader.mode === "scatter" ? (
-        <>
-          <span className={`${chip} items-center`}>
-            <span className={chipMuted}>X</span>
-            <span className={`max-w-[10rem] truncate ${chipValue}`}>
-              {props.semanticHeader.xLabel}
-            </span>
-          </span>
-          <span className={`${chip} items-center`}>
-            <span className={chipMuted}>Y</span>
-            <span className={`max-w-[10rem] truncate ${chipValue}`}>
-              {props.semanticHeader.yLabel}
-            </span>
-          </span>
-        </>
-      ) : (
-        <span className={`${chip} max-w-full items-center`}>
-          <span className={`shrink-0 ${chipMuted}`}>{props.semanticHeader.roleLabel}</span>
-          <span
-            className={`min-w-0 truncate ${chipValue}`}
-            title={props.semanticHeader.detailLabel}
-          >
-            {props.semanticHeader.detailLabel}
-          </span>
-        </span>
-      )}
-      <span className={`${monoChip} min-w-0 truncate`} title={props.badgeCompact}>
-        {props.badgeCompact}
-      </span>
-      {props.leadInsight ? (
-        <span
-          className={`${leadChip} min-w-0 items-center truncate`}
-          title={props.leadInsight}
-        >
-          {props.leadInsight}
-        </span>
-      ) : null}
+    <>
+      <ChartMetadataChipRow specs={chipSpecs} compact={props.compactChips} />
       {props.qualityWarning ? (
         <p
           className={`${chartRateQualityWarningClass} w-full basis-full text-center`}
@@ -1077,21 +1017,9 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
           {props.qualityWarning}
         </p>
       ) : null}
-    </div>
+    </>
   );
 });
-
-function chartTypeShortLabel(kind: ChartKind): string {
-  if (kind === "line") return "Line";
-  if (kind === "area") return "Area";
-  if (kind === "pie") return "Pie";
-  if (kind === "donut") return "Donut";
-  if (kind === "scatter") return "Scatter";
-  if (kind === "bar_horizontal") return "H-Bar";
-  if (kind === "histogram") return "Histogram";
-  if (!kind) return "Chart";
-  return "Bar";
-}
 
 function normalizeIntentToken(s: string | null | undefined): string {
   return (s ?? "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -1179,15 +1107,6 @@ function inferBreakdownLabelFromChartTitle(title: string): string | null {
   return rest || null;
 }
 
-function inferAutoDashboardMetricFromTitle(title: string): string {
-  const t = title.trim();
-  const trendIdx = t.search(/\s+trend\s*\(/i);
-  if (trendIdx > 0) return t.slice(0, trendIdx).trim();
-  const idx = t.search(/\s+by\s+/i);
-  if (idx > 0) return t.slice(0, idx).trim();
-  return t || "Metric";
-}
-
 /** Parse "Average salary by department" → MEAN + salary phrase for badges when provenance is thin. */
 function inferAggAndMetricFromChartTitle(title: string): {
   aggLabel: string | null;
@@ -1214,33 +1133,6 @@ function inferAggAndMetricFromChartTitle(title: string): {
     }
   }
   return { aggLabel: null, metricPhrase: null };
-}
-
-function resolveAnalyzedRowsForChartMetadata(args: {
-  preferAlignedAnalysis: boolean;
-  analysis: AlignedAnalysisContext | null;
-  prov?: InsightProvenance | null;
-  vizAnalyzedRows?: number | null | undefined;
-  filteredDatasetRows?: number | null | undefined;
-  fullDatasetRows?: number | null | undefined;
-}): number | null {
-  const pos = (n: unknown): n is number =>
-    typeof n === "number" && Number.isFinite(n) && n > 0;
-
-  const fromAligned =
-    args.preferAlignedAnalysis && pos(args.analysis?.analysisRowCount)
-      ? (args.analysis!.analysisRowCount as number)
-      : null;
-  const fromViz = pos(args.vizAnalyzedRows) ? (args.vizAnalyzedRows as number) : null;
-  const fromProv = pos(args.prov?.rowsAnalyzed) ? args.prov!.rowsAnalyzed : null;
-  const fromFiltered = pos(args.filteredDatasetRows)
-    ? args.filteredDatasetRows!
-    : null;
-  const fromFull = pos(args.fullDatasetRows) ? args.fullDatasetRows! : null;
-
-  return (
-    fromAligned ?? fromViz ?? fromProv ?? fromFiltered ?? fromFull ?? null
-  );
 }
 
 function normalizeQuestionForMatch(q: string): string {
@@ -1408,155 +1300,6 @@ function applyOriginChartPresentationLock(args: {
   }
 
   return inferred;
-}
-
-function buildChartMetadataLine(
-  kind: ChartKind,
-  groupCount: number,
-  viz: StoredVisualization | null,
-  analysis: AlignedAnalysisContext | null,
-  preferAlignedAnalysis: boolean,
-  opts?: {
-    chartTitle?: string;
-    filteredDatasetRows?: number | null;
-    fullDatasetRows?: number | null;
-  }
-): string {
-  const prov = viz?.provenance ?? null;
-  const title = opts?.chartTitle?.trim() ?? "";
-  const rec = viz?.chartRecommendation ?? null;
-  const titleInfer = inferAggAndMetricFromChartTitle(title);
-
-  let aggRaw = "";
-  let metricRaw = "";
-
-  if (preferAlignedAnalysis && analysis) {
-    aggRaw =
-      String(analysis.aggregationKey || analysis.aggregation || "").trim();
-    metricRaw = String(
-      analysis.metricColumnDisplay || analysis.metricColumn || ""
-    ).trim();
-  }
-
-  if (!aggRaw) {
-    aggRaw = String(prov?.aggregationKey ?? prov?.aggregation ?? "").trim();
-  }
-  if (!aggRaw && titleInfer.aggLabel) {
-    aggRaw = titleInfer.aggLabel;
-  }
-  if (!aggRaw && rec?.metricType) {
-    const mt = String(rec.metricType).trim().toLowerCase();
-    if (mt && mt !== "numeric" && mt !== "number") {
-      aggRaw = String(rec.metricType);
-    }
-  }
-
-  if (!metricRaw) {
-    metricRaw = String(
-      prov?.numericColumnDisplay ?? prov?.numericColumn ?? ""
-    ).trim();
-  }
-  if (!metricRaw && titleInfer.metricPhrase) {
-    metricRaw = titleInfer.metricPhrase;
-  }
-  if (!metricRaw && title && viz?.subtitle === "Auto dashboard") {
-    metricRaw = inferAutoDashboardMetricFromTitle(title);
-  }
-  if (!metricRaw && rec?.detectedIntent) {
-    metricRaw = String(rec.detectedIntent).replace(/_/g, " ");
-  }
-  if (!metricRaw && prov?.numericColumn) {
-    metricRaw = String(prov.numericColumn).trim();
-  }
-  if (!metricRaw) {
-    metricRaw = "metric";
-  }
-
-  const metric =
-    kind === "histogram"
-      ? resolveHistogramMeasureChipLabel(
-          viz as ChartSemanticVizLike,
-          analysis,
-          preferAlignedAnalysis
-        )
-      : buildMetricLabel({
-          aggregationKey: aggRaw || null,
-          aggregationLabel: aggRaw || null,
-          metricColumn:
-            (preferAlignedAnalysis && analysis?.metricColumn?.trim()) ||
-            prov?.numericColumn?.trim() ||
-            null,
-          metricColumnDisplay: metricRaw || null,
-        });
-
-  const rowsNum = resolveAnalyzedRowsForChartMetadata({
-    preferAlignedAnalysis,
-    analysis,
-    prov: viz?.provenance ?? null,
-    vizAnalyzedRows: viz?.analyzedRows,
-    filteredDatasetRows: opts?.filteredDatasetRows,
-    fullDatasetRows: opts?.fullDatasetRows,
-  });
-
-  const typeLabel =
-    kind === "bar_horizontal" ? "H-Bar" : chartTypeShortLabel(kind);
-
-  const parts: string[] = [typeLabel, metric];
-  if (rowsNum != null && rowsNum > 0) {
-    parts.push(`${rowsNum.toLocaleString()} rows`);
-  }
-  if (typeof groupCount === "number" && groupCount >= 0) {
-    parts.push(`${groupCount.toLocaleString()} groups`);
-  }
-  return parts.join(" · ");
-}
-
-/** Compact badge for chart cards (full detail in `title=` tooltip). */
-function buildChartMetadataBadgeCompact(
-  kind: ChartKind,
-  groupCount: number,
-  viz: StoredVisualization | null,
-  analysis: AlignedAnalysisContext | null,
-  preferAlignedAnalysis: boolean,
-  opts?: {
-    filteredDatasetRows?: number | null;
-    fullDatasetRows?: number | null;
-  }
-): string {
-  const prov = viz?.provenance ?? null;
-
-  const rowsNum = resolveAnalyzedRowsForChartMetadata({
-    preferAlignedAnalysis,
-    analysis,
-    prov,
-    vizAnalyzedRows: viz?.analyzedRows,
-    filteredDatasetRows: opts?.filteredDatasetRows,
-    fullDatasetRows: opts?.fullDatasetRows,
-  });
-
-  const typeShort =
-    kind === "bar_horizontal"
-      ? "H-Bar"
-      : kind === "line"
-        ? "Line"
-        : kind === "area"
-          ? "Area"
-          : kind === "pie"
-            ? "Pie"
-            : kind === "donut"
-              ? "Donut"
-              : kind === "scatter"
-                ? "Scatter"
-                : "Bar";
-
-  const parts: string[] = [typeShort];
-  if (rowsNum != null && rowsNum > 0) {
-    parts.push(`${rowsNum.toLocaleString()} rows`);
-  }
-  if (typeof groupCount === "number" && groupCount >= 0) {
-    parts.push(`${groupCount.toLocaleString()} groups`);
-  }
-  return parts.join(" · ");
 }
 
 /** Ascending bar order for lowest/min/MIN; descending for highest/max; null = keep API order. */
@@ -3737,6 +3480,7 @@ type AutoDashboardPayload = {
   type_label: string;
   cards: KpiCard[];
   charts: AutoDashboardMiniChart[];
+  coverage_telemetry?: DashboardCoverageTelemetry | null;
 };
 
 function parseAutoDashboardMiniCharts(raw: unknown): AutoDashboardMiniChart[] {
@@ -3883,6 +3627,7 @@ function parseAutoDashboardPayload(raw: unknown): AutoDashboardPayload | null {
         : "Dashboard",
     cards: cards.slice(0, 5),
     charts: chartsParsed,
+    coverage_telemetry: parseDashboardCoverageTelemetry(o.coverage_telemetry),
   };
 }
 
@@ -4531,6 +4276,70 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     renderBarAsHorizontal
   );
 
+  const overviewSemanticHeader = useMemo(
+    () =>
+      buildChartSemanticHeader({
+        presentationKind: displayKind,
+        chartTitle: chart.title,
+        viz: {
+          chartType: chart.chartType,
+          scatterXLabel:
+            chart.xMetricLabel?.trim() ||
+            chart.scatterXLabel?.trim(),
+          scatterYLabel:
+            chart.yMetricLabel?.trim() ||
+            chart.scatterYLabel?.trim() ||
+            chart.metricColumn,
+        },
+        analysis: null,
+        preferAnalysisForCategory: false,
+        refinedCategoryFallback: categoryAxisLabel,
+        refinedMetricLabel: overviewMetricLabel,
+      }),
+    [displayKind, chart, categoryAxisLabel, overviewMetricLabel]
+  );
+
+  const overviewMetadataBadgeCompact = useMemo(
+    () =>
+      buildChartMetadataBadgeCompact(
+        effectivePresentationKind,
+        chartRows.length,
+        { subtitle: "Auto dashboard" },
+        null,
+        false
+      ),
+    [effectivePresentationKind, chartRows.length]
+  );
+
+  const overviewMetadataChipSpecs = useMemo(
+    () =>
+      buildChartMetadataChipSpecs({
+        renderedKind: effectivePresentationKind,
+        metricLabel: overviewMetricLabel,
+        semanticHeader: overviewSemanticHeader,
+        badgeCompact: overviewMetadataBadgeCompact,
+      }),
+    [
+      effectivePresentationKind,
+      overviewMetricLabel,
+      overviewSemanticHeader,
+      overviewMetadataBadgeCompact,
+    ]
+  );
+
+  const overviewMetadataLine = useMemo(
+    () =>
+      buildChartMetadataLine(
+        effectivePresentationKind,
+        chartRows.length,
+        { subtitle: "Auto dashboard" },
+        null,
+        false,
+        { chartTitle: chart.title }
+      ),
+    [effectivePresentationKind, chartRows.length, chart.title]
+  );
+
   const valueTickFormatter = useCallback(
     (tick: number) => formatAxisTickFromRows(chartRows, tick),
     [chartRows]
@@ -4702,185 +4511,37 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "scatter") {
-      if (pngCapture) {
-        return (
-          <ChartRenderer
-            chartHeight={effectivePlotH}
-            compact
-            insightMode={false}
-            pngCaptureMode={pngCapture}
-            chartRows={chartRows}
-            visualization={{
-              scatterXLabel:
-                chart.xMetricLabel?.trim() ||
-                chart.scatterXLabel?.trim(),
-              scatterYLabel:
-                chart.yMetricLabel?.trim() ||
-                chart.scatterYLabel?.trim() ||
-                chart.metricColumn,
-              xColumn: chart.xColumn,
-              yColumn: chart.yColumn,
-              xMetricLabel: chart.xMetricLabel,
-              yMetricLabel: chart.yMetricLabel,
-              interaction: chart.interaction
-                ? { drillDimensions: chart.interaction.drillDimensions }
-                : null,
-            }}
-            presentationKind="scatter"
-            axes={miniAxes}
-            viewportW={viewW}
-            sessionCartesianPlanMain={null}
-            insightCartesianPlanMain={null}
-            tickTruncate={tickTruncateLocal}
-            onInsightDrill={() => {}}
-          />
-        );
-      }
-
-      const scatterPremium = resolveOverviewScatterPremiumAxes(chartRows);
-      const scatterXMetricCtx: MetricFormatContext = {
-        metricLabel:
-          chart.xMetricLabel?.trim() ||
-          chart.scatterXLabel?.trim() ||
-          miniAxes.categoryAxis,
-        chartTitle: chart.title,
-        presentationKind: "scatter",
-      };
-      const scatterXTickFormatter = (tick: number) =>
-        formatOverviewScatterAxisTick(tick, scatterXMetricCtx);
-      const scatterYTickFormatter = (tick: number) =>
-        formatOverviewScatterAxisTick(tick, overviewMetricCtx);
-      const scatterYTickSamples = scatterPremium
-        ? scatterPremium.y.ticks.map((t) => scatterYTickFormatter(t))
-        : dashTickSamples;
-      const scatterVLay = computeOverviewContinuousVerticalDashLayout(
-        miniAxes.valueAxis,
-        scatterYTickSamples,
-        effectivePlotH
-      );
-      const scatterMargins = scatterPremium
-        ? computeOverviewScatterPremiumMargins(scatterVLay.yAxisWidth)
-        : computeOverviewScatterDashMargins({
-            yAxisWidth: scatterVLay.yAxisWidth,
-            pngCapture: false,
-          });
-
       return (
-        <ResponsiveContainer
-          key={`ov-scatter-${chartLayoutWidthKey(viewW)}-live`}
-          width="100%"
-          height={effectivePlotH}
-          minWidth={0}
-          minHeight={effectivePlotH}
-        >
-          <ScatterChart data={chartRows} margin={scatterMargins}>
-            <CartesianGrid
-              stroke={dashGrid.stroke}
-              strokeDasharray={OV_DASH_GRID_DASHARRAY}
-              strokeOpacity={dashGrid.opacity}
-            />
-            <XAxis
-              type="number"
-              dataKey="x"
-              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK }}
-              tickFormatter={scatterXTickFormatter}
-              {...(scatterPremium
-                ? {
-                    domain: scatterPremium.x.domain,
-                    ticks: scatterPremium.x.ticks,
-                    allowDataOverflow: false,
-                  }
-                : {})}
-              axisLine={{ stroke: OV_AXIS_LINE }}
-              tickLine={{ stroke: OV_AXIS_LINE }}
-            >
-              <Label
-                value={miniAxes.categoryAxis}
-                position="insideBottom"
-                offset={-4}
-                content={CartesianXAxisTitleLabelContent}
-              />
-            </XAxis>
-            <YAxis
-              type="number"
-              dataKey="value"
-              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK, dx: 2 }}
-              tickFormatter={scatterYTickFormatter}
-              width={scatterVLay.yAxisWidth}
-              {...(scatterPremium
-                ? {
-                    domain: scatterPremium.y.domain,
-                    ticks: scatterPremium.y.ticks,
-                    allowDataOverflow: false,
-                  }
-                : {})}
-              axisLine={{ stroke: OV_AXIS_LINE }}
-              tickLine={{ stroke: OV_AXIS_LINE }}
-              label={
-                scatterVLay.showValueAxisTitle
-                  ? {
-                      content: createVerticalValueAxisLabel(
-                        scatterVLay.valueAxisTitleFull,
-                        scatterVLay.valueAxisTitleDisplay
-                      ),
-                    }
-                  : undefined
-              }
-            />
-            <Tooltip
-              {...CHART_TOOLTIP_FRAME}
-              formatter={(_v, _n, item) => {
-                const p = item?.payload as ChartRow;
-                const yd = p?.displayValue?.trim();
-                const xd = p?.displayX?.trim();
-                const yShow =
-                  yd ||
-                  (typeof p?.value === "number" ? String(p.value) : "—");
-                const xShow =
-                  xd ||
-                  (typeof p?.x === "number" ? String(p.x) : "—");
-                return [`${xShow} · ${yShow}`, "Values"];
-              }}
-              labelFormatter={(_, items) => {
-                const arr =
-                  items as unknown as readonly { payload?: ChartRow }[];
-                const p = arr?.[0]?.payload;
-                return p?.name
-                  ? `${miniAxes.categoryAxis} · ${String(p.name)}`
-                  : "Point";
-              }}
-            />
-            <Scatter
-              name="Points"
-              data={chartRows}
-              fill="#6366f1"
-              fillOpacity={OVERVIEW_SCATTER_POINT_FILL_OPACITY}
-              isAnimationActive={plotAnimOn}
-              animationDuration={plotAnimDuration}
-              shape={(props: {
-                cx?: number;
-                cy?: number;
-                fill?: string;
-                fillOpacity?: number;
-              }) => {
-                const { cx, cy, fill, fillOpacity } = props;
-                if (cx == null || cy == null) return <g />;
-                return (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={OVERVIEW_SCATTER_POINT_RADIUS_PX}
-                    fill={fill ?? "#6366f1"}
-                    fillOpacity={fillOpacity ?? OVERVIEW_SCATTER_POINT_FILL_OPACITY}
-                    stroke={OVERVIEW_SCATTER_POINT_STROKE_COLOR}
-                    strokeOpacity={OVERVIEW_SCATTER_POINT_STROKE_OPACITY}
-                    strokeWidth={OVERVIEW_SCATTER_POINT_STROKE_PX}
-                  />
-                );
-              }}
-            />
-          </ScatterChart>
-        </ResponsiveContainer>
+        <ChartRenderer
+          chartHeight={effectivePlotH}
+          compact
+          insightMode={false}
+          pngCaptureMode={pngCapture}
+          chartRows={chartRows}
+          visualization={{
+            scatterXLabel:
+              chart.xMetricLabel?.trim() ||
+              chart.scatterXLabel?.trim(),
+            scatterYLabel:
+              chart.yMetricLabel?.trim() ||
+              chart.scatterYLabel?.trim() ||
+              chart.metricColumn,
+            xColumn: chart.xColumn,
+            yColumn: chart.yColumn,
+            xMetricLabel: chart.xMetricLabel,
+            yMetricLabel: chart.yMetricLabel,
+            interaction: chart.interaction
+              ? { drillDimensions: chart.interaction.drillDimensions }
+              : null,
+          }}
+          presentationKind="scatter"
+          axes={miniAxes}
+          viewportW={viewW}
+          sessionCartesianPlanMain={null}
+          insightCartesianPlanMain={null}
+          tickTruncate={tickTruncateLocal}
+          onInsightDrill={() => {}}
+        />
       );
     }
 
@@ -5428,6 +5089,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                     displayKind,
                     renderBarAsHorizontal,
                     chartTitle: canonicalTitle,
+                    expectedMetadataChipCount: overviewMetadataChipSpecs.length,
                   },
                 });
               } catch (err) {
@@ -5496,6 +5158,15 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         >
           <header className={`${ovDashChartHead} ${overviewPngExportHeader}`}>
             <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
+            <div
+              className={aiInsightsVizChipsWrap}
+              title={overviewMetadataLine}
+            >
+              <ChartMetadataChipRow
+                specs={overviewMetadataChipSpecs}
+                compact
+              />
+            </div>
           </header>
           <div
             className={`${ovDashChartPlot} ${ovDashChartPlotInner} ${chartsTabVizPlotStage}`}
@@ -6973,6 +6644,12 @@ function HomeInner() {
     chartDatasetEpoch,
     replaceAutoDashboardCharts,
   ]);
+
+  useEffect(() => {
+    logDashboardCoverageTelemetry(autoDashboard?.coverage_telemetry ?? null, {
+      source: autoDashboard?.kind || "dashboard",
+    });
+  }, [autoDashboard?.coverage_telemetry, autoDashboard?.kind]);
 
   const pinnedInsightChartIdRef = useRef<string | null>(null);
   const chartsPreviewRef = useRef<HTMLDivElement | null>(null);

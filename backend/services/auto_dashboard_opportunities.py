@@ -1655,7 +1655,48 @@ def _bind_deps_to_dataframe(df: pd.DataFrame, deps: DashboardDeps) -> DashboardD
     )
 
 
-def build_dashboard_charts_from_opportunities(
+def compute_dashboard_coverage_telemetry(
+    *,
+    selected: List[Dict[str, Any]],
+    discovered: List[Dict[str, Any]],
+    merged_count: int,
+    max_charts: int,
+    inv: ColumnInventory,
+) -> Dict[str, Any]:
+    """Dev-facing summary of which story buckets were filled vs skipped."""
+    buckets_filled: List[str] = []
+    buckets_seen: Set[str] = set()
+    for chart in selected:
+        bucket = _coverage_bucket(chart)
+        if bucket not in buckets_seen:
+            buckets_seen.add(bucket)
+            buckets_filled.append(bucket)
+    buckets_missing = [b for b in _COVERAGE_BUCKETS if b not in buckets_seen]
+    discovery_buckets = sorted(
+        {_coverage_bucket(c) for c in discovered if c}
+    )
+    chart_types = [
+        _norm_chart_type(c.get("chartType")) for c in selected if c
+    ]
+    return {
+        "maxCharts": max_charts,
+        "selectedCount": len(selected),
+        "discoveredCount": len(discovered),
+        "mergedCandidateCount": merged_count,
+        "bucketsFilled": buckets_filled,
+        "bucketsMissing": buckets_missing,
+        "bucketsInDiscovery": discovery_buckets,
+        "chartTypesSelected": chart_types,
+        "inventoryRichness": {
+            "dates": len(inv.dates),
+            "numerics": len(inv.numerics),
+            "categories": len(inv.categories),
+            "geographic": len(inv.geographic),
+        },
+    }
+
+
+def build_dashboard_charts_bundle(
     df: pd.DataFrame,
     profile: Dict[str, Any],
     kind: str,
@@ -1663,7 +1704,7 @@ def build_dashboard_charts_from_opportunities(
     *,
     seed_candidates: Optional[List[Dict[str, Any]]] = None,
     kpi_cards: Optional[List[Dict[str, Any]]] = None,
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     bound = _bind_deps_to_dataframe(df, deps)
     inv = classify_columns(df, profile, id_like_fn=bound.id_like_column)
     max_charts = target_chart_count(inv, len(df))
@@ -1690,4 +1731,31 @@ def build_dashboard_charts_from_opportunities(
         kpi_context=kpi_context,
     )
 
-    return selected
+    telemetry = compute_dashboard_coverage_telemetry(
+        selected=selected,
+        discovered=discovered,
+        merged_count=len(merged),
+        max_charts=max_charts,
+        inv=inv,
+    )
+    return selected, telemetry
+
+
+def build_dashboard_charts_from_opportunities(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    kind: str,
+    deps: DashboardDeps,
+    *,
+    seed_candidates: Optional[List[Dict[str, Any]]] = None,
+    kpi_cards: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    charts, _ = build_dashboard_charts_bundle(
+        df,
+        profile,
+        kind,
+        deps,
+        seed_candidates=seed_candidates,
+        kpi_cards=kpi_cards,
+    )
+    return charts

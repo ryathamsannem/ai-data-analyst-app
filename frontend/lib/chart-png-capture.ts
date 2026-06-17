@@ -636,6 +636,36 @@ function findExportHeaderZone(sourceRoot: HTMLElement): HTMLElement | null {
   return null;
 }
 
+function extractStructuredMetadataChips(
+  header: HTMLElement
+): ExportChip[] {
+  const row = header.querySelector("[data-chart-metadata-chips]");
+  if (!row) return [];
+  const chips: ExportChip[] = [];
+  row.querySelectorAll("[data-chart-metadata-chip]").forEach((el) => {
+    const kind = el.getAttribute("data-chip-kind");
+    if (kind === "mono" || kind === "lead") {
+      const value = el.textContent?.trim() ?? "";
+      if (value) {
+        chips.push({
+          label: "",
+          value,
+          mono: true,
+        });
+      }
+      return;
+    }
+    const parts = [...el.querySelectorAll(":scope > span")];
+    if (parts.length >= 2) {
+      chips.push({
+        label: parts[0]?.textContent?.trim() ?? "",
+        value: parts[1]?.textContent?.trim() ?? "",
+      });
+    }
+  });
+  return chips;
+}
+
 function extractHeaderContent(
   header: HTMLElement,
   sourceRoot?: HTMLElement
@@ -653,23 +683,25 @@ function extractHeaderContent(
   const subtitle =
     header.querySelector("[class*='viz-subtitle']")?.textContent?.trim() ?? "";
 
-  const chips: ExportChip[] = [];
-  const chipsRow = header.querySelector(
-    "[class*='viz-chips'] > div, [class*='VizChips'] > div"
-  );
-  if (chipsRow) {
-    chipsRow.querySelectorAll(":scope > span").forEach((span) => {
-      const parts = [...span.querySelectorAll(":scope > span")];
-      if (span.classList.contains("items-center") && parts.length >= 2) {
-        chips.push({
-          label: parts[0]?.textContent?.trim() ?? "",
-          value: parts[1]?.textContent?.trim() ?? "",
-        });
-        return;
-      }
-      const text = span.textContent?.trim();
-      if (text) chips.push({ label: "", value: text, mono: true });
-    });
+  let chips = extractStructuredMetadataChips(header);
+  if (!chips.length) {
+    const chipsRow = header.querySelector(
+      "[class*='viz-chips'] > div, [class*='VizChips'] > div, [data-chart-metadata-chips]"
+    );
+    if (chipsRow) {
+      chipsRow.querySelectorAll(":scope > span").forEach((span) => {
+        const parts = [...span.querySelectorAll(":scope > span")];
+        if (span.classList.contains("items-center") && parts.length >= 2) {
+          chips.push({
+            label: parts[0]?.textContent?.trim() ?? "",
+            value: parts[1]?.textContent?.trim() ?? "",
+          });
+          return;
+        }
+        const text = span.textContent?.trim();
+        if (text) chips.push({ label: "", value: text, mono: true });
+      });
+    }
   }
 
   if (!chips.length && sourceRoot) {
