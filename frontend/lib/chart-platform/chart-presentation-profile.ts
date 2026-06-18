@@ -149,7 +149,7 @@ export function resolvePdfChartEmbedPolicy(kind: ChartKind): PdfChartEmbedPolicy
     case "scatter":
       return {
         maxHeightMm: 150,
-        minWidthRatio: 0.86,
+        minWidthRatio: 0.92,
         minAspectRatio: 0.62,
         maxAspectRatio: 1.55,
       };

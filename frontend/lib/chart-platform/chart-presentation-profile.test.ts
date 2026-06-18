@@ -101,7 +101,7 @@ describe("ChartPresentationProfile", () => {
     });
     expect(resolvePdfChartEmbedPolicy("scatter")).toMatchObject({
       maxHeightMm: 150,
-      minWidthRatio: 0.86,
+      minWidthRatio: 0.92,
     });
   });
 });
