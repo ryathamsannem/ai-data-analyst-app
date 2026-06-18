@@ -12,6 +12,7 @@ import {
   pickPdfVizExecutiveFacts,
   pdfChartMetadataChipText,
   resolvePdfChartImageCandidate,
+  shouldStartPdfChartOnFreshPage,
 } from "@/app/pdf-report";
 import type { SmartChartIntel } from "@/lib/smart-chart-intelligence";
 import type { ExecutiveVizInsightCard } from "@/lib/executive-insight-ranking";
@@ -412,6 +413,17 @@ describe("PDF chart embed sizing", () => {
     });
     expect(sized.widthMm).toBeGreaterThanOrEqual(180 * 0.9);
     expect(sized.heightMm).toBeLessThanOrEqual(158);
+  });
+
+  it("starts crowded line and area PDF chart images on a fresh page only for trend charts", () => {
+    expect(shouldStartPdfChartOnFreshPage("line", 106.9)).toBe(true);
+    expect(shouldStartPdfChartOnFreshPage("area", 88)).toBe(true);
+    expect(shouldStartPdfChartOnFreshPage("line", 107)).toBe(false);
+    expect(shouldStartPdfChartOnFreshPage("area", 118)).toBe(false);
+
+    expect(shouldStartPdfChartOnFreshPage("scatter", 88)).toBe(false);
+    expect(shouldStartPdfChartOnFreshPage("bar_horizontal", 88)).toBe(false);
+    expect(shouldStartPdfChartOnFreshPage("donut", 88)).toBe(false);
   });
 
   it("keeps scatter larger and balanced", () => {

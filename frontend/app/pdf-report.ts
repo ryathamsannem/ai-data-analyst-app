@@ -55,6 +55,7 @@ type JsPdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
 
 /** PDF-only insight section labels (executive report tone). */
 const PDF_REPORT_TITLE = "Executive insight report";
+const PDF_LINE_AREA_MIN_IMAGE_HEIGHT_MM = 107;
 
 const _PDF_INSIGHT_SECTION_LABELS = {
   overview: "Executive overview",
@@ -1718,6 +1719,15 @@ export function resolvePdfChartImageCandidate(args: {
   return args.captureEl
     ? { source: "legacy", captureEl: args.captureEl }
     : { source: "empty" };
+}
+
+export function shouldStartPdfChartOnFreshPage(
+  kind: ChartKind,
+  availableHeightMm: number,
+  requiredHeightMm = PDF_LINE_AREA_MIN_IMAGE_HEIGHT_MM
+): boolean {
+  if (kind !== "line" && kind !== "area") return false;
+  return availableHeightMm < requiredHeightMm;
 }
 
 export function pdfChartMetadataChipText(
@@ -4112,19 +4122,32 @@ export async function runExecutivePdfExport(
     const embedCenteredChartImage = async (
       candidate: Exclude<PdfChartImageCandidate, { source: "empty" }>
     ) => {
-      const insightsReserve = estimateVizInsightsBlockMm();
-      const availableMm = footerY - y - insightsReserve - 5;
+      let insightsReserve = estimateVizInsightsBlockMm();
+      let availableMm = footerY - y - insightsReserve - 5;
       const pdfEmbed =
         candidate.source === "artifact"
           ? ch.chartArtifact?.presentationProfile?.pdfEmbed
           : null;
-      const maxImgH = Math.min(
+      let maxImgH = Math.min(
         pdfEmbed?.maxHeightMm ?? 158,
         Math.max(
           88,
           availableMm > 48 ? availableMm : Math.max(72, footerY - y - 12)
         )
       );
+      if (shouldStartPdfChartOnFreshPage(ch.presentationKind, maxImgH)) {
+        doc.addPage();
+        y = contentTop0;
+        insightsReserve = estimateVizInsightsBlockMm();
+        availableMm = footerY - y - insightsReserve - 5;
+        maxImgH = Math.min(
+          pdfEmbed?.maxHeightMm ?? 158,
+          Math.max(
+            88,
+            availableMm > 48 ? availableMm : Math.max(72, footerY - y - 12)
+          )
+        );
+      }
       ensurePageSpace(maxImgH + 6);
       const placeImage = (dataUrl: string, pxW: number, pxH: number) => {
         const sized = computePdfChartEmbedDimensions(
