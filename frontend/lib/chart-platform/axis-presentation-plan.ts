@@ -54,11 +54,11 @@ export type AxisPresentationPlan = {
   };
 };
 
-export type HBarExportValueAxisProps = {
+export type HBarValueAxisProps = {
   domain?: readonly [number, number];
   ticks?: readonly number[];
   tickCount?: number;
-  allowDataOverflow: boolean;
+  allowDataOverflow?: boolean;
 };
 
 type ResolveAxisPresentationPlanArgs = {
@@ -128,7 +128,7 @@ function resolveExportBarValueDomain(args: {
     chartTitle: args.contract.semantics.title,
     metricLabel: args.contract.semantics.metric.label,
     presentationKind: args.kind,
-    executiveRounding: true,
+    executiveRounding: args.kind === "bar",
   });
   return domain ?? null;
 }
@@ -351,23 +351,18 @@ export function compareAxisPresentationPlans(
   });
 }
 
-export function resolveHBarExportValueAxisProps(args: {
-  plan: AxisPresentationPlan | null | undefined;
-  chartKind: ChartKind;
-  pngCaptureMode: boolean;
-}): HBarExportValueAxisProps | null {
-  const { plan, chartKind, pngCaptureMode } = args;
-  if (!pngCaptureMode || chartKind !== "bar_horizontal") return null;
+function propsFromHorizontalBarPlan(
+  plan: AxisPresentationPlan | null | undefined
+): HBarValueAxisProps | null {
   if (!plan || plan.status !== "supported") return null;
   if (plan.chartKind !== "bar_horizontal" || plan.valueOrientation !== "x") return null;
   if (plan.valueAxis.scale !== "numeric") return null;
 
-  const out: HBarExportValueAxisProps = {
-    allowDataOverflow: true,
-  };
+  const out: HBarValueAxisProps = {};
 
   if (plan.valueAxis.domain) {
     out.domain = plan.valueAxis.domain;
+    out.allowDataOverflow = true;
   }
   if (plan.valueAxis.tickValues?.length) {
     out.ticks = plan.valueAxis.tickValues;
@@ -377,4 +372,31 @@ export function resolveHBarExportValueAxisProps(args: {
   }
 
   return out.domain || out.ticks || out.tickCount ? out : null;
+}
+
+export function resolveHBarValueAxisProps(args: {
+  plan?: AxisPresentationPlan | null;
+  chartKind: ChartKind;
+  rows: readonly ChartRow[];
+  chartTitle?: string | null;
+  metricLabel?: string | null;
+  executiveRounding?: boolean;
+}): HBarValueAxisProps | null {
+  const { plan, chartKind, rows, chartTitle, metricLabel, executiveRounding = false } = args;
+  if (chartKind !== "bar_horizontal") return null;
+
+  const planned = propsFromHorizontalBarPlan(plan);
+  if (planned) return planned;
+
+  const domain = resolveOverviewBarValueDomain(rows, {
+    chartTitle: chartTitle ?? undefined,
+    metricLabel: metricLabel ?? undefined,
+    presentationKind: chartKind,
+    executiveRounding,
+  });
+  if (!domain) return null;
+  return {
+    domain,
+    allowDataOverflow: true,
+  };
 }

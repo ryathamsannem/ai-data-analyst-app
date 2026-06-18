@@ -4612,7 +4612,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         chartTitle: chart.title,
         metricLabel: overviewMetricLabel,
         presentationKind: displayKind,
-        executiveRounding: !!pngCapture,
+        executiveRounding: false,
       });
       const hBarRightMargin = showBarEndLabels
         ? Math.max(hbBalanced.marginRight, 52)

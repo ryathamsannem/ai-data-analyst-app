@@ -78,7 +78,7 @@ import {
   chartLayoutWidthKey,
 } from "@/lib/chart-axis-theme";
 import {
-  resolveHBarExportValueAxisProps,
+  resolveHBarValueAxisProps,
   type AxisPresentationPlan,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
@@ -184,7 +184,7 @@ export type ChartRendererProps = {
   onInsightDrill: (primaryValue: string, secondaryRaw?: string) => void;
   /** Off-screen presentation capture — disable animation for stable PNG/PDF SVG. */
   pngCaptureMode?: boolean;
-  /** Export-only axis plan. Currently passed by Charts PNG capture only. */
+  /** Optional axis plan from export capture profiles; H-Bar falls back to shared domain policy. */
   exportAxisPresentationPlan?: AxisPresentationPlan | null;
   /** Overview auto-dashboard mini-card radial polish (size, legend gap, slice stroke). */
   overviewMiniRadial?: boolean;
@@ -962,10 +962,13 @@ function ChartRendererInner({
       marginLeft: hb.marginLeft,
       chartLayoutMode,
     });
-    const hBarExportValueAxisProps = resolveHBarExportValueAxisProps({
+    const hBarValueAxisProps = resolveHBarValueAxisProps({
       plan: exportAxisPresentationPlan,
       chartKind: rKind,
-      pngCaptureMode,
+      rows: rData,
+      chartTitle: rAxes.valueAxis,
+      metricLabel: rAxes.valueAxis,
+      executiveRounding: pngCaptureMode,
     });
     return (
       <ResponsiveContainer
@@ -992,7 +995,7 @@ function ChartRendererInner({
           />
           <XAxis
             type="number"
-            {...(hBarExportValueAxisProps ?? {})}
+            {...(hBarValueAxisProps ?? {})}
             tick={{ fontSize: 11, fill: AXIS_TICK }}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}

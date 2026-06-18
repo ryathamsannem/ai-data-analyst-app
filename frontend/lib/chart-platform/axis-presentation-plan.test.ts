@@ -5,7 +5,7 @@ import {
   compareAxisPresentationPlans,
   formatAxisPresentationPlanSummary,
   resolveAxisPresentationPlan,
-  resolveHBarExportValueAxisProps,
+  resolveHBarValueAxisProps,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { buildChartPresentationProfile } from "@/lib/chart-platform/chart-presentation-profile";
 
@@ -148,8 +148,8 @@ describe("AxisPresentationPlan", () => {
         "valueAxisHeightPx": null,
         "valueAxisWidthPx": null,
         "valueDomain": [
-          84,
-          130,
+          84.8,
+          123.2,
         ],
         "valueOrientation": "x",
         "valueTickCount": null,
@@ -183,7 +183,7 @@ describe("AxisPresentationPlan", () => {
     expect(plan.diagnostics.reason).toContain("diagnostic-only");
   });
 
-  it("extracts safe H-Bar value-axis props only for PNG capture", () => {
+  it("extracts H-Bar value-axis props from AxisPresentationPlan when provided", () => {
     const contract = buildChartPresentationContract({
       chartId: "hbar-low-variance",
       source: "charts",
@@ -208,29 +208,73 @@ describe("AxisPresentationPlan", () => {
     });
 
     expect(
-      resolveHBarExportValueAxisProps({
+      resolveHBarValueAxisProps({
         plan,
         chartKind: "bar_horizontal",
-        pngCaptureMode: true,
+        rows: contract.data.rows,
+        chartTitle: "Satisfaction Score by Department",
+        metricLabel: "Satisfaction Score",
       })
     ).toEqual({
       allowDataOverflow: true,
-      domain: [4, 4.25],
+      domain: [4.0275, 4.2225],
     });
     expect(
-      resolveHBarExportValueAxisProps({
-        plan,
+      resolveHBarValueAxisProps({
+        plan: null,
         chartKind: "bar_horizontal",
-        pngCaptureMode: false,
+        rows: contract.data.rows,
+        chartTitle: "Satisfaction Score by Department",
+        metricLabel: "Satisfaction Score",
       })
-    ).toBeNull();
+    ).toEqual({
+      allowDataOverflow: true,
+      domain: [4.0275, 4.2225],
+    });
     expect(
-      resolveHBarExportValueAxisProps({
+      resolveHBarValueAxisProps({
         plan,
         chartKind: "bar",
-        pngCaptureMode: true,
+        rows: contract.data.rows,
+        chartTitle: "Satisfaction Score by Department",
+        metricLabel: "Satisfaction Score",
       })
     ).toBeNull();
+  });
+
+  it("resolves the same tight H-Bar domain for live, AI, and PDF-like ChartRenderer paths", () => {
+    const ordersRows = [
+      { name: "Bengaluru", value: 1008 },
+      { name: "Mumbai", value: 1015 },
+      { name: "Delhi", value: 1002 },
+      { name: "Pune", value: 1011 },
+    ];
+
+    const live = resolveHBarValueAxisProps({
+      chartKind: "bar_horizontal",
+      rows: ordersRows,
+      chartTitle: "Orders by City",
+      metricLabel: "Orders",
+    });
+    const ai = resolveHBarValueAxisProps({
+      chartKind: "bar_horizontal",
+      rows: ordersRows,
+      chartTitle: "Orders by City",
+      metricLabel: "Orders",
+    });
+    const pdf = resolveHBarValueAxisProps({
+      chartKind: "bar_horizontal",
+      rows: ordersRows,
+      chartTitle: "Orders by City",
+      metricLabel: "Orders",
+    });
+
+    expect(live).toEqual(ai);
+    expect(ai).toEqual(pdf);
+    expect(live).toEqual({
+      allowDataOverflow: true,
+      domain: [1000.44, 1016.56],
+    });
   });
 
   it("preserves explicit H-Bar tick metadata when present", () => {
@@ -262,14 +306,16 @@ describe("AxisPresentationPlan", () => {
     };
 
     expect(
-      resolveHBarExportValueAxisProps({
+      resolveHBarValueAxisProps({
         plan: planWithTicks,
         chartKind: "bar_horizontal",
-        pngCaptureMode: true,
+        rows: contract.data.rows,
+        chartTitle: "Score by Department",
+        metricLabel: "Score",
       })
     ).toEqual({
       allowDataOverflow: true,
-      domain: [84, 130],
+      domain: [84.8, 123.2],
       tickCount: 4,
       ticks: [80, 100, 120, 140],
     });
