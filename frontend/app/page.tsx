@@ -131,6 +131,7 @@ import {
   createChartPngCaptureRequest,
   downloadChartArtifact,
 } from "@/lib/chart-platform/chart-capture-controller";
+import { resolveChartsPngExportKind } from "@/lib/chart-png-export-session";
 import type {
   ChartArtifact,
   ChartPngCaptureRequest,
@@ -4111,6 +4112,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   onDashboardDrill,
   onViewInChartsTab,
   onAskAiAboutChart,
+  onOverviewEffectiveKind,
   onChartExportError,
   exportFooterHint,
 }: {
@@ -4136,6 +4138,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   onViewInChartsTab?: (snapshotId: string) => void;
   /** Prefills AI Insights and switches tab (pinned snapshot id). */
   onAskAiAboutChart?: (snapshotId: string) => void;
+  /** Reports the chart kind actually used by Overview PNG for export parity. */
+  onOverviewEffectiveKind?: (snapshotId: string, kind: ChartKind) => void;
   /** Surface export failures (e.g. missing SVG). */
   onChartExportError?: (message: string) => void;
 }) {
@@ -4303,6 +4307,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     displayKind,
     renderBarAsHorizontal
   );
+
+  useEffect(() => {
+    if (!snapshotId || !onOverviewEffectiveKind) return;
+    onOverviewEffectiveKind(snapshotId, effectivePresentationKind);
+  }, [snapshotId, effectivePresentationKind, onOverviewEffectiveKind]);
 
   const overviewSemanticHeader = useMemo(
     () =>
@@ -5240,6 +5249,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   onDashboardDrill,
   onOpenDashboardChartInChartsTab,
   onAskAiAboutDashboardChart,
+  onOverviewEffectiveKind,
   onChartExportError,
   exportFooterHint,
 }: {
@@ -5252,6 +5262,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   onDashboardDrill?: (ev: { column: string; label: string; value: string }) => void;
   onOpenDashboardChartInChartsTab: (snapshotId: string) => void;
   onAskAiAboutDashboardChart: (snapshotId: string) => void;
+  onOverviewEffectiveKind: (snapshotId: string, kind: ChartKind) => void;
   onChartExportError: (message: string) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -5305,6 +5316,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
         onDashboardDrill={onDashboardDrill}
         onViewInChartsTab={snapshotId ? handleViewInChartsTab : undefined}
         onAskAiAboutChart={snapshotId ? handleAskAiAboutChart : undefined}
+        onOverviewEffectiveKind={onOverviewEffectiveKind}
         onChartExportError={onChartExportError}
         exportFooterHint={exportFooterHint}
       />
@@ -6243,6 +6255,7 @@ function HomeInner() {
     pinInsightChart,
     pushAIChart,
     replaceAutoDashboardCharts,
+    setAutoDashboardOverviewEffectiveKind,
     invalidateForDatasetChange,
     clearInsightThread,
     clearAiInsightSession,
@@ -6828,6 +6841,13 @@ function HomeInner() {
     [chartHistory, selectChartWithInsightState]
   );
 
+  const recordOverviewEffectiveKind = useCallback(
+    (snapshotId: string, kind: ChartKind) => {
+      setAutoDashboardOverviewEffectiveKind(snapshotId, kind);
+    },
+    [setAutoDashboardOverviewEffectiveKind]
+  );
+
   const dashboardSnapshotByKey = useMemo(() => {
     const m = new Map<string, ChartSnapshot>();
     for (const h of chartHistory) {
@@ -6855,21 +6875,41 @@ function HomeInner() {
       return;
     }
 
+    const liveChartsPngKind = sessionChartKindRef.current;
+    const chartsPngExportKind = resolveChartsPngExportKind({
+      liveKind: liveChartsPngKind,
+      snapshotSource: activeSnapshot?.source ?? null,
+      overviewEffectiveKind: activeSnapshot?.overviewEffectiveChartKind ?? null,
+    });
     const contract =
-      activeSnapshot?.presentationContract ??
-      buildChartPresentationContract({
-        chartId: activeChartId || "charts-tab-active",
-        source: "charts",
-        apiChartType: sessionChartKindRef.current,
-        resolvedKind: sessionChartKindRef.current,
-        title: chartTitle || "Chart",
-        rows: chartData,
-      });
+      activeSnapshot?.presentationContract &&
+      activeSnapshot.presentationContract.kind.resolvedKind ===
+        chartsPngExportKind
+        ? activeSnapshot.presentationContract
+        : buildChartPresentationContract({
+            chartId: activeChartId || "charts-tab-active",
+            source:
+              activeSnapshot?.source === "auto_dashboard"
+                ? "auto_dashboard"
+                : "charts",
+            apiChartType: chartKindToApiChartType(chartsPngExportKind),
+            resolvedKind: chartsPngExportKind,
+            title: chartTitle || "Chart",
+            subtitle: activeSnapshot?.subtitle ?? null,
+            rows: chartData,
+            dashboardChartKey: activeSnapshot?.dashboardChartKey ?? null,
+            metricLabel:
+              activeSnapshot?.presentationContract?.semantics.metric.label ??
+              null,
+            categoryLabel:
+              activeSnapshot?.presentationContract?.semantics.category?.label ??
+              null,
+          });
     const request = createChartPngCaptureRequest({
       contract,
       profile: "chartsPng",
       sourceSurface: "charts",
-      kind: sessionChartKindRef.current,
+      kind: chartsPngExportKind,
       categoryCount: chartData.length,
       filename: sanitizeChartExportFilename(chartTitle || "chart"),
       datasetName: uploadMeta?.name,
@@ -6895,7 +6935,11 @@ function HomeInner() {
     }
   }, [
     activeChartId,
+    activeSnapshot?.dashboardChartKey,
+    activeSnapshot?.overviewEffectiveChartKind,
     activeSnapshot?.presentationContract,
+    activeSnapshot?.source,
+    activeSnapshot?.subtitle,
     chartData,
     chartTitle,
     uploadMeta?.name,
@@ -12116,6 +12160,7 @@ function HomeInner() {
                                   openDashboardChartInChartsTab
                                 }
                                 onAskAiAboutDashboardChart={askAiAboutDashboardChart}
+                                onOverviewEffectiveKind={recordOverviewEffectiveKind}
                                 onChartExportError={setError}
                                 exportFooterHint={uploadMeta?.name}
                               />
@@ -12738,7 +12783,7 @@ function HomeInner() {
                           }
                         >
                           <ChartInsightViewportWrapper
-                            chartKind={sessionRenderedChartKind}
+                            chartKind={chartsTabPngCaptureRequest!.kind}
                             sessionMode
                           >
                             <div className={chartsTabSessionPlotSurface}>
@@ -12752,14 +12797,16 @@ function HomeInner() {
                                   visualization as ChartRendererViz
                                 }
                                 presentationKind={
-                                  sessionRenderedChartKind || presentationChartKind
+                                  chartsTabPngCaptureRequest!.kind ||
+                                  sessionRenderedChartKind ||
+                                  presentationChartKind
                                 }
                                 axes={chartAxisLabels}
                                 viewportW={chartsTabOffscreenLayout.width}
                                 sessionCartesianPlanMain={chartsTabExportCartesianPlan}
                                 insightCartesianPlanMain={null}
                                 exportAxisPresentationPlan={
-                                  chartsTabPngCaptureRequest.presentationProfile
+                                  chartsTabPngCaptureRequest!.presentationProfile
                                     .axisPresentationPlan
                                 }
                                 tickTruncate={tickTruncate}

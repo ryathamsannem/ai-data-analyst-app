@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildPresentationExportSpec } from "@/lib/chart-png-export-layout";
 import { isOffscreenPngExportRoot } from "@/lib/chart-png-capture";
+import { resolveChartsPngExportKind } from "@/lib/chart-png-export-session";
 
 describe("chart PNG export session", () => {
   it("builds line export spec with fixed canvas", () => {
@@ -25,5 +26,45 @@ describe("chart PNG export session", () => {
     expect(isOffscreenPngExportRoot(el)).toBe(false);
     el.setAttribute("data-chart-png-offscreen", "1");
     expect(isOffscreenPngExportRoot(el)).toBe(true);
+  });
+
+  it("uses Overview effective H-Bar only for auto-dashboard Charts PNG export", () => {
+    expect(
+      resolveChartsPngExportKind({
+        liveKind: "bar",
+        snapshotSource: "auto_dashboard",
+        overviewEffectiveKind: "bar_horizontal",
+      })
+    ).toBe("bar_horizontal");
+  });
+
+  it("keeps live Charts kind when no export override is present", () => {
+    expect(
+      resolveChartsPngExportKind({
+        liveKind: "bar",
+        snapshotSource: "auto_dashboard",
+        overviewEffectiveKind: null,
+      })
+    ).toBe("bar");
+  });
+
+  it("does not apply Overview export kind to non-auto-dashboard charts", () => {
+    expect(
+      resolveChartsPngExportKind({
+        liveKind: "bar",
+        snapshotSource: "ai",
+        overviewEffectiveKind: "bar_horizontal",
+      })
+    ).toBe("bar");
+  });
+
+  it("does not apply the export override outside the bar family", () => {
+    expect(
+      resolveChartsPngExportKind({
+        liveKind: "donut",
+        snapshotSource: "auto_dashboard",
+        overviewEffectiveKind: "bar_horizontal",
+      })
+    ).toBe("donut");
   });
 });

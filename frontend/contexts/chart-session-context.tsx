@@ -73,6 +73,8 @@ export type ChartSnapshot = {
   semanticIntentKey?: string;
   /** Normalized presentation for parity across Overview / Insights / PDF. */
   timelineChartType?: TimelineChartType;
+  /** Overview PNG kind after mini-card export fallback; used only for export parity. */
+  overviewEffectiveChartKind?: ChartKind;
   /** Frozen visualization contract — kind, dimension, narrative scope. */
   contract?: VisualizationContract;
   /** Phase 1 chart platform contract — parallel, non-renderer-owning metadata layer. */
@@ -155,6 +157,10 @@ export type ChartSessionValue = {
     semanticIntentKey?: string;
   }) => string;
   replaceAutoDashboardCharts: (charts: AutoDashboardLike[]) => void;
+  setAutoDashboardOverviewEffectiveKind: (
+    snapshotId: string,
+    kind: ChartKind
+  ) => void;
   invalidateForDatasetChange: () => void;
   clearInsightThread: () => void;
   /** Remove AI charts from session, clear insight pin; keeps auto-dashboard charts. */
@@ -456,6 +462,28 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setAutoDashboardOverviewEffectiveKind = useCallback(
+    (snapshotId: string, kind: ChartKind) => {
+      if (!snapshotId || (kind !== "bar" && kind !== "bar_horizontal")) return;
+      setHistory((prev) => {
+        let changed = false;
+        const next = prev.map((snap) => {
+          if (
+            snap.id !== snapshotId ||
+            snap.source !== "auto_dashboard" ||
+            snap.overviewEffectiveChartKind === kind
+          ) {
+            return snap;
+          }
+          changed = true;
+          return { ...snap, overviewEffectiveChartKind: kind };
+        });
+        return changed ? next : prev;
+      });
+    },
+    []
+  );
+
   const value = useMemo<ChartSessionValue>(
     () => ({
       datasetEpoch,
@@ -469,6 +497,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
       pinInsightChart,
       pushAIChart,
       replaceAutoDashboardCharts,
+      setAutoDashboardOverviewEffectiveKind,
       invalidateForDatasetChange,
       clearInsightThread,
       clearAiInsightSession,
@@ -485,6 +514,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
       pinInsightChart,
       pushAIChart,
       replaceAutoDashboardCharts,
+      setAutoDashboardOverviewEffectiveKind,
       invalidateForDatasetChange,
       clearInsightThread,
       clearAiInsightSession,

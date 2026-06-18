@@ -38,6 +38,26 @@ export type RunChartPngExportResult = {
   parity?: Awaited<ReturnType<typeof captureChartPngArtifact>>["parity"];
 };
 
+function isBarFamilyKind(kind: ChartKind | null | undefined): kind is "bar" | "bar_horizontal" {
+  return kind === "bar" || kind === "bar_horizontal";
+}
+
+export function resolveChartsPngExportKind(args: {
+  liveKind: ChartKind;
+  snapshotSource?: "ai" | "auto_dashboard" | null;
+  overviewEffectiveKind?: ChartKind | null;
+}): ChartKind {
+  const { liveKind, snapshotSource, overviewEffectiveKind } = args;
+  if (
+    snapshotSource === "auto_dashboard" &&
+    isBarFamilyKind(liveKind) &&
+    isBarFamilyKind(overviewEffectiveKind)
+  ) {
+    return overviewEffectiveKind;
+  }
+  return liveKind;
+}
+
 /** Wait for offscreen portal chart to mount and settle before capture. */
 export async function waitForOffscreenChartReady(
   getExportRoot: () => HTMLElement | null,
