@@ -12758,6 +12758,10 @@ function HomeInner() {
                                 viewportW={chartsTabOffscreenLayout.width}
                                 sessionCartesianPlanMain={chartsTabExportCartesianPlan}
                                 insightCartesianPlanMain={null}
+                                exportAxisPresentationPlan={
+                                  chartsTabPngCaptureRequest.presentationProfile
+                                    .axisPresentationPlan
+                                }
                                 tickTruncate={tickTruncate}
                                 onInsightDrill={insightChartDrill}
                               />

@@ -77,6 +77,10 @@ import {
   CHART_AXIS_CSS,
   chartLayoutWidthKey,
 } from "@/lib/chart-axis-theme";
+import {
+  resolveHBarExportValueAxisProps,
+  type AxisPresentationPlan,
+} from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
@@ -180,6 +184,8 @@ export type ChartRendererProps = {
   onInsightDrill: (primaryValue: string, secondaryRaw?: string) => void;
   /** Off-screen presentation capture — disable animation for stable PNG/PDF SVG. */
   pngCaptureMode?: boolean;
+  /** Export-only axis plan. Currently passed by Charts PNG capture only. */
+  exportAxisPresentationPlan?: AxisPresentationPlan | null;
   /** Overview auto-dashboard mini-card radial polish (size, legend gap, slice stroke). */
   overviewMiniRadial?: boolean;
 };
@@ -199,6 +205,7 @@ function ChartRendererInner({
   tickTruncate,
   onInsightDrill,
   pngCaptureMode = false,
+  exportAxisPresentationPlan = null,
   overviewMiniRadial = false,
 }: ChartRendererProps) {
   useDevRenderCount("ChartRenderer");
@@ -955,6 +962,11 @@ function ChartRendererInner({
       marginLeft: hb.marginLeft,
       chartLayoutMode,
     });
+    const hBarExportValueAxisProps = resolveHBarExportValueAxisProps({
+      plan: exportAxisPresentationPlan,
+      chartKind: rKind,
+      pngCaptureMode,
+    });
     return (
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
@@ -980,6 +992,7 @@ function ChartRendererInner({
           />
           <XAxis
             type="number"
+            {...(hBarExportValueAxisProps ?? {})}
             tick={{ fontSize: 11, fill: AXIS_TICK }}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}

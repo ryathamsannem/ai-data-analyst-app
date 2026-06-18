@@ -5,6 +5,12 @@ import {
   type PresentationCaptureLayoutOptions,
 } from "@/lib/chart-png-export-layout";
 import type { ChartPresentationContract } from "@/lib/chart-platform/chart-presentation-contract";
+import {
+  compareAxisPresentationPlans,
+  formatAxisPresentationPlanSummary,
+  resolveAxisPresentationPlan,
+  type AxisPresentationPlan,
+} from "@/lib/chart-platform/axis-presentation-plan";
 
 export type ChartPresentationProfileId =
   | "overviewLive"
@@ -55,6 +61,7 @@ export type ChartPresentationProfile = {
   aspectPolicy: ChartAspectPolicy;
   metadataMode: ChartMetadataMode;
   axisPolicyId: string;
+  axisPresentationPlan: AxisPresentationPlan;
 };
 
 type BuildChartPresentationProfileArgs = {
@@ -244,6 +251,12 @@ export function buildChartPresentationProfile({
     chartId: contract.identity.chartId,
     chartKind: kind,
     axisPolicyId: axisPolicyIdForProfile(id, kind),
+    axisPresentationPlan: resolveAxisPresentationPlan({
+      profileId: id,
+      contract,
+      kind,
+      spec: id in LIVE_PROFILE_DEFAULTS ? null : exportSpec,
+    }),
   };
 }
 
@@ -263,6 +276,8 @@ export function formatChartPresentationProfileSummary(
     pdfEmbedMaxHeightMm: profile.pdfEmbed?.maxHeightMm ?? null,
     pdfEmbedMinWidthRatio: profile.pdfEmbed?.minWidthRatio ?? null,
     axisPolicyId: profile.axisPolicyId,
+    axisPlanId: profile.axisPresentationPlan.planId,
+    axisPlanStatus: profile.axisPresentationPlan.status,
     metadataMode: profile.metadataMode,
     aspectPolicy: profile.aspectPolicy,
   };
@@ -288,10 +303,15 @@ function compareProfiles(
   a: ChartPresentationProfile,
   b: ChartPresentationProfile
 ): void {
+  const axisPlanMismatches = compareAxisPresentationPlans(
+    a.axisPresentationPlan,
+    b.axisPresentationPlan
+  );
   const mismatches = [
     a.axisPolicyId !== b.axisPolicyId
       ? `axisPolicyId ${a.id}=${a.axisPolicyId} ${b.id}=${b.axisPolicyId}`
       : "",
+    ...axisPlanMismatches.map((mismatch) => `axisPresentationPlan ${mismatch}`),
     a.metadataMode !== b.metadataMode
       ? `metadataMode ${a.id}=${a.metadataMode} ${b.id}=${b.metadataMode}`
       : "",
@@ -300,6 +320,10 @@ function compareProfiles(
     console.warn(`[chart-profile] ${label}`, mismatches, {
       [a.id]: formatChartPresentationProfileSummary(a),
       [b.id]: formatChartPresentationProfileSummary(b),
+      axisPresentationPlans: {
+        [a.id]: formatAxisPresentationPlanSummary(a.axisPresentationPlan),
+        [b.id]: formatAxisPresentationPlanSummary(b.axisPresentationPlan),
+      },
     });
   }
 }
