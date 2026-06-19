@@ -8,6 +8,7 @@ import {
   resolveOverviewScatterPremiumAxes,
   resolveOverviewScatterPremiumAxisScale,
   resolveSessionPremiumTrendAxisScale,
+  resolveTrendValueAxisProps,
   SESSION_DETAIL_TREND_PREMIUM_PAD_RATIO,
   sessionLineAreaDetailBottomMargin,
   sessionTrendDetailPlotMargins,
@@ -73,6 +74,45 @@ describe("formatOverviewScatterAxisTick", () => {
   it("formats scatter axis ticks with compact K labels", () => {
     expect(formatOverviewScatterAxisTick(90_000)).toBe("90K");
     expect(formatOverviewScatterAxisTick(340_000)).toBe("340K");
+  });
+});
+
+describe("resolveTrendValueAxisProps", () => {
+  const lowVariance = [0.8, 0.82, 0.81, 0.84, 0.83, 0.86, 0.85, 0.88, 0.87, 0.9, 0.89, 0.92];
+
+  it("returns Overview-aligned premium domain for Line", () => {
+    const props = resolveTrendValueAxisProps({
+      chartKind: "line",
+      values: lowVariance,
+    });
+    expect(props).not.toBeNull();
+    expect(props!.allowDataOverflow).toBe(true);
+    expect(props!.domain[0]).toBeLessThanOrEqual(0.8);
+    expect(props!.domain[1]).toBeGreaterThanOrEqual(0.92);
+    expect(props!.ticks).toContain(0.75);
+    expect(props!.ticks).toContain(0.95);
+  });
+
+  it("returns the same domain for Line regardless of surface path", () => {
+    const overview = resolveTrendValueAxisProps({
+      chartKind: "line",
+      values: lowVariance,
+    });
+    const chartsPng = resolveTrendValueAxisProps({
+      chartKind: "line",
+      values: lowVariance,
+    });
+    expect(chartsPng).toEqual(overview);
+  });
+
+  it("returns Overview-aligned premium domain for Area", () => {
+    const props = resolveTrendValueAxisProps({
+      chartKind: "area",
+      values: lowVariance,
+    });
+    expect(props).not.toBeNull();
+    expect(props!.allowDataOverflow).toBe(true);
+    expect(props!.ticks.length).toBeGreaterThanOrEqual(4);
   });
 });
 

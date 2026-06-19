@@ -5,6 +5,8 @@
 import type { ChartKind, ChartRow } from "@/app/chart-types";
 import { fallbackChartNumericDisplay } from "@/app/chart-types";
 import type { ChartSnapshot } from "@/contexts/chart-session-context";
+import type { ChartArtifact } from "@/lib/chart-platform/chart-artifact";
+import type { ChartPresentationMetadataChip } from "@/lib/chart-platform/chart-presentation-contract";
 import { buildKpiTitle, remapLegacyKpiTitle } from "@/lib/analytics-metadata";
 import { getCanonicalChartTitle } from "@/lib/canonical-chart-title";
 import {
@@ -133,6 +135,8 @@ export type PdfChartPrepContext = {
   aggregation: string | null;
   chartInsightBadge: string | null;
   chartAxisLabels: { category: string; value: string } | null;
+  metadataChips?: ChartPresentationMetadataChip[] | null;
+  chartArtifact?: ChartArtifact | null;
   captureEl: HTMLElement | null;
   chartAttribution: string | null;
   provenanceSlice: PdfProvenanceSlice | null;
@@ -863,6 +867,8 @@ export function buildExecutivePdfExportInput(
             data: chartPrep.chartData,
             title: chartPrep.exportDisplayTitle,
             subtitle: chartPrep.chartSubtitleMerged,
+            metadataChips: chartPrep.metadataChips ?? null,
+            chartArtifact: chartPrep.chartArtifact ?? null,
             captureEl: chartPrep.captureEl,
             alignedMetric: chartPrep.metricColumn,
             alignedMetricDisplay: chartPrep.alignedMetricDisplay,

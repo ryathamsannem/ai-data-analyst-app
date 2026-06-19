@@ -29,6 +29,8 @@ import {
   freezeVisualizationContract,
   type VisualizationContract,
 } from "../lib/selected-visualization";
+import { buildChartPresentationContract } from "../lib/chart-platform/build-chart-contract";
+import type { ChartPresentationContract } from "../lib/chart-platform/chart-presentation-contract";
 
 export type ChartSource = "ai" | "auto_dashboard";
 
@@ -71,8 +73,12 @@ export type ChartSnapshot = {
   semanticIntentKey?: string;
   /** Normalized presentation for parity across Overview / Insights / PDF. */
   timelineChartType?: TimelineChartType;
+  /** Overview PNG kind after mini-card export fallback; used only for export parity. */
+  overviewEffectiveChartKind?: ChartKind;
   /** Frozen visualization contract — kind, dimension, narrative scope. */
   contract?: VisualizationContract;
+  /** Phase 1 chart platform contract — parallel, non-renderer-owning metadata layer. */
+  presentationContract?: ChartPresentationContract;
 };
 
 /** Alias: pinned visualization — single source of truth across Overview, Charts, AI Insights, PDF. */
@@ -151,6 +157,10 @@ export type ChartSessionValue = {
     semanticIntentKey?: string;
   }) => string;
   replaceAutoDashboardCharts: (charts: AutoDashboardLike[]) => void;
+  setAutoDashboardOverviewEffectiveKind: (
+    snapshotId: string,
+    kind: ChartKind
+  ) => void;
   invalidateForDatasetChange: () => void;
   clearInsightThread: () => void;
   /** Remove AI charts from session, clear insight pin; keeps auto-dashboard charts. */
@@ -316,6 +326,21 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           timeBucketLabelOverride: args.finalPresentation?.grain ?? null,
           timeSeriesAnalysis: tsMeta,
         });
+        const presentationContract = buildChartPresentationContract({
+          chartId: id,
+          source: "ai_insights",
+          apiChartType: chartKindToApiChartType(contract.chartType),
+          resolvedKind: contract.chartType,
+          title: contract.displayTitle,
+          subtitle: snapBase.subtitle,
+          rows: snapBase.chartData,
+          question: snapBase.question,
+          metricLabel: contract.metricLabel,
+          categoryLabel:
+            contract.dimension ?? contract.categoryKey ?? contract.timeBucketLabel,
+          aggregation: contract.aggregation,
+          legacyVisualizationContract: contract,
+        });
         const snap: ChartSnapshot = {
           ...snapBase,
           id,
@@ -324,6 +349,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           chartKind: contract.chartType,
           timelineChartType: chartKindToTimelineType(contract.chartType),
           contract,
+          presentationContract,
         };
         pushedId = snap.id;
         if (dupIdx >= 0) {
@@ -387,6 +413,21 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           scatterXLabel: scatterAxis?.scatterXLabel ?? null,
           scatterYLabel: scatterAxis?.scatterYLabel ?? null,
         });
+        const presentationContract = buildChartPresentationContract({
+          chartId: snapId,
+          source: "auto_dashboard",
+          apiChartType: chartKindToApiChartType(contract.chartType),
+          resolvedKind: contract.chartType,
+          title: contract.displayTitle,
+          subtitle: "Auto dashboard",
+          rows,
+          dashboardChartKey: key,
+          metricLabel: contract.metricLabel,
+          categoryLabel:
+            contract.dimension ?? contract.categoryKey ?? contract.timeBucketLabel,
+          aggregation: contract.aggregation,
+          legacyVisualizationContract: contract,
+        });
         const viz = buildStubVizFromAutoDashboardMini(mini, contract.chartType, rows);
         added.push({
           id: snapId,
@@ -405,6 +446,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
           ),
           timelineChartType: chartKindToTimelineType(contract.chartType),
           contract,
+          presentationContract,
         });
       }
       const next = [...kept, ...added];
@@ -420,6 +462,28 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setAutoDashboardOverviewEffectiveKind = useCallback(
+    (snapshotId: string, kind: ChartKind) => {
+      if (!snapshotId || (kind !== "bar" && kind !== "bar_horizontal")) return;
+      setHistory((prev) => {
+        let changed = false;
+        const next = prev.map((snap) => {
+          if (
+            snap.id !== snapshotId ||
+            snap.source !== "auto_dashboard" ||
+            snap.overviewEffectiveChartKind === kind
+          ) {
+            return snap;
+          }
+          changed = true;
+          return { ...snap, overviewEffectiveChartKind: kind };
+        });
+        return changed ? next : prev;
+      });
+    },
+    []
+  );
+
   const value = useMemo<ChartSessionValue>(
     () => ({
       datasetEpoch,
@@ -433,6 +497,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
       pinInsightChart,
       pushAIChart,
       replaceAutoDashboardCharts,
+      setAutoDashboardOverviewEffectiveKind,
       invalidateForDatasetChange,
       clearInsightThread,
       clearAiInsightSession,
@@ -449,6 +514,7 @@ export function ChartSessionProvider({ children }: { children: ReactNode }) {
       pinInsightChart,
       pushAIChart,
       replaceAutoDashboardCharts,
+      setAutoDashboardOverviewEffectiveKind,
       invalidateForDatasetChange,
       clearInsightThread,
       clearAiInsightSession,

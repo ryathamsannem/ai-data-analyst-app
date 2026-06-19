@@ -65,6 +65,7 @@ from services.ask_narrative_phase import (
 )
 from services.auto_dashboard_opportunities import (
     DashboardDeps,
+    build_dashboard_charts_bundle,
     build_dashboard_charts_from_opportunities,
 )
 
@@ -3662,12 +3663,12 @@ def _dash_generic_dashboard_charts(kind: str) -> List[Dict[str, Any]]:
     return out_ch
 
 
-def build_auto_dashboard_charts(
+def build_auto_dashboard_charts_bundle(
     kind: str, kpi_cards: Optional[List[Dict[str, Any]]] = None
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     global df, dataset_profile
     if df is None or df.empty:
-        return []
+        return [], {}
     profile = dataset_profile or build_profile(df)
     seed: List[Dict[str, Any]] = []
     if kind == "hr":
@@ -3689,9 +3690,16 @@ def build_auto_dashboard_charts(
         priority_metrics=_dash_priority_metric_columns,
         record_metric_key=_DASH_RECORD_METRIC_KEY,
     )
-    return build_dashboard_charts_from_opportunities(
+    return build_dashboard_charts_bundle(
         df, profile, kind, deps, seed_candidates=seed, kpi_cards=kpi_cards
     )
+
+
+def build_auto_dashboard_charts(
+    kind: str, kpi_cards: Optional[List[Dict[str, Any]]] = None
+) -> List[Dict[str, Any]]:
+    charts, _ = build_auto_dashboard_charts_bundle(kind, kpi_cards=kpi_cards)
+    return charts
 
 
 def build_auto_dashboard(
@@ -3703,7 +3711,13 @@ def build_auto_dashboard(
 ) -> Dict[str, Any]:
     global df, dataset_profile
     if df is None:
-        return {"kind": "generic", "type_label": AUTO_DASHBOARD_LABELS["generic"], "cards": [], "charts": []}
+        return {
+            "kind": "generic",
+            "type_label": AUTO_DASHBOARD_LABELS["generic"],
+            "cards": [],
+            "charts": [],
+            "coverage_telemetry": {},
+        }
 
     profile = profile if profile is not None else (dataset_profile or build_profile(df))
     columns = df.columns.tolist()
@@ -3767,7 +3781,11 @@ def build_auto_dashboard(
         else build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
     )
     out["cards"] = clamp_cards(cards)
-    out["charts"] = build_auto_dashboard_charts(kind, kpi_cards=out["cards"])
+    charts, coverage_telemetry = build_auto_dashboard_charts_bundle(
+        kind, kpi_cards=out["cards"]
+    )
+    out["charts"] = charts
+    out["coverage_telemetry"] = coverage_telemetry
     return out
 
 

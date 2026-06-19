@@ -3,6 +3,7 @@ import {
   resolveOverviewBarValueDomain,
   roundExecutiveAxisMaximum,
 } from "@/lib/overview-bar-value-domain";
+import { countMetadataChipsInExportRoot } from "@/lib/chart-metadata-chips";
 
 export { roundExecutiveAxisMaximum };
 
@@ -134,10 +135,12 @@ export type OverviewDashboardExportParityInput = {
   chartTitle?: string | null;
   expectedPrimaryBarColor?: string;
   theme?: "light" | "dark";
+  /** When set, export root must include at least this many metadata chips. */
+  expectedMetadataChipCount?: number;
 };
 
 export type OverviewDashboardExportParityCheck = {
-  id: "chartKind" | "orientation" | "colors" | "labels" | "theme";
+  id: "chartKind" | "orientation" | "colors" | "labels" | "theme" | "metadataChips";
   ok: boolean;
   message?: string;
 };
@@ -239,6 +242,18 @@ export function validateOverviewDashboardExportParity(
     id: "theme",
     ok: themeOk,
     message: themeOk ? undefined : "export theme does not match document theme",
+  });
+
+  const expectedChipCount = input.expectedMetadataChipCount ?? 0;
+  const actualChipCount = countMetadataChipsInExportRoot(input.exportRoot ?? null);
+  const chipsOk =
+    expectedChipCount <= 0 || actualChipCount >= expectedChipCount;
+  checks.push({
+    id: "metadataChips",
+    ok: chipsOk,
+    message: chipsOk
+      ? undefined
+      : `export metadata chips ${actualChipCount} < expected ${expectedChipCount}`,
   });
 
   return {
