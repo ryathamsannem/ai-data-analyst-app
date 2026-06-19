@@ -6,9 +6,54 @@ import {
   routingPlanSliceForPdf,
   type BuildExecutivePdfInputParams,
 } from "@/lib/build-executive-pdf-input";
-import { pickPdfVizExecutiveFacts } from "@/app/pdf-report";
+import {
+  isValidPdfChartArtifact,
+  normalizePdfChartMetadataChips,
+  pickPdfVizExecutiveFacts,
+  pdfChartMetadataChipText,
+  resolvePdfChartImageCandidate,
+  shouldStartPdfChartOnFreshPage,
+} from "@/app/pdf-report";
 import type { SmartChartIntel } from "@/lib/smart-chart-intelligence";
 import type { ExecutiveVizInsightCard } from "@/lib/executive-insight-ranking";
+import type { ChartArtifact } from "@/lib/chart-platform/chart-artifact";
+import type { ChartPresentationMetadataChip } from "@/lib/chart-platform/chart-presentation-contract";
+import { computePdfChartEmbedDimensions } from "@/lib/pdf-enterprise-style";
+
+const sampleMetadataChips: ChartPresentationMetadataChip[] = [
+  { id: "view", kind: "labeled", label: "View", value: "H-Bar" },
+  { id: "measure", kind: "labeled", label: "Measure", value: "Revenue" },
+  { id: "axis", kind: "labeled", label: "Axis", value: "City" },
+];
+
+const validArtifact = (overrides: Partial<ChartArtifact> = {}): ChartArtifact => ({
+  requestId: "req-1",
+  chartId: "chart-1",
+  profile: "pdfChart",
+  format: "png",
+  dataUrl: "data:image/png;base64,abc",
+  widthPx: 1200,
+  heightPx: 800,
+  contractVersion: 1,
+  capturedAt: 1,
+  diagnostics: {
+    statusTimeline: [],
+    resolvedKind: "bar",
+    svgCount: 1,
+    markCount: 3,
+    measuredWidthPx: 900,
+    measuredHeightPx: 600,
+    rootWidthPx: 900,
+    rootHeightPx: 600,
+    svgWidthPx: 860,
+    svgHeightPx: 520,
+    responsiveContainerWidthPx: 860,
+    responsiveContainerHeightPx: 520,
+    layoutSampleCount: 3,
+    retries: 0,
+  },
+  ...overrides,
+});
 
 const baseParams = (): BuildExecutivePdfInputParams => ({
   options: {
@@ -197,6 +242,71 @@ describe("buildExecutivePdfExportInput", () => {
     expect(built.input.chartIntel?.whyThisChart).toBe(intel.whyThisChart);
   });
 
+  it("carries chartArtifact through chart prep", () => {
+    const artifact = validArtifact();
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      chartPrep: {
+        presentationKind: "bar",
+        chartData: [{ name: "Mumbai", value: 100 }],
+        chartTitle: "Revenue by city",
+        chartSubtitleMerged: "Grouped comparison",
+        exportDisplayTitle: "Revenue by city",
+        trendMode: false,
+        contract: undefined,
+        rankedSignals: null,
+        metricColumn: "revenue",
+        alignedMetricDisplay: "Revenue",
+        aggregation: "sum",
+        chartInsightBadge: null,
+        chartAxisLabels: { category: "City", value: "Revenue" },
+        metadataChips: sampleMetadataChips,
+        chartArtifact: artifact,
+        captureEl: null,
+        chartAttribution: null,
+        provenanceSlice: null,
+        metricType: null,
+        roundingHint: null,
+        vizMetricType: null,
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.input.chart?.chartArtifact).toBe(artifact);
+    expect(built.input.chart?.metadataChips).toEqual(sampleMetadataChips);
+    expect(built.input.chart?.captureEl).toBeNull();
+  });
+
+  it("works when metadata chips are missing", () => {
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      chartPrep: {
+        presentationKind: "bar",
+        chartData: [{ name: "Mumbai", value: 100 }],
+        chartTitle: "Revenue by city",
+        chartSubtitleMerged: "Grouped comparison",
+        exportDisplayTitle: "Revenue by city",
+        trendMode: false,
+        contract: undefined,
+        rankedSignals: null,
+        metricColumn: "revenue",
+        alignedMetricDisplay: "Revenue",
+        aggregation: "sum",
+        chartInsightBadge: null,
+        chartAxisLabels: { category: "City", value: "Revenue" },
+        captureEl: null,
+        chartAttribution: null,
+        provenanceSlice: null,
+        metricType: null,
+        roundingHint: null,
+        vizMetricType: null,
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.input.chart?.metadataChips).toBeNull();
+  });
+
   it("maps routing plan slice without hardcoded dimension values", () => {
     const slice = routingPlanSliceForPdf({
       intent: "profitability",
@@ -220,5 +330,108 @@ describe("pickPdfVizExecutiveFacts", () => {
     const derived = [{ title: "Derived leader", value: "99" }];
     expect(pickPdfVizExecutiveFacts([], derived)).toEqual(derived);
     expect(pickPdfVizExecutiveFacts(undefined, derived)).toEqual(derived);
+  });
+});
+
+describe("PDF chart artifact selection", () => {
+  it("prefers a valid artifact over legacy captureEl", () => {
+    const artifact = validArtifact();
+    const legacyEl = {} as HTMLElement;
+    expect(isValidPdfChartArtifact(artifact)).toBe(true);
+    expect(
+      resolvePdfChartImageCandidate({ artifact, captureEl: legacyEl })
+    ).toMatchObject({
+      source: "artifact",
+      dataUrl: artifact.dataUrl,
+      width: artifact.widthPx,
+      height: artifact.heightPx,
+    });
+  });
+
+  it("falls back when artifact is missing", () => {
+    const legacyEl = {} as HTMLElement;
+    expect(
+      resolvePdfChartImageCandidate({ artifact: null, captureEl: legacyEl })
+    ).toEqual({ source: "legacy", captureEl: legacyEl });
+  });
+
+  it("rejects invalid artifacts instead of embedding blank images", () => {
+    const invalid = validArtifact({
+      widthPx: 0,
+      diagnostics: {
+        ...validArtifact().diagnostics,
+        markCount: 0,
+        failureReason: "missing_marks",
+      },
+    });
+    expect(isValidPdfChartArtifact(invalid)).toBe(false);
+    expect(
+      resolvePdfChartImageCandidate({ artifact: invalid, captureEl: null })
+    ).toEqual({ source: "empty" });
+  });
+});
+
+describe("PDF chart metadata chips", () => {
+  it("formats labeled and mono chips for PDF-native rendering", () => {
+    expect(pdfChartMetadataChipText(sampleMetadataChips[0]!)).toBe("View: H-Bar");
+    expect(
+      pdfChartMetadataChipText({ id: "badge", kind: "mono", value: "3 groups" })
+    ).toBe("3 groups");
+  });
+
+  it("filters blank chips and tolerates missing chips", () => {
+    expect(normalizePdfChartMetadataChips(null)).toEqual([]);
+    expect(
+      normalizePdfChartMetadataChips([
+        ...sampleMetadataChips,
+        { id: "blank", kind: "mono", value: " " },
+      ])
+    ).toEqual(sampleMetadataChips);
+  });
+});
+
+describe("PDF chart embed sizing", () => {
+  it("keeps H-Bar sizing stable with generic defaults", () => {
+    const sized = computePdfChartEmbedDimensions(1100, 900, 180, 158, 0.74);
+    expect(sized.heightMm).toBeLessThanOrEqual(158);
+    expect(sized.widthMm).toBeGreaterThanOrEqual(180 * 0.74);
+  });
+
+  it("honors smaller donut cap and lower width ratio", () => {
+    const sized = computePdfChartEmbedDimensions(1400, 720, 180, 108, 0.58, {
+      minAspectRatio: 0.42,
+      maxAspectRatio: 1.6,
+    });
+    expect(sized.heightMm).toBeLessThanOrEqual(108);
+    expect(sized.widthMm).toBeGreaterThanOrEqual(180 * 0.58);
+  });
+
+  it("allows wider line and area placement", () => {
+    const sized = computePdfChartEmbedDimensions(1200, 800, 180, 158, 0.9, {
+      minAspectRatio: 0.36,
+      maxAspectRatio: 2.1,
+    });
+    expect(sized.widthMm).toBeGreaterThanOrEqual(180 * 0.9);
+    expect(sized.heightMm).toBeLessThanOrEqual(158);
+  });
+
+  it("starts crowded line and area PDF chart images on a fresh page only for trend charts", () => {
+    expect(shouldStartPdfChartOnFreshPage("line", 106.9)).toBe(true);
+    expect(shouldStartPdfChartOnFreshPage("area", 88)).toBe(true);
+    expect(shouldStartPdfChartOnFreshPage("line", 107)).toBe(false);
+    expect(shouldStartPdfChartOnFreshPage("area", 118)).toBe(false);
+
+    expect(shouldStartPdfChartOnFreshPage("scatter", 88)).toBe(false);
+    expect(shouldStartPdfChartOnFreshPage("bar_horizontal", 88)).toBe(false);
+    expect(shouldStartPdfChartOnFreshPage("donut", 88)).toBe(false);
+  });
+
+  it("keeps scatter larger and balanced", () => {
+    const sized = computePdfChartEmbedDimensions(1400, 900, 180, 150, 0.86, {
+      minAspectRatio: 0.62,
+      maxAspectRatio: 1.55,
+    });
+    expect(sized.widthMm).toBeGreaterThanOrEqual(180 * 0.86);
+    expect(sized.heightMm / sized.widthMm).toBeGreaterThanOrEqual(0.62);
   });
 });

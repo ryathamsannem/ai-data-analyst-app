@@ -195,15 +195,19 @@ export function computePdfChartEmbedDimensions(
   pxH: number,
   contentWidthMm: number,
   maxHeightMm: number,
-  minWidthRatio = 0.74
+  minWidthRatio = 0.74,
+  options: {
+    minAspectRatio?: number;
+    maxAspectRatio?: number;
+  } = {}
 ): { widthMm: number; heightMm: number } {
   const safeW = Math.max(1, pxW);
   const safeH = Math.max(1, pxH);
   let imgWidth = contentWidthMm;
   let imgHeight = (safeH * imgWidth) / safeW;
   const minW = contentWidthMm * minWidthRatio;
-  const maxAspect = 2.35;
-  const minAspect = 0.32;
+  const maxAspect = options.maxAspectRatio ?? 2.35;
+  const minAspect = options.minAspectRatio ?? 0.32;
 
   if (imgHeight > maxHeightMm) {
     imgHeight = maxHeightMm;

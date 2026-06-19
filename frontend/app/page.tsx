@@ -85,7 +85,6 @@ import {
 } from "@/lib/chart-time-x-axis";
 import { chartLayoutWidthKey } from "@/lib/chart-axis-theme";
 import {
-  buildPresentationExportSpec,
   presentationCapturePlotStyle,
 } from "@/lib/chart-png-export-layout";
 import {
@@ -110,32 +109,32 @@ import {
   computeOverviewHorizontalDashLayout,
   computeOverviewHBarLiveMargins,
   computeOverviewMiniCategoryPlan,
-  computeOverviewScatterDashMargins,
-  computeOverviewScatterPremiumMargins,
   computeOverviewTrendLivePlotMargins,
   computeOverviewVerticalDashLayout,
   overviewDashUsesExpandedPlotBand,
   overviewDashboardUsesHorizontalBars,
   overviewTrendLiveSideMargins,
   OVERVIEW_LINE_Y_AXIS_LEFT_TRIM_PX,
-  OVERVIEW_SCATTER_POINT_RADIUS_PX,
-  OVERVIEW_SCATTER_POINT_STROKE_PX,
-  OVERVIEW_SCATTER_POINT_STROKE_COLOR,
-  OVERVIEW_SCATTER_POINT_STROKE_OPACITY,
-  OVERVIEW_SCATTER_POINT_FILL_OPACITY,
   resolveOverviewDashLivePlotHeight,
 } from "@/lib/overview-dashboard-plot-layout";
 import {
   formatOverviewLineYAxisTick,
-  formatOverviewScatterAxisTick,
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
-  OVERVIEW_LINE_PREMIUM_PAD_RATIO,
-  resolveOverviewPremiumAxisScale,
-  resolveOverviewScatterPremiumAxes,
+  resolveTrendValueAxisProps,
 } from "@/lib/overview-premium-axis-domain";
-import { ChartPngOffscreenHost } from "@/lib/chart-png-offscreen-host";
+import { ChartCaptureHost } from "@/app/components/chart-platform/ChartCaptureHost";
+import {
+  captureChartPngArtifact,
+  createChartPngCaptureRequest,
+  downloadChartArtifact,
+} from "@/lib/chart-platform/chart-capture-controller";
+import { resolveChartsPngExportKind } from "@/lib/chart-png-export-session";
+import type {
+  ChartArtifact,
+  ChartPngCaptureRequest,
+} from "@/lib/chart-platform/chart-artifact";
 import {
   formatExecutiveMetricValue,
   formatMetricSpreadGap,
@@ -209,6 +208,24 @@ import {
   resolveHistogramMeasureChipLabel,
   resolveSemanticCategoryAxisForCharts,
 } from "@/lib/chart-semantic-metadata";
+import {
+  buildChartMetadataBadgeCompact,
+  buildChartMetadataLine,
+  chartTypeShortLabel,
+  inferAutoDashboardMetricFromTitle,
+  resolveAnalyzedRowsForChartMetadata,
+} from "@/lib/chart-metadata-chips";
+import {
+  buildChartPresentationContract,
+  withChartPresentationMetadata,
+} from "@/lib/chart-platform/build-chart-contract";
+import type { ChartPresentationContract } from "@/lib/chart-platform/chart-presentation-contract";
+import {
+  logDashboardCoverageTelemetry,
+  parseDashboardCoverageTelemetry,
+  type DashboardCoverageTelemetry,
+} from "@/lib/chart-coverage-telemetry";
+import { ChartMetadataChipRow } from "@/app/components/home/chart-metadata-chip-row";
 import {
   buildNormalizedVizMetadata,
   normalizeAlignedAnalysisChartTitle,
@@ -351,18 +368,6 @@ import {
   aiInsightsVizChipsWrap,
   chartsTabVizPreviewCard,
   chartsTabVizSessionFrame,
-  aiInsightsVizMetaChipBase,
-  aiInsightsVizMetaChipCompactSize,
-  aiInsightsVizMetaChipLabel,
-  aiInsightsVizMetaChipLabelCompact,
-  aiInsightsVizMetaChipLead,
-  aiInsightsVizMetaChipLeadCompactSize,
-  aiInsightsVizMetaChipLeadSize,
-  aiInsightsVizMetaChipMono,
-  aiInsightsVizMetaChipMonoCompactSize,
-  aiInsightsVizMetaChipMonoSize,
-  aiInsightsVizMetaChipSize,
-  aiInsightsVizMetaChipValue,
   aiInsightsVizHeaderZone,
   aiInsightsVizHeadingWrap,
   aiInsightsVizKicker,
@@ -713,8 +718,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  ScatterChart,
-  Scatter,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -986,18 +989,8 @@ function computeChartInsightBadge(
   return `Highest: ${top.name}`;
 }
 
-function presentationKindUiLabel(kind: ChartKind): string {
-  if (kind === "line") return "Line";
-  if (kind === "area") return "Area";
-  if (kind === "pie") return "Pie";
-  if (kind === "donut") return "Donut";
-  if (kind === "scatter") return "Scatter";
-  if (kind === "histogram") return "Histogram";
-  if (kind === "bar_horizontal") return "Horizontal";
-  return "Bar";
-}
-
 const ChartContextSummary = memo(function ChartContextSummary(props: {
+  presentationContract?: ChartPresentationContract | null;
   renderedKind: ChartKind;
   metricLabel: string;
   /** Axis / dimension line — replaces the old fixed “Dimension · …” chip. */
@@ -1009,67 +1002,43 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
   /** Tighter pills for AI Insights chart header. */
   compactChips?: boolean;
 }) {
-  const typeLbl = presentationKindUiLabel(props.renderedKind);
-  const c = props.compactChips;
-  const chip = `${aiInsightsVizMetaChipBase} ${c ? aiInsightsVizMetaChipCompactSize : aiInsightsVizMetaChipSize}`;
-  const chipMuted = c ? aiInsightsVizMetaChipLabelCompact : aiInsightsVizMetaChipLabel;
-  const chipValue = aiInsightsVizMetaChipValue;
-  const monoChip = `${aiInsightsVizMetaChipMono} ${c ? aiInsightsVizMetaChipMonoCompactSize : aiInsightsVizMetaChipMonoSize}`;
-  const leadChip = `${aiInsightsVizMetaChipLead} ${c ? aiInsightsVizMetaChipLeadCompactSize : aiInsightsVizMetaChipLeadSize}`;
+  const metadataContract = useMemo(
+    () => {
+      const base =
+        props.presentationContract ??
+        buildChartPresentationContract({
+          chartId: "metadata-preview",
+          source: "manual",
+          apiChartType: chartKindToApiChartType(props.renderedKind),
+          resolvedKind: props.renderedKind,
+          title: "Chart",
+          rows: [],
+        });
+      return withChartPresentationMetadata(base, {
+        metricLabel: props.metricLabel,
+        semanticHeader: props.semanticHeader,
+        badgeCompact: props.badgeCompact,
+        leadInsight: props.leadInsight,
+        warning: props.qualityWarning,
+      });
+    },
+    [
+      props.presentationContract,
+      props.renderedKind,
+      props.metricLabel,
+      props.semanticHeader,
+      props.badgeCompact,
+      props.leadInsight,
+      props.qualityWarning,
+    ]
+  );
+
   return (
-    <div
-      className={`flex flex-wrap items-center justify-center ${c ? "gap-x-2 gap-y-1.5 sm:gap-x-2.5 sm:gap-y-2" : "mt-3 gap-2 px-1 sm:gap-2.5"} ${c ? "" : ""}`}
-    >
-      <span className={`${chip} items-center`}>
-        <span className={chipMuted}>View</span>
-        <span className={chipValue}>{typeLbl}</span>
-      </span>
-      <span className={`${chip} items-center`}>
-        <span className={chipMuted}>Measure</span>
-        <span
-          className={`max-w-[14rem] truncate ${chipValue}`}
-          title={props.metricLabel}
-        >
-          {props.metricLabel}
-        </span>
-      </span>
-      {props.semanticHeader.mode === "scatter" ? (
-        <>
-          <span className={`${chip} items-center`}>
-            <span className={chipMuted}>X</span>
-            <span className={`max-w-[10rem] truncate ${chipValue}`}>
-              {props.semanticHeader.xLabel}
-            </span>
-          </span>
-          <span className={`${chip} items-center`}>
-            <span className={chipMuted}>Y</span>
-            <span className={`max-w-[10rem] truncate ${chipValue}`}>
-              {props.semanticHeader.yLabel}
-            </span>
-          </span>
-        </>
-      ) : (
-        <span className={`${chip} max-w-full items-center`}>
-          <span className={`shrink-0 ${chipMuted}`}>{props.semanticHeader.roleLabel}</span>
-          <span
-            className={`min-w-0 truncate ${chipValue}`}
-            title={props.semanticHeader.detailLabel}
-          >
-            {props.semanticHeader.detailLabel}
-          </span>
-        </span>
-      )}
-      <span className={`${monoChip} min-w-0 truncate`} title={props.badgeCompact}>
-        {props.badgeCompact}
-      </span>
-      {props.leadInsight ? (
-        <span
-          className={`${leadChip} min-w-0 items-center truncate`}
-          title={props.leadInsight}
-        >
-          {props.leadInsight}
-        </span>
-      ) : null}
+    <>
+      <ChartMetadataChipRow
+        specs={metadataContract.metadata.chips}
+        compact={props.compactChips}
+      />
       {props.qualityWarning ? (
         <p
           className={`${chartRateQualityWarningClass} w-full basis-full text-center`}
@@ -1077,21 +1046,9 @@ const ChartContextSummary = memo(function ChartContextSummary(props: {
           {props.qualityWarning}
         </p>
       ) : null}
-    </div>
+    </>
   );
 });
-
-function chartTypeShortLabel(kind: ChartKind): string {
-  if (kind === "line") return "Line";
-  if (kind === "area") return "Area";
-  if (kind === "pie") return "Pie";
-  if (kind === "donut") return "Donut";
-  if (kind === "scatter") return "Scatter";
-  if (kind === "bar_horizontal") return "H-Bar";
-  if (kind === "histogram") return "Histogram";
-  if (!kind) return "Chart";
-  return "Bar";
-}
 
 function normalizeIntentToken(s: string | null | undefined): string {
   return (s ?? "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -1179,15 +1136,6 @@ function inferBreakdownLabelFromChartTitle(title: string): string | null {
   return rest || null;
 }
 
-function inferAutoDashboardMetricFromTitle(title: string): string {
-  const t = title.trim();
-  const trendIdx = t.search(/\s+trend\s*\(/i);
-  if (trendIdx > 0) return t.slice(0, trendIdx).trim();
-  const idx = t.search(/\s+by\s+/i);
-  if (idx > 0) return t.slice(0, idx).trim();
-  return t || "Metric";
-}
-
 /** Parse "Average salary by department" → MEAN + salary phrase for badges when provenance is thin. */
 function inferAggAndMetricFromChartTitle(title: string): {
   aggLabel: string | null;
@@ -1214,33 +1162,6 @@ function inferAggAndMetricFromChartTitle(title: string): {
     }
   }
   return { aggLabel: null, metricPhrase: null };
-}
-
-function resolveAnalyzedRowsForChartMetadata(args: {
-  preferAlignedAnalysis: boolean;
-  analysis: AlignedAnalysisContext | null;
-  prov?: InsightProvenance | null;
-  vizAnalyzedRows?: number | null | undefined;
-  filteredDatasetRows?: number | null | undefined;
-  fullDatasetRows?: number | null | undefined;
-}): number | null {
-  const pos = (n: unknown): n is number =>
-    typeof n === "number" && Number.isFinite(n) && n > 0;
-
-  const fromAligned =
-    args.preferAlignedAnalysis && pos(args.analysis?.analysisRowCount)
-      ? (args.analysis!.analysisRowCount as number)
-      : null;
-  const fromViz = pos(args.vizAnalyzedRows) ? (args.vizAnalyzedRows as number) : null;
-  const fromProv = pos(args.prov?.rowsAnalyzed) ? args.prov!.rowsAnalyzed : null;
-  const fromFiltered = pos(args.filteredDatasetRows)
-    ? args.filteredDatasetRows!
-    : null;
-  const fromFull = pos(args.fullDatasetRows) ? args.fullDatasetRows! : null;
-
-  return (
-    fromAligned ?? fromViz ?? fromProv ?? fromFiltered ?? fromFull ?? null
-  );
 }
 
 function normalizeQuestionForMatch(q: string): string {
@@ -1408,155 +1329,6 @@ function applyOriginChartPresentationLock(args: {
   }
 
   return inferred;
-}
-
-function buildChartMetadataLine(
-  kind: ChartKind,
-  groupCount: number,
-  viz: StoredVisualization | null,
-  analysis: AlignedAnalysisContext | null,
-  preferAlignedAnalysis: boolean,
-  opts?: {
-    chartTitle?: string;
-    filteredDatasetRows?: number | null;
-    fullDatasetRows?: number | null;
-  }
-): string {
-  const prov = viz?.provenance ?? null;
-  const title = opts?.chartTitle?.trim() ?? "";
-  const rec = viz?.chartRecommendation ?? null;
-  const titleInfer = inferAggAndMetricFromChartTitle(title);
-
-  let aggRaw = "";
-  let metricRaw = "";
-
-  if (preferAlignedAnalysis && analysis) {
-    aggRaw =
-      String(analysis.aggregationKey || analysis.aggregation || "").trim();
-    metricRaw = String(
-      analysis.metricColumnDisplay || analysis.metricColumn || ""
-    ).trim();
-  }
-
-  if (!aggRaw) {
-    aggRaw = String(prov?.aggregationKey ?? prov?.aggregation ?? "").trim();
-  }
-  if (!aggRaw && titleInfer.aggLabel) {
-    aggRaw = titleInfer.aggLabel;
-  }
-  if (!aggRaw && rec?.metricType) {
-    const mt = String(rec.metricType).trim().toLowerCase();
-    if (mt && mt !== "numeric" && mt !== "number") {
-      aggRaw = String(rec.metricType);
-    }
-  }
-
-  if (!metricRaw) {
-    metricRaw = String(
-      prov?.numericColumnDisplay ?? prov?.numericColumn ?? ""
-    ).trim();
-  }
-  if (!metricRaw && titleInfer.metricPhrase) {
-    metricRaw = titleInfer.metricPhrase;
-  }
-  if (!metricRaw && title && viz?.subtitle === "Auto dashboard") {
-    metricRaw = inferAutoDashboardMetricFromTitle(title);
-  }
-  if (!metricRaw && rec?.detectedIntent) {
-    metricRaw = String(rec.detectedIntent).replace(/_/g, " ");
-  }
-  if (!metricRaw && prov?.numericColumn) {
-    metricRaw = String(prov.numericColumn).trim();
-  }
-  if (!metricRaw) {
-    metricRaw = "metric";
-  }
-
-  const metric =
-    kind === "histogram"
-      ? resolveHistogramMeasureChipLabel(
-          viz as ChartSemanticVizLike,
-          analysis,
-          preferAlignedAnalysis
-        )
-      : buildMetricLabel({
-          aggregationKey: aggRaw || null,
-          aggregationLabel: aggRaw || null,
-          metricColumn:
-            (preferAlignedAnalysis && analysis?.metricColumn?.trim()) ||
-            prov?.numericColumn?.trim() ||
-            null,
-          metricColumnDisplay: metricRaw || null,
-        });
-
-  const rowsNum = resolveAnalyzedRowsForChartMetadata({
-    preferAlignedAnalysis,
-    analysis,
-    prov: viz?.provenance ?? null,
-    vizAnalyzedRows: viz?.analyzedRows,
-    filteredDatasetRows: opts?.filteredDatasetRows,
-    fullDatasetRows: opts?.fullDatasetRows,
-  });
-
-  const typeLabel =
-    kind === "bar_horizontal" ? "H-Bar" : chartTypeShortLabel(kind);
-
-  const parts: string[] = [typeLabel, metric];
-  if (rowsNum != null && rowsNum > 0) {
-    parts.push(`${rowsNum.toLocaleString()} rows`);
-  }
-  if (typeof groupCount === "number" && groupCount >= 0) {
-    parts.push(`${groupCount.toLocaleString()} groups`);
-  }
-  return parts.join(" · ");
-}
-
-/** Compact badge for chart cards (full detail in `title=` tooltip). */
-function buildChartMetadataBadgeCompact(
-  kind: ChartKind,
-  groupCount: number,
-  viz: StoredVisualization | null,
-  analysis: AlignedAnalysisContext | null,
-  preferAlignedAnalysis: boolean,
-  opts?: {
-    filteredDatasetRows?: number | null;
-    fullDatasetRows?: number | null;
-  }
-): string {
-  const prov = viz?.provenance ?? null;
-
-  const rowsNum = resolveAnalyzedRowsForChartMetadata({
-    preferAlignedAnalysis,
-    analysis,
-    prov,
-    vizAnalyzedRows: viz?.analyzedRows,
-    filteredDatasetRows: opts?.filteredDatasetRows,
-    fullDatasetRows: opts?.fullDatasetRows,
-  });
-
-  const typeShort =
-    kind === "bar_horizontal"
-      ? "H-Bar"
-      : kind === "line"
-        ? "Line"
-        : kind === "area"
-          ? "Area"
-          : kind === "pie"
-            ? "Pie"
-            : kind === "donut"
-              ? "Donut"
-              : kind === "scatter"
-                ? "Scatter"
-                : "Bar";
-
-  const parts: string[] = [typeShort];
-  if (rowsNum != null && rowsNum > 0) {
-    parts.push(`${rowsNum.toLocaleString()} rows`);
-  }
-  if (typeof groupCount === "number" && groupCount >= 0) {
-    parts.push(`${groupCount.toLocaleString()} groups`);
-  }
-  return parts.join(" · ");
 }
 
 /** Ascending bar order for lowest/min/MIN; descending for highest/max; null = keep API order. */
@@ -3737,6 +3509,7 @@ type AutoDashboardPayload = {
   type_label: string;
   cards: KpiCard[];
   charts: AutoDashboardMiniChart[];
+  coverage_telemetry?: DashboardCoverageTelemetry | null;
 };
 
 function parseAutoDashboardMiniCharts(raw: unknown): AutoDashboardMiniChart[] {
@@ -3883,6 +3656,7 @@ function parseAutoDashboardPayload(raw: unknown): AutoDashboardPayload | null {
         : "Dashboard",
     cards: cards.slice(0, 5),
     charts: chartsParsed,
+    coverage_telemetry: parseDashboardCoverageTelemetry(o.coverage_telemetry),
   };
 }
 
@@ -4337,6 +4111,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   onDashboardDrill,
   onViewInChartsTab,
   onAskAiAboutChart,
+  onOverviewEffectiveKind,
   onChartExportError,
   exportFooterHint,
 }: {
@@ -4362,14 +4137,15 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   onViewInChartsTab?: (snapshotId: string) => void;
   /** Prefills AI Insights and switches tab (pinned snapshot id). */
   onAskAiAboutChart?: (snapshotId: string) => void;
+  /** Reports the chart kind actually used by Overview PNG for export parity. */
+  onOverviewEffectiveKind?: (snapshotId: string, kind: ChartKind) => void;
   /** Surface export failures (e.g. missing SVG). */
   onChartExportError?: (message: string) => void;
 }) {
   const offscreenExportRef = useRef<HTMLDivElement | null>(null);
   const [exportingPng, setExportingPng] = useState(false);
-  const [offscreenExportLayout, setOffscreenExportLayout] = useState<ReturnType<
-    typeof buildPresentationExportSpec
-  > | null>(null);
+  const [overviewPngCaptureRequest, setOverviewPngCaptureRequest] =
+    useState<ChartPngCaptureRequest | null>(null);
   const dashGrid = dashGridStyle;
   const drillPrimary = chart.interaction?.drillDimensions.find(
     (d) => d.role === "primary"
@@ -4419,8 +4195,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chart.chartType, chart.title, baseChartRows]
   );
 
-  const exportPlotWidth = offscreenExportLayout?.width ?? viewportWidthPx;
-  const exportPlotHeight = offscreenExportLayout?.height ?? plotHeightPx;
+  const exportPlotWidth = overviewPngCaptureRequest?.layout.width ?? viewportWidthPx;
+  const exportPlotHeight = overviewPngCaptureRequest?.layout.height ?? plotHeightPx;
 
   const overviewMetricLabel = useMemo(
     () =>
@@ -4529,6 +4305,88 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   const effectivePresentationKind = resolveOverviewEffectivePresentationKind(
     displayKind,
     renderBarAsHorizontal
+  );
+
+  useEffect(() => {
+    if (!snapshotId || !onOverviewEffectiveKind) return;
+    onOverviewEffectiveKind(snapshotId, effectivePresentationKind);
+  }, [snapshotId, effectivePresentationKind, onOverviewEffectiveKind]);
+
+  const overviewSemanticHeader = useMemo(
+    () =>
+      buildChartSemanticHeader({
+        presentationKind: displayKind,
+        chartTitle: chart.title,
+        viz: {
+          chartType: chart.chartType,
+          scatterXLabel:
+            chart.xMetricLabel?.trim() ||
+            chart.scatterXLabel?.trim(),
+          scatterYLabel:
+            chart.yMetricLabel?.trim() ||
+            chart.scatterYLabel?.trim() ||
+            chart.metricColumn,
+        },
+        analysis: null,
+        preferAnalysisForCategory: false,
+        refinedCategoryFallback: categoryAxisLabel,
+        refinedMetricLabel: overviewMetricLabel,
+      }),
+    [displayKind, chart, categoryAxisLabel, overviewMetricLabel]
+  );
+
+  const overviewMetadataBadgeCompact = useMemo(
+    () =>
+      buildChartMetadataBadgeCompact(
+        effectivePresentationKind,
+        chartRows.length,
+        { subtitle: "Auto dashboard" },
+        null,
+        false
+      ),
+    [effectivePresentationKind, chartRows.length]
+  );
+
+  const overviewPresentationContract = useMemo(
+    () =>
+      buildChartPresentationContract({
+        chartId: snapshotId ?? `overview-${canonicalTitle}`,
+        source: "auto_dashboard",
+        apiChartType: chart.chartType,
+        resolvedKind: effectivePresentationKind,
+        title: canonicalTitle || chart.title,
+        subtitle: "Auto dashboard",
+        rows: chartRows,
+        metricLabel: overviewMetricLabel,
+        semanticHeader: overviewSemanticHeader,
+        badgeCompact: overviewMetadataBadgeCompact,
+      }),
+    [
+      snapshotId,
+      canonicalTitle,
+      chart.chartType,
+      chart.title,
+      chartRows,
+      effectivePresentationKind,
+      overviewMetricLabel,
+      overviewSemanticHeader,
+      overviewMetadataBadgeCompact,
+    ]
+  );
+
+  const overviewMetadataChipSpecs = overviewPresentationContract.metadata.chips;
+
+  const overviewMetadataLine = useMemo(
+    () =>
+      buildChartMetadataLine(
+        effectivePresentationKind,
+        chartRows.length,
+        { subtitle: "Auto dashboard" },
+        null,
+        false,
+        { chartTitle: chart.title }
+      ),
+    [effectivePresentationKind, chartRows.length, chart.title]
   );
 
   const valueTickFormatter = useCallback(
@@ -4702,185 +4560,37 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "scatter") {
-      if (pngCapture) {
-        return (
-          <ChartRenderer
-            chartHeight={effectivePlotH}
-            compact
-            insightMode={false}
-            pngCaptureMode={pngCapture}
-            chartRows={chartRows}
-            visualization={{
-              scatterXLabel:
-                chart.xMetricLabel?.trim() ||
-                chart.scatterXLabel?.trim(),
-              scatterYLabel:
-                chart.yMetricLabel?.trim() ||
-                chart.scatterYLabel?.trim() ||
-                chart.metricColumn,
-              xColumn: chart.xColumn,
-              yColumn: chart.yColumn,
-              xMetricLabel: chart.xMetricLabel,
-              yMetricLabel: chart.yMetricLabel,
-              interaction: chart.interaction
-                ? { drillDimensions: chart.interaction.drillDimensions }
-                : null,
-            }}
-            presentationKind="scatter"
-            axes={miniAxes}
-            viewportW={viewW}
-            sessionCartesianPlanMain={null}
-            insightCartesianPlanMain={null}
-            tickTruncate={tickTruncateLocal}
-            onInsightDrill={() => {}}
-          />
-        );
-      }
-
-      const scatterPremium = resolveOverviewScatterPremiumAxes(chartRows);
-      const scatterXMetricCtx: MetricFormatContext = {
-        metricLabel:
-          chart.xMetricLabel?.trim() ||
-          chart.scatterXLabel?.trim() ||
-          miniAxes.categoryAxis,
-        chartTitle: chart.title,
-        presentationKind: "scatter",
-      };
-      const scatterXTickFormatter = (tick: number) =>
-        formatOverviewScatterAxisTick(tick, scatterXMetricCtx);
-      const scatterYTickFormatter = (tick: number) =>
-        formatOverviewScatterAxisTick(tick, overviewMetricCtx);
-      const scatterYTickSamples = scatterPremium
-        ? scatterPremium.y.ticks.map((t) => scatterYTickFormatter(t))
-        : dashTickSamples;
-      const scatterVLay = computeOverviewContinuousVerticalDashLayout(
-        miniAxes.valueAxis,
-        scatterYTickSamples,
-        effectivePlotH
-      );
-      const scatterMargins = scatterPremium
-        ? computeOverviewScatterPremiumMargins(scatterVLay.yAxisWidth)
-        : computeOverviewScatterDashMargins({
-            yAxisWidth: scatterVLay.yAxisWidth,
-            pngCapture: false,
-          });
-
       return (
-        <ResponsiveContainer
-          key={`ov-scatter-${chartLayoutWidthKey(viewW)}-live`}
-          width="100%"
-          height={effectivePlotH}
-          minWidth={0}
-          minHeight={effectivePlotH}
-        >
-          <ScatterChart data={chartRows} margin={scatterMargins}>
-            <CartesianGrid
-              stroke={dashGrid.stroke}
-              strokeDasharray={OV_DASH_GRID_DASHARRAY}
-              strokeOpacity={dashGrid.opacity}
-            />
-            <XAxis
-              type="number"
-              dataKey="x"
-              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK }}
-              tickFormatter={scatterXTickFormatter}
-              {...(scatterPremium
-                ? {
-                    domain: scatterPremium.x.domain,
-                    ticks: scatterPremium.x.ticks,
-                    allowDataOverflow: false,
-                  }
-                : {})}
-              axisLine={{ stroke: OV_AXIS_LINE }}
-              tickLine={{ stroke: OV_AXIS_LINE }}
-            >
-              <Label
-                value={miniAxes.categoryAxis}
-                position="insideBottom"
-                offset={-4}
-                content={CartesianXAxisTitleLabelContent}
-              />
-            </XAxis>
-            <YAxis
-              type="number"
-              dataKey="value"
-              tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK, dx: 2 }}
-              tickFormatter={scatterYTickFormatter}
-              width={scatterVLay.yAxisWidth}
-              {...(scatterPremium
-                ? {
-                    domain: scatterPremium.y.domain,
-                    ticks: scatterPremium.y.ticks,
-                    allowDataOverflow: false,
-                  }
-                : {})}
-              axisLine={{ stroke: OV_AXIS_LINE }}
-              tickLine={{ stroke: OV_AXIS_LINE }}
-              label={
-                scatterVLay.showValueAxisTitle
-                  ? {
-                      content: createVerticalValueAxisLabel(
-                        scatterVLay.valueAxisTitleFull,
-                        scatterVLay.valueAxisTitleDisplay
-                      ),
-                    }
-                  : undefined
-              }
-            />
-            <Tooltip
-              {...CHART_TOOLTIP_FRAME}
-              formatter={(_v, _n, item) => {
-                const p = item?.payload as ChartRow;
-                const yd = p?.displayValue?.trim();
-                const xd = p?.displayX?.trim();
-                const yShow =
-                  yd ||
-                  (typeof p?.value === "number" ? String(p.value) : "—");
-                const xShow =
-                  xd ||
-                  (typeof p?.x === "number" ? String(p.x) : "—");
-                return [`${xShow} · ${yShow}`, "Values"];
-              }}
-              labelFormatter={(_, items) => {
-                const arr =
-                  items as unknown as readonly { payload?: ChartRow }[];
-                const p = arr?.[0]?.payload;
-                return p?.name
-                  ? `${miniAxes.categoryAxis} · ${String(p.name)}`
-                  : "Point";
-              }}
-            />
-            <Scatter
-              name="Points"
-              data={chartRows}
-              fill="#6366f1"
-              fillOpacity={OVERVIEW_SCATTER_POINT_FILL_OPACITY}
-              isAnimationActive={plotAnimOn}
-              animationDuration={plotAnimDuration}
-              shape={(props: {
-                cx?: number;
-                cy?: number;
-                fill?: string;
-                fillOpacity?: number;
-              }) => {
-                const { cx, cy, fill, fillOpacity } = props;
-                if (cx == null || cy == null) return <g />;
-                return (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={OVERVIEW_SCATTER_POINT_RADIUS_PX}
-                    fill={fill ?? "#6366f1"}
-                    fillOpacity={fillOpacity ?? OVERVIEW_SCATTER_POINT_FILL_OPACITY}
-                    stroke={OVERVIEW_SCATTER_POINT_STROKE_COLOR}
-                    strokeOpacity={OVERVIEW_SCATTER_POINT_STROKE_OPACITY}
-                    strokeWidth={OVERVIEW_SCATTER_POINT_STROKE_PX}
-                  />
-                );
-              }}
-            />
-          </ScatterChart>
-        </ResponsiveContainer>
+        <ChartRenderer
+          chartHeight={effectivePlotH}
+          compact
+          insightMode={false}
+          pngCaptureMode={pngCapture}
+          chartRows={chartRows}
+          visualization={{
+            scatterXLabel:
+              chart.xMetricLabel?.trim() ||
+              chart.scatterXLabel?.trim(),
+            scatterYLabel:
+              chart.yMetricLabel?.trim() ||
+              chart.scatterYLabel?.trim() ||
+              chart.metricColumn,
+            xColumn: chart.xColumn,
+            yColumn: chart.yColumn,
+            xMetricLabel: chart.xMetricLabel,
+            yMetricLabel: chart.yMetricLabel,
+            interaction: chart.interaction
+              ? { drillDimensions: chart.interaction.drillDimensions }
+              : null,
+          }}
+          presentationKind="scatter"
+          axes={miniAxes}
+          viewportW={viewW}
+          sessionCartesianPlanMain={null}
+          insightCartesianPlanMain={null}
+          tickTruncate={tickTruncateLocal}
+          onInsightDrill={() => {}}
+        />
       );
     }
 
@@ -4901,7 +4611,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         chartTitle: chart.title,
         metricLabel: overviewMetricLabel,
         presentationKind: displayKind,
-        executiveRounding: !!pngCapture,
+        executiveRounding: false,
       });
       const hBarRightMargin = showBarEndLabels
         ? Math.max(hbBalanced.marginRight, 52)
@@ -5003,22 +4713,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "line" || displayKind === "area") {
-      const isOverviewLine = displayKind === "line";
-      const trendPremiumY = isOverviewLine
-        ? resolveOverviewPremiumAxisScale(chartRows.map((r) => r.value), {
-            padRatio: OVERVIEW_LINE_PREMIUM_PAD_RATIO,
-          })
-        : !pngCapture
-          ? resolveOverviewPremiumAxisScale(chartRows.map((r) => r.value))
-          : undefined;
+      const trendValueAxisProps = resolveTrendValueAxisProps({
+        chartKind: displayKind,
+        values: chartRows.map((r) => r.value),
+      });
       const overviewLineYTickFormatter = (tick: number) =>
         formatOverviewLineYAxisTick(tick, overviewMetricCtx);
-      const trendYTickSamples = trendPremiumY
-        ? trendPremiumY.ticks.map((t) =>
-            isOverviewLine
-              ? overviewLineYTickFormatter(t)
-              : valueTickFormatter(t)
-          )
+      const trendYTickSamples = trendValueAxisProps
+        ? trendValueAxisProps.ticks.map((t) => overviewLineYTickFormatter(t))
         : dashTickSamples;
       const vLay = pngCapture
         ? computeOverviewVerticalDashLayout(
@@ -5072,9 +4774,10 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const trendBottom = pngCapture
         ? Math.min(trendBottomRaw, trendBottomCap!)
         : trendBottomRaw;
-      const trendSideLive = isOverviewLine
-        ? overviewTrendLiveSideMargins(vLay.yAxisWidth, { lineChart: true })
-        : overviewTrendLiveSideMargins(vLay.yAxisWidth);
+      const trendSideLive =
+        displayKind === "line"
+          ? overviewTrendLiveSideMargins(vLay.yAxisWidth, { lineChart: true })
+          : overviewTrendLiveSideMargins(vLay.yAxisWidth);
       const trendLiveMargins = pngCapture
         ? { top: plotMarginTop, bottom: trendBottom }
         : computeOverviewTrendLivePlotMargins({
@@ -5083,7 +4786,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           });
       const trendGridOpacity = pngCapture
         ? exportGridOpacity
-        : isOverviewLine
+        : displayKind === "line"
           ? dashGrid.opacity
           : dashGrid.opacity * 0.72;
       const plotMargin = {
@@ -5134,14 +4837,16 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             <YAxis
               tick={{ fontSize: trendTickFs, fill: OV_AXIS_TICK, dx: 2 }}
               tickFormatter={
-                isOverviewLine ? overviewLineYTickFormatter : valueTickFormatter
+                trendValueAxisProps
+                  ? overviewLineYTickFormatter
+                  : valueTickFormatter
               }
               width={vLay.yAxisWidth}
-              {...(trendPremiumY
+              {...(trendValueAxisProps
                 ? {
-                    domain: trendPremiumY.domain,
-                    ticks: trendPremiumY.ticks,
-                    allowDataOverflow: false,
+                    domain: trendValueAxisProps.domain,
+                    ticks: trendValueAxisProps.ticks,
+                    allowDataOverflow: trendValueAxisProps.allowDataOverflow,
                   }
                 : {})}
               axisLine={{ stroke: OV_AXIS_LINE }}
@@ -5410,26 +5115,31 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             disabled={exportingPng}
             onClick={async () => {
               setExportingPng(true);
-              const spec = buildPresentationExportSpec(effectivePresentationKind, {
+              const request = createChartPngCaptureRequest({
+                contract: overviewPresentationContract,
+                profile: "overviewPng",
+                sourceSurface: "overview",
+                kind: effectivePresentationKind,
                 categoryCount: chartRows.length,
+                filename: sanitizeChartExportFilename(canonicalTitle),
+                datasetName: exportFooterHint,
               });
               try {
-                setOffscreenExportLayout(spec);
-                const { runChartPngExport } = await import(
-                  "@/lib/chart-png-export-session"
-                );
-                await runChartPngExport({
+                setOverviewPngCaptureRequest(request);
+                const artifact = await captureChartPngArtifact({
+                  request,
                   getExportRoot: () => offscreenExportRef.current,
-                  kind: effectivePresentationKind,
-                  categoryCount: chartRows.length,
-                  filename: sanitizeChartExportFilename(canonicalTitle),
-                  datasetName: exportFooterHint,
+                  isCurrent: (requestId) =>
+                    offscreenExportRef.current?.dataset.chartCaptureRequestId ===
+                    requestId,
                   parity: {
                     displayKind,
                     renderBarAsHorizontal,
                     chartTitle: canonicalTitle,
+                    expectedMetadataChipCount: overviewMetadataChipSpecs.length,
                   },
                 });
+                downloadChartArtifact(artifact, request.filename);
               } catch (err) {
                 onChartExportError?.(
                   err instanceof Error
@@ -5437,7 +5147,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                     : "Unable to export chart image."
                 );
               } finally {
-                setOffscreenExportLayout(null);
+                setOverviewPngCaptureRequest(null);
                 setExportingPng(false);
               }
             }}
@@ -5488,18 +5198,27 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       </div>
       {exportFooter}
 
-      {offscreenExportLayout ? (
-        <ChartPngOffscreenHost
-          layout={offscreenExportLayout}
+      {overviewPngCaptureRequest ? (
+        <ChartCaptureHost
+          request={overviewPngCaptureRequest}
           exportRef={offscreenExportRef}
           rootClassName={overviewPngExportRoot}
         >
           <header className={`${ovDashChartHead} ${overviewPngExportHeader}`}>
             <h3 className={ovDashChartTitle}>{canonicalTitle}</h3>
+            <div
+              className={aiInsightsVizChipsWrap}
+              title={overviewMetadataLine}
+            >
+              <ChartMetadataChipRow
+                specs={overviewMetadataChipSpecs}
+                compact
+              />
+            </div>
           </header>
           <div
             className={`${ovDashChartPlot} ${ovDashChartPlotInner} ${chartsTabVizPlotStage}`}
-            style={presentationCapturePlotStyle(offscreenExportLayout)}
+            style={presentationCapturePlotStyle(overviewPngCaptureRequest.layout)}
           >
             {buildOverviewDashboardPlot(
               exportPlotWidth,
@@ -5508,7 +5227,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             )}
           </div>
           {exportFooter}
-        </ChartPngOffscreenHost>
+        </ChartCaptureHost>
       ) : null}
     </div>
   );
@@ -5524,6 +5243,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   onDashboardDrill,
   onOpenDashboardChartInChartsTab,
   onAskAiAboutDashboardChart,
+  onOverviewEffectiveKind,
   onChartExportError,
   exportFooterHint,
 }: {
@@ -5536,6 +5256,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
   onDashboardDrill?: (ev: { column: string; label: string; value: string }) => void;
   onOpenDashboardChartInChartsTab: (snapshotId: string) => void;
   onAskAiAboutDashboardChart: (snapshotId: string) => void;
+  onOverviewEffectiveKind: (snapshotId: string, kind: ChartKind) => void;
   onChartExportError: (message: string) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -5589,6 +5310,7 @@ export const OverviewDashboardChartSlot = memo(function OverviewDashboardChartSl
         onDashboardDrill={onDashboardDrill}
         onViewInChartsTab={snapshotId ? handleViewInChartsTab : undefined}
         onAskAiAboutChart={snapshotId ? handleAskAiAboutChart : undefined}
+        onOverviewEffectiveKind={onOverviewEffectiveKind}
         onChartExportError={onChartExportError}
         exportFooterHint={exportFooterHint}
       />
@@ -6420,9 +6142,9 @@ function HomeInner() {
   const [pdfCaptureMounted, setPdfCaptureMounted] = useState(false);
   const skipFilteredDashboardOnceRef = useRef(false);
   const chartsTabOffscreenExportRef = useRef<HTMLDivElement | null>(null);
-  const [chartsTabOffscreenLayout, setChartsTabOffscreenLayout] = useState<
-    ReturnType<typeof buildPresentationExportSpec> | null
-  >(null);
+  const [chartsTabPngCaptureRequest, setChartsTabPngCaptureRequest] =
+    useState<ChartPngCaptureRequest | null>(null);
+  const chartsTabOffscreenLayout = chartsTabPngCaptureRequest?.layout ?? null;
   const [exportingChartsTabPng, setExportingChartsTabPng] = useState(false);
   const sessionChartKindRef = useRef<ChartKind>("bar");
   const [question, setQuestion] = useState("");
@@ -6527,6 +6249,7 @@ function HomeInner() {
     pinInsightChart,
     pushAIChart,
     replaceAutoDashboardCharts,
+    setAutoDashboardOverviewEffectiveKind,
     invalidateForDatasetChange,
     clearInsightThread,
     clearAiInsightSession,
@@ -6974,6 +6697,12 @@ function HomeInner() {
     replaceAutoDashboardCharts,
   ]);
 
+  useEffect(() => {
+    logDashboardCoverageTelemetry(autoDashboard?.coverage_telemetry ?? null, {
+      source: autoDashboard?.kind || "dashboard",
+    });
+  }, [autoDashboard?.coverage_telemetry, autoDashboard?.kind]);
+
   const pinnedInsightChartIdRef = useRef<string | null>(null);
   const chartsPreviewRef = useRef<HTMLDivElement | null>(null);
   const chartsPlotWidth = useMeasuredElementWidth(
@@ -7106,6 +6835,13 @@ function HomeInner() {
     [chartHistory, selectChartWithInsightState]
   );
 
+  const recordOverviewEffectiveKind = useCallback(
+    (snapshotId: string, kind: ChartKind) => {
+      setAutoDashboardOverviewEffectiveKind(snapshotId, kind);
+    },
+    [setAutoDashboardOverviewEffectiveKind]
+  );
+
   const dashboardSnapshotByKey = useMemo(() => {
     const m = new Map<string, ChartSnapshot>();
     for (const h of chartHistory) {
@@ -7133,29 +6869,75 @@ function HomeInner() {
       return;
     }
 
-    const spec = buildPresentationExportSpec(sessionChartKindRef.current, {
+    const liveChartsPngKind = sessionChartKindRef.current;
+    const chartsPngExportKind = resolveChartsPngExportKind({
+      liveKind: liveChartsPngKind,
+      snapshotSource: activeSnapshot?.source ?? null,
+      overviewEffectiveKind: activeSnapshot?.overviewEffectiveChartKind ?? null,
+    });
+    const contract =
+      activeSnapshot?.presentationContract &&
+      activeSnapshot.presentationContract.kind.resolvedKind ===
+        chartsPngExportKind
+        ? activeSnapshot.presentationContract
+        : buildChartPresentationContract({
+            chartId: activeChartId || "charts-tab-active",
+            source:
+              activeSnapshot?.source === "auto_dashboard"
+                ? "auto_dashboard"
+                : "charts",
+            apiChartType: chartKindToApiChartType(chartsPngExportKind),
+            resolvedKind: chartsPngExportKind,
+            title: chartTitle || "Chart",
+            subtitle: activeSnapshot?.subtitle ?? null,
+            rows: chartData,
+            dashboardChartKey: activeSnapshot?.dashboardChartKey ?? null,
+            metricLabel:
+              activeSnapshot?.presentationContract?.semantics.metric.label ??
+              null,
+            categoryLabel:
+              activeSnapshot?.presentationContract?.semantics.category?.label ??
+              null,
+          });
+    const request = createChartPngCaptureRequest({
+      contract,
+      profile: "chartsPng",
+      sourceSurface: "charts",
+      kind: chartsPngExportKind,
       categoryCount: chartData.length,
+      filename: sanitizeChartExportFilename(chartTitle || "chart"),
+      datasetName: uploadMeta?.name,
     });
     try {
       setError("");
       setExportingChartsTabPng(true);
-      setChartsTabOffscreenLayout(spec);
-      const { runChartPngExport } = await import("@/lib/chart-png-export-session");
-      await runChartPngExport({
+      setChartsTabPngCaptureRequest(request);
+      const artifact = await captureChartPngArtifact({
+        request,
         getExportRoot: () => chartsTabOffscreenExportRef.current,
-        kind: sessionChartKindRef.current,
-        categoryCount: chartData.length,
-        filename: sanitizeChartExportFilename(chartTitle || "chart"),
-        datasetName: uploadMeta?.name,
+        isCurrent: (requestId) =>
+          chartsTabOffscreenExportRef.current?.dataset.chartCaptureRequestId ===
+          requestId,
       });
+      downloadChartArtifact(artifact, request.filename);
     } catch (err) {
       console.error("Chart PNG download failed:", err);
       setError("Unable to download chart image.");
     } finally {
-      setChartsTabOffscreenLayout(null);
+      setChartsTabPngCaptureRequest(null);
       setExportingChartsTabPng(false);
     }
-  }, [chartTitle, chartData.length, uploadMeta?.name]);
+  }, [
+    activeChartId,
+    activeSnapshot?.dashboardChartKey,
+    activeSnapshot?.overviewEffectiveChartKind,
+    activeSnapshot?.presentationContract,
+    activeSnapshot?.source,
+    activeSnapshot?.subtitle,
+    chartData,
+    chartTitle,
+    uploadMeta?.name,
+  ]);
 
   const setQuestionAndResetInsightState = useCallback(
     (value: string) => {
@@ -11384,14 +11166,60 @@ function HomeInner() {
         : null;
 
       let captureEl: HTMLDivElement | null = null;
+      let chartArtifact: ChartArtifact | null = null;
       if (resolved.includeChart) {
         setPdfCaptureMounted(true);
         pdfCaptureActive = true;
-        captureEl = await waitForHiddenChartCapture(() =>
+        const getPdfCaptureRoot = () =>
           chartScope === "insight"
             ? chartCaptureInsightRef.current
-            : chartCaptureSessionRef.current
-        );
+            : chartCaptureSessionRef.current;
+        if (pdfChartData.length > 0 && pdfPresentationKind) {
+          try {
+            const artifactContract =
+              pdfSnap?.presentationContract ??
+              buildChartPresentationContract({
+                chartId: pdfSnap?.id ?? "pdf-chart",
+                source:
+                  pdfSnap?.source === "auto_dashboard"
+                    ? "auto_dashboard"
+                    : "ai_insights",
+                apiChartType:
+                  String(pdfVizEarly?.chartType ?? pdfPresentationKind) ||
+                  pdfPresentationKind,
+                resolvedKind: pdfPresentationKind,
+                title: pdfExportDisplayTitle || pdfChartTitle || "Chart",
+                subtitle: pdfChartSubtitleMerged,
+                rows: pdfChartData,
+                question: pdfExportLastAskedQuestion || question,
+                dashboardChartKey: pdfSnap?.dashboardChartKey ?? null,
+                metricLabel: pdfChartAxisLabels?.value ?? null,
+                categoryLabel: pdfChartAxisLabels?.category ?? null,
+                legacyVisualizationContract: pdfContract ?? null,
+              });
+            const request = createChartPngCaptureRequest({
+              contract: artifactContract,
+              profile: "pdfChart",
+              sourceSurface: "pdf",
+              kind: pdfPresentationKind,
+              categoryCount: pdfChartData.length,
+              filename: sanitizeChartExportFilename(
+                pdfExportDisplayTitle || pdfChartTitle || "chart"
+              ),
+              datasetName: uploadMeta?.name,
+            });
+            chartArtifact = await captureChartPngArtifact({
+              request,
+              getExportRoot: getPdfCaptureRoot,
+            });
+          } catch (artifactErr) {
+            console.warn("[PDF export] chart artifact capture failed", artifactErr);
+          }
+        }
+        captureEl = getPdfCaptureRoot();
+        if (!captureEl) {
+          captureEl = await waitForHiddenChartCapture(getPdfCaptureRoot);
+        }
       }
 
       const chartPrep: PdfChartPrepContext | null = resolved.includeChart
@@ -11412,6 +11240,8 @@ function HomeInner() {
             aggregation: pdfAggregation,
             chartInsightBadge: pdfChartInsightBadge,
             chartAxisLabels: pdfChartAxisLabels,
+            metadataChips: pdfSnap?.presentationContract?.metadata.chips ?? null,
+            chartArtifact,
             captureEl,
             chartAttribution: chartExportAttribution,
             provenanceSlice,
@@ -11537,7 +11367,8 @@ function HomeInner() {
     chartHeight: number,
     compact = false,
     insightMode = false,
-    detailViewLayout = false
+    detailViewLayout = false,
+    pngCaptureMode = false
   ) => {
     const renderedKind = insightMode
       ? insightRenderedChartKind || insightPresentationChartKind
@@ -11553,7 +11384,7 @@ function HomeInner() {
         compact={compact}
         insightMode={insightMode}
         detailViewLayout={detailViewLayout}
-        pngCaptureMode={false}
+        pngCaptureMode={pngCaptureMode}
         chartRows={insightMode ? sortedInsightChartData : sortedChartData}
         visualization={
           (insightMode ? insightVisualization : visualization) as ChartRendererViz
@@ -11702,6 +11533,7 @@ function HomeInner() {
                   sessionDetailPlotHeight,
                   false,
                   false,
+                  true,
                   true
                 )}
               </div>
@@ -11719,7 +11551,13 @@ function HomeInner() {
                 plotHeight={insightShellPlotHeight}
               >
                 <div className={aiInsightsVizPlotSurface}>
-                  {renderDatasetChart(insightShellPlotHeight, false, true)}
+                  {renderDatasetChart(
+                    insightShellPlotHeight,
+                    false,
+                    true,
+                    false,
+                    true
+                  )}
                 </div>
               </AiInsightChartShell>
             </div>
@@ -12324,6 +12162,7 @@ function HomeInner() {
                                   openDashboardChartInChartsTab
                                 }
                                 onAskAiAboutDashboardChart={askAiAboutDashboardChart}
+                                onOverviewEffectiveKind={recordOverviewEffectiveKind}
                                 onChartExportError={setError}
                                 exportFooterHint={uploadMeta?.name}
                               />
@@ -12856,6 +12695,7 @@ function HomeInner() {
                             className={aiInsightsVizChipsWrap}
                           >
                             <ChartContextSummary
+                              presentationContract={activeSnapshot?.presentationContract}
                               renderedKind={sessionRenderedChartKind}
                               metricLabel={chartAxisLabels.valueAxis}
                               semanticHeader={sessionChartSemanticHeader}
@@ -12893,9 +12733,9 @@ function HomeInner() {
                       </div>
                     </div>
 
-                    {chartsTabOffscreenLayout ? (
-                      <ChartPngOffscreenHost
-                        layout={chartsTabOffscreenLayout}
+                    {chartsTabPngCaptureRequest && chartsTabOffscreenLayout ? (
+                      <ChartCaptureHost
+                        request={chartsTabPngCaptureRequest}
                         exportRef={chartsTabOffscreenExportRef}
                         rootClassName={chartsTabPngExportRoot}
                       >
@@ -12920,6 +12760,7 @@ function HomeInner() {
                             className={`${aiInsightsVizChipsWrap} mt-1`}
                           >
                             <ChartContextSummary
+                              presentationContract={activeSnapshot?.presentationContract}
                               renderedKind={sessionRenderedChartKind}
                               metricLabel={chartAxisLabels.valueAxis}
                               semanticHeader={sessionChartSemanticHeader}
@@ -12944,7 +12785,7 @@ function HomeInner() {
                           }
                         >
                           <ChartInsightViewportWrapper
-                            chartKind={sessionRenderedChartKind}
+                            chartKind={chartsTabPngCaptureRequest!.kind}
                             sessionMode
                           >
                             <div className={chartsTabSessionPlotSurface}>
@@ -12958,19 +12799,25 @@ function HomeInner() {
                                   visualization as ChartRendererViz
                                 }
                                 presentationKind={
-                                  sessionRenderedChartKind || presentationChartKind
+                                  chartsTabPngCaptureRequest!.kind ||
+                                  sessionRenderedChartKind ||
+                                  presentationChartKind
                                 }
                                 axes={chartAxisLabels}
                                 viewportW={chartsTabOffscreenLayout.width}
                                 sessionCartesianPlanMain={chartsTabExportCartesianPlan}
                                 insightCartesianPlanMain={null}
+                                exportAxisPresentationPlan={
+                                  chartsTabPngCaptureRequest!.presentationProfile
+                                    .axisPresentationPlan
+                                }
                                 tickTruncate={tickTruncate}
                                 onInsightDrill={insightChartDrill}
                               />
                             </div>
                           </ChartInsightViewportWrapper>
                         </div>
-                      </ChartPngOffscreenHost>
+                      </ChartCaptureHost>
                     ) : null}
 
                     <div className={chartsTabSmartReadWrap}>
@@ -13380,6 +13227,7 @@ function HomeInner() {
                         className={aiInsightsVizChipsWrap}
                       >
                         <ChartContextSummary
+                          presentationContract={insightSnapshot?.presentationContract}
                           renderedKind={insightRenderedChartKind}
                           metricLabel={insightChartMeasureLabel}
                           semanticHeader={insightChartSemanticHeader}
