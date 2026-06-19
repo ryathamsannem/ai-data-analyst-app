@@ -122,8 +122,7 @@ import {
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
-  OVERVIEW_LINE_PREMIUM_PAD_RATIO,
-  resolveOverviewPremiumAxisScale,
+  resolveTrendValueAxisProps,
 } from "@/lib/overview-premium-axis-domain";
 import { ChartCaptureHost } from "@/app/components/chart-platform/ChartCaptureHost";
 import {
@@ -4714,22 +4713,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "line" || displayKind === "area") {
-      const isOverviewLine = displayKind === "line";
-      const trendPremiumY = isOverviewLine
-        ? resolveOverviewPremiumAxisScale(chartRows.map((r) => r.value), {
-            padRatio: OVERVIEW_LINE_PREMIUM_PAD_RATIO,
-          })
-        : !pngCapture
-          ? resolveOverviewPremiumAxisScale(chartRows.map((r) => r.value))
-          : undefined;
+      const trendValueAxisProps = resolveTrendValueAxisProps({
+        chartKind: displayKind,
+        values: chartRows.map((r) => r.value),
+      });
       const overviewLineYTickFormatter = (tick: number) =>
         formatOverviewLineYAxisTick(tick, overviewMetricCtx);
-      const trendYTickSamples = trendPremiumY
-        ? trendPremiumY.ticks.map((t) =>
-            isOverviewLine
-              ? overviewLineYTickFormatter(t)
-              : valueTickFormatter(t)
-          )
+      const trendYTickSamples = trendValueAxisProps
+        ? trendValueAxisProps.ticks.map((t) => overviewLineYTickFormatter(t))
         : dashTickSamples;
       const vLay = pngCapture
         ? computeOverviewVerticalDashLayout(
@@ -4783,9 +4774,10 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const trendBottom = pngCapture
         ? Math.min(trendBottomRaw, trendBottomCap!)
         : trendBottomRaw;
-      const trendSideLive = isOverviewLine
-        ? overviewTrendLiveSideMargins(vLay.yAxisWidth, { lineChart: true })
-        : overviewTrendLiveSideMargins(vLay.yAxisWidth);
+      const trendSideLive =
+        displayKind === "line"
+          ? overviewTrendLiveSideMargins(vLay.yAxisWidth, { lineChart: true })
+          : overviewTrendLiveSideMargins(vLay.yAxisWidth);
       const trendLiveMargins = pngCapture
         ? { top: plotMarginTop, bottom: trendBottom }
         : computeOverviewTrendLivePlotMargins({
@@ -4794,7 +4786,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           });
       const trendGridOpacity = pngCapture
         ? exportGridOpacity
-        : isOverviewLine
+        : displayKind === "line"
           ? dashGrid.opacity
           : dashGrid.opacity * 0.72;
       const plotMargin = {
@@ -4845,14 +4837,16 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             <YAxis
               tick={{ fontSize: trendTickFs, fill: OV_AXIS_TICK, dx: 2 }}
               tickFormatter={
-                isOverviewLine ? overviewLineYTickFormatter : valueTickFormatter
+                trendValueAxisProps
+                  ? overviewLineYTickFormatter
+                  : valueTickFormatter
               }
               width={vLay.yAxisWidth}
-              {...(trendPremiumY
+              {...(trendValueAxisProps
                 ? {
-                    domain: trendPremiumY.domain,
-                    ticks: trendPremiumY.ticks,
-                    allowDataOverflow: false,
+                    domain: trendValueAxisProps.domain,
+                    ticks: trendValueAxisProps.ticks,
+                    allowDataOverflow: trendValueAxisProps.allowDataOverflow,
                   }
                 : {})}
               axisLine={{ stroke: OV_AXIS_LINE }}
@@ -11373,7 +11367,8 @@ function HomeInner() {
     chartHeight: number,
     compact = false,
     insightMode = false,
-    detailViewLayout = false
+    detailViewLayout = false,
+    pngCaptureMode = false
   ) => {
     const renderedKind = insightMode
       ? insightRenderedChartKind || insightPresentationChartKind
@@ -11389,7 +11384,7 @@ function HomeInner() {
         compact={compact}
         insightMode={insightMode}
         detailViewLayout={detailViewLayout}
-        pngCaptureMode={false}
+        pngCaptureMode={pngCaptureMode}
         chartRows={insightMode ? sortedInsightChartData : sortedChartData}
         visualization={
           (insightMode ? insightVisualization : visualization) as ChartRendererViz
@@ -11538,6 +11533,7 @@ function HomeInner() {
                   sessionDetailPlotHeight,
                   false,
                   false,
+                  true,
                   true
                 )}
               </div>
@@ -11555,7 +11551,13 @@ function HomeInner() {
                 plotHeight={insightShellPlotHeight}
               >
                 <div className={aiInsightsVizPlotSurface}>
-                  {renderDatasetChart(insightShellPlotHeight, false, true)}
+                  {renderDatasetChart(
+                    insightShellPlotHeight,
+                    false,
+                    true,
+                    false,
+                    true
+                  )}
                 </div>
               </AiInsightChartShell>
             </div>

@@ -163,6 +163,39 @@ export function resolveSessionPremiumTrendAxisScale(
   });
 }
 
+/** Recharts YAxis props for Line/Area trend charts — Overview premium domain everywhere. */
+export type TrendValueAxisProps = {
+  domain: readonly [number, number];
+  ticks: readonly number[];
+  allowDataOverflow: boolean;
+};
+
+/** Shared Overview-aligned premium Y scale for Line and Area trend charts. */
+export function resolveTrendValueAxisScale(
+  values: readonly number[],
+  kind: "line" | "area"
+): OverviewPremiumAxisScale | undefined {
+  return kind === "line"
+    ? resolveOverviewPremiumAxisScale(values, {
+        padRatio: OVERVIEW_LINE_PREMIUM_PAD_RATIO,
+      })
+    : resolveOverviewPremiumAxisScale(values);
+}
+
+/** Safe YAxis props for Line/Area — same domain/ticks across live, PNG, AI, and PDF. */
+export function resolveTrendValueAxisProps(args: {
+  chartKind: "line" | "area";
+  values: readonly number[];
+}): TrendValueAxisProps | null {
+  const scale = resolveTrendValueAxisScale(args.values, args.chartKind);
+  if (!scale) return null;
+  return {
+    domain: scale.domain,
+    ticks: scale.ticks,
+    allowDataOverflow: true,
+  };
+}
+
 /** Tighter optical side margins for session detail line/area (not Overview mini-cards). */
 export function sessionTrendDetailSideMargins(yAxisWidth: number): {
   left: number;

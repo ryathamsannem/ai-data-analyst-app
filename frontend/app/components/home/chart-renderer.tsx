@@ -54,8 +54,8 @@ import {
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
-  resolveSessionPremiumTrendAxisScale,
   resolveSessionScatterPremiumAxes,
+  resolveTrendValueAxisProps,
   sessionLineAreaDetailBottomMargin,
   sessionLineAreaDetailXAxisHeightPx,
   sessionTrendDetailPlotMargins,
@@ -1085,31 +1085,27 @@ function ChartRendererInner({
       ? sessionLineAreaDetailXAxisHeightPx()
       : lineAreaXAxisHeightPx(compact);
     const hideMarkers = rData.length > 45;
-    const trendPremiumY = detailLayout
-      ? resolveSessionPremiumTrendAxisScale(
-          rData.map((r) => r.value),
-          rKind
-        )
-      : undefined;
-    const trendYTickFormatter =
-      detailLayout && trendPremiumY
-        ? (tick: number) => formatOverviewLineYAxisTick(tick, metricTooltipCtx)
-        : valueTickFormatter;
-    const premiumTickSamples = trendPremiumY
-      ? trendPremiumY.ticks.map((t) => trendYTickFormatter(t))
+    const trendValueAxisProps = resolveTrendValueAxisProps({
+      chartKind: rKind,
+      values: rData.map((r) => r.value),
+    });
+    const trendYTickFormatter = trendValueAxisProps
+      ? (tick: number) => formatOverviewLineYAxisTick(tick, metricTooltipCtx)
+      : valueTickFormatter;
+    const premiumTickSamples = trendValueAxisProps
+      ? trendValueAxisProps.ticks.map((t) => trendYTickFormatter(t))
       : collectSampleTickStrings(rData);
-    const trendValueLayout =
-      detailLayout && trendPremiumY
-        ? computeVerticalValueAxisLayout({
-            valueAxisLabel: rAxes.valueAxisCompact,
-            valueAxisMeasureLabel: rAxes.valueAxis,
-            tickSampleStrings: premiumTickSamples,
-            chartLayoutMode: "full",
-            plotInnerHeightPx: Math.max(220, Math.floor(chartHeight * 0.94)),
-          })
-        : verticalValueLayout;
+    const trendValueLayout = trendValueAxisProps
+      ? computeVerticalValueAxisLayout({
+          valueAxisLabel: rAxes.valueAxisCompact,
+          valueAxisMeasureLabel: rAxes.valueAxis,
+          tickSampleStrings: premiumTickSamples,
+          chartLayoutMode: "full",
+          plotInnerHeightPx: Math.max(220, Math.floor(chartHeight * 0.94)),
+        })
+      : verticalValueLayout;
     const plotMargin =
-      detailLayout && trendPremiumY
+      detailLayout && trendValueAxisProps
         ? sessionTrendDetailPlotMargins({
             computedBottom: lineAreaBottomMargin,
             yAxisWidth: trendValueLayout.yAxisWidth,
@@ -1175,11 +1171,11 @@ function ChartRendererInner({
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
             width={trendValueLayout.yAxisWidth}
-            {...(trendPremiumY
+            {...(trendValueAxisProps
               ? {
-                  domain: trendPremiumY.domain,
-                  ticks: trendPremiumY.ticks,
-                  allowDataOverflow: false,
+                  domain: trendValueAxisProps.domain,
+                  ticks: trendValueAxisProps.ticks,
+                  allowDataOverflow: trendValueAxisProps.allowDataOverflow,
                 }
               : {})}
             label={
