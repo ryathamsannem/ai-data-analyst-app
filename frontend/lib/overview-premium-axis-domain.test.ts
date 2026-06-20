@@ -7,6 +7,7 @@ import {
   resolveOverviewPremiumAxisScale,
   resolveOverviewScatterPremiumAxes,
   resolveOverviewScatterPremiumAxisScale,
+  resolveScatterValueAxisProps,
   resolveSessionPremiumTrendAxisScale,
   resolveTrendValueAxisProps,
   SESSION_DETAIL_TREND_PREMIUM_PAD_RATIO,
@@ -198,5 +199,41 @@ describe("resolveOverviewScatterPremiumAxes", () => {
     const yMaxSlack = (yScale!.domain[1] - Math.max(...ys)) / (Math.max(...ys) - Math.min(...ys));
     expect(xMaxSlack).toBeLessThan(0.26);
     expect(yMaxSlack).toBeLessThan(0.22);
+  });
+});
+
+describe("resolveScatterValueAxisProps", () => {
+  const fixtureRows = [
+    { name: "a", value: 18_000, x: 90_000 },
+    { name: "b", value: 42_000, x: 170_000 },
+    { name: "c", value: 82_000, x: 340_000 },
+  ];
+
+  it("returns premium X/Y domains and ticks for scatter rows", () => {
+    const props = resolveScatterValueAxisProps(fixtureRows);
+    expect(props).not.toBeNull();
+    expect(props!.x.allowDataOverflow).toBe(false);
+    expect(props!.y.allowDataOverflow).toBe(false);
+    expect(props!.x.domain[0]).toBeLessThan(90_000);
+    expect(props!.x.domain[1]).toBeGreaterThan(340_000);
+    expect(props!.y.domain[0]).toBeLessThan(18_000);
+    expect(props!.y.domain[1]).toBeGreaterThan(82_000);
+    expect(props!.x.ticks.length).toBeGreaterThanOrEqual(4);
+    expect(props!.y.ticks.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("returns the same props regardless of surface path", () => {
+    const a = resolveScatterValueAxisProps(fixtureRows);
+    const b = resolveScatterValueAxisProps(fixtureRows);
+    expect(b).toEqual(a);
+  });
+
+  it("matches resolveOverviewScatterPremiumAxes channel values", () => {
+    const props = resolveScatterValueAxisProps(fixtureRows);
+    const axes = resolveOverviewScatterPremiumAxes(fixtureRows);
+    expect(props!.x.domain).toEqual(axes!.x.domain);
+    expect(props!.x.ticks).toEqual(axes!.x.ticks);
+    expect(props!.y.domain).toEqual(axes!.y.domain);
+    expect(props!.y.ticks).toEqual(axes!.y.ticks);
   });
 });

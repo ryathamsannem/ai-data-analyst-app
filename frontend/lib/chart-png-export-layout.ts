@@ -4,10 +4,10 @@ import {
   resolveRadialExportPlotHeight,
 } from "@/lib/radial-export-layout";
 
-/** Default presentation PNG canvas width (line / area / scatter). */
+/** Default presentation PNG canvas width (histogram and other cartesian kinds). */
 export const PRESENTATION_EXPORT_WIDTH_PX = 1400;
 
-/** Balanced width for line/area exports. */
+/** Balanced width for line / area / scatter exports. */
 export const PRESENTATION_EXPORT_COMPACT_WIDTH_PX = 1200;
 
 /** Tighter width for horizontal-bar exports (reduces empty right-side space). */
@@ -61,6 +61,7 @@ export function resolvePresentationExportCanvasWidth(
         : PRESENTATION_EXPORT_HORIZONTAL_WIDTH_PX;
     case "line":
     case "area":
+    case "scatter":
       return PRESENTATION_EXPORT_COMPACT_WIDTH_PX;
     default:
       return PRESENTATION_EXPORT_WIDTH_PX;
@@ -82,6 +83,7 @@ export function resolvePresentationExportCanvasHeight(
       );
     case "line":
     case "area":
+    case "scatter":
       return PRESENTATION_EXPORT_LINE_HEIGHT_PX;
     case "bar_horizontal":
       return PRESENTATION_EXPORT_HEIGHT_PX;

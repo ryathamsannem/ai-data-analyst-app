@@ -482,3 +482,35 @@ export function resolveOverviewScatterPremiumAxes(
   if (!x || !y) return undefined;
   return { x, y };
 }
+
+/** Recharts axis props for scatter X/Y — same domain/ticks across all surfaces. */
+export type ScatterAxisChannelProps = {
+  domain: readonly [number, number];
+  ticks: readonly number[];
+  allowDataOverflow: false;
+};
+
+export type ScatterValueAxisProps = {
+  x: ScatterAxisChannelProps;
+  y: ScatterAxisChannelProps;
+};
+
+/** Safe scatter axis props — Overview, Charts, AI Insights, and PDF share premium domains. */
+export function resolveScatterValueAxisProps(
+  rows: readonly ChartRow[]
+): ScatterValueAxisProps | null {
+  const axes = resolveOverviewScatterPremiumAxes(rows);
+  if (!axes) return null;
+  return {
+    x: {
+      domain: axes.x.domain,
+      ticks: axes.x.ticks,
+      allowDataOverflow: false,
+    },
+    y: {
+      domain: axes.y.domain,
+      ticks: axes.y.ticks,
+      allowDataOverflow: false,
+    },
+  };
+}

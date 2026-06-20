@@ -25,6 +25,14 @@ describe("chart PNG export layout", () => {
     expect(layout.width).toBe(1200);
   });
 
+  it("aligns scatter export canvas with line and area", () => {
+    const spec = buildPresentationExportSpec("scatter");
+    expect(spec.canvasWidth).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+    expect(spec.canvasHeight).toBe(PRESENTATION_EXPORT_LINE_HEIGHT_PX);
+    expect(spec.width).toBe(1200);
+    expect(spec.height).toBe(668);
+  });
+
   it("uses tighter width for horizontal bars with few categories", () => {
     expect(
       resolvePresentationExportCanvasWidth("bar_horizontal", { categoryCount: 8 })
