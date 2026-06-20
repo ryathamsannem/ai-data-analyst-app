@@ -79,6 +79,7 @@ import {
 } from "@/lib/chart-axis-theme";
 import {
   resolveHBarValueAxisProps,
+  resolveVerticalBarValueAxisProps,
   type AxisPresentationPlan,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
@@ -1281,6 +1282,13 @@ function ChartRendererInner({
           axisLine={{ stroke: CHART_AXIS_LINE }}
           tickLine={{ stroke: CHART_AXIS_LINE }}
           width={verticalValueLayout.yAxisWidth}
+          {...(resolveVerticalBarValueAxisProps({
+            plan: exportAxisPresentationPlan,
+            chartKind: rKind,
+            rows: rData,
+            chartTitle: metricTooltipCtx.chartTitle,
+            metricLabel: rAxes.valueAxis,
+          }) ?? {})}
           label={
             verticalValueLayout.showValueAxisTitle
               ? {

@@ -6,7 +6,9 @@ import {
   formatAxisPresentationPlanSummary,
   resolveAxisPresentationPlan,
   resolveHBarValueAxisProps,
+  resolveVerticalBarValueAxisProps,
 } from "@/lib/chart-platform/axis-presentation-plan";
+import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
 import { buildChartPresentationProfile } from "@/lib/chart-platform/chart-presentation-profile";
 
 const rows = [
@@ -119,8 +121,8 @@ describe("AxisPresentationPlan", () => {
         "valueAxisHeightPx": null,
         "valueAxisWidthPx": 144,
         "valueDomain": [
-          84,
-          130,
+          84.8,
+          123.2,
         ],
         "valueOrientation": "y",
         "valueTickCount": null,
@@ -319,5 +321,107 @@ describe("AxisPresentationPlan", () => {
       tickCount: 4,
       ticks: [80, 100, 120, 140],
     });
+  });
+});
+
+describe("resolveVerticalBarValueAxisProps", () => {
+  const satisfactionRows = [
+    { name: "Sales", value: 4.06 },
+    { name: "Marketing", value: 4.12 },
+    { name: "Finance", value: 4.19 },
+  ];
+
+  it("uses vertical bar export plan domain when provided", () => {
+    const contract = buildChartPresentationContract({
+      chartId: "bar-1",
+      source: "charts",
+      apiChartType: "bar",
+      resolvedKind: "bar",
+      title: "Revenue by Region",
+      rows,
+      metricLabel: "Revenue",
+      categoryLabel: "Region",
+    });
+    const plan = resolveAxisPresentationPlan({
+      profileId: "chartsPng",
+      contract,
+      kind: "bar",
+      spec: buildPresentationExportSpec("bar", { categoryCount: rows.length }),
+    });
+
+    expect(
+      resolveVerticalBarValueAxisProps({
+        plan,
+        chartKind: "bar",
+        rows: contract.data.rows,
+        chartTitle: "Revenue by Region",
+        metricLabel: "Revenue",
+      })
+    ).toEqual({
+      allowDataOverflow: false,
+      domain: plan.valueAxis.domain,
+    });
+  });
+
+  it("falls back to overview bar domain for live charts and insights", () => {
+    const overviewDomain = resolveOverviewBarValueDomain(satisfactionRows, {
+      chartTitle: "Satisfaction Score by Department",
+      metricLabel: "Satisfaction Score",
+      presentationKind: "bar",
+      executiveRounding: false,
+    });
+    const props = resolveVerticalBarValueAxisProps({
+      plan: null,
+      chartKind: "bar",
+      rows: satisfactionRows,
+      chartTitle: "Satisfaction Score by Department",
+      metricLabel: "Satisfaction Score",
+    });
+
+    expect(props).toEqual({
+      allowDataOverflow: false,
+      domain: overviewDomain,
+    });
+    expect(props!.domain![0]).toBeGreaterThan(4);
+    expect(props!.domain![1]).toBeLessThan(4.25);
+  });
+
+  it("applies the same fallback policy for histogram", () => {
+    const histogramRows = [
+      { name: "40-50k", value: 12 },
+      { name: "50-60k", value: 28 },
+      { name: "60-70k", value: 19 },
+      { name: "70-80k", value: 8 },
+    ];
+    const overviewDomain = resolveOverviewBarValueDomain(histogramRows, {
+      chartTitle: "Salary Distribution",
+      metricLabel: "Employee Count",
+      presentationKind: "histogram",
+      executiveRounding: false,
+    });
+
+    expect(
+      resolveVerticalBarValueAxisProps({
+        plan: null,
+        chartKind: "histogram",
+        rows: histogramRows,
+        chartTitle: "Salary Distribution",
+        metricLabel: "Employee Count",
+      })
+    ).toEqual({
+      allowDataOverflow: false,
+      domain: overviewDomain,
+    });
+  });
+
+  it("returns null for unsupported chart kinds", () => {
+    expect(
+      resolveVerticalBarValueAxisProps({
+        chartKind: "line",
+        rows: satisfactionRows,
+        chartTitle: "Trend",
+        metricLabel: "Revenue",
+      })
+    ).toBeNull();
   });
 });

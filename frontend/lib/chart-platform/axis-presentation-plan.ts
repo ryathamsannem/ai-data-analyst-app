@@ -61,6 +61,11 @@ export type HBarValueAxisProps = {
   allowDataOverflow?: boolean;
 };
 
+export type VerticalBarValueAxisProps = {
+  domain?: readonly [number, number];
+  allowDataOverflow?: boolean;
+};
+
 type ResolveAxisPresentationPlanArgs = {
   profileId: string;
   contract: ChartPresentationContract;
@@ -128,7 +133,7 @@ function resolveExportBarValueDomain(args: {
     chartTitle: args.contract.semantics.title,
     metricLabel: args.contract.semantics.metric.label,
     presentationKind: args.kind,
-    executiveRounding: args.kind === "bar",
+    executiveRounding: false,
   });
   return domain ?? null;
 }
@@ -372,6 +377,51 @@ function propsFromHorizontalBarPlan(
   }
 
   return out.domain || out.ticks || out.tickCount ? out : null;
+}
+
+function propsFromVerticalBarPlan(
+  plan: AxisPresentationPlan | null | undefined
+): VerticalBarValueAxisProps | null {
+  if (!plan || plan.status !== "supported") return null;
+  if (plan.chartKind !== "bar" || plan.valueOrientation !== "y") return null;
+  if (plan.valueAxis.scale !== "numeric") return null;
+
+  if (!plan.valueAxis.domain) return null;
+
+  return {
+    domain: plan.valueAxis.domain,
+    allowDataOverflow: false,
+  };
+}
+
+export function resolveVerticalBarValueAxisProps(args: {
+  plan?: AxisPresentationPlan | null;
+  chartKind: ChartKind;
+  rows: readonly ChartRow[];
+  chartTitle?: string | null;
+  metricLabel?: string | null;
+  executiveRounding?: boolean;
+}): VerticalBarValueAxisProps | null {
+  const { plan, chartKind, rows, chartTitle, metricLabel, executiveRounding = false } =
+    args;
+  if (chartKind !== "bar" && chartKind !== "histogram") return null;
+
+  if (chartKind === "bar") {
+    const planned = propsFromVerticalBarPlan(plan);
+    if (planned) return planned;
+  }
+
+  const domain = resolveOverviewBarValueDomain(rows, {
+    chartTitle: chartTitle ?? undefined,
+    metricLabel: metricLabel ?? undefined,
+    presentationKind: chartKind,
+    executiveRounding,
+  });
+  if (!domain) return null;
+  return {
+    domain,
+    allowDataOverflow: false,
+  };
 }
 
 export function resolveHBarValueAxisProps(args: {
