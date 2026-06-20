@@ -1,21 +1,31 @@
 import { describe, expect, it } from "vitest";
+import type { ChartRow } from "@/app/chart-types";
 import {
+  computeOverviewMiniCategoryPlan,
+  computeOverviewHBarLiveMargins,
+  computeOverviewTrendLivePlotMargins,
   overviewDashboardUsesHorizontalBars,
   overviewDashUsesContinuousPlot,
   overviewDashUsesExpandedPlotBand,
   overviewDashUsesHorizontalPlotBand,
   overviewTrendLiveSideMargins,
   resolveOverviewDashLivePlotHeight,
-  computeOverviewHBarLiveMargins,
-  computeOverviewTrendLivePlotMargins,
   OVERVIEW_LINE_Y_AXIS_LEFT_TRIM_PX,
   OVERVIEW_TREND_PLOT_HEIGHT_BOOST_PX,
   OVERVIEW_SCATTER_PLOT_HEIGHT_BOOST_PX,
   OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX,
+  OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX,
   OVERVIEW_SCATTER_POINT_RADIUS_PX,
   OVERVIEW_SCATTER_POINT_STROKE_PX,
   OVERVIEW_SCATTER_POINT_FILL_OPACITY,
 } from "./overview-dashboard-plot-layout";
+
+const regionRows: ChartRow[] = [
+  { name: "North", value: 120 },
+  { name: "South", value: 95 },
+  { name: "East", value: 88 },
+  { name: "West", value: 72 },
+];
 
 describe("overviewDashboardUsesHorizontalBars", () => {
   it("detects explicit and fallback horizontal orientation", () => {
@@ -42,6 +52,24 @@ describe("overviewDashboardUsesHorizontalBars", () => {
         xAxisHeightPx: 32,
       })
     ).toBe(false);
+  });
+});
+
+describe("computeOverviewMiniCategoryPlan canonical bar policy", () => {
+  it("does not layout-flip canonical vertical bars on narrow overview cards", () => {
+    const plan = computeOverviewMiniCategoryPlan(
+      "bar",
+      regionRows,
+      {
+        categoryAxis: "Region",
+        valueAxis: "Revenue",
+        valueAxisCompact: "Revenue",
+      },
+      280,
+      340
+    );
+    expect(plan?.renderAsHorizontalBar).not.toBe(true);
+    expect(overviewDashboardUsesHorizontalBars("bar", plan)).toBe(false);
   });
 });
 
@@ -76,7 +104,9 @@ describe("overview continuous plot height", () => {
     expect(resolveOverviewDashLivePlotHeight("bar", 340, true)).toBe(
       340 + OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX
     );
-    expect(resolveOverviewDashLivePlotHeight("bar", 340, false)).toBe(340);
+    expect(resolveOverviewDashLivePlotHeight("bar", 340, false)).toBe(
+      340 + OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX
+    );
     expect(resolveOverviewDashLivePlotHeight("donut", 340)).toBe(340);
   });
 

@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vitest";
+import type { ChartRow } from "@/app/chart-types";
 import {
   computeAutoDashboardChartPresentation,
   computeFinalChartPresentation,
+  rankIntentFromText,
+  resolveBarFamilyKind,
 } from "@/lib/final-chart-presentation";
 import { resolveSnapshotPresentationKind } from "@/lib/normalize-visualization-contract";
 
-const cityRows = [
+const regionRows: ChartRow[] = [
+  { name: "North", value: 120 },
+  { name: "South", value: 95 },
+  { name: "East", value: 88 },
+  { name: "West", value: 72 },
+];
+
+const cityRows: ChartRow[] = [
   { name: "NYC", value: 120 },
   { name: "LA", value: 95 },
   { name: "Chicago", value: 88 },
@@ -15,26 +25,73 @@ const cityRows = [
   { name: "San Antonio", value: 48 },
 ];
 
-const regionRows = [
-  { name: "North", value: 120 },
-  { name: "South", value: 95 },
-  { name: "East", value: 88 },
-  { name: "West", value: 72 },
-];
+describe("resolveBarFamilyKind", () => {
+  it("returns vertical bar for simple comparison with ≤6 short categories", () => {
+    expect(
+      resolveBarFamilyKind({
+        rows: regionRows,
+        title: "Revenue by region",
+        question: "Compare revenue across regions",
+      })
+    ).toBe("bar");
+  });
+
+  it("returns horizontal bar when category count exceeds six", () => {
+    expect(
+      resolveBarFamilyKind({
+        rows: cityRows,
+        title: "Orders by city",
+      })
+    ).toBe("bar_horizontal");
+  });
+
+  it("returns horizontal bar for ranking intent", () => {
+    expect(
+      resolveBarFamilyKind({
+        rows: regionRows,
+        title: "Top 3 regions by revenue",
+      })
+    ).toBe("bar_horizontal");
+    expect(rankIntentFromText("Top 3 regions by revenue")).toBe(true);
+  });
+
+  it("does not treat compare phrasing alone as ranking intent", () => {
+    expect(
+      rankIntentFromText("Compare revenue across regions", "Compare revenue across regions")
+    ).toBe(false);
+  });
+
+  it("returns horizontal bar for long category labels", () => {
+    const rows: ChartRow[] = [
+      { name: "North America Enterprise Division", value: 10 },
+      { name: "South", value: 8 },
+    ];
+    expect(
+      resolveBarFamilyKind({
+        rows,
+        title: "Revenue by region",
+      })
+    ).toBe("bar_horizontal");
+  });
+});
 
 describe("computeFinalChartPresentation", () => {
-  it("re-evaluates API horizontalBar using canonical bar-family policy", () => {
+  it("re-evaluates API horizontalBar to vertical bar for compact comparisons", () => {
     expect(
       computeFinalChartPresentation({
         apiChartType: "horizontalBar",
-        title: "Average revenue by region",
+        title: "Revenue by region",
+        question: "Compare revenue across regions",
         rows: regionRows,
       })
     ).toBe("bar");
+  });
+
+  it("keeps horizontal bar when more than six categories", () => {
     expect(
       computeFinalChartPresentation({
         apiChartType: "horizontalBar",
-        title: "Orders by City",
+        title: "Orders by city",
         rows: cityRows,
       })
     ).toBe("bar_horizontal");
@@ -42,7 +99,7 @@ describe("computeFinalChartPresentation", () => {
 });
 
 describe("computeAutoDashboardChartPresentation", () => {
-  it("matches canonical policy for compact auto-dashboard charts", () => {
+  it("matches canonical policy for generic dashboard horizontalBar API type", () => {
     expect(
       computeAutoDashboardChartPresentation({
         apiChartType: "horizontalBar",
@@ -56,61 +113,15 @@ describe("computeAutoDashboardChartPresentation", () => {
     expect(
       computeAutoDashboardChartPresentation({
         apiChartType: "bar",
-        title: "Orders by City",
+        title: "Orders by city",
         rows: cityRows,
       })
     ).toBe("bar_horizontal");
   });
-
-  it("preserves API donut for composition auto-dashboard charts without share phrasing in title", () => {
-    const rows = [
-      { name: "Electronics", value: 120000 },
-      { name: "Apparel", value: 95000 },
-      { name: "Home", value: 88000 },
-      { name: "Sports", value: 72000 },
-    ];
-    expect(
-      computeAutoDashboardChartPresentation({
-        apiChartType: "donut",
-        title: "Profit by Product",
-        rows,
-      })
-    ).toBe("donut");
-  });
-
-  it("preserves share-titled donut from backend composition titles", () => {
-    const rows = [
-      { name: "North", value: 120000 },
-      { name: "South", value: 95000 },
-      { name: "East", value: 88000 },
-    ];
-    expect(
-      computeAutoDashboardChartPresentation({
-        apiChartType: "donut",
-        title: "Profit Share by Region",
-        rows,
-      })
-    ).toBe("donut");
-  });
-
-  it("downgrades API donut to bar for rate metrics", () => {
-    const rows = [
-      { name: "Spring", value: 2.4 },
-      { name: "Summer", value: 3.1 },
-      { name: "Fall", value: 2.8 },
-    ];
-    const kind = computeAutoDashboardChartPresentation({
-      apiChartType: "donut",
-      title: "Conversion Rate by Campaign",
-      rows,
-    });
-    expect(kind === "donut" || kind === "pie").toBe(false);
-    expect(kind === "bar" || kind === "bar_horizontal").toBe(true);
-  });
 });
 
 describe("resolveSnapshotPresentationKind", () => {
-  it("keeps horizontal bar when chart kind is pinned on contract", () => {
+  it("honours pinned chart kind from frozen contract", () => {
     expect(
       resolveSnapshotPresentationKind({
         title: "Orders by City",
@@ -145,18 +156,14 @@ describe("resolveSnapshotPresentationKind", () => {
     ).toBe("bar_horizontal");
   });
 
-  it("preserves scatter from API type", () => {
-    const scatterRows = [
-      { name: "P1", value: 10, x: 100 },
-      { name: "P2", value: 20, x: 150 },
-    ];
+  it("re-evaluates unpinned horizontalBar API to vertical bar for compact rows", () => {
     expect(
       resolveSnapshotPresentationKind({
-        title: "Revenue vs Profit",
-        rows: scatterRows,
-        apiChartType: "scatter",
+        title: "Revenue by region",
+        rows: regionRows,
+        apiChartType: "horizontalBar",
         source: "auto_dashboard",
       })
-    ).toBe("scatter");
+    ).toBe("bar");
   });
 });

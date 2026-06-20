@@ -154,6 +154,10 @@ export function resolvePdfChartEmbedPolicy(kind: ChartKind): PdfChartEmbedPolicy
         maxAspectRatio: 1.55,
       };
     case "bar":
+      return {
+        maxHeightMm: 150,
+        minWidthRatio: 0.88,
+      };
     default:
       return { maxHeightMm: 145, minWidthRatio: 0.78 };
   }

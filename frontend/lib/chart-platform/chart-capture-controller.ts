@@ -80,12 +80,22 @@ export function createChartPngCaptureRequest({
   };
 }
 
-/** PDF scatter only — omit fixed composite canvas so the card fills the artifact. */
+/** PDF scatter + vertical bar — omit fixed composite canvas so the card fills the artifact. */
+export function pdfChartUsesContentTightComposite(
+  profile: ChartArtifactProfile,
+  kind: ChartKind
+): boolean {
+  return (
+    profile === "pdfChart" && (kind === "scatter" || kind === "bar")
+  );
+}
+
+/** @deprecated Use pdfChartUsesContentTightComposite */
 export function pdfChartScatterUsesContentTightComposite(
   profile: ChartArtifactProfile,
   kind: ChartKind
 ): boolean {
-  return profile === "pdfChart" && kind === "scatter";
+  return pdfChartUsesContentTightComposite(profile, kind);
 }
 
 export type CaptureChartPngArtifactArgs = {
@@ -137,7 +147,7 @@ export async function captureChartPngArtifact({
   }
 
   try {
-    const contentTight = pdfChartScatterUsesContentTightComposite(
+    const contentTight = pdfChartUsesContentTightComposite(
       request.profile,
       request.kind
     );

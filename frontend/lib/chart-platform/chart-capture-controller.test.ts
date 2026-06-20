@@ -1,28 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { pdfChartScatterUsesContentTightComposite } from "@/lib/chart-platform/chart-capture-controller";
+import {
+  pdfChartScatterUsesContentTightComposite,
+  pdfChartUsesContentTightComposite,
+} from "@/lib/chart-platform/chart-capture-controller";
 
-describe("pdfChartScatterUsesContentTightComposite", () => {
-  it("enables content-tight composite only for pdfChart scatter", () => {
+describe("pdfChartUsesContentTightComposite", () => {
+  it("enables content-tight composite for pdfChart scatter and vertical bar", () => {
+    expect(pdfChartUsesContentTightComposite("pdfChart", "scatter")).toBe(true);
+    expect(pdfChartUsesContentTightComposite("pdfChart", "bar")).toBe(true);
+    expect(pdfChartUsesContentTightComposite("pdfChart", "line")).toBe(false);
+    expect(pdfChartUsesContentTightComposite("pdfChart", "area")).toBe(false);
+    expect(pdfChartUsesContentTightComposite("pdfChart", "bar_horizontal")).toBe(
+      false
+    );
+    expect(pdfChartUsesContentTightComposite("pdfChart", "donut")).toBe(false);
+    expect(pdfChartUsesContentTightComposite("pdfChart", "histogram")).toBe(
+      false
+    );
+    expect(pdfChartUsesContentTightComposite("chartsPng", "bar")).toBe(false);
+    expect(pdfChartUsesContentTightComposite("overviewPng", "bar")).toBe(false);
+  });
+
+  it("keeps scatter alias aligned with combined helper", () => {
     expect(pdfChartScatterUsesContentTightComposite("pdfChart", "scatter")).toBe(
-      true
+      pdfChartUsesContentTightComposite("pdfChart", "scatter")
     );
-    expect(pdfChartScatterUsesContentTightComposite("pdfChart", "line")).toBe(
-      false
-    );
-    expect(pdfChartScatterUsesContentTightComposite("pdfChart", "area")).toBe(
-      false
-    );
-    expect(
-      pdfChartScatterUsesContentTightComposite("pdfChart", "bar_horizontal")
-    ).toBe(false);
-    expect(pdfChartScatterUsesContentTightComposite("pdfChart", "donut")).toBe(
-      false
-    );
-    expect(pdfChartScatterUsesContentTightComposite("chartsPng", "scatter")).toBe(
-      false
-    );
-    expect(
-      pdfChartScatterUsesContentTightComposite("overviewPng", "scatter")
-    ).toBe(false);
   });
 });

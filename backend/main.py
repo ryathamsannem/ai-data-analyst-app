@@ -9212,7 +9212,7 @@ def _deterministic_viz_last_resort(
             smart_trace["deterministic_fallback_reason"] = "groupby_empty"
             return [], "", "", ""
         want_h = len(chart_data) > 10 or any(
-            k in q for k in ("highest", "lowest", "rank", "which ", "compare")
+            k in q for k in ("highest", "lowest", "rank", "which ")
         )
         ctype = "bar_horizontal" if want_h else "bar"
         op = "Average" if want_mean else "Total"
@@ -9752,7 +9752,6 @@ def build_smart_chart(
                             "highest",
                             "lowest",
                             "which ",
-                            "compare",
                             "best",
                             "most risky",
                             "riskiest",

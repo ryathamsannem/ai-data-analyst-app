@@ -2,6 +2,7 @@
 
 import { memo, useMemo } from "react";
 import type { ChartKind, ChartRow } from "@/app/chart-types";
+import { SHARED_CHART_LAYOUT } from "@/lib/shared-chart-layout";
 import {
   balanceHorizontalOuterMargins,
   balanceVerticalOuterMargins,
@@ -1238,8 +1239,9 @@ function ChartRendererInner({
         barCategoryGap={
           isHistogram
             ? 2
-            : detailLayout && rData.length <= 5
-              ? "5%"
+            : detailLayout &&
+                rData.length <= SHARED_CHART_LAYOUT.verticalBar.compactCategoryMax
+              ? SHARED_CHART_LAYOUT.verticalBar.compactCategoryGap
               : detailLayout && rData.length <= 10
                 ? "10%"
                 : undefined

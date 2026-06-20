@@ -31,6 +31,13 @@ export const SHARED_CHART_LAYOUT = {
   },
   barGapDense: 4,
   barGapThreshold: 6,
+  /** Premium vertical bar spacing for small category counts (matches Overview/PNG export). */
+  verticalBar: {
+    compactCategoryGap: "16%",
+    compactCategoryMax: 6,
+    /** Live detail plot floor for compact vertical bars (Charts + Insights). */
+    livePlotFloorPx: 520,
+  },
 } as const;
 
 /** Extra ResponsiveContainer height for session line/area/scatter — plot allocation only, not shell width. */
@@ -125,7 +132,20 @@ export function resolveSharedDetailPlotHeight(
 
   if (kind === "bar" || kind === "histogram") {
     const extra = Math.min(48, Math.max(0, n - 5) * 8);
-    return Math.min(SHARED_DETAIL_PLOT_BAND.desktopCeiling, band + extra);
+    const categoryBand = Math.min(
+      SHARED_DETAIL_PLOT_BAND.desktopCeiling,
+      band + extra
+    );
+    if (n <= SHARED_CHART_LAYOUT.verticalBar.compactCategoryMax) {
+      return Math.min(
+        SHARED_CHART_LAYOUT.horizontalBar.capPx,
+        Math.max(
+          categoryBand,
+          SHARED_CHART_LAYOUT.verticalBar.livePlotFloorPx
+        )
+      );
+    }
+    return categoryBand;
   }
 
   return band;

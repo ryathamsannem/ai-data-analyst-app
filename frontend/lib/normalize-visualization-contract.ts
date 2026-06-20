@@ -10,7 +10,6 @@ import {
   orientationForChartKind,
   type FinalChartOrientation,
 } from "@/lib/final-chart-presentation";
-import { apiChartStringToKind } from "@/lib/smart-chart-intelligence";
 import {
   resolvePresentationKindFromContract,
   type VisualizationContract,
@@ -47,18 +46,13 @@ export type NormalizeVisualizationContractArgs = {
 function resolveKindFromPayload(
   args: NormalizeVisualizationContractArgs
 ): ChartKind {
-  const apiKind = apiChartStringToKind(args.apiChartType ?? "");
-  if (apiKind === "bar_horizontal") return "bar_horizontal";
+  if (args.pinnedChartKind) return args.pinnedChartKind;
 
   const fromContract = resolvePresentationKindFromContract({
     chartKind: args.pinnedChartKind,
     contract: args.contract ?? null,
   });
-  if (fromContract === "bar_horizontal") return "bar_horizontal";
   if (fromContract) return fromContract;
-
-  if (args.pinnedChartKind === "bar_horizontal") return "bar_horizontal";
-  if (args.pinnedChartKind) return args.pinnedChartKind;
 
   if (args.source === "auto_dashboard") {
     return computeAutoDashboardChartPresentation({

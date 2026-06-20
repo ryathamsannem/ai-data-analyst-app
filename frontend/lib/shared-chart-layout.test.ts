@@ -38,4 +38,13 @@ describe("resolveSharedDetailPlotHeight", () => {
     expect(lineMetrics.planViewportPx).toBe(850);
     expect(lineMetrics.plotHeightMax).toBe(580);
   });
+
+  it("boosts compact vertical bar plot height for Charts and Insights", () => {
+    const compactBar = resolveSharedDetailPlotHeight(4, "bar", 900);
+    const denseBar = resolveSharedDetailPlotHeight(8, "bar", 900);
+    expect(compactBar).toBeGreaterThanOrEqual(
+      SHARED_CHART_LAYOUT.verticalBar.livePlotFloorPx
+    );
+    expect(compactBar).toBeGreaterThan(denseBar);
+  });
 });

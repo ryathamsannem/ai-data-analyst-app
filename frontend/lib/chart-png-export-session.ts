@@ -45,15 +45,17 @@ function isBarFamilyKind(kind: ChartKind | null | undefined): kind is "bar" | "b
 export function resolveChartsPngExportKind(args: {
   liveKind: ChartKind;
   snapshotSource?: "ai" | "auto_dashboard" | null;
-  overviewEffectiveKind?: ChartKind | null;
+  /** Pinned session kind for auto-dashboard charts (canonical resolver output). */
+  snapshotChartKind?: ChartKind | null;
 }): ChartKind {
-  const { liveKind, snapshotSource, overviewEffectiveKind } = args;
+  const { liveKind, snapshotSource, snapshotChartKind } = args;
   if (
     snapshotSource === "auto_dashboard" &&
     isBarFamilyKind(liveKind) &&
-    isBarFamilyKind(overviewEffectiveKind)
+    snapshotChartKind &&
+    isBarFamilyKind(snapshotChartKind)
   ) {
-    return overviewEffectiveKind;
+    return snapshotChartKind;
   }
   return liveKind;
 }

@@ -98,7 +98,6 @@ import {
   OVERVIEW_PNG_EXPORT_MARGIN_TOP,
   OVERVIEW_PNG_EXPORT_MARKER_R_PX,
   OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE,
-  resolveOverviewEffectivePresentationKind,
   shouldShowOverviewBarValueLabels,
 } from "@/lib/overview-dashboard-export";
 import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
@@ -4302,15 +4301,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     miniCategoryPlan
   );
 
-  const effectivePresentationKind = resolveOverviewEffectivePresentationKind(
-    displayKind,
-    renderBarAsHorizontal
-  );
-
   useEffect(() => {
     if (!snapshotId || !onOverviewEffectiveKind) return;
-    onOverviewEffectiveKind(snapshotId, effectivePresentationKind);
-  }, [snapshotId, effectivePresentationKind, onOverviewEffectiveKind]);
+    if (displayKind !== "bar" && displayKind !== "bar_horizontal") return;
+    onOverviewEffectiveKind(snapshotId, displayKind);
+  }, [snapshotId, displayKind, onOverviewEffectiveKind]);
 
   const overviewSemanticHeader = useMemo(
     () =>
@@ -4338,13 +4333,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   const overviewMetadataBadgeCompact = useMemo(
     () =>
       buildChartMetadataBadgeCompact(
-        effectivePresentationKind,
+        displayKind,
         chartRows.length,
         { subtitle: "Auto dashboard" },
         null,
         false
       ),
-    [effectivePresentationKind, chartRows.length]
+    [displayKind, chartRows.length]
   );
 
   const overviewPresentationContract = useMemo(
@@ -4353,7 +4348,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         chartId: snapshotId ?? `overview-${canonicalTitle}`,
         source: "auto_dashboard",
         apiChartType: chart.chartType,
-        resolvedKind: effectivePresentationKind,
+        resolvedKind: displayKind,
         title: canonicalTitle || chart.title,
         subtitle: "Auto dashboard",
         rows: chartRows,
@@ -4367,7 +4362,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       chart.chartType,
       chart.title,
       chartRows,
-      effectivePresentationKind,
+      displayKind,
       overviewMetricLabel,
       overviewSemanticHeader,
       overviewMetadataBadgeCompact,
@@ -4379,14 +4374,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
   const overviewMetadataLine = useMemo(
     () =>
       buildChartMetadataLine(
-        effectivePresentationKind,
+        displayKind,
         chartRows.length,
         { subtitle: "Auto dashboard" },
         null,
         false,
         { chartTitle: chart.title }
       ),
-    [effectivePresentationKind, chartRows.length, chart.title]
+    [displayKind, chartRows.length, chart.title]
   );
 
   const valueTickFormatter = useCallback(
@@ -4944,7 +4939,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         left: pngCapture ? plotMarginSide : barMargins.marginLeft,
       };
       const barCategoryGap =
-        isHist ? 2 : pngCapture && chartRows.length <= 6 ? "16%" : undefined;
+        isHist
+          ? 2
+          : chartRows.length <= 6
+            ? "16%"
+            : undefined;
       return (
         <ResponsiveContainer
           key={`ov-bar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
@@ -5009,8 +5008,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               fill="#6366f1"
               radius={isHist ? [3, 3, 0, 0] : [8, 8, 4, 4]}
               maxBarSize={
-                isHist ? 44 : pngCapture ? OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE : 42
-              }
+            isHist ? 44 : OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE
+          }
               isAnimationActive={plotAnimOn}
               animationDuration={plotAnimDuration}
               cursor={drillable ? "pointer" : "default"}
@@ -5119,7 +5118,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 contract: overviewPresentationContract,
                 profile: "overviewPng",
                 sourceSurface: "overview",
-                kind: effectivePresentationKind,
+                kind: displayKind,
                 categoryCount: chartRows.length,
                 filename: sanitizeChartExportFilename(canonicalTitle),
                 datasetName: exportFooterHint,
@@ -5134,7 +5133,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                     requestId,
                   parity: {
                     displayKind,
-                    renderBarAsHorizontal,
+                    renderBarAsHorizontal: displayKind === "bar_horizontal",
                     chartTitle: canonicalTitle,
                     expectedMetadataChipCount: overviewMetadataChipSpecs.length,
                   },
@@ -6873,7 +6872,7 @@ function HomeInner() {
     const chartsPngExportKind = resolveChartsPngExportKind({
       liveKind: liveChartsPngKind,
       snapshotSource: activeSnapshot?.source ?? null,
-      overviewEffectiveKind: activeSnapshot?.overviewEffectiveChartKind ?? null,
+      snapshotChartKind: activeSnapshot?.chartKind ?? null,
     });
     const contract =
       activeSnapshot?.presentationContract &&
@@ -6930,7 +6929,7 @@ function HomeInner() {
   }, [
     activeChartId,
     activeSnapshot?.dashboardChartKey,
-    activeSnapshot?.overviewEffectiveChartKind,
+    activeSnapshot?.chartKind,
     activeSnapshot?.presentationContract,
     activeSnapshot?.source,
     activeSnapshot?.subtitle,

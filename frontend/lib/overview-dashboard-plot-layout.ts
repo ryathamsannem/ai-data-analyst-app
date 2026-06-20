@@ -200,7 +200,8 @@ export function computeOverviewMiniCategoryPlan(
     viewportWidthPx: Math.max(viewportW, 200),
     axes: miniAxes,
     layoutVariant: "overview_half",
-    allowHorizontalBarFallback: rowKind === "bar",
+    /** Canonical bar vs h-bar is decided by resolveBarFamilyKind — not layout fallback. */
+    allowHorizontalBarFallback: false,
   });
 }
 
@@ -240,6 +241,9 @@ export const OVERVIEW_TREND_PLOT_HEIGHT_BOOST_PX = 36;
 
 /** Slightly smaller boost — scatter already reads larger at the same band. */
 export const OVERVIEW_SCATTER_PLOT_HEIGHT_BOOST_PX = 32;
+
+/** Match line/scatter band boost — vertical bars on compact category charts. */
+export const OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX = 28;
 
 /** Match line band — closes h-full slack between H-Bar plot and footer. */
 export const OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX = 36;
@@ -296,6 +300,9 @@ export function resolveOverviewDashLivePlotHeight(
   }
   if (overviewDashUsesHorizontalPlotBand(displayKind, renderAsHorizontal)) {
     return baseHeightPx + OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX;
+  }
+  if (displayKind === "bar" || displayKind === "histogram") {
+    return baseHeightPx + OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX;
   }
   return baseHeightPx;
 }
