@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getSharedDetailLayoutMetrics,
   resolveSharedDetailPlotHeight,
+  sessionDetailVerticalOuterMargins,
   SESSION_DETAIL_CONTINUOUS_PLOT_FLOOR_PX,
   SHARED_CHART_LAYOUT,
 } from "@/lib/shared-chart-layout";
@@ -46,5 +47,15 @@ describe("resolveSharedDetailPlotHeight", () => {
       SHARED_CHART_LAYOUT.verticalBar.livePlotFloorPx
     );
     expect(compactBar).toBeGreaterThan(denseBar);
+  });
+
+  it("session detail vertical margins use outer left pad only (H-Bar parity)", () => {
+    const sides = sessionDetailVerticalOuterMargins({
+      yAxisWidth: 68,
+      pointCount: 14,
+    });
+    expect(sides.marginLeft).toBeLessThanOrEqual(10);
+    expect(sides.marginRight).toBeGreaterThanOrEqual(18);
+    expect(sides.marginRight).toBeLessThanOrEqual(32);
   });
 });

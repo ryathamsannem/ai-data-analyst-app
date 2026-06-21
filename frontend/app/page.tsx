@@ -110,6 +110,7 @@ import {
   computeOverviewHBarLiveMargins,
   computeOverviewMiniCategoryPlan,
   computeOverviewScatterLivePlotMargins,
+  computeOverviewScatterDashMargins,
   computeOverviewTrendLivePlotMargins,
   computeOverviewVBarLivePlotMargins,
   computeOverviewVBarLiveOuterMargins,
@@ -4567,40 +4568,6 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "scatter") {
-      if (pngCapture) {
-        return (
-          <ChartRenderer
-            chartHeight={effectivePlotH}
-            compact
-            insightMode={false}
-            pngCaptureMode
-            chartRows={chartRows}
-            visualization={{
-              scatterXLabel:
-                chart.xMetricLabel?.trim() ||
-                chart.scatterXLabel?.trim(),
-              scatterYLabel:
-                chart.yMetricLabel?.trim() ||
-                chart.scatterYLabel?.trim() ||
-                chart.metricColumn,
-              xColumn: chart.xColumn,
-              yColumn: chart.yColumn,
-              xMetricLabel: chart.xMetricLabel,
-              yMetricLabel: chart.yMetricLabel,
-              interaction: chart.interaction
-                ? { drillDimensions: chart.interaction.drillDimensions }
-                : null,
-            }}
-            presentationKind="scatter"
-            axes={miniAxes}
-            viewportW={viewW}
-            sessionCartesianPlanMain={null}
-            insightCartesianPlanMain={null}
-            tickTruncate={tickTruncateLocal}
-            onInsightDrill={() => {}}
-          />
-        );
-      }
       const scatterAxisProps = resolveScatterValueAxisProps(chartRows);
       if (scatterAxisProps == null) {
         return (
@@ -4608,7 +4575,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             chartHeight={effectivePlotH}
             compact
             insightMode={false}
-            pngCaptureMode={false}
+            pngCaptureMode={pngCapture}
             chartRows={chartRows}
             visualization={{
               scatterXLabel:
@@ -4657,15 +4624,24 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         scatterYTickSamples,
         effectivePlotH
       );
-      const scatterMargins = computeOverviewScatterLivePlotMargins({
-        yAxisWidth: scatterValueLayout.yAxisWidth,
-        pointCount: chartRows.length,
-      });
+      const scatterMargins = pngCapture
+        ? computeOverviewScatterDashMargins({
+            yAxisWidth: scatterValueLayout.yAxisWidth,
+            pointCount: chartRows.length,
+            pngCapture: true,
+          })
+        : computeOverviewScatterLivePlotMargins({
+            yAxisWidth: scatterValueLayout.yAxisWidth,
+            pointCount: chartRows.length,
+          });
       const scatterAnimOn =
-        chartRows.length <= RECHARTS_ANIMATION_MAX_POINTS;
+        !pngCapture && chartRows.length <= RECHARTS_ANIMATION_MAX_POINTS;
+      const scatterGridOpacity = pngCapture
+        ? exportGridOpacity
+        : dashGrid.opacity * 0.32;
       return (
         <ResponsiveContainer
-          key={`ov-scatter-${chartLayoutWidthKey(viewW)}-live`}
+          key={`ov-scatter-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
           width="100%"
           height={effectivePlotH}
           minWidth={0}
@@ -4675,7 +4651,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             <CartesianGrid
               stroke={dashGrid.stroke}
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
-              strokeOpacity={dashGrid.opacity * 0.32}
+              strokeOpacity={scatterGridOpacity}
             />
             <XAxis
               type="number"
@@ -4689,7 +4665,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               <Label
                 value={miniAxes.categoryAxis}
                 position="insideBottom"
-                offset={-4}
+                offset={pngCapture ? -6 : -4}
                 content={CartesianXAxisTitleLabelContent}
               />
             </XAxis>
@@ -4882,6 +4858,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const trendValueAxisProps = resolveTrendValueAxisProps({
         chartKind: displayKind,
         values: chartRows.map((r) => r.value),
+        surface: "overview",
       });
       const overviewLineYTickFormatter = (tick: number) =>
         formatOverviewLineYAxisTick(tick, overviewMetricCtx);
@@ -5033,7 +5010,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 stroke="#4f46e5"
                 strokeWidth={pngCapture ? OVERVIEW_PNG_EXPORT_LINE_STROKE_PX : 2.5}
                 fill="#6366f1"
-                fillOpacity={0.18}
+                fillOpacity={pngCapture ? 0.18 : 0.26}
                 isAnimationActive={plotAnimOn}
                 animationDuration={plotAnimDuration}
                 dot={
@@ -12997,6 +12974,7 @@ function HomeInner() {
                                 chartHeight={chartsTabOffscreenLayout.height}
                                 compact={false}
                                 insightMode={false}
+                                detailViewLayout
                                 pngCaptureMode
                                 chartRows={sortedChartData}
                                 visualization={

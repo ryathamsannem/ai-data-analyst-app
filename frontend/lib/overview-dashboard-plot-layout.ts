@@ -239,8 +239,8 @@ export function overviewDashboardUsesHorizontalBars(
 /** Extra live-view plot height for Overview line / area mini cards. */
 export const OVERVIEW_TREND_PLOT_HEIGHT_BOOST_PX = 36;
 
-/** Slightly smaller boost — scatter already reads larger at the same band. */
-export const OVERVIEW_SCATTER_PLOT_HEIGHT_BOOST_PX = 32;
+/** Slightly smaller boost — scatter matches H-Bar plot band height. */
+export const OVERVIEW_SCATTER_PLOT_HEIGHT_BOOST_PX = 36;
 
 /** Match H-Bar band boost — vertical bars fill the live card band. */
 export const OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX = 36;
@@ -317,7 +317,7 @@ export function resolveOverviewDashLivePlotHeight(
 export const OVERVIEW_LINE_Y_AXIS_LEFT_TRIM_PX = 25;
 
 /** Overview scatter live point size (Pipeline B). */
-export const OVERVIEW_SCATTER_POINT_RADIUS_PX = 3;
+export const OVERVIEW_SCATTER_POINT_RADIUS_PX = 3.5;
 export const OVERVIEW_SCATTER_POINT_STROKE_PX = 0.4;
 /** Subtle indigo rim — avoids default white halo. */
 export const OVERVIEW_SCATTER_POINT_STROKE_COLOR = "#4f46e5";
@@ -467,13 +467,26 @@ export function computeOverviewContinuousVerticalDashLayout(
 
 export function computeOverviewScatterDashMargins(args: {
   yAxisWidth: number;
+  pointCount?: number;
   pngCapture?: boolean;
 }): { top: number; right: number; bottom: number; left: number } {
   const pngCapture = args.pngCapture === true;
+  if (pngCapture) {
+    const outer = computeOverviewContinuousLiveOuterMargins({
+      yAxisWidth: args.yAxisWidth,
+      pointCount: args.pointCount,
+    });
+    return {
+      top: 16,
+      right: Math.max(24, outer.marginRight),
+      bottom: 40,
+      left: Math.max(16, outer.marginLeft),
+    };
+  }
   return {
-    top: pngCapture ? 16 : 8,
-    right: pngCapture ? 24 : 8,
-    bottom: pngCapture ? 40 : 28,
+    top: 8,
+    right: 8,
+    bottom: 28,
     left: Math.max(10, Math.ceil(args.yAxisWidth) + 6),
   };
 }

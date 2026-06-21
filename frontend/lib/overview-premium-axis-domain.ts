@@ -4,6 +4,7 @@ import {
   resolveMetricValueFormat,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
+import { sessionDetailVerticalOuterMargins } from "@/lib/shared-chart-layout";
 
 /** Rounded domain + explicit tick positions for Overview mini charts (live only). */
 export type OverviewPremiumAxisScale = {
@@ -14,6 +15,11 @@ export type OverviewPremiumAxisScale = {
 /** Subtle extra Y padding for Overview line mini cards (Pipeline B). */
 export const OVERVIEW_LINE_PREMIUM_PAD_RATIO = 0.12;
 
+/** Occupancy-tuned Y padding for Overview dashboard live line/area mini cards. */
+export const OVERVIEW_MINI_LINE_PREMIUM_PAD_RATIO = 0.05;
+export const OVERVIEW_MINI_AREA_PREMIUM_PAD_RATIO = 0.05;
+export const OVERVIEW_MINI_TREND_MIN_PAD_RATIO = 0.04;
+
 /** Tighter rounded domains for Overview scatter — occupancy-tuned in resolver. */
 export const OVERVIEW_SCATTER_PREMIUM_PAD_RATIO = 0.045;
 
@@ -21,7 +27,7 @@ export const OVERVIEW_SCATTER_PREMIUM_PAD_RATIO = 0.045;
 export const OVERVIEW_SCATTER_MIN_PAD_RATIO = 0.025;
 
 /** Target share of axis span occupied by the data cluster (65–75% band). */
-export const OVERVIEW_SCATTER_TARGET_OCCUPANCY = 0.7;
+export const OVERVIEW_SCATTER_TARGET_OCCUPANCY = 0.74;
 
 /** Anchor-min gutter — small pad below/left of cluster; tighter above/right. */
 export const OVERVIEW_SCATTER_MIN_SIDE_GUTTER_RATIO = 0.06;
@@ -182,12 +188,35 @@ export function resolveTrendValueAxisScale(
     : resolveOverviewPremiumAxisScale(values);
 }
 
-/** Safe YAxis props for Line/Area — same domain/ticks across live, PNG, AI, and PDF. */
+/** Overview dashboard mini-cards — tighter Y domains for higher data occupancy. */
+export function resolveOverviewMiniTrendAxisScale(
+  values: readonly number[],
+  kind: "line" | "area"
+): OverviewPremiumAxisScale | undefined {
+  return resolveOverviewPremiumAxisScale(values, {
+    padRatio:
+      kind === "line"
+        ? OVERVIEW_MINI_LINE_PREMIUM_PAD_RATIO
+        : OVERVIEW_MINI_AREA_PREMIUM_PAD_RATIO,
+    minPadRatio: OVERVIEW_MINI_TREND_MIN_PAD_RATIO,
+  });
+}
+
+export type TrendAxisSurface = "overview" | "session" | "default";
+
+/** Safe YAxis props for Line/Area — surface selects domain tightness. */
 export function resolveTrendValueAxisProps(args: {
   chartKind: "line" | "area";
   values: readonly number[];
+  surface?: TrendAxisSurface;
 }): TrendValueAxisProps | null {
-  const scale = resolveTrendValueAxisScale(args.values, args.chartKind);
+  const surface = args.surface ?? "default";
+  const scale =
+    surface === "session"
+      ? resolveSessionPremiumTrendAxisScale(args.values, args.chartKind)
+      : surface === "overview"
+        ? resolveOverviewMiniTrendAxisScale(args.values, args.chartKind)
+        : resolveTrendValueAxisScale(args.values, args.chartKind);
   if (!scale) return null;
   return {
     domain: scale.domain,
@@ -197,15 +226,19 @@ export function resolveTrendValueAxisProps(args: {
 }
 
 /** Tighter optical side margins for session detail line/area (not Overview mini-cards). */
-export function sessionTrendDetailSideMargins(yAxisWidth: number): {
+export function sessionTrendDetailSideMargins(
+  yAxisWidth: number,
+  options?: { lineChart?: boolean; pointCount?: number }
+): {
   left: number;
   right: number;
 } {
-  const baseLeft = Math.max(16, Math.ceil(yAxisWidth) + 4);
-  return {
-    left: Math.max(12, baseLeft - 8),
-    right: 10,
-  };
+  const sides = sessionDetailVerticalOuterMargins({
+    yAxisWidth,
+    lineChart: options?.lineChart,
+    pointCount: options?.pointCount,
+  });
+  return { left: sides.marginLeft, right: sides.marginRight };
 }
 
 /** Bottom margin input for session detail line/area before outer cap. */
@@ -217,8 +250,13 @@ export function sessionLineAreaDetailBottomMargin(computedBottom: number): numbe
 export function sessionTrendDetailPlotMargins(args: {
   computedBottom: number;
   yAxisWidth: number;
+  pointCount?: number;
+  lineChart?: boolean;
 }): { top: number; right: number; bottom: number; left: number } {
-  const side = sessionTrendDetailSideMargins(args.yAxisWidth);
+  const side = sessionTrendDetailSideMargins(args.yAxisWidth, {
+    lineChart: args.lineChart,
+    pointCount: args.pointCount,
+  });
   const bottom = Math.min(
     sessionLineAreaDetailBottomMargin(args.computedBottom),
     SESSION_DETAIL_TREND_MARGIN_BOTTOM_CAP_PX

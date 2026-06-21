@@ -2,7 +2,7 @@
 
 import { memo, useMemo } from "react";
 import type { ChartKind, ChartRow } from "@/app/chart-types";
-import { SHARED_CHART_LAYOUT } from "@/lib/shared-chart-layout";
+import { SHARED_CHART_LAYOUT, sessionDetailVerticalOuterMargins } from "@/lib/shared-chart-layout";
 import {
   balanceHorizontalOuterMargins,
   balanceVerticalOuterMargins,
@@ -63,7 +63,6 @@ import {
 } from "@/lib/overview-premium-axis-domain";
 import {
   computeOverviewContinuousVerticalDashLayout,
-  computeOverviewScatterPremiumMargins,
   OVERVIEW_SCATTER_POINT_FILL_OPACITY,
   OVERVIEW_SCATTER_POINT_RADIUS_PX,
   OVERVIEW_SCATTER_POINT_STROKE_COLOR,
@@ -392,6 +391,9 @@ function ChartRendererInner({
   const pickCartesianMargin = (bottomForCartesian: number) =>
     verticalCartesianOuterMargins(rKind, vmBalanced, bottomForCartesian, {
       insightUi: detailLayout,
+      yAxisWidth: detailLayout ? verticalValueLayout.yAxisWidth : undefined,
+      pointCount: detailLayout ? rData.length : undefined,
+      lineChart: detailLayout && rKind === "line",
     });
 
   const insightVBarCatDense =
@@ -701,11 +703,18 @@ function ChartRendererInner({
         )
       : verticalValueLayout;
     const scatterMargins = scatterPremiumActive
-      ? {
-          ...computeOverviewScatterPremiumMargins(scatterValueLayout.yAxisWidth),
-          top: 2,
-          bottom: 20,
-        }
+      ? (() => {
+          const sides = sessionDetailVerticalOuterMargins({
+            yAxisWidth: scatterValueLayout.yAxisWidth,
+            pointCount: rData.length,
+          });
+          return {
+            top: 2,
+            bottom: 20,
+            left: sides.marginLeft,
+            right: sides.marginRight,
+          };
+        })()
       : pickCartesianMargin(
           Math.max(
             manyCategoryLegacy ? 56 : 42,
@@ -1067,6 +1076,7 @@ function ChartRendererInner({
     const trendValueAxisProps = resolveTrendValueAxisProps({
       chartKind: rKind,
       values: rData.map((r) => r.value),
+      surface: detailLayout ? "session" : "default",
     });
     const trendYTickFormatter = trendValueAxisProps
       ? (tick: number) => formatOverviewLineYAxisTick(tick, metricTooltipCtx)
@@ -1088,6 +1098,8 @@ function ChartRendererInner({
         ? sessionTrendDetailPlotMargins({
             computedBottom: lineAreaBottomMargin,
             yAxisWidth: trendValueLayout.yAxisWidth,
+            pointCount: rData.length,
+            lineChart: rKind === "line",
           })
         : pickCartesianMargin(lineAreaBottomMargin);
     const detailLineStroke =

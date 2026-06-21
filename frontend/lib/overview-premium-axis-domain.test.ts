@@ -81,7 +81,7 @@ describe("formatOverviewScatterAxisTick", () => {
 describe("resolveTrendValueAxisProps", () => {
   const lowVariance = [0.8, 0.82, 0.81, 0.84, 0.83, 0.86, 0.85, 0.88, 0.87, 0.9, 0.89, 0.92];
 
-  it("returns Overview-aligned premium domain for Line", () => {
+  it("returns Overview-aligned premium domain for Line (default surface)", () => {
     const props = resolveTrendValueAxisProps({
       chartKind: "line",
       values: lowVariance,
@@ -94,16 +94,32 @@ describe("resolveTrendValueAxisProps", () => {
     expect(props!.ticks).toContain(0.95);
   });
 
-  it("returns the same domain for Line regardless of surface path", () => {
+  it("uses tighter domains for overview and session surfaces", () => {
+    const values = [
+      620_000, 640_000, 660_000, 680_000, 700_000, 720_000, 740_000, 760_000,
+      825_000,
+    ];
+    const legacy = resolveTrendValueAxisProps({
+      chartKind: "line",
+      values,
+    });
     const overview = resolveTrendValueAxisProps({
       chartKind: "line",
-      values: lowVariance,
+      values,
+      surface: "overview",
     });
-    const chartsPng = resolveTrendValueAxisProps({
+    const session = resolveTrendValueAxisProps({
       chartKind: "line",
-      values: lowVariance,
+      values,
+      surface: "session",
     });
-    expect(chartsPng).toEqual(overview);
+    expect(overview).not.toBeNull();
+    expect(session).not.toBeNull();
+    const legacySpan = legacy!.domain[1] - legacy!.domain[0];
+    const overviewSpan = overview!.domain[1] - overview!.domain[0];
+    const sessionSpan = session!.domain[1] - session!.domain[0];
+    expect(overviewSpan).toBeLessThan(legacySpan);
+    expect(sessionSpan).toBeLessThanOrEqual(overviewSpan);
   });
 
   it("returns Overview-aligned premium domain for Area", () => {
@@ -153,6 +169,18 @@ describe("sessionTrendDetailPlotMargins", () => {
     expect(margins.bottom).toBeLessThanOrEqual(30);
     expect(margins.bottom).toBeGreaterThanOrEqual(26);
   });
+
+  it("keeps margin.left as outer pad only — YAxis.width owns tick column", () => {
+    const margins = sessionTrendDetailPlotMargins({
+      computedBottom: 48,
+      yAxisWidth: 72,
+      pointCount: 14,
+      lineChart: true,
+    });
+    expect(margins.left).toBeLessThanOrEqual(10);
+    expect(margins.left).toBeGreaterThanOrEqual(8);
+    expect(margins.right).toBeGreaterThanOrEqual(18);
+  });
 });
 
 describe("resolveOverviewScatterPremiumAxes", () => {
@@ -173,7 +201,7 @@ describe("resolveOverviewScatterPremiumAxes", () => {
     expect(axes!.y.ticks.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("targets ~65–75% cluster occupancy on both axes", () => {
+  it("targets ~70–78% cluster occupancy on both axes", () => {
     const xs = fixtureRows.map((r) => r.x as number);
     const ys = fixtureRows.map((r) => r.value);
     const xScale = resolveOverviewScatterPremiumAxisScale(xs);
@@ -198,7 +226,7 @@ describe("resolveOverviewScatterPremiumAxes", () => {
     const xMaxSlack = (xScale!.domain[1] - Math.max(...xs)) / (Math.max(...xs) - Math.min(...xs));
     const yMaxSlack = (yScale!.domain[1] - Math.max(...ys)) / (Math.max(...ys) - Math.min(...ys));
     expect(xMaxSlack).toBeLessThan(0.26);
-    expect(yMaxSlack).toBeLessThan(0.22);
+    expect(yMaxSlack).toBeLessThan(0.3);
   });
 });
 

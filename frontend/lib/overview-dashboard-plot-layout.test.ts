@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChartRow } from "@/app/chart-types";
 import {
+  computeOverviewScatterDashMargins,
   computeOverviewContinuousLiveOuterMargins,
   computeOverviewMiniCategoryPlan,
   computeOverviewHBarLiveMargins,
@@ -120,7 +121,7 @@ describe("overview continuous plot height", () => {
   });
 
   it("uses lighter scatter point styling constants", () => {
-    expect(OVERVIEW_SCATTER_POINT_RADIUS_PX).toBe(3);
+    expect(OVERVIEW_SCATTER_POINT_RADIUS_PX).toBe(3.5);
     expect(OVERVIEW_SCATTER_POINT_STROKE_PX).toBeLessThan(0.5);
     expect(OVERVIEW_SCATTER_POINT_FILL_OPACITY).toBe(1);
   });
@@ -204,6 +205,18 @@ describe("overview continuous plot height", () => {
     });
     expect(areaSparse.marginLeft).toBe(OVERVIEW_VBAR_LIVE_MARGIN_LEFT_PX);
     expect(areaSparse.marginRight).toBeGreaterThan(areaDense.marginRight);
+  });
+
+  it("uses balanced outer margins for overview scatter PNG capture", () => {
+    const png = computeOverviewScatterDashMargins({
+      yAxisWidth: 56,
+      pointCount: 4,
+      pngCapture: true,
+    });
+    expect(png.left).toBeGreaterThanOrEqual(16);
+    expect(png.right).toBeGreaterThanOrEqual(24);
+    expect(png.top).toBe(16);
+    expect(png.bottom).toBe(40);
   });
 
   it("keeps legacy trend side margins for ChartRenderer scatter paths", () => {
