@@ -28,32 +28,49 @@ describe("chart PNG export session", () => {
     expect(isOffscreenPngExportRoot(el)).toBe(true);
   });
 
-  it("uses Overview effective H-Bar only for auto-dashboard Charts PNG export", () => {
+  it("uses pinned snapshot chartKind for auto-dashboard Charts PNG export", () => {
     expect(
       resolveChartsPngExportKind({
         liveKind: "bar",
         snapshotSource: "auto_dashboard",
-        overviewEffectiveKind: "bar_horizontal",
+        snapshotChartKind: "bar",
+      })
+    ).toBe("bar");
+    expect(
+      resolveChartsPngExportKind({
+        liveKind: "bar",
+        snapshotSource: "auto_dashboard",
+        snapshotChartKind: "bar_horizontal",
       })
     ).toBe("bar_horizontal");
   });
 
-  it("keeps live Charts kind when no export override is present", () => {
+  it("ignores stale layout kind and prefers snapshot chartKind over live drift", () => {
     expect(
       resolveChartsPngExportKind({
-        liveKind: "bar",
+        liveKind: "bar_horizontal",
         snapshotSource: "auto_dashboard",
-        overviewEffectiveKind: null,
+        snapshotChartKind: "bar",
       })
     ).toBe("bar");
   });
 
-  it("does not apply Overview export kind to non-auto-dashboard charts", () => {
+  it("keeps live Charts kind when no snapshot kind is present", () => {
+    expect(
+      resolveChartsPngExportKind({
+        liveKind: "bar",
+        snapshotSource: "auto_dashboard",
+        snapshotChartKind: null,
+      })
+    ).toBe("bar");
+  });
+
+  it("does not apply snapshot kind to non-auto-dashboard charts", () => {
     expect(
       resolveChartsPngExportKind({
         liveKind: "bar",
         snapshotSource: "ai",
-        overviewEffectiveKind: "bar_horizontal",
+        snapshotChartKind: "bar_horizontal",
       })
     ).toBe("bar");
   });
@@ -63,7 +80,7 @@ describe("chart PNG export session", () => {
       resolveChartsPngExportKind({
         liveKind: "donut",
         snapshotSource: "auto_dashboard",
-        overviewEffectiveKind: "bar_horizontal",
+        snapshotChartKind: "bar_horizontal",
       })
     ).toBe("donut");
   });

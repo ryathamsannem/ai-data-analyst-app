@@ -94,7 +94,7 @@ export function orientationForChartKind(kind: ChartKind): FinalChartOrientation 
   return "vertical";
 }
 
-function rankIntentFromText(title: string, question?: string): boolean {
+export function rankIntentFromText(title: string, question?: string): boolean {
   const blob = `${title} ${question ?? ""}`.toLowerCase();
   if (
     /\b(outliers?|anomal(?:y|ies)|ranked\s+by|value\s+distribution)\b/i.test(blob)
@@ -117,6 +117,37 @@ function rankIntentFromText(title: string, question?: string): boolean {
   );
 }
 
+export type ResolveBarFamilyKindArgs = {
+  rows: ChartRow[];
+  title: string;
+  question?: string;
+};
+
+/**
+ * Canonical bar-family orientation policy shared by Overview, Charts, AI Insights,
+ * PNG, and PDF. API `horizontalBar` is a hint only — row stats and intent win.
+ */
+export function resolveBarFamilyKind(args: ResolveBarFamilyKindArgs): ChartKind {
+  const { rows, title, question } = args;
+  if (!rows.length) {
+    return "bar";
+  }
+
+  const n = rows.length;
+  const labels = rows.map((r) => String(r.name ?? ""));
+  const maxLen = Math.max(0, ...labels.map((s) => s.length));
+  const avgLen =
+    labels.reduce((a, b) => a + b.length, 0) / Math.max(1, labels.length);
+  const shortLabels = maxLen <= 14 && avgLen <= 10;
+  const rankIntent = rankIntentFromText(title, question);
+
+  if (rankIntent || n > 6 || !shortLabels) {
+    return "bar_horizontal";
+  }
+
+  return "bar";
+}
+
 function barFamilyKindFromRows(args: {
   apiBarLike: ChartKind;
   title: string;
@@ -125,19 +156,11 @@ function barFamilyKindFromRows(args: {
 }): ChartKind {
   const { apiBarLike, title, question, rows } = args;
 
-  if (apiBarLike === "bar_horizontal") {
-    return "bar_horizontal";
-  }
-
   if (!rows.length) {
     return apiBarLike === "pie" || apiBarLike === "donut" ? apiBarLike : "bar";
   }
 
   const n = rows.length;
-  const labels = rows.map((r) => String(r.name ?? ""));
-  const maxLen = Math.max(0, ...labels.map((s) => s.length));
-  const avgLen =
-    labels.reduce((a, b) => a + b.length, 0) / Math.max(1, labels.length);
 
   if (rowsLookTemporal(rows)) {
     return "line";
@@ -171,27 +194,7 @@ function barFamilyKindFromRows(args: {
     return "histogram";
   }
 
-  const rankIntent = rankIntentFromText(title, question);
-  const shortLabels = maxLen <= 14 && avgLen <= 10;
-  const useVerticalBar = n <= 6 && shortLabels && !rankIntent;
-  const geoRankCompact =
-    rankIntent &&
-    n >= 2 &&
-    n <= 8 &&
-    shortLabels &&
-    /\b(city|cities|region|regions|zone|zones|performing)\b/i.test(
-      `${title} ${question ?? ""}`
-    );
-
-  if (useVerticalBar || geoRankCompact) {
-    return "bar";
-  }
-
-  if (rankIntent || n > 6 || maxLen > 18 || avgLen > 12) {
-    return "bar_horizontal";
-  }
-
-  return "bar_horizontal";
+  return resolveBarFamilyKind({ rows, title, question });
 }
 
 function overviewDashLabelLooksTemporal(name: string): boolean {
@@ -241,13 +244,14 @@ function resolveAutoDashboardRadialKind(
 }
 
 /**
- * Auto-dashboard chart kind — preserves API horizontalBar and Overview bar rules.
+ * Auto-dashboard chart kind — same bar-family policy as AI Insights / Charts / export.
  * Shared by Overview mini-cards and Charts/Insights session sync.
  */
 export function computeAutoDashboardChartPresentation(args: {
   apiChartType: string;
   title: string;
   rows: ChartRow[];
+  question?: string;
 }): ChartKind {
   const api = apiChartStringToKind(args.apiChartType);
   const { rows, title } = args;
@@ -267,23 +271,13 @@ export function computeAutoDashboardChartPresentation(args: {
     return overviewRowsLookReadableTimeSeries(rows) ? api : "bar_horizontal";
   }
 
-  if (api === "bar_horizontal") return "bar_horizontal";
-
   const fromRows = computeFinalChartPresentation(args);
   if (fromRows === "line" || fromRows === "area") {
     return overviewRowsLookReadableTimeSeries(rows)
       ? fromRows
       : "bar_horizontal";
   }
-  if (fromRows !== "bar" && fromRows !== "bar_horizontal") return fromRows;
-
-  const labels = rows.map((r) => String(r.name ?? ""));
-  const n = labels.length;
-  const maxLen = Math.max(0, ...labels.map((s) => s.length));
-  const shortLabels = maxLen <= 14;
-
-  if (n <= 4 && shortLabels) return "bar";
-  return "bar_horizontal";
+  return fromRows;
 }
 
 /** Radial charts only for composition/share questions — not min/max ranking. */
@@ -293,7 +287,7 @@ export function shareCompositionAllowed(title: string, question?: string): boole
   if (/\b(lowest|minimum|least|highest|maximum|top|bottom|rank|ranking)\b/.test(blob)) {
     return false;
   }
-  return /\b(share|composition|mix|split|portion|breakdown|distribution of|percent of total|percentage of total)\b/.test(
+  return /\b(share|composition|mix|split|portion|breakdown|contribution|contribut(?:e|es|ing)|distribution of|(?:segment|category|customer|product)\s+distribution|percent of total|percentage of total)\b/.test(
     blob
   );
 }
@@ -326,7 +320,6 @@ export function computeFinalChartPresentation(args: {
 
   if (api === "area") return "area";
   if (api === "line") return "line";
-  if (api === "bar_horizontal") return "bar_horizontal";
   if (api === "pie" || api === "donut") {
     if (
       !shareCompositionAllowed(title, question) ||

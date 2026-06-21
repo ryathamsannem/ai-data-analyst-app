@@ -313,13 +313,94 @@ _METRIC_TAIL_RE = re.compile(
     re.I,
 )
 
-_CONCENTRATION_RE = re.compile(
+_SHARE_COMPOSITION_INTENT_RE = re.compile(
     r"\b("
-    r"concentrat(?:ed|ion)?|overly\s+concentrat|dominat(?:e|ion)?|"
-    r"dependency|revenue\s+share|share\s+by"
+    r"share|split|breakdown|proportion|percentage|mix|composition|contribution|"
+    r"distribut(?:ion|e)"
     r")\b",
     re.I,
 )
+
+_SHARE_ROUTING_RANKCOMPARE_BLOCK_RE = re.compile(
+    r"\b("
+    r"top\s+(?:\d+|five|ten|three|four|seven|eight)|"
+    r"\btop\s+(?:performing|regions?|products?|campaigns?|cities?)|"
+    r"rank(?:ing)?|"
+    r"\bcompare\b|"
+    r"\bversus\b|\bvs\.?\b"
+    r")\b",
+    re.I,
+)
+
+_CONCENTRATION_RE = re.compile(
+    r"\b("
+    r"concentrat(?:ed|ion)?|overly\s+concentrat|dominat(?:e|ion)?|"
+    r"dependency|concentration\s+risk"
+    r")\b",
+    re.I,
+)
+
+
+def question_asks_categorical_share_composition(question: str) -> bool:
+    """
+    True for pie/donut-style share, mix, contribution, or distribution questions.
+    Excludes ranking, top-N, and explicit compare phrasing.
+    """
+    q = str(question or "").strip()
+    if not q or not _SHARE_COMPOSITION_INTENT_RE.search(q):
+        return False
+    if _SHARE_ROUTING_RANKCOMPARE_BLOCK_RE.search(q):
+        if re.search(r"\b(largest|biggest|greatest|highest)\s+share\b", q, re.I):
+            return True
+        if re.search(r"\bshare\s+of\b", q, re.I):
+            return True
+        return False
+    if re.search(
+        r"\b(highest|lowest|best|worst|leading|trailing)\b", q, re.I
+    ) and not re.search(
+        r"\bshare\b|\bmix\b|\bcomposition\b|\bcontribution\b|\bdistribut",
+        q,
+        re.I,
+    ):
+        return False
+    return True
+
+
+def question_requests_categorical_distribution_chart(
+    question: str,
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    *,
+    match_column,
+) -> bool:
+    """
+    True when distribution/share phrasing targets a categorical breakdown (pie/donut),
+    not a numeric value histogram.
+    """
+    q = str(question or "").strip()
+    if not q or not question_asks_categorical_share_composition(q):
+        return False
+    ql = q.lower()
+    if re.search(
+        r"\b("
+        r"segment|category|categories|channel|channels?|region|product\s+category|"
+        r"customer\s+segment|payment|status|type|types"
+        r")\s+distribut",
+        ql,
+        re.I,
+    ):
+        return True
+    if re.search(r"\bby\s+[a-z0-9]", ql):
+        return True
+    ct = profile.get("column_types", {}) if profile else {}
+    cat_cols = [str(c) for c in df.columns if ct.get(c) not in ("number", "date")]
+    for phrase in extract_dimension_request_phrases(ql):
+        if _phrase_refers_to_metric_column(phrase, df, profile, match_column=match_column):
+            continue
+        hit = match_column(phrase, cat_cols, profile)
+        if hit:
+            return True
+    return False
 
 _RANK_DIM_RE = re.compile(
     r"\brank(?:ing)?\s+([a-z0-9][a-z0-9_\s]{0,32}?)\s+by\b",

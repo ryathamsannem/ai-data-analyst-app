@@ -16,6 +16,10 @@ export const OVERVIEW_PNG_EXPORT_HBAR_VALUE_PAD_RATIO = 0.06;
 export const OVERVIEW_PNG_EXPORT_HBAR_CATEGORY_PAD_PX = 14;
 export const OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE = 48;
 export const OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE = 52;
+/** Touching histogram bins on overview mini cards (live). */
+export const OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE = 52;
+/** Histogram export — wider bins for PNG readability at capture resolution. */
+export const OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE = 58;
 export const OVERVIEW_PNG_EXPORT_MARGIN_TOP = 4;
 export const OVERVIEW_PNG_EXPORT_MARGIN_SIDE = 6;
 export const OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR = 18;

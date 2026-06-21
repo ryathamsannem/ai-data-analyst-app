@@ -10,7 +10,10 @@ import {
 } from "@/lib/chart-axis-theme";
 import { ensureReadableExportTextFill } from "@/lib/chart-png-export-text";
 import { applyPngExportSvgPolish } from "@/lib/chart-png-export-svg-polish";
-import { RADIAL_EXPORT_MIN_SVG_PAD_PX } from "@/lib/radial-export-layout";
+import {
+  RADIAL_EXPORT_LEGEND_FONT_PX,
+  RADIAL_EXPORT_MIN_SVG_PAD_PX,
+} from "@/lib/radial-export-layout";
 const EXPORT_MIN_WIDTH = 720;
 /** Plot uses most of the inner card width without stretching sparse bar SVGs. */
 const PLOT_WIDTH_UTIL = 0.97;
@@ -337,9 +340,9 @@ function renderLegendChromeToPng(
 
   const fontFamily =
     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  const labelFont = `500 11px ${fontFamily}`;
+  const labelFont = `500 ${RADIAL_EXPORT_LEGEND_FONT_PX}px ${fontFamily}`;
   const innerW = exportWidth - COMPOSITE_PAD_X * 2;
-  const rowH = 18;
+  const rowH = RADIAL_EXPORT_LEGEND_FONT_PX + 6;
   const rowGap = 6;
   const swatch = 10;
   const swatchGap = 6;

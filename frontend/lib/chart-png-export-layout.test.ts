@@ -25,6 +25,14 @@ describe("chart PNG export layout", () => {
     expect(layout.width).toBe(1200);
   });
 
+  it("aligns scatter export canvas with line and area", () => {
+    const spec = buildPresentationExportSpec("scatter");
+    expect(spec.canvasWidth).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+    expect(spec.canvasHeight).toBe(PRESENTATION_EXPORT_LINE_HEIGHT_PX);
+    expect(spec.width).toBe(1200);
+    expect(spec.height).toBe(668);
+  });
+
   it("uses tighter width for horizontal bars with few categories", () => {
     expect(
       resolvePresentationExportCanvasWidth("bar_horizontal", { categoryCount: 8 })
@@ -88,6 +96,16 @@ describe("chart PNG export layout", () => {
     expect(d8.canvasHeight).toBeGreaterThan(d6.canvasHeight);
     expect(d4.height).toBeGreaterThanOrEqual(400);
     expect(d8.height).toBeGreaterThan(d4.height);
+  });
+
+  it("assigns histogram export plot height aligned with vertical bar", () => {
+    const hist = resolvePresentationExportPlotHeight("histogram", {
+      categoryCount: 8,
+    });
+    const bar = resolvePresentationExportPlotHeight("bar", {
+      categoryCount: 8,
+    });
+    expect(hist).toBe(bar);
   });
 
   it("documents two-column overview threshold", () => {

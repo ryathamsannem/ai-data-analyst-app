@@ -698,7 +698,7 @@ def _executive_share_by_dim_title(
 ) -> str:
     met = _title_case_phrase(pretty_label(metric_col))
     dim = _title_case_phrase(pretty_label(dim_col))
-    return normalize_canonical_chart_title(f"{met} Share by {dim}")
+    return normalize_canonical_chart_title(f"{dim} {met} Share")
 
 
 def _breakdown_dimension_eligible(

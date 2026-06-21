@@ -7,6 +7,7 @@ import {
   computeDetailViewCartesianPlan,
   getSharedDetailLayoutMetrics,
   resolveSharedDetailPlotHeight,
+  sessionDetailVerticalOuterMargins,
   SHARED_CHART_LAYOUT,
   SHARED_DETAIL_PLOT_BAND,
   type SharedDetailLayoutMetrics,
@@ -72,6 +73,10 @@ type VmBalanced = { marginLeft: number; marginRight: number };
 export type ChartPlotMarginOpts = {
   /** AI Insights / PDF insight layout — slightly tighter optical centering. */
   insightUi?: boolean;
+  /** Y-axis tick column width — when set with insightUi, margin.left is outer pad only. */
+  yAxisWidth?: number;
+  pointCount?: number;
+  lineChart?: boolean;
 };
 
 function cartesianSideMargin(vmBalanced: VmBalanced, kind: ChartKind): number {
@@ -95,6 +100,27 @@ export function verticalCartesianOuterMargins(
   opts?: ChartPlotMarginOpts
 ): { top: number; left: number; right: number; bottom: number } {
   const insightUi = opts?.insightUi ?? false;
+  const sessionSides =
+    insightUi && opts?.yAxisWidth != null
+      ? sessionDetailVerticalOuterMargins({
+          yAxisWidth: opts.yAxisWidth,
+          lineChart: opts.lineChart,
+          pointCount: opts.pointCount,
+        })
+      : null;
+
+  if (sessionSides && (kind === "bar" || kind === "histogram")) {
+    const bottomTrim = insightUi ? 6 : 4;
+    const bottom = Math.max(computedBottom - bottomTrim, insightUi ? 18 : 22);
+    const top = insightUi ? 5 : 10;
+    return {
+      top,
+      left: sessionSides.marginLeft,
+      right: sessionSides.marginRight,
+      bottom,
+    };
+  }
+
   const side = cartesianSideMargin(vmBalanced, kind);
 
   if (kind === "histogram") {
@@ -165,11 +191,19 @@ export function radialChartOuterMargins(
   compact: boolean,
   piePad: { marginHorizontal: number; marginBottom: number }
 ): { top: number; left: number; right: number; bottom: number } {
-  const top = compact ? 7 : 8;
+  const top = compact ? 7 : 6;
   const horizontal = 8 + piePad.marginHorizontal;
+  const bottomFactor = compact
+    ? kind === "donut"
+      ? 0.88
+      : 0.82
+    : kind === "donut"
+      ? 0.58
+      : 0.52;
+  const bottomFloor = compact ? 10 : 8;
   const bottom = Math.max(
-    10,
-    6 + Math.ceil(piePad.marginBottom * (kind === "donut" ? 0.88 : 0.82))
+    bottomFloor,
+    (compact ? 6 : 4) + Math.ceil(piePad.marginBottom * bottomFactor)
   );
   return {
     top,
