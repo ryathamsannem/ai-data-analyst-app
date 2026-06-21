@@ -43,7 +43,7 @@ def _selection_matches_chart_type(reason: str, chart_type: str) -> bool:
     if ct == "scatter":
         return "scatter" in r
     if ct == "histogram":
-        return "histogram" in r or "bin" in r
+        return "histogram" in r or "bin" in r or "bucket" in r
     return True
 
 

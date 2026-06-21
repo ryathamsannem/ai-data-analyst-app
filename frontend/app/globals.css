@@ -2783,7 +2783,7 @@ body {
   min-height: var(--overview-chart-plot-min-h) !important;
 }
 
-/* Overview line / area / scatter / H-Bar — grow band, anchor plot flush above footer */
+/* Overview line / area / scatter / H-Bar / V-Bar — grow band, anchor plot flush above footer */
 .overview-chart-plot--continuous {
   flex: 1 1 auto;
   height: auto;

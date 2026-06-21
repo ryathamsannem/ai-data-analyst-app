@@ -8,10 +8,13 @@ import {
 } from "./overview-dashboard-export";
 
 describe("resolveOverviewEffectivePresentationKind", () => {
-  it("preserves horizontal orientation when dashboard renders h-bar fallback", () => {
+  it("maps layout flip only when explicitly requested (legacy helper)", () => {
     expect(
       resolveOverviewEffectivePresentationKind("bar", true)
     ).toBe("bar_horizontal");
+    expect(
+      resolveOverviewEffectivePresentationKind("bar", false)
+    ).toBe("bar");
   });
 
   it("keeps explicit chart kinds unchanged", () => {
@@ -112,20 +115,39 @@ describe("roundExecutiveAxisMaximum", () => {
 });
 
 describe("validateOverviewDashboardExportParity", () => {
-  it("passes when export kind and orientation match dashboard fallback", () => {
+  it("passes when export kind matches canonical vertical bar", () => {
     if (typeof document === "undefined") return;
     const root = document.createElement("div");
     root.innerHTML = `
-      <header class="overview-png-export-header"><h3>Delivery Days by Payment Method</h3></header>
-      <div class="recharts-cartesian-grid-vertical"><line /></div>
+      <header class="overview-png-export-header"><h3>Revenue by Region</h3></header>
+      <div class="recharts-cartesian-grid-horizontal"><line /></div>
       <g class="recharts-bar-rectangle"><path fill="#6366f1" /></g>
     `;
     const result = validateOverviewDashboardExportParity({
       displayKind: "bar",
+      renderBarAsHorizontal: false,
+      exportKind: "bar",
+      exportRoot: root,
+      chartTitle: "Revenue by Region",
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checks.find((c) => c.id === "orientation")?.ok).toBe(true);
+  });
+
+  it("passes when export kind and orientation match explicit h-bar", () => {
+    if (typeof document === "undefined") return;
+    const root = document.createElement("div");
+    root.innerHTML = `
+      <header class="overview-png-export-header"><h3>Orders by City</h3></header>
+      <div class="recharts-cartesian-grid-vertical"><line /></div>
+      <g class="recharts-bar-rectangle"><path fill="#6366f1" /></g>
+    `;
+    const result = validateOverviewDashboardExportParity({
+      displayKind: "bar_horizontal",
       renderBarAsHorizontal: true,
       exportKind: "bar_horizontal",
       exportRoot: root,
-      chartTitle: "Delivery Days by Payment Method",
+      chartTitle: "Orders by City",
     });
     expect(result.ok).toBe(true);
     expect(result.checks.find((c) => c.id === "orientation")?.ok).toBe(true);
@@ -138,7 +160,7 @@ describe("validateOverviewDashboardExportParity", () => {
       <div class="recharts-cartesian-grid-horizontal"><line /></div>
     `;
     const result = validateOverviewDashboardExportParity({
-      displayKind: "bar",
+      displayKind: "bar_horizontal",
       renderBarAsHorizontal: true,
       exportKind: "bar_horizontal",
       exportRoot: root,

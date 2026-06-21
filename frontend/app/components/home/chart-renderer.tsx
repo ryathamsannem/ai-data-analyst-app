@@ -2,6 +2,7 @@
 
 import { memo, useMemo } from "react";
 import type { ChartKind, ChartRow } from "@/app/chart-types";
+import { SHARED_CHART_LAYOUT, sessionDetailVerticalOuterMargins } from "@/lib/shared-chart-layout";
 import {
   balanceHorizontalOuterMargins,
   balanceVerticalOuterMargins,
@@ -34,6 +35,14 @@ import {
 } from "@/lib/chart-layout-config";
 import {
   radialChartExportOuterMargins,
+  RADIAL_EXPORT_LEGEND_FONT_PX,
+  RADIAL_EXPORT_LEGEND_ICON_PX,
+  RADIAL_EXPORT_LEGEND_PAD_TOP_PX,
+  RADIAL_EXPORT_SLICE_STROKE_WIDTH,
+  RADIAL_SESSION_LEGEND_FONT_PX,
+  RADIAL_SESSION_LEGEND_ICON_PX,
+  RADIAL_SESSION_LEGEND_PAD_TOP_PX,
+  RADIAL_SESSION_SLICE_STROKE_WIDTH,
   resolveRadialChartRadii,
 } from "@/lib/radial-export-layout";
 import {
@@ -54,7 +63,7 @@ import {
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
-  resolveSessionScatterPremiumAxes,
+  resolveScatterValueAxisProps,
   resolveTrendValueAxisProps,
   sessionLineAreaDetailBottomMargin,
   sessionLineAreaDetailXAxisHeightPx,
@@ -62,7 +71,6 @@ import {
 } from "@/lib/overview-premium-axis-domain";
 import {
   computeOverviewContinuousVerticalDashLayout,
-  computeOverviewScatterPremiumMargins,
   OVERVIEW_SCATTER_POINT_FILL_OPACITY,
   OVERVIEW_SCATTER_POINT_RADIUS_PX,
   OVERVIEW_SCATTER_POINT_STROKE_COLOR,
@@ -79,6 +87,7 @@ import {
 } from "@/lib/chart-axis-theme";
 import {
   resolveHBarValueAxisProps,
+  resolveVerticalBarValueAxisProps,
   type AxisPresentationPlan,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
@@ -390,6 +399,9 @@ function ChartRendererInner({
   const pickCartesianMargin = (bottomForCartesian: number) =>
     verticalCartesianOuterMargins(rKind, vmBalanced, bottomForCartesian, {
       insightUi: detailLayout,
+      yAxisWidth: detailLayout ? verticalValueLayout.yAxisWidth : undefined,
+      pointCount: detailLayout ? rData.length : undefined,
+      lineChart: detailLayout && rKind === "line",
     });
 
   const insightVBarCatDense =
@@ -673,60 +685,56 @@ function ChartRendererInner({
   }
 
   if (rKind === "scatter") {
-    const scatterViewport = detailLayout ? detailLayoutViewportW : viewportW;
-    const scatterPremium = detailLayout
-      ? resolveSessionScatterPremiumAxes(rData)
-      : undefined;
+    const scatterAxisProps = resolveScatterValueAxisProps(rData);
+    const scatterPremiumActive = scatterAxisProps != null;
     const scatterXMetricCtx: MetricFormatContext = {
       metricLabel: rAxes.categoryAxis,
       chartTitle: metricTooltipCtx.chartTitle,
       presentationKind: "scatter",
     };
-    const detailScatterXTickFmt =
-      detailLayout && scatterPremium
-        ? (tick: number) =>
-            formatOverviewScatterAxisTick(tick, scatterXMetricCtx)
-        : scatterXTickFormatter;
-    const detailScatterYTickFmt =
-      detailLayout && scatterPremium
-        ? (tick: number) =>
-            formatOverviewScatterAxisTick(tick, metricTooltipCtx)
-        : valueTickFormatter;
-    const scatterYTickSamples = scatterPremium
-      ? scatterPremium.y.ticks.map((t) => detailScatterYTickFmt(t))
+    const detailScatterXTickFmt = scatterPremiumActive
+      ? (tick: number) =>
+          formatOverviewScatterAxisTick(tick, scatterXMetricCtx)
+      : scatterXTickFormatter;
+    const detailScatterYTickFmt = scatterPremiumActive
+      ? (tick: number) =>
+          formatOverviewScatterAxisTick(tick, metricTooltipCtx)
+      : valueTickFormatter;
+    const scatterYTickSamples = scatterAxisProps
+      ? scatterAxisProps.y.ticks.map((t) => detailScatterYTickFmt(t))
       : collectSampleTickStrings(rData);
-    const scatterValueLayout =
-      detailLayout && scatterPremium
-        ? computeOverviewContinuousVerticalDashLayout(
-            rAxes.valueAxis,
-            scatterYTickSamples,
-            chartHeight
-          )
-        : verticalValueLayout;
-    const scatterMargins =
-      detailLayout && scatterPremium
-        ? {
-            ...computeOverviewScatterPremiumMargins(scatterValueLayout.yAxisWidth),
+    const scatterValueLayout = scatterPremiumActive
+      ? computeOverviewContinuousVerticalDashLayout(
+          rAxes.valueAxis,
+          scatterYTickSamples,
+          chartHeight
+        )
+      : verticalValueLayout;
+    const scatterMargins = scatterPremiumActive
+      ? (() => {
+          const sides = sessionDetailVerticalOuterMargins({
+            yAxisWidth: scatterValueLayout.yAxisWidth,
+            pointCount: rData.length,
+          });
+          return {
             top: 2,
             bottom: 20,
-          }
-        : pickCartesianMargin(
-            Math.max(
-              manyCategoryLegacy ? 56 : 42,
-              computeCategoryAxisBottomMargin({
-                categoryTickStrings: [String(rAxes.categoryAxis || "—")],
-                angled: false,
-              }) + 8
-            )
-          );
+            left: sides.marginLeft,
+            right: sides.marginRight,
+          };
+        })()
+      : pickCartesianMargin(
+          Math.max(
+            manyCategoryLegacy ? 56 : 42,
+            computeCategoryAxisBottomMargin({
+              categoryTickStrings: [String(rAxes.categoryAxis || "—")],
+              angled: false,
+            }) + 8
+          )
+        );
     return (
       <ResponsiveContainer
-        key={rechartsContainerKey(
-          rKind,
-          scatterViewport,
-          chartHeight,
-          pngCaptureMode
-        )}
+        key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
         width="100%"
         height={chartHeight}
       >
@@ -734,27 +742,21 @@ function ChartRendererInner({
           <CartesianGrid
             stroke={GRID_STROKE}
             strokeDasharray="4 12"
-            strokeOpacity={detailLayout ? 0.32 : 0.38}
+            strokeOpacity={scatterPremiumActive ? 0.32 : 0.38}
           />
           <XAxis
             type="number"
             dataKey="x"
             tick={{ fontSize: 11, fill: AXIS_TICK }}
             tickFormatter={detailScatterXTickFmt}
-            {...(scatterPremium
-              ? {
-                  domain: scatterPremium.x.domain,
-                  ticks: scatterPremium.x.ticks,
-                  allowDataOverflow: false,
-                }
-              : {})}
+            {...(scatterAxisProps ? scatterAxisProps.x : {})}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
           >
             <Label
               value={rAxes.categoryAxis}
               position="insideBottom"
-              offset={detailLayout ? -4 : -6}
+              offset={scatterPremiumActive ? -4 : -6}
               content={CartesianXAxisTitleLabelContent}
             />
           </XAxis>
@@ -766,13 +768,7 @@ function ChartRendererInner({
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
             width={scatterValueLayout.yAxisWidth}
-            {...(scatterPremium
-              ? {
-                  domain: scatterPremium.y.domain,
-                  ticks: scatterPremium.y.ticks,
-                  allowDataOverflow: false,
-                }
-              : {})}
+            {...(scatterAxisProps ? scatterAxisProps.y : {})}
             label={
               scatterValueLayout.showValueAxisTitle
                 ? {
@@ -812,13 +808,13 @@ function ChartRendererInner({
             data={rData}
             fill="#6366f1"
             fillOpacity={
-              detailLayout
+              scatterPremiumActive
                 ? OVERVIEW_SCATTER_POINT_FILL_OPACITY
                 : 0.88
             }
             isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
-            {...(detailLayout
+            {...(scatterPremiumActive
               ? {
                   shape: (props: {
                     cx?: number;
@@ -854,13 +850,15 @@ function ChartRendererInner({
   if (rKind === "pie" || rKind === "donut") {
     const polishOverviewMini =
       overviewMiniRadial && !insightMode && (rKind === "pie" || rKind === "donut");
+    const piePad = computePieChartMargins(rAxes.valueAxisCompact);
     let radii = resolveRadialChartRadii({
       kind: rKind,
       plotHeightPx: chartHeight,
+      plotWidthPx: viewportW,
       compact,
       pngCaptureMode,
+      piePad,
     });
-    const piePad = computePieChartMargins(rAxes.valueAxisCompact);
     let margins = pngCaptureMode
       ? radialChartExportOuterMargins(rKind, piePad)
       : radialChartOuterMargins(rKind, compact, piePad);
@@ -871,12 +869,26 @@ function ChartRendererInner({
     const sliceStroke = polishOverviewMini
       ? OVERVIEW_MINI_RADIAL_SLICE_STROKE
       : "#fff";
+    const legendFontSize = polishOverviewMini
+      ? 11
+      : pngCaptureMode
+        ? RADIAL_EXPORT_LEGEND_FONT_PX
+        : RADIAL_SESSION_LEGEND_FONT_PX;
+    const legendIconSize = polishOverviewMini
+      ? 8
+      : pngCaptureMode
+        ? RADIAL_EXPORT_LEGEND_ICON_PX
+        : RADIAL_SESSION_LEGEND_ICON_PX;
     const sliceStrokeWidth = polishOverviewMini
       ? OVERVIEW_MINI_RADIAL_SLICE_STROKE_WIDTH
-      : 2;
+      : pngCaptureMode
+        ? RADIAL_EXPORT_SLICE_STROKE_WIDTH
+        : RADIAL_SESSION_SLICE_STROKE_WIDTH;
     const legendPaddingTop = polishOverviewMini
       ? OVERVIEW_MINI_RADIAL_LEGEND_PADDING_TOP_PX
-      : 10;
+      : pngCaptureMode
+        ? RADIAL_EXPORT_LEGEND_PAD_TOP_PX
+        : RADIAL_SESSION_LEGEND_PAD_TOP_PX;
     return (
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
@@ -937,7 +949,8 @@ function ChartRendererInner({
             }}
           />
           <Legend
-            wrapperStyle={{ fontSize: 11, paddingTop: legendPaddingTop }}
+            wrapperStyle={{ fontSize: legendFontSize, paddingTop: legendPaddingTop }}
+            iconSize={legendIconSize}
             iconType="circle"
             formatter={(v) => tickTruncate(v)}
           />
@@ -1088,6 +1101,7 @@ function ChartRendererInner({
     const trendValueAxisProps = resolveTrendValueAxisProps({
       chartKind: rKind,
       values: rData.map((r) => r.value),
+      surface: detailLayout ? "session" : "default",
     });
     const trendYTickFormatter = trendValueAxisProps
       ? (tick: number) => formatOverviewLineYAxisTick(tick, metricTooltipCtx)
@@ -1109,6 +1123,8 @@ function ChartRendererInner({
         ? sessionTrendDetailPlotMargins({
             computedBottom: lineAreaBottomMargin,
             yAxisWidth: trendValueLayout.yAxisWidth,
+            pointCount: rData.length,
+            lineChart: rKind === "line",
           })
         : pickCartesianMargin(lineAreaBottomMargin);
     const detailLineStroke =
@@ -1260,8 +1276,9 @@ function ChartRendererInner({
         barCategoryGap={
           isHistogram
             ? 2
-            : detailLayout && rData.length <= 5
-              ? "5%"
+            : detailLayout &&
+                rData.length <= SHARED_CHART_LAYOUT.verticalBar.compactCategoryMax
+              ? SHARED_CHART_LAYOUT.verticalBar.compactCategoryGap
               : detailLayout && rData.length <= 10
                 ? "10%"
                 : undefined
@@ -1304,6 +1321,13 @@ function ChartRendererInner({
           axisLine={{ stroke: CHART_AXIS_LINE }}
           tickLine={{ stroke: CHART_AXIS_LINE }}
           width={verticalValueLayout.yAxisWidth}
+          {...(resolveVerticalBarValueAxisProps({
+            plan: exportAxisPresentationPlan,
+            chartKind: rKind,
+            rows: rData,
+            chartTitle: metricTooltipCtx.chartTitle,
+            metricLabel: rAxes.valueAxis,
+          }) ?? {})}
           label={
             verticalValueLayout.showValueAxisTitle
               ? {

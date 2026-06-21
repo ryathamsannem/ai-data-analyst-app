@@ -80,6 +80,25 @@ export function createChartPngCaptureRequest({
   };
 }
 
+/** PDF scatter + vertical bar — omit fixed composite canvas so the card fills the artifact. */
+export function pdfChartUsesContentTightComposite(
+  profile: ChartArtifactProfile,
+  kind: ChartKind
+): boolean {
+  return (
+    profile === "pdfChart" &&
+    (kind === "scatter" || kind === "bar" || kind === "histogram")
+  );
+}
+
+/** @deprecated Use pdfChartUsesContentTightComposite */
+export function pdfChartScatterUsesContentTightComposite(
+  profile: ChartArtifactProfile,
+  kind: ChartKind
+): boolean {
+  return pdfChartUsesContentTightComposite(profile, kind);
+}
+
 export type CaptureChartPngArtifactArgs = {
   request: ChartPngCaptureRequest;
   getExportRoot: () => HTMLElement | null;
@@ -129,11 +148,19 @@ export async function captureChartPngArtifact({
   }
 
   try {
+    const contentTight = pdfChartUsesContentTightComposite(
+      request.profile,
+      request.kind
+    );
     const png = await captureElementToPng(ready.root, {
       scale: request.scale,
       layoutWidthPx: request.spec.width,
-      canvasWidthPx: request.spec.canvasWidth,
-      canvasHeightPx: request.spec.canvasHeight,
+      ...(contentTight
+        ? {}
+        : {
+            canvasWidthPx: request.spec.canvasWidth,
+            canvasHeightPx: request.spec.canvasHeight,
+          }),
       footerText: buildPngExportFooterText(request.datasetName),
     });
     pushChartCaptureStatus(ready.diagnostics.statusTimeline, "complete");

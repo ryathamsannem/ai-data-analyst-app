@@ -53,7 +53,7 @@ _IMPROVE_RE = re.compile(
 _CONCENTRATION_RE = re.compile(
     r"\b("
     r"concentrat(?:ed|ion)?|overly\s+concentrat|dominat(?:e|ion)?|"
-    r"revenue\s+share|share\s+by|dependency"
+    r"dependency|concentration\s+risk"
     r")\b",
     re.I,
 )
@@ -113,6 +113,13 @@ def classify_executive_ambiguous_bucket(question: str) -> ExecutiveAmbiguousBuck
     q = (question or "").replace("\n", " ").strip()
     if len(q) < 8:
         return None
+    try:
+        from intent_engine.dimension_request import question_asks_categorical_share_composition
+
+        if question_asks_categorical_share_composition(q):
+            return None
+    except Exception:
+        pass
     if _is_named_risk_metric_question(q):
         return None
     if _OTHER_INTENT_RE.search(q):
@@ -255,11 +262,15 @@ def pick_executive_breakdown_column(
 ) -> Optional[str]:
     """Prefer region/city/segment over product for broad executive questions."""
     try:
-        from intent_engine.geographic_scope import resolve_geographic_group_column
+        from intent_engine.geographic_scope import (
+            question_geographic_scope_level,
+            resolve_geographic_group_column,
+        )
 
-        geo = resolve_geographic_group_column(question or "by region", df, profile)
-        if geo and geo in df.columns:
-            return str(geo)
+        if question_geographic_scope_level(question):
+            geo = resolve_geographic_group_column(question, df, profile)
+            if geo and geo in df.columns:
+                return str(geo)
     except Exception:
         pass
 
@@ -440,6 +451,31 @@ def apply_executive_ambiguous_routing(
     bucket = classify_executive_ambiguous_bucket(question)
     if not bucket or df is None or df.empty:
         return False
+
+    try:
+        from intent_engine.dimension_request import question_asks_categorical_share_composition
+
+        if question_asks_categorical_share_composition(question):
+            return False
+    except Exception:
+        pass
+
+    existing_gcol = intent.get("group_col")
+    if existing_gcol:
+        ql = (question or "").lower()
+        raw = str(existing_gcol).strip()
+        variants = {
+            raw.lower(),
+            raw.lower().replace(" ", "_"),
+            raw.lower().replace("_", " "),
+        }
+        for v in variants:
+            if len(v) >= 3 and re.search(
+                rf"(?<!\w){re.escape(v.replace(' ', '_'))}(?!\w)|"
+                rf"(?<!\w){re.escape(v.replace('_', ' '))}(?!\w)",
+                ql,
+            ):
+                return False
 
     lens = bucket_to_executive_lens(bucket)
     gcol = pick_executive_breakdown_column(df, profile, question=question, bucket=bucket)

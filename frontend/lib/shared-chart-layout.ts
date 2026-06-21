@@ -31,7 +31,41 @@ export const SHARED_CHART_LAYOUT = {
   },
   barGapDense: 4,
   barGapThreshold: 6,
+  /** Premium vertical bar spacing for small category counts (matches Overview/PNG export). */
+  verticalBar: {
+    compactCategoryGap: "16%",
+    compactCategoryMax: 6,
+    /** Live detail plot floor for compact vertical bars (Charts + Insights). */
+    livePlotFloorPx: 520,
+  },
 } as const;
+
+/** Session detail (Charts + AI Insights + PDF capture): outer pad only — YAxis.width owns ticks. */
+export const SESSION_DETAIL_YAXIS_OUTER_LEFT_PX = 10;
+export const SESSION_DETAIL_YAXIS_OUTER_RIGHT_MIN_PX = 18;
+export const SESSION_DETAIL_YAXIS_OUTER_RIGHT_MAX_PX = 32;
+
+/** Balanced outer margins for session vertical value charts (line/area/v-bar/scatter). */
+export function sessionDetailVerticalOuterMargins(args: {
+  yAxisWidth: number;
+  lineChart?: boolean;
+  pointCount?: number;
+}): { marginLeft: number; marginRight: number } {
+  const yw = Math.ceil(args.yAxisWidth);
+  const marginLeft =
+    args.lineChart === true
+      ? Math.max(8, SESSION_DETAIL_YAXIS_OUTER_LEFT_PX - 2)
+      : SESSION_DETAIL_YAXIS_OUTER_LEFT_PX;
+  const leftFootprint = marginLeft + yw;
+  const slots = Math.max(1, args.pointCount ?? 12);
+  const sparseBoost = slots <= 6 ? Math.max(0, 6 - slots) * 2 : 0;
+  const balancedRight = Math.ceil(leftFootprint * 0.14 + 10) + sparseBoost;
+  const marginRight = Math.min(
+    SESSION_DETAIL_YAXIS_OUTER_RIGHT_MAX_PX,
+    Math.max(SESSION_DETAIL_YAXIS_OUTER_RIGHT_MIN_PX, balancedRight)
+  );
+  return { marginLeft, marginRight };
+}
 
 /** Extra ResponsiveContainer height for session line/area/scatter — plot allocation only, not shell width. */
 export const SESSION_DETAIL_CONTINUOUS_PLOT_BOOST_PX = 40;
@@ -125,7 +159,20 @@ export function resolveSharedDetailPlotHeight(
 
   if (kind === "bar" || kind === "histogram") {
     const extra = Math.min(48, Math.max(0, n - 5) * 8);
-    return Math.min(SHARED_DETAIL_PLOT_BAND.desktopCeiling, band + extra);
+    const categoryBand = Math.min(
+      SHARED_DETAIL_PLOT_BAND.desktopCeiling,
+      band + extra
+    );
+    if (n <= SHARED_CHART_LAYOUT.verticalBar.compactCategoryMax) {
+      return Math.min(
+        SHARED_CHART_LAYOUT.horizontalBar.capPx,
+        Math.max(
+          categoryBand,
+          SHARED_CHART_LAYOUT.verticalBar.livePlotFloorPx
+        )
+      );
+    }
+    return categoryBand;
   }
 
   return band;

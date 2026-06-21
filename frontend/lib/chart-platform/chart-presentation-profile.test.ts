@@ -103,5 +103,13 @@ describe("ChartPresentationProfile", () => {
       maxHeightMm: 150,
       minWidthRatio: 0.92,
     });
+    expect(resolvePdfChartEmbedPolicy("bar")).toMatchObject({
+      maxHeightMm: 158,
+      minWidthRatio: 0.88,
+      minAspectRatio: 0.58,
+    });
+    expect(resolvePdfChartEmbedPolicy("histogram")).toEqual(
+      resolvePdfChartEmbedPolicy("bar")
+    );
   });
 });
