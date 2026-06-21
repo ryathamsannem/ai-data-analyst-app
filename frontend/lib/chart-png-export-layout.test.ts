@@ -98,6 +98,16 @@ describe("chart PNG export layout", () => {
     expect(d8.height).toBeGreaterThan(d4.height);
   });
 
+  it("assigns histogram export plot height aligned with vertical bar", () => {
+    const hist = resolvePresentationExportPlotHeight("histogram", {
+      categoryCount: 8,
+    });
+    const bar = resolvePresentationExportPlotHeight("bar", {
+      categoryCount: 8,
+    });
+    expect(hist).toBe(bar);
+  });
+
   it("documents two-column overview threshold", () => {
     expect(OVERVIEW_TWO_COLUMN_MIN_CONTAINER_PX).toBeGreaterThanOrEqual(960);
   });

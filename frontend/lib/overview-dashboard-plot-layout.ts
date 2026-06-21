@@ -187,7 +187,12 @@ export function computeOverviewMiniCategoryPlan(
       : displayKind === "histogram"
         ? "histogram"
         : "bar";
-  if (rowKind !== "bar" && rowKind !== "line" && rowKind !== "area") {
+  if (
+    rowKind !== "bar" &&
+    rowKind !== "line" &&
+    rowKind !== "area" &&
+    rowKind !== "histogram"
+  ) {
     return null;
   }
   return computeCartesianCategoryPlanForRender({

@@ -112,8 +112,6 @@ export function resolvePresentationExportPlotHeight(
     case "pie":
     case "donut":
       return resolveRadialExportPlotHeight(Math.max(1, categoryCount || 4));
-    case "histogram":
-      return Math.max(420, balancedBase - 60);
     case "scatter":
       return balancedBase;
     default:

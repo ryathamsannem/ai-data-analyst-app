@@ -86,7 +86,8 @@ export function pdfChartUsesContentTightComposite(
   kind: ChartKind
 ): boolean {
   return (
-    profile === "pdfChart" && (kind === "scatter" || kind === "bar")
+    profile === "pdfChart" &&
+    (kind === "scatter" || kind === "bar" || kind === "histogram")
   );
 }
 

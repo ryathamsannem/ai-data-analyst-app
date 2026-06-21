@@ -79,6 +79,29 @@ describe("computeOverviewMiniCategoryPlan canonical bar policy", () => {
     expect(plan?.renderAsHorizontalBar).not.toBe(true);
     expect(overviewDashboardUsesHorizontalBars("bar", plan)).toBe(false);
   });
+
+  it("builds a category plan for histogram bins (not V-Bar fallback)", () => {
+    const histogramRows: ChartRow[] = [
+      { name: "40-50k", value: 12 },
+      { name: "50-60k", value: 28 },
+      { name: "60-70k", value: 19 },
+      { name: "70-80k", value: 8 },
+    ];
+    const plan = computeOverviewMiniCategoryPlan(
+      "histogram",
+      histogramRows,
+      {
+        categoryAxis: "Value range",
+        valueAxis: "Salary",
+        valueAxisCompact: "Salary",
+      },
+      320,
+      340
+    );
+    expect(plan).not.toBeNull();
+    expect(plan?.renderAsHorizontalBar).not.toBe(true);
+    expect(overviewDashboardUsesHorizontalBars("histogram", plan)).toBe(false);
+  });
 });
 
 describe("overview continuous plot height", () => {

@@ -287,7 +287,7 @@ export function shareCompositionAllowed(title: string, question?: string): boole
   if (/\b(lowest|minimum|least|highest|maximum|top|bottom|rank|ranking)\b/.test(blob)) {
     return false;
   }
-  return /\b(share|composition|mix|split|portion|breakdown|distribution of|percent of total|percentage of total)\b/.test(
+  return /\b(share|composition|mix|split|portion|breakdown|contribution|contribut(?:e|es|ing)|distribution of|(?:segment|category|customer|product)\s+distribution|percent of total|percentage of total)\b/.test(
     blob
   );
 }

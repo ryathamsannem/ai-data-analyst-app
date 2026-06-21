@@ -35,6 +35,14 @@ import {
 } from "@/lib/chart-layout-config";
 import {
   radialChartExportOuterMargins,
+  RADIAL_EXPORT_LEGEND_FONT_PX,
+  RADIAL_EXPORT_LEGEND_ICON_PX,
+  RADIAL_EXPORT_LEGEND_PAD_TOP_PX,
+  RADIAL_EXPORT_SLICE_STROKE_WIDTH,
+  RADIAL_SESSION_LEGEND_FONT_PX,
+  RADIAL_SESSION_LEGEND_ICON_PX,
+  RADIAL_SESSION_LEGEND_PAD_TOP_PX,
+  RADIAL_SESSION_SLICE_STROKE_WIDTH,
   resolveRadialChartRadii,
 } from "@/lib/radial-export-layout";
 import {
@@ -842,13 +850,15 @@ function ChartRendererInner({
   if (rKind === "pie" || rKind === "donut") {
     const polishOverviewMini =
       overviewMiniRadial && !insightMode && (rKind === "pie" || rKind === "donut");
+    const piePad = computePieChartMargins(rAxes.valueAxisCompact);
     let radii = resolveRadialChartRadii({
       kind: rKind,
       plotHeightPx: chartHeight,
+      plotWidthPx: viewportW,
       compact,
       pngCaptureMode,
+      piePad,
     });
-    const piePad = computePieChartMargins(rAxes.valueAxisCompact);
     let margins = pngCaptureMode
       ? radialChartExportOuterMargins(rKind, piePad)
       : radialChartOuterMargins(rKind, compact, piePad);
@@ -859,12 +869,26 @@ function ChartRendererInner({
     const sliceStroke = polishOverviewMini
       ? OVERVIEW_MINI_RADIAL_SLICE_STROKE
       : "#fff";
+    const legendFontSize = polishOverviewMini
+      ? 11
+      : pngCaptureMode
+        ? RADIAL_EXPORT_LEGEND_FONT_PX
+        : RADIAL_SESSION_LEGEND_FONT_PX;
+    const legendIconSize = polishOverviewMini
+      ? 8
+      : pngCaptureMode
+        ? RADIAL_EXPORT_LEGEND_ICON_PX
+        : RADIAL_SESSION_LEGEND_ICON_PX;
     const sliceStrokeWidth = polishOverviewMini
       ? OVERVIEW_MINI_RADIAL_SLICE_STROKE_WIDTH
-      : 2;
+      : pngCaptureMode
+        ? RADIAL_EXPORT_SLICE_STROKE_WIDTH
+        : RADIAL_SESSION_SLICE_STROKE_WIDTH;
     const legendPaddingTop = polishOverviewMini
       ? OVERVIEW_MINI_RADIAL_LEGEND_PADDING_TOP_PX
-      : 10;
+      : pngCaptureMode
+        ? RADIAL_EXPORT_LEGEND_PAD_TOP_PX
+        : RADIAL_SESSION_LEGEND_PAD_TOP_PX;
     return (
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
@@ -925,7 +949,8 @@ function ChartRendererInner({
             }}
           />
           <Legend
-            wrapperStyle={{ fontSize: 11, paddingTop: legendPaddingTop }}
+            wrapperStyle={{ fontSize: legendFontSize, paddingTop: legendPaddingTop }}
+            iconSize={legendIconSize}
             iconType="circle"
             formatter={(v) => tickTruncate(v)}
           />

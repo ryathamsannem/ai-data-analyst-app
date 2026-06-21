@@ -108,5 +108,8 @@ describe("ChartPresentationProfile", () => {
       minWidthRatio: 0.88,
       minAspectRatio: 0.58,
     });
+    expect(resolvePdfChartEmbedPolicy("histogram")).toEqual(
+      resolvePdfChartEmbedPolicy("bar")
+    );
   });
 });

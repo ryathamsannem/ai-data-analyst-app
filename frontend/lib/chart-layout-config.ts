@@ -191,11 +191,19 @@ export function radialChartOuterMargins(
   compact: boolean,
   piePad: { marginHorizontal: number; marginBottom: number }
 ): { top: number; left: number; right: number; bottom: number } {
-  const top = compact ? 7 : 8;
+  const top = compact ? 7 : 6;
   const horizontal = 8 + piePad.marginHorizontal;
+  const bottomFactor = compact
+    ? kind === "donut"
+      ? 0.88
+      : 0.82
+    : kind === "donut"
+      ? 0.58
+      : 0.52;
+  const bottomFloor = compact ? 10 : 8;
   const bottom = Math.max(
-    10,
-    6 + Math.ceil(piePad.marginBottom * (kind === "donut" ? 0.88 : 0.82))
+    bottomFloor,
+    (compact ? 6 : 4) + Math.ceil(piePad.marginBottom * bottomFactor)
   );
   return {
     top,

@@ -6008,6 +6008,21 @@ def _infer_dimension_column_from_question(
         if hit:
             return hit
 
+    mm_contrib = re.search(
+        r"\bwhich\s+([a-z0-9][a-z0-9_\s]{0,48}?)\s+contributes?\b",
+        ql,
+        re.I,
+    )
+    if mm_contrib:
+        raw_phrase = mm_contrib.group(1).strip().replace("-", "_")
+        hit = _match_column_from_phrase(raw_phrase, cand_dims or columns, profile)
+        if hit:
+            return hit
+        alt = raw_phrase.replace(" ", "_")
+        hit = _match_column_from_phrase(alt, cand_dims or columns, profile)
+        if hit:
+            return hit
+
     scored: List[Tuple[int, str]] = []
     for c in cand_dims:
         variants = (
@@ -6239,9 +6254,20 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
                 gcol = dcol
 
     if question_requests_executive_summary(question_str):
-        exec_dim = _pick_executive_summary_dimension(df, profile)
-        if exec_dim:
-            gcol = exec_dim
+        try:
+            from intent_engine.dimension_request import (
+                question_asks_categorical_share_composition,
+            )
+
+            skip_exec_summary_dim = bool(by_cols_ordered) or (
+                question_asks_categorical_share_composition(question_str)
+            )
+        except Exception:
+            skip_exec_summary_dim = bool(by_cols_ordered)
+        if not skip_exec_summary_dim:
+            exec_dim = _pick_executive_summary_dimension(df, profile)
+            if exec_dim:
+                gcol = exec_dim
 
     try:
         from intent_engine.geographic_scope import (
@@ -7276,7 +7302,9 @@ def _validate_chart_dimension_alignment(
         return None
     if str(intent_debug.get("agg_key") or "").lower() == "scatter":
         return None
-    if str(chart_type or "").strip().lower() in ("scatter",):
+    if str(chart_type or "").strip().lower() in ("scatter", "histogram"):
+        return None
+    if intent_debug.get("histogram"):
         return None
     if intent_debug.get("trend_time_series"):
         return None
@@ -8626,6 +8654,20 @@ def _resolve_categorical_outlier_dimension_column(
     return None
 
 
+_HISTOGRAM_NUMERIC_INTENT_TERMS_RE = re.compile(
+    r"\b("
+    r"histogram|"
+    r"frequency(?:\s+distribution)?|"
+    r"binning|bins?|"
+    r"buckets?(?:\s+ranges?)?|"
+    r"bucketi[sz](?:e|ed|es|ing)?|"
+    r"grouped\s+ranges?|"
+    r"ranges?"
+    r")\b",
+    re.I,
+)
+
+
 def _question_asks_numeric_distribution_histogram(ql: str) -> bool:
     """User wants a numeric value distribution (histogram), not category share."""
     s = str(ql).lower()
@@ -8640,13 +8682,64 @@ def _question_asks_numeric_distribution_histogram(ql: str) -> bool:
         return False
     if _question_asks_outlier_analysis(s) and not _question_explicitly_groups_by_dimension(s):
         return True
-    if re.search(r"\b(histogram|frequency|binning|bins?)\b", s):
+    if _HISTOGRAM_NUMERIC_INTENT_TERMS_RE.search(s):
         return True
-    if re.search(r"\bspread\b", s) or re.search(r"\brange\b", s):
+    if re.search(r"\bspread\b", s):
         return True
-    if "distribution" in s:
+    if re.search(r"\bdistribut(?:ion|ed)\b", s):
         return True
     return False
+
+
+def _try_build_histogram_visualization(
+    question: str,
+    df_in: pd.DataFrame,
+    profile: Dict[str, Any],
+    trace: Optional[Dict[str, Any]] = None,
+) -> Optional[
+    Tuple[List[Dict[str, Any]], str, str, Dict[str, Any], Dict[str, Any]]
+]:
+    """Numeric histogram when the question asks for value buckets/bins/distribution."""
+    if df_in is None or df_in.empty:
+        return None
+    q = question.lower().strip()
+    columns = df_in.columns.tolist()
+    ct_map = profile.get("column_types", {})
+    numeric_cols = [c for c in columns if ct_map.get(c) == "number"]
+    if not numeric_cols:
+        return None
+    domain = _infer_business_domain(columns)
+    hist_ncol = _resolve_histogram_numeric_column_for_question(
+        question, q, numeric_cols, columns, {"column_types": ct_map}, domain
+    )
+    if not hist_ncol or str(hist_ncol) not in df_in.columns:
+        return None
+    h_rows, h_title = _histogram_bucket_rows(df_in, str(hist_ncol))
+    if not h_rows:
+        return None
+    metric_label = _pretty_label_text(str(hist_ncol))
+    title = (h_title or "").strip() or f"Distribution — {metric_label}"
+    smart_trace = {
+        "routing": "histogram",
+        "category_column": str(hist_ncol),
+        "numeric_column": str(hist_ncol),
+        "aggregation": "count",
+        "aggregation_key": "count",
+        "rows_analyzed": int(len(df_in)),
+        "notes": "Histogram: row counts per numeric value range.",
+        "histogram": True,
+    }
+    if trace is not None:
+        trace.update(smart_trace)
+    intent_debug = {
+        "value_col": str(hist_ncol),
+        "agg_label": "Count",
+        "agg_key": "count",
+        "metricColumnDisplay": metric_label,
+        "normalized_question": q,
+        "histogram": True,
+    }
+    return h_rows, "histogram", title, intent_debug, smart_trace
 
 
 def _pick_individual_label_column(
@@ -8915,9 +9008,12 @@ def _numeric_column_for_histogram_question(
     """Resolve which numeric column to bucket for a distribution / histogram question."""
     ql = str(question).lower().strip()
     patterns = (
-        r"\b(?:distribution|histogram|frequency|spread|range)\s+of\s+([a-z0-9][a-z0-9_\s%/\-]{1,64})",
-        r"\b(?:show|analyze)\s+([a-z0-9][a-z0-9_\s]{1,64}?)\s+distribution\b",
-        r"\b([a-z0-9][a-z0-9_\s]{1,64}?)\s+distribution\b",
+        r"\b(?:distribution|histogram|frequency(?:\s+distribution)?|spread|ranges?)\s+of\s+([a-z0-9][a-z0-9_\s%/\-]{1,64})",
+        r"\b(?:show|display|analyze)\s+([a-z0-9][a-z0-9_\s]{1,64}?)\s+(?:distribution|histogram|buckets?|bins?|ranges?)\b",
+        r"\b([a-z0-9][a-z0-9_\s]{1,64}?)\s+(?:distribution|histogram|buckets?|bins?|ranges?)\b",
+        r"\bhow\s+(?:is|are)\s+([a-z0-9][a-z0-9_\s]{1,64}?)\s+distribut(?:ion|ed)\b",
+        r"\b(?:bucket(?:ize|ing)|bin(?:ning)?)\s+([a-z0-9][a-z0-9_\s]{1,64})\b",
+        r"\b(?:grouped\s+)?(?:bucket|range|bin)\s+ranges?\s+(?:for|of)\s+([a-z0-9][a-z0-9_\s]{1,64})",
     )
     for pat in patterns:
         m = re.search(pat, ql, re.I)
@@ -8958,10 +9054,13 @@ def _resolve_histogram_numeric_column_for_question(
     hcol = _numeric_column_for_histogram_question(question, numeric_cols, columns, ct)
     if hcol:
         return str(hcol)
-    if re.search(r"\b(histogram|frequency|binning|spread|range)\b", q):
+    if _HISTOGRAM_NUMERIC_INTENT_TERMS_RE.search(q) or re.search(r"\bspread\b", q):
+        hm = _numeric_col_mentioned(question, numeric_cols)
+        if hm:
+            return str(hm)
         pc = _pick_default_metric_column(q, numeric_cols, domain)
         return str(pc) if pc else None
-    if "distribution" in q:
+    if "distribution" in q or re.search(r"\bdistribut(?:ion|ed)\b", q):
         hm = _numeric_col_mentioned(question, numeric_cols)
         return str(hm) if hm else None
     return None
@@ -10886,6 +10985,8 @@ def _chart_selection_question_bucket(ql: str) -> str:
             return "trend"
     except Exception:
         pass
+    if _question_asks_numeric_distribution_histogram(q):
+        return "distribution"
     if re.search(r"\b(vs\.?|versus|against)\b", q):
         try:
             from intent_engine.question_patterns import (
@@ -11911,6 +12012,7 @@ def determine_chart_type_and_reason(
             bucket == "compare"
             and n <= 14
             and not (_looks_like_ranking_question(ql) or _extract_top_n(ql))
+            and not _question_asks_share_or_composition_pie(ql)
         ):
             return (
                 "bar",
@@ -14215,6 +14317,46 @@ def _compute_visualization_for_question_body(
             chart_title = ""
             chart_path_handled = True
 
+    skip_histogram_for_categorical_distribution = False
+    try:
+        from intent_engine.dimension_request import (
+            question_requests_categorical_distribution_chart,
+        )
+
+        skip_histogram_for_categorical_distribution = (
+            question_requests_categorical_distribution_chart(
+                question,
+                df,
+                profile_live,
+                match_column=_match_column_from_phrase,
+            )
+        )
+    except Exception:
+        pass
+
+    if (
+        not chart_path_handled
+        and not correlation_routing_locked
+        and _question_asks_numeric_distribution_histogram(ql)
+        and not _question_asks_outlier_analysis(ql)
+        and not _question_explicitly_groups_by_dimension(ql)
+        and not skip_histogram_for_categorical_distribution
+    ):
+        hist_pack = _try_build_histogram_visualization(
+            question, df, profile_live, smart_trace
+        )
+        if hist_pack:
+            h_rows, h_type, h_title, h_intent, h_trace = hist_pack
+            chart_data = list(_normalize_chart_records(h_rows))
+            chart_type = h_type
+            chart_title = h_title
+            intent_debug = h_intent
+            smart_trace = h_trace
+            smart_routing_used = True
+            chart_path_handled = True
+            tab_h = _tabular_exact_from_name_value_rows(h_rows)
+            exact_result = tab_h or exact_result
+
     if not chart_path_handled and not correlation_routing_locked:
         standout_category_compare = bool(
             intent_debug and intent_debug.get("executive_standout_analysis")
@@ -15105,9 +15247,9 @@ def _compute_visualization_for_question_body(
 
     print(
         "[viz] finalized_category_col:",
-        intent_debug["group_col"] if intent_debug else None,
+        intent_debug.get("group_col") if intent_debug else None,
         "finalized_numeric_col:",
-        intent_debug["value_col"] if intent_debug else None,
+        intent_debug.get("value_col") if intent_debug else None,
         "finalized_agg:",
         (intent_debug.get("agg_label"), intent_debug.get("agg_key"))
         if intent_debug

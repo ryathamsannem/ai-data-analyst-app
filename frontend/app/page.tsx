@@ -97,6 +97,8 @@ import {
   OVERVIEW_PNG_EXPORT_MARGIN_SIDE,
   OVERVIEW_PNG_EXPORT_MARGIN_TOP,
   OVERVIEW_PNG_EXPORT_MARKER_R_PX,
+  OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE,
+  OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE,
   OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE,
   shouldShowOverviewBarValueLabels,
 } from "@/lib/overview-dashboard-export";
@@ -5059,8 +5061,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 
     if (displayKind === "bar" || displayKind === "histogram") {
       const isHist = displayKind === "histogram";
-      const vLay =
-        !pngCapture && displayKind === "bar"
+      const useOverviewVBarLiveLayout = !pngCapture;
+      const vLay = useOverviewVBarLiveLayout
           ? computeOverviewVBarLiveVerticalDashLayout(
               valueAxisTitle,
               dashTickSamples,
@@ -5078,16 +5080,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         chartRows,
         localCategoryPlan
       );
-      const vBarLiveMargins =
-        !pngCapture && displayKind === "bar"
+      const vBarLiveMargins = useOverviewVBarLiveLayout
           ? computeOverviewVBarLivePlotMargins({
               computedBottom: barCatBottom,
               angled: Boolean(localCategoryPlan?.angled),
               categoryCount: chartRows.length,
             })
           : null;
-      const vBarLiveOuter =
-        !pngCapture && displayKind === "bar"
+      const vBarLiveOuter = useOverviewVBarLiveLayout
           ? computeOverviewVBarLiveOuterMargins({
               yAxisWidth: vLay.yAxisWidth,
               categoryCount: chartRows.length,
@@ -5190,8 +5190,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               fill="#6366f1"
               radius={isHist ? [3, 3, 0, 0] : [8, 8, 4, 4]}
               maxBarSize={
-            isHist ? 44 : OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE
-          }
+                isHist
+                  ? pngCapture
+                    ? OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE
+                    : OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE
+                  : OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE
+              }
               isAnimationActive={plotAnimOn}
               animationDuration={plotAnimDuration}
               cursor={drillable ? "pointer" : "default"}
