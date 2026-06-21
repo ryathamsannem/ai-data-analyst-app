@@ -102,7 +102,12 @@ import {
   OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE,
   shouldShowOverviewBarValueLabels,
 } from "@/lib/overview-dashboard-export";
-import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
+import {
+  cartesianUsesHorizontalPlot,
+  resolveCartesianBarValueAxisProps,
+  resolveScatterValueAxisProps,
+  resolveTrendValueAxisProps,
+} from "@/lib/cartesian-chart-decisions";
 import {
   computeCartesianCategoryPlanForRender,
   computeOverviewBarCategoryBottom,
@@ -119,7 +124,6 @@ import {
   computeOverviewVBarLiveVerticalDashLayout,
   computeOverviewVerticalDashLayout,
   overviewDashUsesExpandedPlotBand,
-  overviewDashboardUsesHorizontalBars,
   OVERVIEW_SCATTER_POINT_FILL_OPACITY,
   OVERVIEW_SCATTER_POINT_RADIUS_PX,
   OVERVIEW_SCATTER_POINT_STROKE_COLOR,
@@ -133,8 +137,6 @@ import {
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
-  resolveTrendValueAxisProps,
-  resolveScatterValueAxisProps,
 } from "@/lib/overview-premium-axis-domain";
 import { ChartCaptureHost } from "@/app/components/chart-platform/ChartCaptureHost";
 import {
@@ -4310,7 +4312,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [displayKind, chartRows, miniAxes, viewportWidthPx, plotHeightPx]
   );
 
-  const renderBarAsHorizontal = overviewDashboardUsesHorizontalBars(
+  const renderBarAsHorizontal = cartesianUsesHorizontalPlot(
     displayKind,
     miniCategoryPlan
   );
@@ -4403,14 +4405,17 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chartRows]
   );
 
-  const overviewBarValueDomain = useMemo(
+  const overviewVerticalBarAxisProps = useMemo(
     () =>
-      resolveOverviewBarValueDomain(chartRows, {
-        chartTitle: chart.title,
-        metricLabel: overviewMetricLabel,
-        presentationKind: displayKind,
-        executiveRounding: false,
-      }),
+      displayKind === "bar" || displayKind === "histogram"
+        ? resolveCartesianBarValueAxisProps({
+            chartKind: displayKind,
+            rows: chartRows,
+            chartTitle: chart.title,
+            metricLabel: overviewMetricLabel,
+            context: { pipeline: "overview", capture: false },
+          })
+        : null,
     [chartRows, chart.title, overviewMetricLabel, displayKind]
   );
 
@@ -4524,7 +4529,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     );
     const plotHorizontal = pngCapture
       ? renderBarAsHorizontal
-      : overviewDashboardUsesHorizontalBars(displayKind, localCategoryPlan);
+      : cartesianUsesHorizontalPlot(displayKind, localCategoryPlan);
     const effectivePlotH =
       pngCapture
         ? plotH
@@ -4753,11 +4758,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         chartLayoutMode: pngCapture ? "export" : "compact",
         minRight: pngCapture ? 12 : 8,
       });
-      const hBarValueDomain = resolveOverviewBarValueDomain(chartRows, {
+      const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
+        chartKind: "bar_horizontal",
+        rows: chartRows,
         chartTitle: chart.title,
         metricLabel: overviewMetricLabel,
-        presentationKind: displayKind,
-        executiveRounding: false,
+        context: { pipeline: "overview", capture: pngCapture },
       });
       const hBarRightMargin = showBarEndLabels
         ? Math.max(hbBalanced.marginRight, 52)
@@ -4792,9 +4798,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             />
             <XAxis
               type="number"
-              {...(hBarValueDomain
-                ? { domain: hBarValueDomain, allowDataOverflow: false }
-                : {})}
+              {...(hBarValueAxisProps ?? {})}
               tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK }}
               tickFormatter={valueTickFormatter}
               axisLine={{ stroke: OV_AXIS_LINE }}
@@ -5176,9 +5180,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK, dx: 2 }}
               tickFormatter={valueTickFormatter}
               width={vLay.yAxisWidth}
-              {...(overviewBarValueDomain
-                ? { domain: overviewBarValueDomain, allowDataOverflow: false }
-                : {})}
+              {...(overviewVerticalBarAxisProps ?? {})}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             />

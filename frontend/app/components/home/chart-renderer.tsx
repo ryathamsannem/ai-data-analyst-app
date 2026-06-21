@@ -59,13 +59,17 @@ import {
   formatChartAxisCategoryTick,
 } from "@/lib/chart-axis-formatters";
 import {
+  cartesianUsesHorizontalPlot,
+  resolveCartesianBarValueAxisProps,
+  resolveScatterValueAxisProps,
+  resolveTrendValueAxisProps,
+} from "@/lib/cartesian-chart-decisions";
+import {
   formatOverviewLineYAxisTick,
   formatOverviewScatterAxisTick,
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
-  resolveScatterValueAxisProps,
-  resolveTrendValueAxisProps,
   sessionLineAreaDetailBottomMargin,
   sessionLineAreaDetailXAxisHeightPx,
   sessionTrendDetailPlotMargins,
@@ -87,8 +91,6 @@ import {
   chartLayoutWidthKey,
 } from "@/lib/chart-axis-theme";
 import {
-  resolveHBarValueAxisProps,
-  resolveVerticalBarValueAxisProps,
   type AxisPresentationPlan,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
@@ -963,7 +965,7 @@ function ChartRendererInner({
     );
   }
 
-  const shouldRenderHorizontal = rKind === "bar_horizontal";
+  const shouldRenderHorizontal = cartesianUsesHorizontalPlot(rKind, categoryPlan);
 
   if (shouldRenderHorizontal) {
     const hb =
@@ -979,13 +981,16 @@ function ChartRendererInner({
       marginLeft: hb.marginLeft,
       chartLayoutMode,
     });
-    const hBarValueAxisProps = resolveHBarValueAxisProps({
-      plan: exportAxisPresentationPlan,
-      chartKind: rKind,
+    const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
+      chartKind: "bar_horizontal",
       rows: rData,
       chartTitle: rAxes.valueAxis,
       metricLabel: rAxes.valueAxis,
-      executiveRounding: pngCaptureMode,
+      context: {
+        pipeline: "session",
+        capture: pngCaptureMode,
+        exportAxisPlan: exportAxisPresentationPlan,
+      },
     });
     return (
       <ResponsiveContainer
@@ -1325,12 +1330,16 @@ function ChartRendererInner({
           axisLine={{ stroke: CHART_AXIS_LINE }}
           tickLine={{ stroke: CHART_AXIS_LINE }}
           width={verticalValueLayout.yAxisWidth}
-          {...(resolveVerticalBarValueAxisProps({
-            plan: exportAxisPresentationPlan,
+          {...(resolveCartesianBarValueAxisProps({
             chartKind: rKind,
             rows: rData,
             chartTitle: metricTooltipCtx.chartTitle,
             metricLabel: rAxes.valueAxis,
+            context: {
+              pipeline: "session",
+              capture: pngCaptureMode,
+              exportAxisPlan: exportAxisPresentationPlan,
+            },
           }) ?? {})}
           label={
             verticalValueLayout.showValueAxisTitle

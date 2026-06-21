@@ -1,4 +1,5 @@
 import type { ChartKind, ChartRow } from "@/app/chart-types";
+import { cartesianUsesHorizontalPlot } from "@/lib/cartesian-chart-decisions";
 import { OVERVIEW_PNG_EXPORT_HBAR_CATEGORY_PAD_PX } from "@/lib/overview-dashboard-export";
 import {
   balanceVerticalOuterMargins,
@@ -235,10 +236,7 @@ export function overviewDashboardUsesHorizontalBars(
   displayKind: ChartKind,
   miniCategoryPlan: ReturnType<typeof computeOverviewMiniCategoryPlan>
 ): boolean {
-  return (
-    displayKind === "bar_horizontal" ||
-    (displayKind === "bar" && Boolean(miniCategoryPlan?.renderAsHorizontalBar))
-  );
+  return cartesianUsesHorizontalPlot(displayKind, miniCategoryPlan);
 }
 
 /** Extra live-view plot height for Overview line / area mini cards. */
