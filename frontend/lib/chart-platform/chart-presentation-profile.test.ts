@@ -104,8 +104,9 @@ describe("ChartPresentationProfile", () => {
       minWidthRatio: 0.92,
     });
     expect(resolvePdfChartEmbedPolicy("bar")).toMatchObject({
-      maxHeightMm: 150,
+      maxHeightMm: 158,
       minWidthRatio: 0.88,
+      minAspectRatio: 0.58,
     });
   });
 });

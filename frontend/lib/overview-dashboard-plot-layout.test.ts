@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChartRow } from "@/app/chart-types";
 import {
+  computeOverviewContinuousLiveOuterMargins,
   computeOverviewMiniCategoryPlan,
   computeOverviewHBarLiveMargins,
   computeOverviewTrendLivePlotMargins,
@@ -15,6 +16,12 @@ import {
   OVERVIEW_SCATTER_PLOT_HEIGHT_BOOST_PX,
   OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX,
   OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX,
+  OVERVIEW_VBAR_LIVE_MARGIN_BOTTOM_CAP_FLAT_PX,
+  computeOverviewVBarLivePlotMargins,
+  computeOverviewVBarLiveOuterMargins,
+  OVERVIEW_VBAR_LIVE_MARGIN_LEFT_PX,
+  OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MIN_PX,
+  OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MAX_PX,
   OVERVIEW_SCATTER_POINT_RADIUS_PX,
   OVERVIEW_SCATTER_POINT_STROKE_PX,
   OVERVIEW_SCATTER_POINT_FILL_OPACITY,
@@ -87,6 +94,8 @@ describe("overview continuous plot height", () => {
 
     expect(overviewDashUsesExpandedPlotBand("line")).toBe(true);
     expect(overviewDashUsesExpandedPlotBand("bar", true)).toBe(true);
+    expect(overviewDashUsesExpandedPlotBand("bar", false)).toBe(true);
+    expect(overviewDashUsesExpandedPlotBand("bar", true)).toBe(true);
     expect(overviewDashUsesExpandedPlotBand("donut")).toBe(false);
 
     expect(resolveOverviewDashLivePlotHeight("line", 340)).toBe(
@@ -116,11 +125,52 @@ describe("overview continuous plot height", () => {
     expect(OVERVIEW_SCATTER_POINT_FILL_OPACITY).toBe(1);
   });
 
-  it("lowers sparse H-Bar groups and tightens live trend margins", () => {
+  it("balances live V-Bar outer margins like H-Bar — axis width on YAxis, not margin-left", () => {
+    const fourCats = computeOverviewVBarLiveOuterMargins({
+      yAxisWidth: 56,
+      categoryCount: 4,
+    });
+    expect(fourCats.marginLeft).toBe(OVERVIEW_VBAR_LIVE_MARGIN_LEFT_PX);
+    expect(fourCats.marginRight).toBeGreaterThanOrEqual(
+      OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MIN_PX
+    );
+    expect(fourCats.marginRight).toBeLessThanOrEqual(
+      OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MAX_PX
+    );
+    expect(fourCats.marginRight).toBeGreaterThan(fourCats.marginLeft);
+
+    const sixCats = computeOverviewVBarLiveOuterMargins({
+      yAxisWidth: 56,
+      categoryCount: 6,
+    });
+    expect(sixCats.marginRight).toBeLessThan(fourCats.marginRight);
+
+    const longTicks = computeOverviewVBarLiveOuterMargins({
+      yAxisWidth: 88,
+      categoryCount: 4,
+    });
+    expect(longTicks.marginLeft).toBe(OVERVIEW_VBAR_LIVE_MARGIN_LEFT_PX);
+    expect(longTicks.marginRight).toBeGreaterThanOrEqual(
+      OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MIN_PX
+    );
+    expect(longTicks.marginRight).toBeLessThanOrEqual(
+      OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MAX_PX
+    );
+  });
+
+  it("lowers sparse H-Bar groups and tightens live trend and V-Bar margins", () => {
     const sparse = computeOverviewHBarLiveMargins(4);
     const dense = computeOverviewHBarLiveMargins(8);
     expect(sparse.top).toBeGreaterThan(dense.top);
     expect(sparse.bottom).toBeLessThan(32);
+
+    const vBarFlat = computeOverviewVBarLivePlotMargins({
+      computedBottom: 40,
+      angled: false,
+      categoryCount: 4,
+    });
+    expect(vBarFlat.top).toBeGreaterThan(8);
+    expect(vBarFlat.bottom).toBe(OVERVIEW_VBAR_LIVE_MARGIN_BOTTOM_CAP_FLAT_PX);
 
     const trend = computeOverviewTrendLivePlotMargins({
       computedBottom: 48,
@@ -130,7 +180,33 @@ describe("overview continuous plot height", () => {
     expect(trend.bottom).toBeLessThan(48);
   });
 
-  it("trims line Y-axis left inset without affecting default trend margins", () => {
+  it("balances live continuous outer margins without double-counting YAxis width", () => {
+    const line = computeOverviewContinuousLiveOuterMargins({
+      yAxisWidth: 56,
+      lineChart: true,
+      pointCount: 12,
+    });
+    expect(line.marginLeft).toBe(8);
+    expect(line.marginRight).toBeGreaterThanOrEqual(
+      OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MIN_PX
+    );
+    expect(line.marginRight).toBeLessThanOrEqual(
+      OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MAX_PX
+    );
+
+    const areaSparse = computeOverviewContinuousLiveOuterMargins({
+      yAxisWidth: 56,
+      pointCount: 4,
+    });
+    const areaDense = computeOverviewContinuousLiveOuterMargins({
+      yAxisWidth: 56,
+      pointCount: 12,
+    });
+    expect(areaSparse.marginLeft).toBe(OVERVIEW_VBAR_LIVE_MARGIN_LEFT_PX);
+    expect(areaSparse.marginRight).toBeGreaterThan(areaDense.marginRight);
+  });
+
+  it("keeps legacy trend side margins for ChartRenderer scatter paths", () => {
     const defaultSide = overviewTrendLiveSideMargins(42);
     const lineSide = overviewTrendLiveSideMargins(42, { lineChart: true });
     expect(defaultSide.left - lineSide.left).toBe(

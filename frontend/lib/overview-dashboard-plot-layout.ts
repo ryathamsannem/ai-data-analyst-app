@@ -242,8 +242,8 @@ export const OVERVIEW_TREND_PLOT_HEIGHT_BOOST_PX = 36;
 /** Slightly smaller boost — scatter already reads larger at the same band. */
 export const OVERVIEW_SCATTER_PLOT_HEIGHT_BOOST_PX = 32;
 
-/** Match line/scatter band boost — vertical bars on compact category charts. */
-export const OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX = 28;
+/** Match H-Bar band boost — vertical bars fill the live card band. */
+export const OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX = 36;
 
 /** Match line band — closes h-full slack between H-Bar plot and footer. */
 export const OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX = 36;
@@ -251,6 +251,11 @@ export const OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX = 36;
 /** Live H-Bar margins — lower plot band, tighter footer gutter. */
 export const OVERVIEW_HBAR_LIVE_MARGIN_BOTTOM_PX = 20;
 export const OVERVIEW_HBAR_LIVE_MARGIN_TOP_BASE_PX = 10;
+
+/** Live V-Bar margins — mirror H-Bar sparse lift and tighter footer gutter. */
+export const OVERVIEW_VBAR_LIVE_MARGIN_TOP_BASE_PX = 8;
+export const OVERVIEW_VBAR_LIVE_MARGIN_BOTTOM_CAP_FLAT_PX = 22;
+export const OVERVIEW_VBAR_LIVE_MARGIN_BOTTOM_CAP_ANGLED_PX = 34;
 
 /** Nudge live line / area plot slightly lower inside the band. */
 export const OVERVIEW_TREND_LIVE_MARGIN_TOP_PX = 16;
@@ -275,14 +280,15 @@ export function overviewDashUsesHorizontalPlotBand(
   );
 }
 
-/** Live Overview cards with a taller plot band (line / area / scatter / H-Bar). */
+/** Live Overview cards with a taller plot band (line / area / scatter / H-Bar / V-Bar). */
 export function overviewDashUsesExpandedPlotBand(
   displayKind: ChartKind,
   renderAsHorizontal?: boolean
 ): boolean {
   return (
     overviewDashUsesContinuousPlot(displayKind) ||
-    overviewDashUsesHorizontalPlotBand(displayKind, renderAsHorizontal)
+    overviewDashUsesHorizontalPlotBand(displayKind, renderAsHorizontal) ||
+    (displayKind === "bar" && renderAsHorizontal !== true)
   );
 }
 
@@ -318,6 +324,36 @@ export const OVERVIEW_SCATTER_POINT_STROKE_COLOR = "#4f46e5";
 export const OVERVIEW_SCATTER_POINT_STROKE_OPACITY = 0.25;
 export const OVERVIEW_SCATTER_POINT_FILL_OPACITY = 1;
 
+/** Live V-Bar side margins — YAxis.width owns tick column; left is outer pad only (H-Bar parity). */
+export const OVERVIEW_VBAR_LIVE_MARGIN_LEFT_PX = 10;
+export const OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MIN_PX = 18;
+export const OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MAX_PX = 32;
+
+/** Overview dashboard live line / area / scatter — balanced outer margins. */
+export function computeOverviewContinuousLiveOuterMargins(args: {
+  yAxisWidth: number;
+  /** Overview line cards — slightly tighter outer left pad vs area/scatter. */
+  lineChart?: boolean;
+  /** Fewer points leave wider bands — nudge right gutter for card-center balance. */
+  pointCount?: number;
+}): { marginLeft: number; marginRight: number } {
+  const yw = Math.ceil(args.yAxisWidth);
+  const marginLeft =
+    args.lineChart === true
+      ? Math.max(8, OVERVIEW_VBAR_LIVE_MARGIN_LEFT_PX - 2)
+      : OVERVIEW_VBAR_LIVE_MARGIN_LEFT_PX;
+  const leftFootprint = marginLeft + yw;
+  const slots = Math.max(1, args.pointCount ?? 12);
+  const sparseBoost = slots <= 6 ? Math.max(0, 6 - slots) * 2 : 0;
+  const balancedRight = Math.ceil(leftFootprint * 0.14 + 10) + sparseBoost;
+  const marginRight = Math.min(
+    OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MAX_PX,
+    Math.max(OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MIN_PX, balancedRight)
+  );
+  return { marginLeft, marginRight };
+}
+
+/** Legacy side margins — ChartRenderer scatter on Charts/Insights/PNG only. */
 export function overviewTrendLiveSideMargins(
   yAxisWidth: number,
   options?: { lineChart?: boolean }
@@ -336,6 +372,24 @@ export function overviewTrendLiveSideMargins(
   };
 }
 
+export function computeOverviewVBarLiveOuterMargins(args: {
+  yAxisWidth: number;
+  categoryCount: number;
+}): { marginLeft: number; marginRight: number } {
+  const yw = Math.ceil(args.yAxisWidth);
+  const marginLeft = OVERVIEW_VBAR_LIVE_MARGIN_LEFT_PX;
+  const leftFootprint = marginLeft + yw;
+  const slots = Math.max(1, args.categoryCount);
+  /** Fewer categories leave wider bands — nudge right gutter for card-center balance. */
+  const sparseBoost = slots <= 6 ? Math.max(0, 6 - slots) * 2 : 0;
+  const balancedRight = Math.ceil(leftFootprint * 0.14 + 10) + sparseBoost;
+  const marginRight = Math.min(
+    OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MAX_PX,
+    Math.max(OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MIN_PX, balancedRight)
+  );
+  return { marginLeft, marginRight };
+}
+
 export function computeOverviewHBarLiveMargins(
   categoryCount: number
 ): { top: number; bottom: number } {
@@ -345,6 +399,40 @@ export function computeOverviewHBarLiveMargins(
     top: Math.min(40, OVERVIEW_HBAR_LIVE_MARGIN_TOP_BASE_PX + sparseLift),
     bottom: OVERVIEW_HBAR_LIVE_MARGIN_BOTTOM_PX,
   };
+}
+
+/** Live V-Bar plot margins — capped category gutter, sparse-category top lift. */
+export function computeOverviewVBarLivePlotMargins(args: {
+  computedBottom: number;
+  angled: boolean;
+  categoryCount: number;
+}): { top: number; bottom: number } {
+  const slots = Math.max(1, args.categoryCount);
+  const sparseLift = slots <= 5 ? (6 - slots) * 4 : 0;
+  const bottomCap = args.angled
+    ? OVERVIEW_VBAR_LIVE_MARGIN_BOTTOM_CAP_ANGLED_PX
+    : OVERVIEW_VBAR_LIVE_MARGIN_BOTTOM_CAP_FLAT_PX;
+  return {
+    top: Math.min(28, OVERVIEW_VBAR_LIVE_MARGIN_TOP_BASE_PX + sparseLift),
+    bottom: Math.min(args.computedBottom, bottomCap),
+  };
+}
+
+/** Tighter value-axis plan for live Overview vertical bar mini plots. */
+export function computeOverviewVBarLiveVerticalDashLayout(
+  valueAxisTitle: string,
+  dashTickSamples: string[],
+  plotHeightPx: number
+) {
+  return computeVerticalValueAxisLayout({
+    valueAxisLabel: valueAxisTitle,
+    valueAxisMeasureLabel: valueAxisTitle,
+    tickSampleStrings: dashTickSamples,
+    chartLayoutMode: "compact",
+    tickFontSizePx: 10,
+    titleFontSizePx: 10,
+    plotInnerHeightPx: Math.max(200, Math.floor(plotHeightPx * 0.84)),
+  });
 }
 
 export function computeOverviewTrendLivePlotMargins(args: {
@@ -404,5 +492,22 @@ export function computeOverviewScatterPremiumMargins(yAxisWidth: number): {
     right: hGutter,
     bottom: 24,
     left: side.left,
+  };
+}
+
+/** Overview dashboard live scatter — balanced outer margins (Charts/PNG use ChartRenderer path). */
+export function computeOverviewScatterLivePlotMargins(args: {
+  yAxisWidth: number;
+  pointCount: number;
+}): { top: number; right: number; bottom: number; left: number } {
+  const outer = computeOverviewContinuousLiveOuterMargins({
+    yAxisWidth: args.yAxisWidth,
+    pointCount: args.pointCount,
+  });
+  return {
+    top: 4,
+    right: outer.marginRight,
+    bottom: 24,
+    left: outer.marginLeft,
   };
 }
