@@ -4,6 +4,7 @@
  */
 
 import { Canvg } from "canvg";
+import { waitForCaptureGeometrySettled } from "@/lib/chart-platform/chart-capture-readiness";
 import {
   readResolvedChartAxisTheme,
   type ResolvedChartAxisTheme,
@@ -443,38 +444,7 @@ function nextFrame(): Promise<void> {
 }
 
 /** Wait until a line/area path stops changing (animation settled) or timeout. */
-export async function waitForStableChartSvg(
-  root: HTMLElement,
-  maxMs = 900
-): Promise<void> {
-  if (typeof window === "undefined") return;
-
-  const deadline = Date.now() + maxMs;
-  let stableFrames = 0;
-  let prevPath = "";
-
-  while (Date.now() < deadline) {
-    const curve = root.querySelector(
-      ".recharts-line-curve, .recharts-area-curve"
-    );
-    if (!curve) {
-      stableFrames = 0;
-      await nextFrame();
-      continue;
-    }
-    const d = curve.getAttribute("d") ?? "";
-    if (d.length > 16 && d === prevPath) {
-      stableFrames += 1;
-      if (stableFrames >= 2) break;
-    } else {
-      stableFrames = 0;
-      prevPath = d;
-    }
-    await nextFrame();
-  }
-
-  await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
-}
+export { waitForStableChartSvg } from "@/lib/chart-platform/chart-capture-readiness";
 
 /** Reflow Recharts after layout changes (e.g. sidebar collapse) before PNG capture. */
 export async function prepareChartForPngCapture(
@@ -499,7 +469,7 @@ export async function prepareChartForPngCapture(
   window.dispatchEvent(new Event("resize"));
   await nextFrame();
   await nextFrame();
-  await waitForStableChartSvg(sourceRoot);
+  await waitForCaptureGeometrySettled(sourceRoot);
 }
 
 async function renderPlotSvgToPng(
