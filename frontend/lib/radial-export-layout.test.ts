@@ -3,13 +3,19 @@ import {
   computeSessionRadialPlotBandOccupancy,
   estimateExportLegendRows,
   RADIAL_COMPACT_OUTER_PX,
-  RADIAL_EXPORT_RADIUS_SCALE,
+  RADIAL_EXPORT_LEGEND_FONT_PX,
+  RADIAL_EXPORT_LEGEND_ICON_PX,
+  RADIAL_EXPORT_PLOT_BAND_DIAMETER_RATIO,
   resolveProportionalSessionRadialRadii,
   resolveRadialChartRadii,
   resolveRadialExportCanvasHeight,
   resolveRadialExportPlotHeight,
   SESSION_RADIAL_PLOT_BAND_DIAMETER_RATIO,
 } from "./radial-export-layout";
+import {
+  OVERVIEW_MINI_RADIAL_SIZE_SCALE,
+  scaleOverviewMiniRadialRadii,
+} from "./overview-mini-radial-polish";
 
 describe("radial export layout", () => {
   it("uses proportional session detail radii (~65–75% plot band occupancy)", () => {
@@ -32,7 +38,7 @@ describe("radial export layout", () => {
     expect(live.cy).toBe("48%");
   });
 
-  it("matches live occupancy on export capture with legend outside chart", () => {
+  it("export capture uses lower occupancy than live (~62–65%)", () => {
     const live = resolveRadialChartRadii({
       kind: "donut",
       plotHeightPx: 480,
@@ -49,7 +55,17 @@ describe("radial export layout", () => {
       pngCaptureMode: true,
       piePad: { marginHorizontal: 12, marginBottom: 24 },
     });
-    expect(exported.outerRadius).toBe(live.outerRadius);
+    const liveOcc = computeSessionRadialPlotBandOccupancy({
+      outerRadius: live.outerRadius,
+      plotHeightPx: 480,
+    });
+    const exportOcc = computeSessionRadialPlotBandOccupancy({
+      outerRadius: exported.outerRadius,
+      plotHeightPx: 480,
+    });
+    expect(exportOcc).toBeLessThan(liveOcc);
+    expect(exportOcc).toBeGreaterThanOrEqual(0.62);
+    expect(exportOcc).toBeLessThanOrEqual(0.66);
     expect(exported.cy).toBe("50%");
   });
 
@@ -66,11 +82,11 @@ describe("radial export layout", () => {
       outerRadius: chartsPng.outerRadius,
       plotHeightPx: 400,
     });
-    expect(occupancy).toBeGreaterThanOrEqual(0.65);
-    expect(occupancy).toBeLessThanOrEqual(0.75);
+    expect(occupancy).toBeGreaterThanOrEqual(0.62);
+    expect(occupancy).toBeLessThanOrEqual(0.66);
   });
 
-  it("keeps overview compact fixed radii unchanged", () => {
+  it("keeps overview compact fixed radii unchanged for live", () => {
     const overview = resolveRadialChartRadii({
       kind: "donut",
       plotHeightPx: 260,
@@ -81,23 +97,46 @@ describe("radial export layout", () => {
     expect(overview.cy).toBe("50%");
   });
 
-  it("shrinks overview compact export radii only", () => {
-    const overview = resolveRadialChartRadii({
+  it("overview live polish targets ~65–75% plot-band occupancy", () => {
+    const base = resolveRadialChartRadii({
       kind: "donut",
       plotHeightPx: 300,
+      plotWidthPx: 440,
       compact: true,
       pngCaptureMode: false,
     });
+    const scaled = scaleOverviewMiniRadialRadii(base);
+    const occupancy = computeSessionRadialPlotBandOccupancy({
+      outerRadius: scaled.outerRadius,
+      plotHeightPx: 300,
+    });
+    expect(occupancy).toBeGreaterThanOrEqual(0.65);
+    expect(occupancy).toBeLessThanOrEqual(0.75);
+    expect(scaled.outerRadius).toBe(
+      Math.round(RADIAL_COMPACT_OUTER_PX * OVERVIEW_MINI_RADIAL_SIZE_SCALE)
+    );
+  });
+
+  it("export legend typography meets readability floor", () => {
+    expect(RADIAL_EXPORT_LEGEND_FONT_PX).toBeGreaterThanOrEqual(24);
+    expect(RADIAL_EXPORT_LEGEND_ICON_PX).toBeGreaterThanOrEqual(17);
+  });
+
+  it("overview compact export uses balanced proportional occupancy", () => {
     const exported = resolveRadialChartRadii({
       kind: "donut",
-      plotHeightPx: 300,
+      plotHeightPx: 400,
+      plotWidthPx: 1400,
       compact: true,
       pngCaptureMode: true,
     });
-    expect(exported.outerRadius / overview.outerRadius).toBeCloseTo(
-      RADIAL_EXPORT_RADIUS_SCALE,
-      1
-    );
+    const occupancy = computeSessionRadialPlotBandOccupancy({
+      outerRadius: exported.outerRadius,
+      plotHeightPx: 400,
+    });
+    expect(occupancy).toBeGreaterThanOrEqual(0.62);
+    expect(occupancy).toBeLessThanOrEqual(0.66);
+    expect(exported.cy).toBe("50%");
   });
 
   it("reports before/after occupancy delta vs legacy fixed 88px ring", () => {
@@ -123,6 +162,10 @@ describe("radial export layout", () => {
       1
     );
     expect(nextOccupancy - legacyOccupancy).toBeGreaterThan(0.28);
+  });
+
+  it("export plot band diameter ratio targets ~63%", () => {
+    expect(RADIAL_EXPORT_PLOT_BAND_DIAMETER_RATIO).toBeCloseTo(0.63, 2);
   });
 
   it("grows canvas height for 4, 6, and 8 category donuts", () => {

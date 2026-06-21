@@ -156,9 +156,8 @@ import {
 import { buildChartCartesianTooltipHandlers } from "@/lib/chart-tooltip-format";
 import { radialShareDisplayAllowed } from "@/lib/radial-chart-format";
 import {
-  chartHasRateAbove100,
   percentGapChipAriaLabel,
-  RATE_EXCEEDS_100_WARNING,
+  resolveRateExceeds100Warning,
 } from "@/lib/chart-quality-warnings";
 import { useMeasuredElementWidth } from "@/lib/use-measured-element-width";
 import { CartesianXAxisTitleLabelContent, createVerticalValueAxisLabel } from "@/app/components/chart-value-axis-title";
@@ -4438,10 +4437,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 
   const overviewRateWarning = useMemo(
     () =>
-      chartHasRateAbove100(chartRows, chart.title)
-        ? RATE_EXCEEDS_100_WARNING
-        : null,
-    [chartRows, chart.title]
+      resolveRateExceeds100Warning({
+        rows: chartRows,
+        metricLabel: chart.title,
+        presentationKind: displayKind,
+        chartTitle: canonicalTitle || chart.title,
+      }),
+    [chartRows, chart.title, displayKind, canonicalTitle]
   );
 
   const overviewTooltipHandlers = useMemo(
@@ -9508,10 +9510,19 @@ function HomeInner() {
 
   const sessionChartRateWarning = useMemo(() => {
     const metricLabel = visualization?.title ?? chartAxisLabels.valueAxis;
-    return chartHasRateAbove100(sortedChartData, metricLabel)
-      ? RATE_EXCEEDS_100_WARNING
-      : null;
-  }, [sortedChartData, visualization?.title, chartAxisLabels.valueAxis]);
+    return resolveRateExceeds100Warning({
+      rows: sortedChartData,
+      metricLabel,
+      presentationKind: sessionRenderedChartKind,
+      chartTitle: visualization?.title ?? chartTitle,
+    });
+  }, [
+    sortedChartData,
+    visualization?.title,
+    chartAxisLabels.valueAxis,
+    sessionRenderedChartKind,
+    chartTitle,
+  ]);
 
   const executiveVizInsights = useMemo((): ExecutiveVizInsightCard[] => {
     if (isTrendMode(activeSnapshot?.contract) && sortedChartData.length) {
@@ -10162,14 +10173,21 @@ function HomeInner() {
       insightVisualization?.title ??
       insightChartMeasureLabel ??
       insightChartAxisLabels.valueAxis;
-    return chartHasRateAbove100(sortedInsightChartData, metricLabel)
-      ? RATE_EXCEEDS_100_WARNING
-      : null;
+    return resolveRateExceeds100Warning({
+      rows: sortedInsightChartData,
+      metricLabel,
+      presentationKind: insightRenderedChartKind,
+      chartTitle: insightDisplayChartTitle,
+      question: lastAskedQuestion,
+    });
   }, [
     sortedInsightChartData,
     insightVisualization?.title,
     insightChartMeasureLabel,
     insightChartAxisLabels.valueAxis,
+    insightRenderedChartKind,
+    insightDisplayChartTitle,
+    lastAskedQuestion,
   ]);
 
   const insightExecutiveVizInsights = useMemo((): ExecutiveVizInsightCard[] => {

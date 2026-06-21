@@ -43,6 +43,7 @@ import {
   RADIAL_SESSION_LEGEND_ICON_PX,
   RADIAL_SESSION_LEGEND_PAD_TOP_PX,
   RADIAL_SESSION_SLICE_STROKE_WIDTH,
+  SESSION_DETAIL_RADIAL_CY,
   resolveRadialChartRadii,
 } from "@/lib/radial-export-layout";
 import {
@@ -863,19 +864,22 @@ function ChartRendererInner({
       ? radialChartExportOuterMargins(rKind, piePad)
       : radialChartOuterMargins(rKind, compact, piePad);
     if (polishOverviewMini) {
-      radii = scaleOverviewMiniRadialRadii(radii);
+      radii = {
+        ...scaleOverviewMiniRadialRadii(radii),
+        cy: SESSION_DETAIL_RADIAL_CY,
+      };
       margins = tightenOverviewMiniRadialMargins(margins);
     }
     const sliceStroke = polishOverviewMini
       ? OVERVIEW_MINI_RADIAL_SLICE_STROKE
       : "#fff";
     const legendFontSize = polishOverviewMini
-      ? 11
+      ? RADIAL_SESSION_LEGEND_FONT_PX
       : pngCaptureMode
         ? RADIAL_EXPORT_LEGEND_FONT_PX
         : RADIAL_SESSION_LEGEND_FONT_PX;
     const legendIconSize = polishOverviewMini
-      ? 8
+      ? RADIAL_SESSION_LEGEND_ICON_PX
       : pngCaptureMode
         ? RADIAL_EXPORT_LEGEND_ICON_PX
         : RADIAL_SESSION_LEGEND_ICON_PX;

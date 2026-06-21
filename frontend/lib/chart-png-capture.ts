@@ -11,8 +11,17 @@ import {
 import { ensureReadableExportTextFill } from "@/lib/chart-png-export-text";
 import { applyPngExportSvgPolish } from "@/lib/chart-png-export-svg-polish";
 import {
+  RADIAL_EXPORT_FOOTER_FONT_PX,
+  RADIAL_EXPORT_FOOTER_RESERVE_PX,
   RADIAL_EXPORT_LEGEND_FONT_PX,
+  RADIAL_EXPORT_LEGEND_ICON_PX,
+  RADIAL_EXPORT_LEGEND_ITEM_GAP_PX,
+  RADIAL_EXPORT_LEGEND_PLOT_GAP_PX,
+  RADIAL_EXPORT_LEGEND_ROW_EXTRA_PX,
+  RADIAL_EXPORT_LEGEND_SWATCH_GAP_PX,
   RADIAL_EXPORT_MIN_SVG_PAD_PX,
+  RADIAL_EXPORT_PLOT_BAND_DIAMETER_RATIO,
+  RADIAL_EXPORT_PLOT_WIDTH_UTIL,
 } from "@/lib/radial-export-layout";
 const EXPORT_MIN_WIDTH = 720;
 /** Plot uses most of the inner card width without stretching sparse bar SVGs. */
@@ -342,10 +351,10 @@ function renderLegendChromeToPng(
     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
   const labelFont = `500 ${RADIAL_EXPORT_LEGEND_FONT_PX}px ${fontFamily}`;
   const innerW = exportWidth - COMPOSITE_PAD_X * 2;
-  const rowH = RADIAL_EXPORT_LEGEND_FONT_PX + 6;
-  const rowGap = 6;
-  const swatch = 10;
-  const swatchGap = 6;
+  const rowH = RADIAL_EXPORT_LEGEND_FONT_PX + RADIAL_EXPORT_LEGEND_ROW_EXTRA_PX;
+  const rowGap = RADIAL_EXPORT_LEGEND_ITEM_GAP_PX;
+  const swatch = RADIAL_EXPORT_LEGEND_ICON_PX;
+  const swatchGap = RADIAL_EXPORT_LEGEND_SWATCH_GAP_PX;
 
   const probe = document.createElement("canvas");
   const pctx = probe.getContext("2d");
@@ -380,7 +389,7 @@ function renderLegendChromeToPng(
   }
 
   const contentH =
-    rows.length * rowH + Math.max(0, rows.length - 1) * rowGap + 8;
+    rows.length * rowH + Math.max(0, rows.length - 1) * rowGap + 14;
 
   const canvas = document.createElement("canvas");
   canvas.width = exportWidth * scale;
@@ -1198,11 +1207,13 @@ function drawExportFooter(
   cardW: number,
   cardH: number,
   footerText: string,
-  palette: ExportPalette
+  palette: ExportPalette,
+  fontPx: number = EXPORT_FOOTER_FONT_PX,
+  padBottom: number = EXPORT_FOOTER_PAD_BOTTOM
 ): void {
   const fontFamily =
     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  ctx.font = `500 ${EXPORT_FOOTER_FONT_PX}px ${fontFamily}`;
+  ctx.font = `500 ${fontPx}px ${fontFamily}`;
   ctx.fillStyle = palette.footer;
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
@@ -1210,7 +1221,7 @@ function drawExportFooter(
   ctx.fillText(
     footerText,
     cardX + cardW / 2,
-    cardY + cardH - EXPORT_FOOTER_PAD_BOTTOM
+    cardY + cardH - padBottom
   );
   ctx.globalAlpha = 1;
 }
@@ -1222,7 +1233,8 @@ async function compositeExportPng(
   scale: number,
   palette: ExportPalette,
   canvasSize?: { width: number; height: number },
-  footerText: string = EXPORT_FOOTER_TEXT
+  footerText: string = EXPORT_FOOTER_TEXT,
+  radialExport = false
 ): Promise<{ dataUrl: string; width: number; height: number }> {
   const plotImg = await loadImage(plot.dataUrl);
   const headerImg = header ? await loadImage(header.dataUrl) : null;
@@ -1243,15 +1255,25 @@ async function compositeExportPng(
   const cardInnerW = contentW - EXPORT_CARD_PAD * 2;
   const plotNaturalW = plotImg.naturalWidth;
   const plotNaturalH = plotImg.naturalHeight;
-  const targetPlotW = Math.round(
-    cardInnerW *
-      (plotNaturalW < cardInnerW * 0.78 ? PLOT_WIDTH_UTIL_COMPACT : PLOT_WIDTH_UTIL)
-  );
+  const plotWidthUtil = radialExport
+    ? RADIAL_EXPORT_PLOT_WIDTH_UTIL
+    : plotNaturalW < cardInnerW * 0.78
+      ? PLOT_WIDTH_UTIL_COMPACT
+      : PLOT_WIDTH_UTIL;
+  const targetPlotW = Math.round(cardInnerW * plotWidthUtil);
   const plotScale = targetPlotW / plotNaturalW;
   const plotW = Math.round(plotNaturalW * plotScale);
   const plotH = Math.round(plotNaturalH * plotScale);
 
-  const legendGap = legendH > 0 ? 8 : 0;
+  const legendGap =
+    legendH > 0
+      ? radialExport
+        ? RADIAL_EXPORT_LEGEND_PLOT_GAP_PX
+        : 8
+      : 0;
+  const footerReserve = radialExport
+    ? RADIAL_EXPORT_FOOTER_RESERVE_PX
+    : EXPORT_FOOTER_H;
   const contentH =
     EXPORT_CARD_PAD +
     headerH +
@@ -1260,7 +1282,7 @@ async function compositeExportPng(
     legendGap +
     legendH +
     EXPORT_CARD_PAD +
-    EXPORT_FOOTER_H;
+    footerReserve;
 
   const outW = canvasSize?.width
     ? Math.round(canvasSize.width * scale)
@@ -1312,7 +1334,17 @@ async function compositeExportPng(
 
   ctx.restore();
 
-  drawExportFooter(ctx, cardX, cardY, cardW, cardH, footerText, palette);
+  drawExportFooter(
+    ctx,
+    cardX,
+    cardY,
+    cardW,
+    cardH,
+    footerText,
+    palette,
+    radialExport ? RADIAL_EXPORT_FOOTER_FONT_PX : EXPORT_FOOTER_FONT_PX,
+    radialExport ? 18 : EXPORT_FOOTER_PAD_BOTTOM
+  );
   drawExportCardBorder(ctx, cardX, cardY, cardW, cardH, surfaces);
 
   return {
@@ -1398,6 +1430,8 @@ export async function captureElementToPng(
   const footerText =
     options.footerText ?? buildPngExportFooterText();
 
+  const radialExport = isRadialChartRoot(sourceRoot);
+
   return compositeExportPng(
     header,
     plot,
@@ -1405,7 +1439,8 @@ export async function captureElementToPng(
     scale,
     palette,
     canvasSize,
-    footerText
+    footerText,
+    radialExport
   );
 }
 
