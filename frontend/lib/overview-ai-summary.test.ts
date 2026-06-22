@@ -11,6 +11,7 @@ import {
   OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE,
   OVERVIEW_AI_SUMMARY_MAX_BULLETS,
   partitionOverviewAiSummaryBullets,
+  selectOverviewAiSummaryInsights,
   type ComputeOverviewAiSummaryArgs,
 } from "@/lib/overview-ai-summary";
 
@@ -464,5 +465,141 @@ describe("executive wording helpers", () => {
     expect(
       bullets.some((b) => /loan balance is concentrated in the/i.test(b))
     ).toBe(true);
+  });
+
+  it("selectOverviewAiSummaryInsights dedupes leader and concentration on same finding", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+      {
+        text: "Electronics is the leading product category by sales amount.",
+        score: 90,
+        kind: "leader",
+        entity: "electronics",
+        metricKey: "sales amount",
+        dimensionKey: "product category",
+        topicKey: "leader|electronics|sales amount|product category",
+      },
+      {
+        text: "Electronics accounts for about 54% of total sales amount in this breakdown.",
+        score: 80,
+        kind: "concentration",
+        entity: "electronics",
+        metricKey: "sales amount",
+        dimensionKey: "product category",
+        topicKey: "concentration|electronics|sales amount|product category",
+      },
+      {
+        text: "Total Sales is 7,849,721 across filtered rows.",
+        score: 95,
+        kind: "kpi",
+        metricKey: "total sales",
+      },
+    ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "retail"
+    );
+    expect(out).toHaveLength(2);
+    expect(out.some((b) => /total sales/i.test(b))).toBe(true);
+    expect(out.some((b) => /54%/i.test(b))).toBe(false);
+  });
+
+  it("selectOverviewAiSummaryInsights limits repeated entity coverage in top slots", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+      { text: "Frame", score: 100, kind: "frame" },
+      {
+        text: "Engineering has the highest salary.",
+        score: 92,
+        kind: "leader",
+        entity: "engineering",
+        metricKey: "salary",
+        dimensionKey: "department",
+      },
+      {
+        text: "Engineering has the most training hours.",
+        score: 88,
+        kind: "leader",
+        entity: "engineering",
+        metricKey: "training hours",
+        dimensionKey: "department",
+      },
+      {
+        text: "Sales shows the highest attrition rate among departments.",
+        score: 94,
+        kind: "impact",
+        entity: "sales",
+        metricKey: "attrition",
+        dimensionKey: "department",
+      },
+    ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "hr"
+    );
+    expect(out.filter((b) => /engineering/i.test(b))).toHaveLength(1);
+    expect(out.some((b) => /attrition/i.test(b))).toBe(true);
+  });
+
+  it("selectOverviewAiSummaryInsights dedupes equivalent loan segment outcomes", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+        { text: "Banking analytics snapshot.", score: 100, kind: "frame" },
+        {
+          text: "Loan balance is concentrated in the Corporate segment.",
+          score: 95,
+          kind: "impact",
+          entity: "corporate",
+          outcomeKey: "loan_segment_dominance|corporate",
+          topicCategory: "segments",
+        },
+        {
+          text: "Top Customer Segment by Loan balance is Corporate in the current slice.",
+          score: 70,
+          kind: "kpi",
+          entity: "corporate",
+        },
+        {
+          text: "About 9% of records carry a delinquency flag — prioritize credit-score and utilization review.",
+          score: 96,
+          kind: "impact",
+          topicCategory: "risk",
+        },
+      ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "banking"
+    );
+    expect(out.filter((b) => /corporate/i.test(b) && /loan balance/i.test(b))).toHaveLength(1);
+    expect(out.some((b) => /delinquency flag/i.test(b))).toBe(true);
+  });
+
+  it("selectOverviewAiSummaryInsights keeps region coverage in top 5 for retail topic targets", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+        { text: "Retail analytics snapshot.", score: 100, kind: "frame" },
+        { text: "Total Sales is 100 across filtered rows.", score: 101, kind: "kpi", metricKey: "sales" },
+        { text: "Total Profit is 10 across filtered rows.", score: 101, kind: "kpi", metricKey: "profit" },
+        {
+          text: "Electronics has the highest product category sales amount share.",
+          score: 110,
+          kind: "leader",
+          entity: "electronics",
+          topicCategory: "concentration",
+        },
+        {
+          text: "Revenue concentration is highest in the North region.",
+          score: 96,
+          kind: "impact",
+          topicCategory: "region",
+          entity: "north",
+          outcomeKey: "region_activity|north",
+        },
+        { text: "Sales trend shows moderation.", score: 90, kind: "trend", topicCategory: "trend" },
+      ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "retail"
+    );
+    const top = out.slice(0, OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE);
+    expect(top.some((b) => /north region|revenue concentration is highest in the north/i.test(b))).toBe(
+      true
+    );
   });
 });
