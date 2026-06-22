@@ -58,6 +58,17 @@ export type ComputeOverviewAiSummaryArgs = {
   dateColumn: string | null;
 };
 
+/** Initial bullets shown before expanding the summary panel. */
+export const OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE = 5;
+
+/** Maximum ranked insights when the dataset supports them. */
+export const OVERVIEW_AI_SUMMARY_MAX_BULLETS = 12;
+
+const MAX_TREND_INSIGHTS = 2;
+const MAX_CHART_BREAKDOWN_INSIGHTS = 8;
+const CONCENTRATION_SHARE_MIN = 0.35;
+const LAGGARD_SPREAD_RATIO_MIN = 2;
+
 const HR_LANGUAGE_RE =
   /\b(total employees?|department count|highest paid employee|workforce|headcount)\b/i;
 
@@ -172,10 +183,17 @@ function chartPairs(chart: OverviewAiSummaryChart): { name: string; value: numbe
 
 function isLikelyTrendChart(chart: OverviewAiSummaryChart): boolean {
   const ct = (chart.chartType || "").toLowerCase();
+  if (ct === "scatter") return false;
+  if (/\bcorrelation\b/i.test(chart.title)) return false;
   if (ct === "line" || ct === "area") return true;
   return /\b(trend|over time|time series|weekly|daily|monthly|quarter)\b/i.test(
     chart.title
   );
+}
+
+function isCorrelationOrScatterChart(chart: OverviewAiSummaryChart): boolean {
+  const ct = (chart.chartType || "").toLowerCase();
+  return ct === "scatter" || /\bcorrelation\b/i.test(chart.title);
 }
 
 function splitChartTitleMetricAndBreakdown(title: string): {
@@ -410,6 +428,91 @@ export function buildBreakdownInsightLine(args: {
   return `${leader} has the highest ${metLc}.`;
 }
 
+/** Natural executive line for the lowest category in a breakdown chart. */
+export function buildLaggardInsightLine(args: {
+  chartTitle: string;
+  chartType: string;
+  laggardName: string;
+  domain: SummaryDomain;
+}): string {
+  const titles = [args.chartTitle.trim()];
+  const canonical = getCanonicalChartTitle({
+    rawTitle: args.chartTitle,
+    chartType: args.chartType,
+    labels: ["A", "B"],
+    values: [1, 2],
+  });
+  if (canonical && canonical !== "Chart") titles.push(canonical);
+
+  for (const title of titles) {
+    const topBy = parseTopByTitle(title);
+    if (topBy) {
+      const dim = polishInsightPhrase(topBy.dimension).toLowerCase();
+      const met = polishInsightPhrase(topBy.metric).toLowerCase();
+      const name = formatLeaderForBreakdown(args.laggardName, topBy.dimension);
+      if (isDurationLatencyMetric(topBy.metric)) {
+        return `${name} has the lowest average ${met}.`;
+      }
+      return `${name} is the lowest-performing ${dim} by ${met}.`;
+    }
+
+    const byDim = parseMetricByDimensionTitle(title);
+    if (byDim) {
+      const met = polishInsightPhrase(byDim.metric).toLowerCase();
+      const dim = polishInsightPhrase(byDim.dimension).toLowerCase();
+      const name = formatLeaderForBreakdown(args.laggardName, byDim.dimension);
+      if (isDurationLatencyMetric(byDim.metric)) {
+        return `${name} has the lowest average ${met}.`;
+      }
+      return `${name} is the lowest ${dim} by ${met}.`;
+    }
+  }
+
+  const { metric, breakdown } = splitChartTitleMetricAndBreakdown(args.chartTitle);
+  const met = polishInsightPhrase(metric).toLowerCase();
+  const name = formatLeaderForBreakdown(args.laggardName, breakdown);
+  if (isDurationLatencyMetric(metric)) {
+    return `${name} has the lowest average ${met}.`;
+  }
+  return `${name} has the lowest ${met} in this breakdown.`;
+}
+
+function buildConcentrationInsightLine(args: {
+  chartTitle: string;
+  chartType: string;
+  leaderName: string;
+  leaderValue: number;
+  total: number;
+}): string | null {
+  if (!Number.isFinite(args.total) || args.total <= 0) return null;
+  const share = args.leaderValue / args.total;
+  if (share < CONCENTRATION_SHARE_MIN) return null;
+  const pct = Math.round(share * 100);
+  const leader = formatLeaderForBreakdown(args.leaderName, null);
+
+  const shareBy = parseShareByTitle(args.chartTitle);
+  if (shareBy && !isDurationLatencyMetric(shareBy.metric)) {
+    const met = polishInsightPhrase(shareBy.metric).toLowerCase();
+    return `${leader} represents about ${pct}% of total ${met} in this breakdown.`;
+  }
+
+  const topBy = parseTopByTitle(args.chartTitle);
+  if (topBy && !isDurationLatencyMetric(topBy.metric)) {
+    const met = polishInsightPhrase(topBy.metric).toLowerCase();
+    return `${leader} accounts for about ${pct}% of total ${met} in this breakdown.`;
+  }
+
+  if (isShareChartTitle(args.chartTitle, args.chartType)) {
+    const byDim = parseMetricByDimensionTitle(args.chartTitle);
+    const met = byDim
+      ? polishInsightPhrase(byDim.metric).toLowerCase()
+      : polishInsightPhrase(args.chartTitle).toLowerCase();
+    return `${leader} represents about ${pct}% of ${met} in this slice.`;
+  }
+
+  return `${leader} accounts for about ${pct}% of the total in this breakdown.`;
+}
+
 function extractTrendMetricLabel(chart: OverviewAiSummaryChart): string {
   const canonical = getCanonicalChartTitle({
     rawTitle: chart.title,
@@ -625,6 +728,24 @@ function summaryLineAllowedForDomain(text: string, domain: SummaryDomain): boole
   return true;
 }
 
+/** Split ranked bullets for initial vs expanded Overview summary UI. */
+export function partitionOverviewAiSummaryBullets(
+  bullets: readonly string[],
+  initialVisible = OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE
+): {
+  initial: string[];
+  extra: string[];
+  hasMore: boolean;
+} {
+  const initial = bullets.slice(0, initialVisible);
+  const extra = bullets.slice(initialVisible);
+  return {
+    initial,
+    extra,
+    hasMore: extra.length > 0,
+  };
+}
+
 export function computeOverviewAiSummaryBullets(
   args: ComputeOverviewAiSummaryArgs
 ): string[] {
@@ -657,13 +778,18 @@ export function computeOverviewAiSummaryBullets(
   const cards = autoDashboard?.cards ?? [];
 
   let trendBulletsAdded = 0;
-  let barBulletsAdded = 0;
+  let chartBreakdownBulletsAdded = 0;
+  const trendTitlesSeen = new Set<string>();
   let trendRelCaptured: number | null = null;
   let trendMetricCaptured: string | null = null;
 
   for (const chart of charts) {
+    if (isCorrelationOrScatterChart(chart)) continue;
+
     if (isLikelyTrendChart(chart)) {
-      if (trendBulletsAdded >= 1) continue;
+      if (trendBulletsAdded >= MAX_TREND_INSIGHTS) continue;
+      const trendKey = chart.title.trim().toLowerCase();
+      if (trendTitlesSeen.has(trendKey)) continue;
       const vals = chart.values.filter((x) => Number.isFinite(x));
       if (vals.length >= 4) {
         const mid = Math.floor(vals.length / 2);
@@ -671,22 +797,27 @@ export function computeOverviewAiSummaryBullets(
         const late = meanFinite(vals.slice(mid));
         if (early != null && late != null && early !== 0) {
           const rel = (late - early) / (Math.abs(early) + 1e-9);
-          trendRelCaptured = rel;
-          trendMetricCaptured = extractTrendMetricLabel(chart);
+          if (trendBulletsAdded === 0) {
+            trendRelCaptured = rel;
+            trendMetricCaptured = extractTrendMetricLabel(chart);
+          }
           pushScored(buildTrendInsightLine(chart, rel), 96);
           trendBulletsAdded += 1;
+          trendTitlesSeen.add(trendKey);
         }
       }
       continue;
     }
 
-    if (barBulletsAdded >= 2) continue;
+    if (chartBreakdownBulletsAdded >= MAX_CHART_BREAKDOWN_INSIGHTS) continue;
 
     const pairs = chartPairs(chart);
     if (pairs.length >= 2) {
       let hi = pairs[0];
+      let lo = pairs[0];
       for (const p of pairs) {
         if (p.value > hi.value) hi = p;
+        if (p.value < lo.value) lo = p;
       }
       if (pairs.some((p) => p.name !== hi.name)) {
         pushScored(
@@ -698,7 +829,39 @@ export function computeOverviewAiSummaryBullets(
           }),
           92
         );
-        barBulletsAdded += 1;
+        chartBreakdownBulletsAdded += 1;
+
+        const total = pairs.reduce((sum, p) => sum + p.value, 0);
+        const concentration = buildConcentrationInsightLine({
+          chartTitle: chart.title,
+          chartType: chart.chartType,
+          leaderName: hi.name,
+          leaderValue: hi.value,
+          total,
+        });
+        if (concentration && chartBreakdownBulletsAdded < MAX_CHART_BREAKDOWN_INSIGHTS) {
+          pushScored(concentration, 86);
+          chartBreakdownBulletsAdded += 1;
+        }
+
+        if (
+          pairs.length >= 3 &&
+          lo.name !== hi.name &&
+          lo.value > 0 &&
+          hi.value / lo.value >= LAGGARD_SPREAD_RATIO_MIN &&
+          chartBreakdownBulletsAdded < MAX_CHART_BREAKDOWN_INSIGHTS
+        ) {
+          pushScored(
+            buildLaggardInsightLine({
+              chartTitle: chart.title,
+              chartType: chart.chartType,
+              laggardName: lo.name,
+              domain,
+            }),
+            84
+          );
+          chartBreakdownBulletsAdded += 1;
+        }
       }
     }
   }
@@ -712,7 +875,7 @@ export function computeOverviewAiSummaryBullets(
   });
   if (impact) pushScored(impact, 89);
 
-  for (const card of cards.slice(0, 5)) {
+  for (const card of cards) {
     const line = formatKpiSummaryLine(card);
     if (!line) continue;
     if (isLowValueKpiTitle(card.title)) continue;
@@ -778,7 +941,9 @@ export function computeOverviewAiSummaryBullets(
   }
 
   scored.sort((a, b) => b.score - a.score);
-  const out = scored.slice(0, 5).map((item) => item.text);
+  const out = scored
+    .slice(0, OVERVIEW_AI_SUMMARY_MAX_BULLETS)
+    .map((item) => item.text);
   const minBullets = 3;
   const neutralFill = [
     `Ask a focused question in AI Insights to go deeper on any chart signal.`,
@@ -794,5 +959,5 @@ export function computeOverviewAiSummaryBullets(
       out.push(s);
     }
   }
-  return out.slice(0, 5);
+  return out.slice(0, OVERVIEW_AI_SUMMARY_MAX_BULLETS);
 }

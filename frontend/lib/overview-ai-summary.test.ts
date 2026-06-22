@@ -8,6 +8,9 @@ import {
   computeOverviewAiSummaryBullets,
   DURATION_LATENCY_METRIC_RE,
   inferOverviewSummaryDomain,
+  OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE,
+  OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+  partitionOverviewAiSummaryBullets,
   type ComputeOverviewAiSummaryArgs,
 } from "@/lib/overview-ai-summary";
 
@@ -83,7 +86,7 @@ describe("computeOverviewAiSummaryBullets per domain fixture", () => {
     (domain, payload) => {
       const bullets = bulletsFor(payload);
       expect(bullets.length).toBeGreaterThanOrEqual(3);
-      expect(bullets.length).toBeLessThanOrEqual(5);
+      expect(bullets.length).toBeLessThanOrEqual(OVERVIEW_AI_SUMMARY_MAX_BULLETS);
       for (const line of bullets) {
         expect(line.trim().length).toBeGreaterThan(10);
         expect(/\bn\/a\b/i.test(line)).toBe(false);
@@ -92,6 +95,100 @@ describe("computeOverviewAiSummaryBullets per domain fixture", () => {
       expect(frame.toLowerCase()).toContain("snapshot");
     }
   );
+
+  it("rich retail fixture produces more than initial visible insights", () => {
+    const retail = DOMAIN_PAYLOADS.find((p) => p.domain === "retail")!;
+    const bullets = bulletsFor(retail);
+    expect(bullets.length).toBeGreaterThan(OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE);
+    const { initial, extra, hasMore } = partitionOverviewAiSummaryBullets(bullets);
+    expect(initial).toHaveLength(OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE);
+    expect(extra.length).toBeGreaterThan(0);
+    expect(hasMore).toBe(true);
+  });
+
+  it("sparse monthly_sales fixture keeps meaningful insights without filler noise", () => {
+    const payload = DOMAIN_PAYLOADS.find((p) => p.domain === "monthly_sales")!;
+    const bullets = bulletsFor(payload);
+    expect(bullets.length).toBeGreaterThanOrEqual(3);
+    expect(bullets.some((b) => /sales/i.test(b) && /trend|improving|steady/i.test(b))).toBe(
+      true
+    );
+    expect(bullets.some((b) => /ask a focused question in ai insights/i.test(b))).toBe(
+      false
+    );
+  });
+
+  it("minimal dashboard yields at most initial visible insights without show-more", () => {
+    const bullets = computeOverviewAiSummaryBullets({
+      rows: 5,
+      columns: ["month", "sales"],
+      autoDashboard: {
+        kind: "sales",
+        type_label: "Sales",
+        cards: [{ title: "Total Revenue", value: "500", subtitle: null }],
+        charts: [],
+      },
+      profile: {
+        column_types: { sales: "number", month: "category" },
+        summary_stats: { mean: { sales: 100 }, std: { sales: 10 }, max: { sales: 120 }, min: { sales: 80 } },
+      },
+      primaryMetricColumn: "sales",
+      groupingColumn: null,
+      dateColumn: "month",
+    });
+    expect(bullets.length).toBeLessThanOrEqual(OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE);
+    expect(partitionOverviewAiSummaryBullets(bullets).hasMore).toBe(false);
+  });
+
+  it("showcase dataset can surface 8–12 ranked insights when charts and KPIs are rich", () => {
+    const showcase = DOMAIN_PAYLOADS.find((p) => p.domain === "dashboard_showcase_dataset")!;
+    const bullets = bulletsFor(showcase);
+    expect(bullets.length).toBeGreaterThanOrEqual(8);
+    expect(bullets.length).toBeLessThanOrEqual(OVERVIEW_AI_SUMMARY_MAX_BULLETS);
+    expect(partitionOverviewAiSummaryBullets(bullets).extra.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("skips correlation scatter charts for misleading breakdown bullets", () => {
+    const bullets = computeOverviewAiSummaryBullets({
+      rows: 120,
+      columns: ["revenue", "profit", "region"],
+      autoDashboard: {
+        kind: "sales",
+        cards: [{ title: "Total Revenue", value: "1,000,000", subtitle: null }],
+        charts: [
+          {
+            title: "revenue vs profit (correlation)",
+            chartType: "scatter",
+            labels: ["100 / 20", "200 / 40"],
+            values: [0.9, 0.85],
+          },
+          {
+            title: "Top region by revenue",
+            chartType: "bar",
+            labels: ["North", "South"],
+            values: [500, 300],
+          },
+        ],
+      },
+      profile: {
+        column_types: { revenue: "number", profit: "number", region: "category" },
+      },
+      primaryMetricColumn: "revenue",
+      groupingColumn: "region",
+      dateColumn: null,
+    });
+    expect(bullets.some((b) => /\b100\s*\/\s*20\b/.test(b))).toBe(false);
+    expect(bullets.some((b) => /north/i.test(b) && /leading|highest/i.test(b))).toBe(
+      true
+    );
+  });
+
+  it("partitionOverviewAiSummaryBullets keeps ranking order", () => {
+    const sample = ["a", "b", "c", "d", "e", "f", "g"];
+    const { initial, extra } = partitionOverviewAiSummaryBullets(sample, 5);
+    expect(initial).toEqual(["a", "b", "c", "d", "e"]);
+    expect(extra).toEqual(["f", "g"]);
+  });
 
   it("hr fixture uses workforce language, not employee-count HR KPI echo", () => {
     const hr = DOMAIN_PAYLOADS.find((p) => p.domain === "hr")!;
