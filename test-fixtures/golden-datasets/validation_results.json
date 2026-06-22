@@ -1,0 +1,739 @@
+[
+  {
+    "file": "retail_gold_10000.csv",
+    "rows": 10000,
+    "columns": [
+      "order_date",
+      "month",
+      "quarter",
+      "year",
+      "region",
+      "state",
+      "city",
+      "customer_segment",
+      "customer_age_group",
+      "product_category",
+      "sub_category",
+      "product_name",
+      "quantity",
+      "sales_amount",
+      "profit",
+      "discount_pct",
+      "shipping_cost",
+      "delivery_days",
+      "customer_rating",
+      "campaign_name",
+      "marketing_channel"
+    ],
+    "column_count": 21,
+    "quality": {
+      "empty_columns": [],
+      "duplicate_columns": [],
+      "null_pct_by_column": {
+        "order_date": 0.0,
+        "month": 0.0,
+        "quarter": 0.0,
+        "year": 0.0,
+        "region": 0.0,
+        "state": 0.0,
+        "city": 0.0,
+        "customer_segment": 0.0,
+        "customer_age_group": 0.0,
+        "product_category": 0.0,
+        "sub_category": 0.0,
+        "product_name": 0.0,
+        "quantity": 0.0,
+        "sales_amount": 0.0,
+        "profit": 0.0,
+        "discount_pct": 0.0,
+        "shipping_cost": 0.0,
+        "delivery_days": 0.0,
+        "customer_rating": 0.0,
+        "campaign_name": 0.0,
+        "marketing_channel": 0.0
+      },
+      "numeric_summary": [
+        "year: mean=2023.00, std=0.81, min=2022.00, max=2024.00",
+        "quantity: mean=3.32, std=6.38, min=1.00, max=80.00",
+        "sales_amount: mean=784.97, std=1904.05, min=11.34, max=52600.71",
+        "profit: mean=80.10, std=342.78, min=-4644.89, max=13626.08",
+        "discount_pct: mean=0.10, std=0.10, min=0.00, max=0.45",
+        "shipping_cost: mean=18.32, std=7.75, min=5.11, max=74.21",
+        "delivery_days: mean=5.33, std=3.26, min=1.00, max=28.00",
+        "customer_rating: mean=3.95, std=0.51, min=1.70, max=5.00"
+      ]
+    },
+    "semantic_mapping": {
+      "product": "product_category",
+      "sales": "sales_amount",
+      "region": "region",
+      "customer": "customer_rating",
+      "profit": "profit",
+      "date": "order_date"
+    },
+    "executive_domain": "sales",
+    "auto_dashboard_kind": "sales",
+    "kpi_cards": [
+      {
+        "title": "Total Sales",
+        "value": "7,849,721"
+      },
+      {
+        "title": "Total Profit",
+        "value": "801,021"
+      },
+      {
+        "title": "Average Revenue per Record",
+        "value": "785"
+      },
+      {
+        "title": "Top Product Category by Sales amount",
+        "value": "Electronics"
+      },
+      {
+        "title": "Top Region by Sales amount",
+        "value": "North"
+      }
+    ],
+    "kpi_count": 5,
+    "auto_charts": [
+      {
+        "title": "Monthly Sales Amount Trend",
+        "chartType": "line"
+      },
+      {
+        "title": "Year by Customer Segment",
+        "chartType": "horizontalBar"
+      },
+      {
+        "title": "Product Category Sales Amount Share",
+        "chartType": "donut"
+      },
+      {
+        "title": "Sales Amount vs Profit",
+        "chartType": "scatter"
+      },
+      {
+        "title": "Shipping Cost by Marketing Channel",
+        "chartType": "bar"
+      },
+      {
+        "title": "Delivery Days by Sub Category",
+        "chartType": "horizontalBar"
+      },
+      {
+        "title": "Monthly Profit Trend",
+        "chartType": "area"
+      },
+      {
+        "title": "Monthly Year Trend",
+        "chartType": "area"
+      }
+    ],
+    "auto_chart_count": 8,
+    "auto_chart_types": {
+      "line": 1,
+      "horizontalbar": 2,
+      "donut": 1,
+      "scatter": 1,
+      "bar": 1,
+      "area": 2
+    },
+    "opportunity_inventory": {
+      "trend": [
+        "Monthly Sales Amount Trend",
+        "Monthly Profit Trend",
+        "Monthly Year Trend"
+      ],
+      "ranking": [
+        "Sales Amount by Region",
+        "Profit by Product Category",
+        "Year by Customer Segment",
+        "Quantity by Campaign Name",
+        "Discount Pct by Marketing Channel",
+        "Shipping Cost by Sub Category"
+      ],
+      "composition": [
+        "Region Profit Share",
+        "Product Category Sales Amount Share",
+        "Customer Segment Profit Share",
+        "Campaign Name Sales Amount Share",
+        "Marketing Channel Profit Share",
+        "Customer Age Group Sales Amount Share"
+      ],
+      "correlation": [
+        "Sales Amount vs Profit",
+        "Sales Amount vs Quantity"
+      ],
+      "geographic": [
+        "Profit by Region",
+        "Shipping Cost by Marketing Channel"
+      ],
+      "compare": [
+        "Year by Product Category",
+        "Quantity by Customer Segment",
+        "Discount Pct by Campaign Name",
+        "Delivery Days by Sub Category"
+      ]
+    },
+    "opportunity_counts": {
+      "trend": 3,
+      "ranking": 6,
+      "composition": 6,
+      "correlation": 2,
+      "geographic": 2,
+      "compare": 4
+    },
+    "discovered_chart_types": {
+      "line": 1,
+      "area": 2,
+      "horizontalbar": 7,
+      "donut": 6,
+      "scatter": 2,
+      "bar": 5
+    },
+    "coverage_telemetry": {
+      "maxCharts": 8,
+      "selectedCount": 8,
+      "discoveredCount": 23,
+      "mergedCandidateCount": 27,
+      "bucketsFilled": [
+        "compare"
+      ],
+      "bucketsMissing": [
+        "trend",
+        "ranking",
+        "composition",
+        "distribution",
+        "relationship",
+        "geographic"
+      ],
+      "bucketsInDiscovery": [
+        "compare",
+        "composition",
+        "geographic",
+        "ranking",
+        "relationship",
+        "trend"
+      ],
+      "chartTypesSelected": [
+        "line",
+        "horizontalbar",
+        "donut",
+        "scatter",
+        "bar",
+        "horizontalbar",
+        "area",
+        "area"
+      ],
+      "inventoryRichness": {
+        "dates": 2,
+        "numerics": 8,
+        "categories": 7,
+        "geographic": 4
+      }
+    },
+    "histogram_routing": {
+      "question": "Show distribution of delivery days",
+      "routed": true,
+      "chart_type": "histogram",
+      "title": "Histogram \u2014 delivery days",
+      "bucket_count": 12,
+      "column": "delivery_days"
+    },
+    "raw_kpis": {
+      "total_rows": 10000,
+      "total_columns": 21,
+      "total_sales": 7849721.13,
+      "top_product": {
+        "name": "Electronics",
+        "value": 4269021.06
+      },
+      "unique_products": 4
+    }
+  },
+  {
+    "file": "hr_gold_5000.csv",
+    "rows": 5000,
+    "columns": [
+      "employee_id",
+      "gender",
+      "age",
+      "age_band",
+      "department",
+      "job_family",
+      "job_level",
+      "location",
+      "hire_date",
+      "exit_date",
+      "salary",
+      "bonus",
+      "performance_rating",
+      "engagement_score",
+      "training_hours",
+      "manager_flag",
+      "attrition_flag",
+      "promotion_flag"
+    ],
+    "column_count": 18,
+    "quality": {
+      "empty_columns": [],
+      "duplicate_columns": [],
+      "null_pct_by_column": {
+        "employee_id": 0.0,
+        "gender": 0.0,
+        "age": 0.0,
+        "age_band": 0.0,
+        "department": 0.0,
+        "job_family": 0.0,
+        "job_level": 0.0,
+        "location": 0.0,
+        "hire_date": 0.0,
+        "exit_date": 87.82,
+        "salary": 0.0,
+        "bonus": 0.0,
+        "performance_rating": 0.0,
+        "engagement_score": 0.0,
+        "training_hours": 0.0,
+        "manager_flag": 0.0,
+        "attrition_flag": 0.0,
+        "promotion_flag": 0.0
+      },
+      "numeric_summary": [
+        "age: mean=37.71, std=8.64, min=22.00, max=62.00",
+        "salary: mean=90237.10, std=41197.06, min=31797.76, max=286328.83",
+        "bonus: mean=7191.08, std=5045.96, min=332.81, max=40192.31",
+        "performance_rating: mean=3.59, std=0.64, min=1.30, max=5.00",
+        "engagement_score: mean=3.64, std=0.64, min=1.20, max=5.00",
+        "training_hours: mean=27.95, std=11.88, min=4.00, max=78.00",
+        "manager_flag: mean=0.29, std=0.45, min=0.00, max=1.00",
+        "attrition_flag: mean=0.12, std=0.33, min=0.00, max=1.00"
+      ]
+    },
+    "semantic_mapping": {
+      "product": "age_band",
+      "sales": "training_hours",
+      "region": "location",
+      "customer": "age",
+      "profit": "age",
+      "date": "exit_date"
+    },
+    "executive_domain": "hr",
+    "auto_dashboard_kind": "hr",
+    "kpi_cards": [
+      {
+        "title": "Total Employees",
+        "value": "5,000"
+      },
+      {
+        "title": "Average Salary",
+        "value": "90,237"
+      },
+      {
+        "title": "Average Bonus",
+        "value": "7,191"
+      },
+      {
+        "title": "Department Count",
+        "value": "7"
+      },
+      {
+        "title": "Top Department",
+        "value": "Engineering"
+      }
+    ],
+    "kpi_count": 5,
+    "auto_charts": [
+      {
+        "title": "Monthly Training Hours Trend",
+        "chartType": "line"
+      },
+      {
+        "title": "Age by Age Band",
+        "chartType": "horizontalBar"
+      },
+      {
+        "title": "Job Family Training Hours Share",
+        "chartType": "donut"
+      },
+      {
+        "title": "Records by Department",
+        "chartType": "horizontalBar"
+      },
+      {
+        "title": "Salary vs Manager Flag",
+        "chartType": "scatter"
+      },
+      {
+        "title": "Manager Flag by Location",
+        "chartType": "bar"
+      },
+      {
+        "title": "Bonus by Gender",
+        "chartType": "bar"
+      },
+      {
+        "title": "Monthly Age Trend",
+        "chartType": "area"
+      }
+    ],
+    "auto_chart_count": 8,
+    "auto_chart_types": {
+      "line": 1,
+      "horizontalbar": 2,
+      "donut": 1,
+      "scatter": 1,
+      "bar": 2,
+      "area": 1
+    },
+    "opportunity_inventory": {
+      "trend": [
+        "Monthly Training Hours Trend",
+        "Monthly Age Trend",
+        "Monthly Salary Trend"
+      ],
+      "ranking": [
+        "Training Hours by Department",
+        "Age by Age Band",
+        "Salary by Gender",
+        "Bonus by Job Family",
+        "Performance Rating by Job Level",
+        "Engagement Score by Location"
+      ],
+      "composition": [
+        "Department Age Share",
+        "Age Band Training Hours Share",
+        "Gender Age Share",
+        "Job Family Training Hours Share",
+        "Job Level Age Share",
+        "Location Training Hours Share"
+      ],
+      "correlation": [
+        "Salary vs Bonus",
+        "Salary vs Manager Flag"
+      ],
+      "compare": [
+        "Age by Department",
+        "Salary by Age Band",
+        "Bonus by Gender",
+        "Performance Rating by Job Family",
+        "Engagement Score by Job Level"
+      ],
+      "geographic": [
+        "Manager Flag by Location"
+      ],
+      "distribution": [
+        "Records by Gender",
+        "Records by Age Band",
+        "Records by Department"
+      ]
+    },
+    "opportunity_counts": {
+      "trend": 3,
+      "ranking": 6,
+      "composition": 6,
+      "correlation": 2,
+      "compare": 5,
+      "geographic": 1,
+      "distribution": 3
+    },
+    "discovered_chart_types": {
+      "line": 1,
+      "area": 2,
+      "horizontalbar": 12,
+      "donut": 6,
+      "scatter": 2,
+      "bar": 3
+    },
+    "coverage_telemetry": {
+      "maxCharts": 8,
+      "selectedCount": 8,
+      "discoveredCount": 26,
+      "mergedCandidateCount": 29,
+      "bucketsFilled": [
+        "compare"
+      ],
+      "bucketsMissing": [
+        "trend",
+        "ranking",
+        "composition",
+        "distribution",
+        "relationship",
+        "geographic"
+      ],
+      "bucketsInDiscovery": [
+        "compare",
+        "composition",
+        "distribution",
+        "geographic",
+        "ranking",
+        "relationship",
+        "trend"
+      ],
+      "chartTypesSelected": [
+        "line",
+        "horizontalbar",
+        "donut",
+        "horizontalbar",
+        "scatter",
+        "bar",
+        "bar",
+        "area"
+      ],
+      "inventoryRichness": {
+        "dates": 2,
+        "numerics": 9,
+        "categories": 5,
+        "geographic": 1
+      }
+    },
+    "histogram_routing": {
+      "question": "Show salary distribution",
+      "routed": true,
+      "chart_type": "histogram",
+      "title": "Histogram \u2014 salary",
+      "bucket_count": 12,
+      "column": "salary"
+    },
+    "raw_kpis": {
+      "total_rows": 5000,
+      "total_columns": 18,
+      "total_sales": null,
+      "top_product": null,
+      "unique_products": 5
+    }
+  },
+  {
+    "file": "banking_gold_10000.csv",
+    "rows": 10000,
+    "columns": [
+      "customer_id",
+      "customer_segment",
+      "region",
+      "city",
+      "product_type",
+      "loan_balance",
+      "deposit_balance",
+      "credit_score",
+      "utilization_pct",
+      "spend_amount",
+      "transaction_count",
+      "delinquency_flag",
+      "account_age_months",
+      "monthly_income",
+      "month"
+    ],
+    "column_count": 15,
+    "quality": {
+      "empty_columns": [],
+      "duplicate_columns": [],
+      "null_pct_by_column": {
+        "customer_id": 0.0,
+        "customer_segment": 0.0,
+        "region": 0.0,
+        "city": 0.0,
+        "product_type": 0.0,
+        "loan_balance": 0.0,
+        "deposit_balance": 0.0,
+        "credit_score": 0.0,
+        "utilization_pct": 0.0,
+        "spend_amount": 0.0,
+        "transaction_count": 0.0,
+        "delinquency_flag": 0.0,
+        "account_age_months": 0.0,
+        "monthly_income": 0.0,
+        "month": 0.0
+      },
+      "numeric_summary": [
+        "loan_balance: mean=2630510.58, std=7034815.18, min=8928.28, max=75384086.63",
+        "deposit_balance: mean=559183.93, std=937592.97, min=9581.76, max=10253373.01",
+        "credit_score: mean=692.62, std=58.39, min=520.00, max=820.00",
+        "utilization_pct: mean=0.50, std=0.22, min=0.06, max=0.98",
+        "spend_amount: mean=35797.40, std=61416.48, min=1132.41, max=1396303.40",
+        "transaction_count: mean=27.67, std=11.86, min=3.00, max=68.00",
+        "delinquency_flag: mean=0.09, std=0.28, min=0.00, max=1.00",
+        "account_age_months: mean=109.59, std=50.72, min=6.00, max=215.00"
+      ]
+    },
+    "semantic_mapping": {
+      "product": "product_type",
+      "sales": "spend_amount",
+      "region": "region",
+      "customer": "customer_id",
+      "profit": "account_age_months",
+      "date": "month"
+    },
+    "executive_domain": "banking",
+    "auto_dashboard_kind": "finance",
+    "kpi_cards": [
+      {
+        "title": "Total Loan Balance",
+        "value": "26,305,105,819"
+      },
+      {
+        "title": "Total Spend Amount",
+        "value": "357,973,985"
+      },
+      {
+        "title": "Average Spend Amount",
+        "value": "35,797"
+      },
+      {
+        "title": "Top Customer Segment by Loan balance",
+        "value": "Corporate"
+      },
+      {
+        "title": "Top Region by Spend amount",
+        "value": "North"
+      }
+    ],
+    "kpi_count": 5,
+    "auto_charts": [
+      {
+        "title": "Monthly Spend Amount Trend",
+        "chartType": "line"
+      },
+      {
+        "title": "Account Age Months by Product Type",
+        "chartType": "horizontalBar"
+      },
+      {
+        "title": "Product Type Spend Amount Share",
+        "chartType": "donut"
+      },
+      {
+        "title": "Spend Amount vs Deposit Balance",
+        "chartType": "scatter"
+      },
+      {
+        "title": "Credit Score by City",
+        "chartType": "horizontalBar"
+      },
+      {
+        "title": "Monthly Account Age Months Trend",
+        "chartType": "area"
+      },
+      {
+        "title": "Monthly Loan Balance Trend",
+        "chartType": "area"
+      },
+      {
+        "title": "Spend Amount vs Loan Balance",
+        "chartType": "scatter"
+      }
+    ],
+    "auto_chart_count": 8,
+    "auto_chart_types": {
+      "line": 1,
+      "horizontalbar": 2,
+      "donut": 1,
+      "scatter": 2,
+      "area": 2
+    },
+    "opportunity_inventory": {
+      "trend": [
+        "Monthly Spend Amount Trend",
+        "Monthly Account Age Months Trend",
+        "Monthly Loan Balance Trend"
+      ],
+      "ranking": [
+        "Spend Amount by Region",
+        "Account Age Months by Product Type",
+        "Loan Balance by Customer Segment",
+        "Deposit Balance by City"
+      ],
+      "composition": [
+        "Region Account Age Months Share",
+        "Product Type Spend Amount Share",
+        "Customer Segment Account Age Months Share"
+      ],
+      "correlation": [
+        "Spend Amount vs Loan Balance",
+        "Spend Amount vs Deposit Balance"
+      ],
+      "geographic": [
+        "Account Age Months by Region",
+        "Credit Score by City"
+      ],
+      "compare": [
+        "Loan Balance by Product Type",
+        "Deposit Balance by Customer Segment"
+      ]
+    },
+    "opportunity_counts": {
+      "trend": 3,
+      "ranking": 4,
+      "composition": 3,
+      "correlation": 2,
+      "geographic": 2,
+      "compare": 2
+    },
+    "discovered_chart_types": {
+      "line": 1,
+      "area": 2,
+      "horizontalbar": 5,
+      "donut": 3,
+      "scatter": 2,
+      "bar": 3
+    },
+    "coverage_telemetry": {
+      "maxCharts": 8,
+      "selectedCount": 8,
+      "discoveredCount": 16,
+      "mergedCandidateCount": 20,
+      "bucketsFilled": [
+        "compare"
+      ],
+      "bucketsMissing": [
+        "trend",
+        "ranking",
+        "composition",
+        "distribution",
+        "relationship",
+        "geographic"
+      ],
+      "bucketsInDiscovery": [
+        "compare",
+        "composition",
+        "geographic",
+        "ranking",
+        "relationship",
+        "trend"
+      ],
+      "chartTypesSelected": [
+        "line",
+        "horizontalbar",
+        "donut",
+        "scatter",
+        "horizontalbar",
+        "area",
+        "area",
+        "scatter"
+      ],
+      "inventoryRichness": {
+        "dates": 1,
+        "numerics": 9,
+        "categories": 2,
+        "geographic": 2
+      }
+    },
+    "histogram_routing": {
+      "question": "Show utilization rate distribution",
+      "routed": true,
+      "chart_type": "histogram",
+      "title": "Histogram \u2014 utilization pct",
+      "bucket_count": 12,
+      "column": "utilization_pct"
+    },
+    "raw_kpis": {
+      "total_rows": 10000,
+      "total_columns": 15,
+      "total_sales": 357973984.61,
+      "top_product": {
+        "name": "Personal Loan",
+        "value": 96015438.16
+      },
+      "unique_products": 6
+    }
+  }
+]
