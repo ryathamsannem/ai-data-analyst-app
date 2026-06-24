@@ -38,7 +38,7 @@ DATE_PHRASE_ALIASES: Dict[str, Tuple[str, ...]] = {
     "created date": ("created_date", "created_at", "date"),
     "period": ("report_date", "order_date", "date", "period"),
     "periods": ("report_date", "order_date", "date", "period"),
-    "month": ("report_date", "order_date", "date", "month"),
+    "month": ("month", "report_date", "order_date", "date", "period"),
     "date": ("report_date", "order_date", "date"),
 }
 
@@ -196,10 +196,38 @@ def _infer_date_like_columns(df: pd.DataFrame, profile: Dict[str, Any]) -> List[
     return out
 
 
+def _column_is_duration_not_calendar(col: str) -> bool:
+    """Exclude tenure/age columns from calendar period hints (e.g. account_age_months)."""
+    cn = _norm_col(str(col))
+    if "account age" in cn or "age month" in cn or "tenure" in cn:
+        return True
+    if cn.startswith("monthly_") or cn.startswith("monthly "):
+        return True
+    if re.search(r"\b(age|tenure|duration|elapsed)\b", cn) and re.search(
+        r"\b(month|year|day)s?\b", cn
+    ):
+        return True
+    return False
+
+
 def _column_matches_hint(col: str, hint: str) -> bool:
     cn = _norm_col(col).replace(" ", "_")
     h = _norm_col(hint).replace(" ", "_")
-    return h == cn or h in cn or cn in h
+    if _column_is_duration_not_calendar(col) and h in (
+        "month",
+        "year",
+        "date",
+        "period",
+    ):
+        return False
+    if cn == h:
+        return True
+    if h in ("month", "year", "day", "week", "period"):
+        parts = cn.split("_")
+        if h in parts:
+            return True
+        return False
+    return h in cn or cn in h
 
 
 def date_column_named_in_question(

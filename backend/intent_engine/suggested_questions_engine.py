@@ -23,6 +23,8 @@ VERTICAL_METRIC_PRIORITY: Dict[str, Tuple[str, ...]] = {
     "banking": (
         "loan_balance",
         "deposit_balance",
+        "utilization_pct",
+        "utilization",
         "credit_utilization",
         "delinquency_rate",
         "npl_amount",
@@ -293,10 +295,57 @@ def _add_candidate(
     )
 
 
+def _metric_can_trend(
+    df: pd.DataFrame,
+    profile: Dict[str, Any],
+    metric: str,
+    date_col: str,
+) -> bool:
+    if df is None or df.empty or not metric or not date_col:
+        return False
+    if metric not in df.columns or date_col not in df.columns:
+        return False
+    ct = profile.get("column_types", {}) if profile else {}
+    if ct.get(metric) != "number":
+        return False
+    try:
+        from intent_engine.trend_date_resolve import group_column_is_time_series_eligible
+
+        return group_column_is_time_series_eligible(df, date_col)
+    except Exception:
+        return False
+
+
+def _pick_trend_metric(
+    vertical: str,
+    metrics: Sequence[str],
+    columns: Sequence[str],
+) -> Optional[str]:
+    """Prefer rate/pct metrics for trends; banking favors utilization over spend."""
+    if vertical == "banking":
+        util = _find_column_by_tokens(
+            list(columns), ("utilization_pct", "utilization"), pool=list(metrics)
+        )
+        if util:
+            return util
+    for m in metrics:
+        ml = _norm_col(m)
+        if any(t in ml for t in ("pct", "percent", "rate", "ratio", "score")):
+            return m
+    if len(metrics) >= 2:
+        return metrics[1]
+    return metrics[0] if metrics else None
+
+
 def _generate_basic_candidates(
     metrics: Sequence[str],
     dims: Sequence[str],
     date_col: Optional[str],
+    *,
+    vertical: str = "generic",
+    columns: Optional[Sequence[str]] = None,
+    df: Optional[pd.DataFrame] = None,
+    profile: Optional[Dict[str, Any]] = None,
 ) -> List[QuestionCandidate]:
     out: List[QuestionCandidate] = []
     if not metrics or not dims:
@@ -336,18 +385,26 @@ def _generate_basic_candidates(
         )
 
     if date_col:
-        trend_metric = metrics[min(2, len(metrics) - 1)]
-        _add_candidate(
-            out,
-            text=(
-                f"How does {_q_label(trend_metric)} trend over {_q_label(date_col)}?"
-            ),
-            category="basic",
-            intent="trend",
-            metric=trend_metric,
-            dimension=date_col,
-            score=8.0,
+        trend_metric = _pick_trend_metric(
+            vertical, metrics, columns or metrics
         )
+        if trend_metric and (
+            df is None
+            or profile is None
+            or _metric_can_trend(df, profile, trend_metric, date_col)
+        ):
+            _add_candidate(
+                out,
+                text=(
+                    f"How does {_q_label(trend_metric)} trend over "
+                    f"{_q_label(date_col)}?"
+                ),
+                category="basic",
+                intent="trend",
+                metric=trend_metric,
+                dimension=date_col,
+                score=8.0,
+            )
 
     if len(dims) > 0 and len(metrics) > 2:
         _add_candidate(
@@ -642,8 +699,43 @@ def compose_suggested_questions(
 
     candidates: List[QuestionCandidate] = []
     candidates.extend(_generate_executive_candidates(vertical, metrics, dims))
-    candidates.extend(_generate_basic_candidates(metrics, dims, date_for_trend))
+    candidates.extend(
+        _generate_basic_candidates(
+            metrics,
+            dims,
+            date_for_trend,
+            vertical=vertical,
+            columns=columns,
+            df=df,
+            profile=profile,
+        )
+    )
     candidates.extend(_generate_relationship_candidates(metrics, dims))
+
+    if vertical == "banking" and date_for_trend:
+        util = _find_column_by_tokens(columns, ("utilization_pct", "utilization"))
+        if util and _metric_can_trend(df, profile, util, date_for_trend):
+            _add_candidate(
+                candidates,
+                text=f"Show {_q_label(util)} trend by {_q_label(date_for_trend)}",
+                category="basic",
+                intent="trend",
+                metric=util,
+                dimension=date_for_trend,
+                score=9.8,
+            )
+
+    # Drop trend suggestions that cannot be charted on this dataset.
+    candidates = [
+        c
+        for c in candidates
+        if c.intent != "trend"
+        or (
+            c.metric
+            and c.dimension
+            and _metric_can_trend(df, profile, c.metric, c.dimension)
+        )
+    ]
 
     selected = select_diverse_candidates(candidates, max_n=6)
     if len(selected) >= 5:

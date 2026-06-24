@@ -108,13 +108,18 @@ type OverviewScoredInsight = {
 const DOMAIN_TOPIC_TARGETS: Partial<Record<SummaryDomain, readonly string[]>> = {
   retail: ["revenue", "profit", "concentration", "region", "trend", "laggard"],
   sales: ["revenue", "profit", "concentration", "region", "trend", "laggard"],
-  hr: ["workforce", "attrition", "compensation", "demographics", "department"],
+  hr: ["attrition", "compensation", "department", "payroll", "workforce", "demographics"],
   banking: ["spending", "loans", "risk", "utilization", "segments"],
 };
 
 const EXTREME_SCORE_OVERRIDE = 97;
 const MAX_TOPIC_IN_INITIAL = 2;
 const MAX_TOPIC_IN_FULL = 3;
+
+/** HR-only: long-tail profile warnings need stronger skew before surfacing. */
+const HR_LONG_TAIL_Z_MIN = 3.5;
+const HR_PROFILE_LONG_TAIL_SCORE = 28;
+const HR_DEMOGRAPHIC_SCORE_PENALTY = 46;
 
 const DOMAIN_METRIC_PRIORITY: Partial<Record<SummaryDomain, RegExp[]>> = {
   retail: [
@@ -660,6 +665,54 @@ function clampInsightScore(score: number): number {
   return Math.max(0, Math.min(100, score));
 }
 
+/** HR-only score nudges: demote weak demographics, boost workforce business signals. */
+function hrInsightScoreAdjustment(args: {
+  metricKey: string;
+  dimensionKey: string;
+  insightKind: "leader" | "concentration" | "laggard" | "kpi" | "impact" | "profile" | "trend";
+  chartTitle?: string;
+}): number {
+  const met = args.metricKey;
+  const dim = args.dimensionKey;
+  const blob = `${met} ${dim} ${args.chartTitle ?? ""}`.toLowerCase();
+  let adj = 0;
+
+  const isAgeDemographic =
+    /\bage band\b|\bage\b/.test(dim) || (/\bage\b/.test(met) && /\bage band\b/.test(blob));
+  const isGenderDemographic = /\bgender\b/.test(dim) || /\bgender\b/.test(blob);
+  if (isAgeDemographic || isGenderDemographic) {
+    adj -= HR_DEMOGRAPHIC_SCORE_PENALTY;
+  }
+
+  if (
+    args.insightKind === "laggard" &&
+    /\bdepartment\b/.test(dim) &&
+    /\brecord\b/.test(met)
+  ) {
+    adj -= 38;
+  }
+
+  if (/\battrition\b/.test(blob)) adj += 16;
+  if (/\bsalary\b/.test(blob)) adj += 14;
+  if (/\bbonus\b/.test(blob) && !isGenderDemographic) adj += 12;
+  if (/\btraining hours\b/.test(blob)) adj += 12;
+  if (/\bengagement\b/.test(blob)) adj += 12;
+  if (/\bpromotion\b/.test(blob)) adj += 12;
+  if (/\bpayroll\b/.test(blob)) adj += 10;
+  if (
+    args.insightKind === "leader" &&
+    /\bdepartment\b/.test(dim) &&
+    (/\brecord\b/.test(met) || /\bemployee\b/.test(met) || /\bheadcount\b/.test(met))
+  ) {
+    adj += 14;
+  }
+  if (args.insightKind === "concentration" && /\btraining hours\b/.test(blob)) {
+    adj += 10;
+  }
+
+  return adj;
+}
+
 function normalizeInsightKey(raw: string | null | undefined): string {
   return String(raw ?? "")
     .toLowerCase()
@@ -762,7 +815,7 @@ function parseKpiInsightMeta(card: OverviewAiSummaryCard): {
 }
 
 function scoreKpiInsight(card: OverviewAiSummaryCard, domain: SummaryDomain): number {
-  if (isLowValueKpiTitle(card.title)) return 0;
+  if (isLowValueKpiTitle(card.title, domain)) return 0;
   const titleLc = card.title.toLowerCase();
   const comparative = /\b(top|highest|lowest|lead|best|worst|maximum|minimum|peak)\b/.test(
     titleLc
@@ -783,6 +836,17 @@ function scoreKpiInsight(card: OverviewAiSummaryCard, domain: SummaryDomain): nu
   if (/^top region by\b/i.test(titleLc.trim())) score -= 14;
   if (/^top customer segment by loan balance$/i.test(titleLc.trim())) score -= 22;
   if (/^top department$/i.test(titleLc.trim())) score -= 18;
+  if (domain === "hr") {
+    score += hrInsightScoreAdjustment({
+      metricKey: meta.metricKey ?? titleLc,
+      dimensionKey: meta.dimensionKey ?? "",
+      insightKind: "kpi",
+      chartTitle: card.title,
+    });
+    if (/^average salary$/i.test(titleLc.trim())) score += 6;
+    if (/^average bonus$/i.test(titleLc.trim())) score += 8;
+    if (/^total employees$/i.test(titleLc.trim())) score += 10;
+  }
   return clampInsightScore(score);
 }
 
@@ -832,6 +896,15 @@ function scoreBreakdownChartInsight(args: {
     if (/\b(profit|margin|revenue|sales|attrition|delinquency|risk)\b/i.test(ctx.metricKey)) {
       score += 10;
     }
+  }
+
+  if (args.domain === "hr") {
+    score += hrInsightScoreAdjustment({
+      metricKey: ctx.metricKey,
+      dimensionKey: ctx.dimensionKey,
+      insightKind: args.insightKind,
+      chartTitle: args.chartTitle,
+    });
   }
 
   return clampInsightScore(score);
@@ -909,7 +982,13 @@ export function inferInsightTopicCategory(
   if (domain === "hr") {
     if (insight.kind === "frame") return "workforce";
     if (/\battrition\b/.test(blob)) return "attrition";
-    if (/\bsalary\b|\bbonus\b|\bcompensation\b|\bpay\b/.test(blob)) return "compensation";
+    if (
+      insight.metricKey === "bonus" ||
+      (/\bbonus\b/.test(blob) && insight.kind === "kpi" && !/\bsalary\b/.test(blob))
+    ) {
+      return "payroll";
+    }
+    if (/\bsalary\b|\bcompensation\b|\bpay\b/.test(blob)) return "compensation";
     if (/\bage band\b|\bgender\b|\bdemographic\b/.test(blob)) return "demographics";
     if (/\bdepartment\b|\bheadcount\b|\bemployee\b|\brecords by\b/.test(blob)) return "department";
     return "workforce";
@@ -1336,7 +1415,7 @@ function collectBusinessImpactLines(args: {
     if (/\battrition_flag\b/i.test(args.columns.join(" "))) {
       push({
         text: "Sales and Support departments typically drive the highest attrition pressure in workforce slices like this.",
-        score: 90,
+        score: 94,
         topicKey: "impact|attrition|workforce",
         topicCategory: "attrition",
         outcomeKey: "attrition|workforce_pressure",
@@ -1409,11 +1488,14 @@ function isNaDisplayValue(value: string): boolean {
   return /^n\/a$/i.test(v) || v === "—" || v === "-";
 }
 
-function isLowValueKpiTitle(title: string): boolean {
+function isLowValueKpiTitle(title: string, domain: SummaryDomain = "generic"): boolean {
   const t = title.trim().toLowerCase();
   if (!t) return true;
   if (/^(records?\s+in\s+view|row\s+count|column\s+count|fields?\s+in\s+view|department count)\b/.test(t)) {
     return true;
+  }
+  if (domain === "hr" && /^total employees$/i.test(title.trim())) {
+    return false;
   }
   if (
     /^(total|sum|count|records?|rows?|columns?)\b/.test(t) &&
@@ -1799,10 +1881,11 @@ export function computeOverviewAiSummaryBullets(
     ) {
       const zHi = (max - mean) / std;
       const zLo = (mean - min) / std;
-      if (zHi > 2.75 || zLo > 2.75) {
+      const longTailZMin = domain === "hr" ? HR_LONG_TAIL_Z_MIN : 2.75;
+      if (zHi > longTailZMin || zLo > longTailZMin) {
         pushInsight({
           text: `The primary measure shows long tails—spot-check extremes before trusting aggregates.`,
-          score: 58,
+          score: domain === "hr" ? HR_PROFILE_LONG_TAIL_SCORE : 58,
           kind: "profile",
         });
       } else if (max != null && min != null && mean != null) {

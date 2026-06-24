@@ -8517,6 +8517,11 @@ def _pick_default_metric_column(
                 sc += 85
             if n == "spend amount" or n.endswith("spend_amount"):
                 sc -= 120
+        if re.search(r"\butilization\b", ql):
+            if "utilization" in n:
+                sc += 95
+            if n == "spend amount" or n.endswith("spend_amount"):
+                sc -= 120
         if re.search(r"\bproduction\s+loss\b", ql) or re.search(
             r"\bproduction[_\s]+loss\b", ql.replace("_", " ")
         ):
@@ -15822,6 +15827,22 @@ def _compute_visualization_for_question_body(
     except Exception as _rb_exc:
         print(
             "[routing_plan] attach skipped:",
+            type(_rb_exc).__name__,
+            str(_rb_exc)[:300],
+            flush=True,
+        )
+
+    try:
+        from intent_engine.reasoning_blocks import attach_reasoning_blocks_to_analysis
+
+        attach_reasoning_blocks_to_analysis(
+            analysis_ctx,
+            labels=list(visualization.get("labels") or []),
+            values=list(visualization.get("values") or []),
+        )
+    except Exception as _rb_exc:
+        print(
+            "[reasoning_blocks] attach skipped:",
             type(_rb_exc).__name__,
             str(_rb_exc)[:300],
             flush=True,

@@ -120,6 +120,21 @@ describe("golden dataset AI summary quality", () => {
     expect(top.filter((b) => /\bengineering\b/i.test(b)).length).toBeLessThanOrEqual(1);
   });
 
+  it("hr golden prioritizes business signals over demographic noise in top 5", () => {
+    const hr = GOLDEN_PAYLOADS.find((p) => p.domain === "hr_gold_5000")!;
+    const top = partitionOverviewAiSummaryBullets(bulletsFor(hr)).initial;
+    expect(top.some((b) => /\battrition\b/i.test(b))).toBe(true);
+    expect(top.some((b) => /\bsalary\b/i.test(b))).toBe(true);
+    expect(top.some((b) => /\bbonus\b/i.test(b))).toBe(true);
+    expect(top.some((b) => /\bdepartment\b/i.test(b) && /\bengineering\b/i.test(b))).toBe(
+      true
+    );
+    expect(top.some((b) => /\blong tails\b/i.test(b))).toBe(false);
+    expect(top.some((b) => /\bage band\b/i.test(b))).toBe(false);
+    expect(top.some((b) => /\bgender\b/i.test(b))).toBe(false);
+    expect(top.some((b) => /\blowest department by records\b/i.test(b))).toBe(false);
+  });
+
   it("banking golden includes risk or utilization insight in top 5", () => {
     const banking = GOLDEN_PAYLOADS.find((p) => p.domain === "banking_gold_10000")!;
     const top = partitionOverviewAiSummaryBullets(bulletsFor(banking)).initial;

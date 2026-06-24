@@ -287,6 +287,10 @@ import {
   formatInsightSummary,
 } from "./components/ai-insight-answer-body";
 import {
+  parseReasoningBlocks,
+  type ReasoningBlock,
+} from "@/lib/reasoning-blocks";
+import {
   polishInsightNarrativeText,
   type DualMetricRoasLead,
 } from "@/lib/narrative-number-format";
@@ -318,6 +322,10 @@ import {
   aiInsightsAnswerDetailSummaryRecommendations,
   aiInsightsAnswerDetailsGroup,
   aiInsightsAnswerDetailsLabel,
+  aiInsightsReasoningBasis,
+  aiInsightsReasoningClaim,
+  aiInsightsReasoningItem,
+  aiInsightsReasoningList,
   aiInsightsAnswerHeader,
   aiInsightsAnswerKicker,
   aiInsightsAnswerLead,
@@ -3216,6 +3224,7 @@ type AlignedAnalysisContext = {
     disclaimer?: string | null;
     lacksTimeSeries?: boolean;
   } | null;
+  reasoningBlocks?: ReasoningBlock[];
 };
 
 type InsightConfidenceBreakdownComponent = {
@@ -3499,6 +3508,7 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
     dimensionRedirectHandled: Boolean(o.dimensionRedirectHandled),
     requestedDimensionMissing: Boolean(o.requestedDimensionMissing),
     forecastGuardrails: parseForecastGuardrails(o.forecastGuardrails),
+    reasoningBlocks: parseReasoningBlocks(o.reasoningBlocks),
   };
 }
 
@@ -8554,6 +8564,11 @@ function HomeInner() {
     mappingConfirmedByUser,
   ]);
 
+  const insightReasoningBlocks = useMemo(
+    () => alignedAnalysis?.reasoningBlocks ?? [],
+    [alignedAnalysis?.reasoningBlocks]
+  );
+
   const insightNarrativeTone = useMemo((): NarrativeTone => {
     if (!alignedAnalysis) return "balanced";
     const backendMap =
@@ -13296,6 +13311,30 @@ function HomeInner() {
                           )}
                         </p>
                       </div>
+                      {insightReasoningBlocks.length > 0 ? (
+                        <div className={aiInsightsAnswerDetailsGroup}>
+                          <p className={aiInsightsAnswerDetailsLabel}>
+                            Why this matters
+                          </p>
+                          <ul className={aiInsightsReasoningList}>
+                            {insightReasoningBlocks.map((block, idx) => (
+                              <li
+                                key={`${block.type}-${idx}-${block.claim.slice(0, 32)}`}
+                                className={aiInsightsReasoningItem}
+                              >
+                                <p className={aiInsightsReasoningClaim}>
+                                  {block.claim}
+                                </p>
+                                {block.reason ? (
+                                  <p className={aiInsightsReasoningBasis}>
+                                    {block.reason}
+                                  </p>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                       <div className={aiInsightsAnswerDetailsGroup}>
                         <p className={aiInsightsAnswerDetailsLabel}>
                           Supporting detail

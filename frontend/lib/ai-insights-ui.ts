@@ -111,6 +111,18 @@ export const aiInsightsAnswerDetailsGroup =
 export const aiInsightsAnswerDetailsLabel =
   "ai-insights-answer-details-label px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-[color:var(--insights-answer-label)]";
 
+export const aiInsightsReasoningList =
+  "ai-insights-reasoning-list my-0 list-none space-y-1.5 px-2 pb-2 pt-0.5";
+
+export const aiInsightsReasoningItem =
+  "ai-insights-reasoning-item rounded-lg border border-[color:var(--insights-border-soft)] bg-[color:var(--insights-layer-inset)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:border-[color:var(--insights-border-medium)] dark:bg-[color:color-mix(in_srgb,var(--insights-layer-card)_88%,var(--insights-layer-inset))]";
+
+export const aiInsightsReasoningClaim =
+  "ai-insights-reasoning-claim m-0 text-[13px] font-medium leading-snug text-slate-800 dark:text-[color:var(--insights-answer-emphasis)]";
+
+export const aiInsightsReasoningBasis =
+  "ai-insights-reasoning-basis m-0 mt-1 text-[11px] leading-[1.45] text-slate-500 dark:text-[color:var(--insights-answer-label)]";
+
 export const aiInsightsAnswerDetail =
   "ai-insights-answer-detail group overflow-hidden rounded-lg border-0 border-b border-[color:var(--border-default)]/40 bg-transparent transition-[border-color,background-color] duration-200 last:border-b-0 open:border-b-[color:color-mix(in_srgb,var(--accent)_16%,var(--border-default))] open:shadow-none dark:border-b-[color:var(--insights-border-soft)] dark:bg-transparent dark:open:border-b-[color:var(--insights-border-soft)] dark:open:bg-transparent dark:open:shadow-none";
 

@@ -365,6 +365,18 @@ def build_ask_narrative_prompt(
     except Exception:
         pass
 
+    reasoning_block = ""
+    try:
+        from intent_engine.reasoning_blocks import reasoning_blocks_prompt_block
+
+        rb_raw = analysis_ctx.get("reasoningBlocks")
+        if isinstance(rb_raw, list) and rb_raw:
+            reasoning_block = reasoning_blocks_prompt_block(rb_raw)
+            if reasoning_block:
+                reasoning_block = f"\n{reasoning_block}\n"
+    except Exception:
+        pass
+
     semantic_correction = m._semantic_intent_correction_prompt_block(question)
     needs_cautious = bool(
         analysis_ctx.get("cautiousNarrativeRequired")
@@ -395,6 +407,7 @@ Exact calculated result (ground truth metrics / table):
 {outlier_block}
 {forecast_block}
 {exec_rank_block}
+{reasoning_block}
 {guard_block}
 {polish_block}
 {viz_anchor}

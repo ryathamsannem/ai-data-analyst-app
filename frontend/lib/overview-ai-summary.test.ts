@@ -602,4 +602,48 @@ describe("executive wording helpers", () => {
       true
     );
   });
+
+  it("selectOverviewAiSummaryInsights demotes HR demographic chart insights below business floor", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+        { text: "Workforce analytics snapshot.", score: 100, kind: "frame" },
+        {
+          text: "Sales and Support departments typically drive the highest attrition pressure in workforce slices like this.",
+          score: 94,
+          kind: "impact",
+          topicCategory: "attrition",
+        },
+        {
+          text: "Average Salary is 90,000 across filtered rows.",
+          score: 101,
+          kind: "kpi",
+          metricKey: "salary",
+          topicCategory: "compensation",
+        },
+        {
+          text: "35-44 is the leading age band by age.",
+          score: 35,
+          kind: "leader",
+          entity: "35 44",
+          metricKey: "age",
+          dimensionKey: "age band",
+          topicCategory: "demographics",
+        },
+        {
+          text: "Male is the leading gender by bonus.",
+          score: 32,
+          kind: "leader",
+          entity: "male",
+          metricKey: "bonus",
+          dimensionKey: "gender",
+          topicCategory: "demographics",
+        },
+      ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "hr"
+    );
+    expect(out.some((b) => /\bage band\b/i.test(b))).toBe(false);
+    expect(out.some((b) => /\bgender\b/i.test(b))).toBe(false);
+    expect(out.some((b) => /\battrition\b/i.test(b))).toBe(true);
+  });
 });
