@@ -425,6 +425,9 @@ def reasoning_blocks_prompt_block(blocks: List[Dict[str, Any]]) -> str:
         "- Do not invent causes, drivers, or external explanations beyond this list.",
         "- Distinguish: (1) what the numbers show, (2) cautious interpretation, "
         "(3) a sensible next question — not proven root cause.",
+        "- The app displays these items in a separate \"Why this matters\" panel — "
+        "synthesize in Key findings; do not copy every bullet verbatim.",
+        "- Use hedging in What this may indicate (may indicate, could suggest, appears to).",
     ]
     for i, b in enumerate(blocks[:MAX_REASONING_BLOCKS], start=1):
         if not isinstance(b, dict):
