@@ -716,7 +716,9 @@ import {
 import {
   buildExecutivePdfExportInput,
   computePdfRankedSignalsFromChartRows,
+  insightAnswerSummaryForDisplay,
   parseAnswerIntoSections,
+  resolveParsedAnswerSummary,
   sortRowsForPresentation,
   type PdfChartPrepContext,
 } from "@/lib/build-executive-pdf-input";
@@ -10596,7 +10598,8 @@ function HomeInner() {
     }
     const parsed = parseAnswerIntoSections(
       answer,
-      alignedAnalysis?.insightSummary ?? undefined
+      alignedAnalysis?.insightSummary ?? undefined,
+      { reasoningBlockClaim: insightReasoningBlocks[0]?.claim }
     );
     const c = insightSnapshot?.contract;
     const tone = insightNarrativeTone;
@@ -10635,8 +10638,14 @@ function HomeInner() {
     };
     const summaryTextRaw =
       insightNumberedExecutiveBrief ??
-      softenSummary(parsed.summary) ??
-      "";
+      (softenSummary(parsed.summary) ||
+        softenSummary(
+          resolveParsedAnswerSummary(parsed, {
+            insightSummary: alignedAnalysis?.insightSummary ?? undefined,
+            reasoningBlockClaim: insightReasoningBlocks[0]?.claim,
+          })
+        ) ||
+        "");
     let summaryText = summaryTextRaw;
     if (insightUnsupportedGrowth) {
       summaryText = prependUnsupportedGrowthLead(
@@ -10693,6 +10702,7 @@ function HomeInner() {
     insightVisualization?.relationshipInsights,
     insightRelationshipEnriched,
     insightCorrelationCaution,
+    insightReasoningBlocks,
   ]);
 
   const insightExecutiveBrief = useMemo(() => {
@@ -13328,8 +13338,12 @@ function HomeInner() {
                       <div className={aiInsightsAnswerSummaryPanel}>
                         <p className={aiInsightsAnswerSummary}>
                           {formatInsightSummary(
-                            parsedInsightAnswer.summary ||
-                              "Summary unavailable — see detail sections."
+                            insightAnswerSummaryForDisplay(parsedInsightAnswer, {
+                              insightSummary:
+                                alignedAnalysis?.insightSummary ?? undefined,
+                              reasoningBlockClaim:
+                                insightReasoningBlocks[0]?.claim,
+                            })
                           )}
                         </p>
                       </div>

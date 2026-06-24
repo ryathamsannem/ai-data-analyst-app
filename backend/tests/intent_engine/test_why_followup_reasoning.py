@@ -109,6 +109,7 @@ class TestWhyFollowupGoldenIntegration(unittest.TestCase):
         self.assertIn("Limitations", prompt)
         self.assertIn("90–130 words", prompt)
         self.assertIn("Why this matters", prompt)
+        self.assertIn("Do NOT use Key findings", prompt)
 
     def test_banking_why_corporate(self) -> None:
         parent_q = "Which customer segment has the highest total loan balance?"

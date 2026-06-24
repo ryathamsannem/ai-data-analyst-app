@@ -391,11 +391,12 @@ def why_followup_prompt_block(ctx: WhyFollowupContext) -> str:
         "- Keep the answer concise (about 90–130 words). Do NOT repeat the same percentages "
         "or values more than once — the app shows evidence bullets separately under "
         "\"Why this matters\".",
-        "- Structure your answer:",
-        "  1) Key findings — 2–3 evidence-backed points in plain language (no verbatim copy).",
-        "  2) What this may indicate — one hedged sentence (may indicate / could be consistent with).",
-        "  3) Suggested next steps — 1–2 drill-down questions from the list below.",
-        "- State clearly that this does not prove causation.",
+        "- Do NOT use Key findings / What this may indicate / Suggested next steps labels.",
+        "- Use this plain-text format (blank lines between blocks, no section headings):",
+        "  Line 1: Based on the previous {metric}-by-{dimension} result, {entity} stands out because …",
+        "  Lines 2–4: Numbered evidence (1. … 2. … 3. …) OR two short sentences.",
+        "  Line 5: One limitation sentence (does not prove root cause / not proven causation).",
+        "  Line 6: Next, … (one drill-down sentence from suggested questions).",
     ]
 
     ent = ctx.get("entity")

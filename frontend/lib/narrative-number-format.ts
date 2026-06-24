@@ -99,6 +99,36 @@ function dedupeNarrativeArtifacts(text: string): string {
   return out.replace(/(\b[\w\s,'"%-]{20,140}[.!?])\s+\1/g, "$1");
 }
 
+/** Collapse double-modal hedging (e.g. could may → may). */
+export function fixMalformedNarrativeHedging(text: string): string {
+  if (!text?.trim()) return text;
+  let out = text;
+  const auxHedgeFixes: [RegExp, string][] = [
+    [/\b(is|are|was|were)\s+may\s+reflect\b/gi, "may reflect"],
+    [/\b(is|are|was|were)\s+may\s+indicate\b/gi, "may indicate"],
+    [/\b(is|are|was|were)\s+may\s+be\s+associated\b/gi, "may be associated"],
+    [/\b(is|are|was|were)\s+may\s+be\b/gi, "may be"],
+    [/\b(is|are|was|were)\s+could\s+suggest\b/gi, "could suggest"],
+    [/\b(is|are|was|were)\s+could\s+be\b/gi, "could be"],
+    [
+      /\b(is|are|was|were)\s+potentially\s+associated\b/gi,
+      "may be associated with",
+    ],
+  ];
+  for (const [re, repl] of auxHedgeFixes) {
+    out = out.replace(re, repl);
+  }
+  out = out.replace(/\bcould\s+be\s+may\s+be\b/gi, "may be");
+  out = out.replace(/\bcould\s+be\s+may\b/gi, "may be");
+  out = out.replace(
+    /\b(?:could\s+may|may\s+could|could\s+could|may\s+may)\b/gi,
+    "may"
+  );
+  out = out.replace(/\bmay\s+be\s+could\b/gi, "may be");
+  out = out.replace(/\bmay\s+be\s+be\b/gi, "may be");
+  return out;
+}
+
 /** Full narrative polish pipeline for AI insight prose. */
 export function polishInsightNarrativeText(
   text: string,
@@ -111,5 +141,5 @@ export function polishInsightNarrativeText(
   if (opts?.dualMetricRoasLead) {
     out = augmentDualMetricRoasLead(out, opts.dualMetricRoasLead);
   }
-  return out;
+  return fixMalformedNarrativeHedging(out);
 }

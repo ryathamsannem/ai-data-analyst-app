@@ -58,6 +58,16 @@ _MALFORMED_HEDGING_RE = re.compile(
     r"\b(?:could\s+may|may\s+could|could\s+could|may\s+may)\b",
     re.I,
 )
+_COULD_BE_MAY_RE = re.compile(r"\bcould\s+be\s+may\b", re.I)
+_MAY_BE_COULD_RE = re.compile(r"\bmay\s+be\s+could\b", re.I)
+_WHY_INLINE_SECTION_RE = re.compile(
+    r"\b(Key findings|What this may indicate|Suggested next steps|Next steps)\s*:?\s*",
+    re.I,
+)
+_WHY_OPENER_RE = re.compile(
+    r"^(Based on the previous[^.\n]{8,220}?result,?)\s*",
+    re.I | re.M,
+)
 _THREE_TIME_PERIOD_RE = re.compile(
     r"\bthree-time\s+period\b",
     re.I,
@@ -240,10 +250,45 @@ def fix_malformed_hedging(answer: str) -> str:
     """Collapse double-modal phrases like 'could may be consistent with'."""
     if not answer:
         return answer
-    text = _MALFORMED_HEDGING_RE.sub("may", answer)
-    text = re.sub(r"\bcould\s+be\s+may\b", "may be", text, flags=re.I)
-    text = re.sub(r"\bmay\s+be\s+could\b", "may be", text, flags=re.I)
+    text = answer
+    aux_hedge_fixes = (
+        (r"\b(is|are|was|were)\s+may\s+reflect\b", "may reflect"),
+        (r"\b(is|are|was|were)\s+may\s+indicate\b", "may indicate"),
+        (r"\b(is|are|was|were)\s+may\s+be\s+associated\b", "may be associated"),
+        (r"\b(is|are|was|were)\s+may\s+be\b", "may be"),
+        (r"\b(is|are|was|were)\s+could\s+suggest\b", "could suggest"),
+        (r"\b(is|are|was|were)\s+could\s+be\b", "could be"),
+        (r"\b(is|are|was|were)\s+potentially\s+associated\b", "may be associated with"),
+    )
+    for pattern, repl in aux_hedge_fixes:
+        text = re.sub(pattern, repl, text, flags=re.I)
+    text = re.sub(r"\bcould\s+be\s+may\s+be\b", "may be", text, flags=re.I)
+    text = _COULD_BE_MAY_RE.sub("may be", text)
+    text = _MALFORMED_HEDGING_RE.sub("may", text)
+    text = _MAY_BE_COULD_RE.sub("may be", text)
+    text = re.sub(r"\bmay\s+be\s+be\b", "may be", text, flags=re.I)
     return text
+
+
+def apply_final_narrative_polish(
+    answer: str,
+    df: Optional[pd.DataFrame] = None,
+    profile: Optional[Dict[str, Any]] = None,
+    analysis_ctx: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Last-pass grammar polish on fully assembled narrative (all sections)."""
+    if not answer:
+        return answer
+    text = fix_malformed_hedging(answer)
+    text = fix_fraction_quarter_corruption(text)
+    if df is not None and not df.empty:
+        text = fix_limitation_wording(text)
+        text = sanitize_unsupported_quarter_wording(text, df, profile, analysis_ctx)
+        text = fix_malformed_hedging(text)
+        text = fix_fraction_quarter_corruption(text)
+    else:
+        text = fix_limitation_wording(text)
+    return text.strip()
 
 
 def fix_fraction_quarter_corruption(answer: str) -> str:
@@ -355,13 +400,112 @@ def ensure_follow_up_opener(
 
 
 def trim_why_followup_prose(answer: str, *, max_words: int = 130) -> str:
-    """Keep why follow-ups concise — evidence also appears in the UI panel."""
+    """Keep why follow-ups concise while preserving paragraph breaks."""
     if not answer:
         return answer
     words = answer.split()
     if len(words) <= max_words:
         return answer
-    return " ".join(words[:max_words]).strip()
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", answer) if p.strip()]
+    if not paragraphs:
+        return " ".join(words[:max_words]).strip()
+    kept: List[str] = []
+    count = 0
+    for para in paragraphs:
+        para_words = para.split()
+        if count + len(para_words) > max_words:
+            if not kept:
+                kept.append(" ".join(para_words[:max_words]))
+            break
+        kept.append(para)
+        count += len(para_words)
+    return "\n\n".join(kept).strip()
+
+
+def _why_sentences(body: str) -> List[str]:
+    text = re.sub(r"\s+", " ", str(body or "")).strip()
+    if not text:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def format_why_followup_narrative(answer: str, *, max_words: int = 130) -> str:
+    """
+    Convert why follow-ups with inline section labels into readable prose
+    (short opener, evidence bullets, limitation, next step).
+    """
+    if not answer:
+        return answer
+
+    text = fix_malformed_hedging(answer.strip())
+    text = re.sub(
+        r"\s+(Key findings|What this may indicate|Suggested next steps|Next steps)\s*:?\s+",
+        r"\n\n\1:\n",
+        text,
+        flags=re.I,
+    )
+
+    matches = list(_WHY_INLINE_SECTION_RE.finditer(text))
+    if not matches:
+        opener = _WHY_OPENER_RE.match(text)
+        if opener:
+            rest = text[opener.end() :].strip()
+            if rest:
+                return trim_why_followup_prose(
+                    f"{opener.group(1).strip()}\n\n{rest}", max_words=max_words
+                )
+        return trim_why_followup_prose(text, max_words=max_words)
+
+    preamble = text[: matches[0].start()].strip()
+    sections: Dict[str, str] = {}
+    for i, match in enumerate(matches):
+        label = match.group(1).lower()
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        body = text[start:end].strip()
+        if "key finding" in label:
+            sections["findings"] = body
+        elif "may indicate" in label:
+            sections["indicate"] = body
+        elif "next" in label or "step" in label:
+            sections["steps"] = body
+
+    paragraphs: List[str] = []
+    if preamble:
+        paragraphs.append(preamble.rstrip())
+
+    findings = sections.get("findings", "")
+    if findings:
+        sentences = _why_sentences(findings)
+        if len(sentences) >= 2:
+            bullets = "\n".join(
+                f"{idx}. {sent}" for idx, sent in enumerate(sentences[:3], start=1)
+            )
+            if paragraphs:
+                lead = paragraphs[-1].rstrip(".")
+                if not re.search(r"\bfor (?:these )?reasons?\b", lead, re.I):
+                    paragraphs[-1] = f"{lead}:"
+                paragraphs.append(bullets)
+            else:
+                paragraphs.append(bullets)
+        else:
+            paragraphs.append(findings)
+
+    indicate = sections.get("indicate", "")
+    if indicate:
+        paragraphs.append(indicate)
+
+    steps = sections.get("steps", "")
+    if steps:
+        step_text = steps.strip()
+        if not re.match(r"^(next|suggested|compare|show)\b", step_text, re.I):
+            step_text = f"Next, {step_text[0].lower()}{step_text[1:]}"
+        paragraphs.append(step_text)
+
+    formatted = "\n\n".join(p for p in paragraphs if p.strip())
+    formatted = trim_why_followup_prose(formatted, max_words=max_words)
+    return fix_malformed_hedging(formatted)
 
 
 def trim_executive_prose(answer: str, *, max_words: int = 200) -> str:
@@ -398,7 +542,7 @@ def polish_narrative_answer(
     if sidecar and sidecar.get("wasFollowUp"):
         text = ensure_follow_up_opener(text, question, sidecar, analysis_ctx)
     if sidecar and sidecar.get("whyFollowUp"):
-        text = trim_why_followup_prose(text)
+        text = format_why_followup_narrative(text)
     if executive or is_executive_narrative_question(question, analysis_ctx):
         text = normalize_executive_sections(text)
         text = trim_executive_prose(text)
@@ -406,6 +550,6 @@ def polish_narrative_answer(
         text = apply_micro_polish(text, df, profile, analysis_ctx)
     else:
         text = fix_limitation_wording(text)
-        text = fix_malformed_hedging(text)
-        text = fix_fraction_quarter_corruption(text)
-    return text.strip()
+    return apply_final_narrative_polish(
+        text, df=df, profile=profile, analysis_ctx=analysis_ctx
+    )

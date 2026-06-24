@@ -128,7 +128,7 @@ const DEFINITIVE_PATTERNS: [RegExp, string][] = [
   [/\bdefinitively\b/gi, "tentatively"],
   [/\bobviously\b/gi, "possibly"],
   [/\bwithout doubt\b/gi, "with some uncertainty"],
-  [/\bmust be\b/gi, "could be"],
+  [/\bmust be\b(?!\s+may\b)/gi, "could be"],
   [/\balways\b/gi, "often"],
   [/\bthe main driver is\b/gi, "the strongest observed relationship may be"],
   [/\bdominant driver\b/gi, "strongest observed relationship"],

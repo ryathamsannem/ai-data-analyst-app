@@ -533,13 +533,13 @@ def soften_unsupported_causal_language(answer: str) -> str:
     )
     text = re.sub(
         r"\b(is|are|was|were)\s+caused by\b",
-        r"\1 may be associated with",
+        "may be associated with",
         text,
         flags=re.I,
     )
     text = re.sub(
         r"\b(is|are|was|were)\s+driven by\b",
-        r"\1 may reflect",
+        "may reflect",
         text,
         flags=re.I,
     )
@@ -618,6 +618,15 @@ def sanitize_narrative_answer(
             pass
 
     text = soften_unsupported_causal_language(text)
+
+    try:
+        from intent_engine.narrative_polish import apply_final_narrative_polish
+
+        text = apply_final_narrative_polish(
+            text, df=df, profile=profile, analysis_ctx=analysis_ctx
+        )
+    except Exception:
+        pass
 
     return text.strip()
 
