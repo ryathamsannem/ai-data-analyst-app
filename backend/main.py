@@ -165,6 +165,7 @@ class ParentAnalysisContextPayload(BaseModel):
     followUpChain: List[str] = Field(default_factory=list)
     lastAiAnswer: Optional[str] = None
     turnId: Optional[str] = None
+    reasoningBlocks: Optional[List[Dict[str, Any]]] = None
 
 
 def _pretty_join_dimension_metric(
@@ -13329,24 +13330,29 @@ def _is_thread_meta_follow_up(q: str) -> bool:
 
 
 def _is_explanation_follow_up(q: str) -> bool:
-    s = (q or "").strip()
-    if not s:
+    try:
+        from intent_engine.why_followup_reasoning import is_why_followup_question
+
+        return is_why_followup_question(q)
+    except Exception:
+        s = (q or "").strip()
+        if not s:
+            return False
+        if len(s) <= 48 and re.match(
+            r"^\s*(why|explain)(\s+that|\s+this|\s+it)?\s*\??\s*$", s, re.I
+        ):
+            return True
+        if len(s) > 120:
+            return False
+        if re.search(
+            r"\bwhy\s+is\b.+\b(highest|lowest|top|leading|largest|best|worst|most)\b",
+            s,
+            re.I,
+        ):
+            return True
+        if re.search(r"\bwhat\s+explains\b.+\b(highest|lowest|being)\b", s, re.I):
+            return True
         return False
-    if len(s) <= 48 and re.match(
-        r"^\s*(why|explain)(\s+that|\s+this|\s+it)?\s*\??\s*$", s, re.I
-    ):
-        return True
-    if len(s) > 120:
-        return False
-    if re.search(
-        r"\bwhy\s+is\b.+\b(highest|lowest|top|leading|largest|best|worst|most)\b",
-        s,
-        re.I,
-    ):
-        return True
-    if re.search(r"\bwhat\s+explains\b.+\b(highest|lowest|being)\b", s, re.I):
-        return True
-    return False
 
 
 def _scoped_follow_up_question(q: str) -> bool:
@@ -13661,6 +13667,7 @@ def resolve_follow_up_turn(
 
     explanation = _is_explanation_follow_up(rq)
     thread_meta = _is_thread_meta_follow_up(rq)
+    why_follow_up = explanation and not thread_meta
     scoped = explanation or thread_meta
     if scoped:
         eff = scope_q
@@ -13677,7 +13684,11 @@ def resolve_follow_up_turn(
 
     applied_bits: List[str] = []
     if explanation:
-        applied_bits.append("Explain / why (same calculation as previous question)")
+        applied_bits.append(
+            "Why follow-up (evidence from prior analysis)"
+            if why_follow_up
+            else "Explain / why (same calculation as previous question)"
+        )
     elif thread_meta:
         applied_bits.append(
             "Thread guidance (same prior analysis scope; answer references prior results)"
@@ -13820,6 +13831,7 @@ def resolve_follow_up_turn(
     out["ai_context_block"] = ai_block
     out["conversation_sidecar"] = {
         "wasFollowUp": True,
+        "whyFollowUp": why_follow_up,
         "previousAnalysisSummary": prev_summary,
         "followUpApplied": follow_line,
         "contextUsedLine": ctx_used,
@@ -16193,6 +16205,42 @@ def ask_question(data: QuestionRequest, request: Request):
                 analysis_ctx["insightConfidenceRationale"] = (
                     icr_fu + " " + " ".join(extras_fu)
                 ).strip()
+
+            if (
+                sidecar
+                and isinstance(sidecar, dict)
+                and sidecar.get("whyFollowUp")
+            ):
+                try:
+                    from intent_engine.why_followup_reasoning import (
+                        attach_why_followup_to_analysis,
+                        merge_parent_reasoning_blocks,
+                    )
+
+                    parent_blocks = None
+                    if data.parent_analysis_context is not None:
+                        pb = data.parent_analysis_context.reasoningBlocks
+                        if isinstance(pb, list):
+                            parent_blocks = pb
+                    merge_parent_reasoning_blocks(analysis_ctx, parent_blocks)
+                    scope_q = str(plan.get("scope_question") or eff_q).strip()
+                    attach_why_followup_to_analysis(
+                        analysis_ctx,
+                        follow_up_question=data.question.strip(),
+                        parent_question=scope_q,
+                        visualization=visualization,
+                        exact_result=str(exact_result or ""),
+                        df=final_df,
+                        profile=dataset_profile,
+                        parent_reasoning_blocks=parent_blocks,
+                    )
+                except Exception as _why_exc:
+                    print(
+                        "[why_followup] attach skipped:",
+                        type(_why_exc).__name__,
+                        str(_why_exc)[:200],
+                        flush=True,
+                    )
 
         all_row_scope = list(dash_labs) + list(filter_added)
         if visualization and all_row_scope:

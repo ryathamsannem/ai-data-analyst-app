@@ -1986,6 +1986,7 @@ function parseConversationMeta(raw: unknown): ConversationMeta | null {
 
 type ConversationFollowUpMeta = {
   wasFollowUp: boolean;
+  whyFollowUp?: boolean;
   previousAnalysisSummary: string;
   followUpApplied: string;
   contextUsedLine: string;
@@ -1998,6 +1999,7 @@ function parseConversationFollowUp(raw: unknown): ConversationFollowUpMeta | nul
   if (!o.wasFollowUp) return null;
   return {
     wasFollowUp: true,
+    whyFollowUp: Boolean(o.whyFollowUp),
     previousAnalysisSummary: String(o.previousAnalysisSummary ?? "").trim(),
     followUpApplied: String(o.followUpApplied ?? "").trim(),
     contextUsedLine: String(o.contextUsedLine ?? "").trim(),
@@ -7800,6 +7802,7 @@ function HomeInner() {
               followUpChain: parentAnalysisContext.followUpChain,
               lastAiAnswer: parentAnalysisContext.lastAiAnswer,
               turnId: parentAnalysisContext.turnId,
+              reasoningBlocks: parentAnalysisContext.reasoningBlocks ?? undefined,
             }
           : null,
         continuation_intent: continuationIntent,
@@ -13289,7 +13292,11 @@ function HomeInner() {
                   answer.trim()) ? (
                 <div className={aiInsightsAnswerCard}>
                   <div className={aiInsightsAnswerHeader}>
-                    <p className={aiInsightsAnswerKicker}>Executive analysis</p>
+                    <p className={aiInsightsAnswerKicker}>
+                      {alignedAnalysis?.conversationFollowUp?.whyFollowUp
+                        ? "Evidence-backed follow-up"
+                        : "Executive analysis"}
+                    </p>
                     <h3 className={aiInsightsAnswerTitle}>AI Answer</h3>
                   </div>
                   {answer.trim() || insightAskLoadingNarrative ? (
@@ -13297,7 +13304,22 @@ function HomeInner() {
                       {(() => {
                         const lead = aiAnswerLeadIn(
                           datasetKind || "",
-                          insightPresentationChartKind
+                          insightPresentationChartKind,
+                          {
+                            routingIntent:
+                              alignedAnalysis?.routingPlan?.intent ?? null,
+                            categoryColumn:
+                              alignedAnalysis?.categoryColumn ??
+                              insightVisualization?.provenance?.categoryColumn ??
+                              null,
+                            metricColumn:
+                              alignedAnalysis?.metricColumn ??
+                              insightVisualization?.provenance?.numericColumn ??
+                              null,
+                            isTimeSeries: isTrendMode(
+                              insightSnapshot?.contract ?? null
+                            ),
+                          }
                         );
                         return lead ? (
                           <p className={aiInsightsAnswerLead}>{lead}</p>

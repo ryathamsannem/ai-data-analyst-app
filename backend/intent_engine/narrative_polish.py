@@ -50,6 +50,18 @@ _DUPLICATE_REQUESTED_RE = re.compile(
     re.I,
 )
 _QUARTER_LABEL_RE = re.compile(r"^Q[1-4]\b", re.I)
+_FRACTION_QUARTER_RE = re.compile(
+    r"\b(?:one|two|three|four|five|\d+)\s*-\s*quarters?\b",
+    re.I,
+)
+_MALFORMED_HEDGING_RE = re.compile(
+    r"\b(?:could\s+may|may\s+could|could\s+could|may\s+may)\b",
+    re.I,
+)
+_THREE_TIME_PERIOD_RE = re.compile(
+    r"\bthree-time\s+period\b",
+    re.I,
+)
 
 _KEY_FINDINGS_RE = re.compile(r"^\s*Key findings\s*:?\s*", re.I | re.M)
 _MAY_INDICATE_RE = re.compile(r"^\s*What this may indicate\s*:?\s*", re.I | re.M)
@@ -138,6 +150,8 @@ def follow_up_narrative_prompt_block(
         "- Do NOT answer as a brand-new standalone question.",
     ]
 
+    if sidecar.get("whyFollowUp"):
+        return ""
     if _WHY_FOLLOW_UP_RE.search(rq):
         lines.append(
             f'- Open with: "Based on the previous {metric}-by-{cat} result, …" '
@@ -222,6 +236,30 @@ def dataset_supports_quarter_wording(
     return False
 
 
+def fix_malformed_hedging(answer: str) -> str:
+    """Collapse double-modal phrases like 'could may be consistent with'."""
+    if not answer:
+        return answer
+    text = _MALFORMED_HEDGING_RE.sub("may", answer)
+    text = re.sub(r"\bcould\s+be\s+may\b", "may be", text, flags=re.I)
+    text = re.sub(r"\bmay\s+be\s+could\b", "may be", text, flags=re.I)
+    return text
+
+
+def fix_fraction_quarter_corruption(answer: str) -> str:
+    """Repair 'three-time period' artifacts from quarter sanitization."""
+    if not answer:
+        return answer
+    text = _THREE_TIME_PERIOD_RE.sub("three-quarters", answer)
+    text = re.sub(
+        r"\b(?:one|two|four|five|\d+)-time\s+period\b",
+        lambda m: m.group(0).replace("-time period", "-quarters"),
+        text,
+        flags=re.I,
+    )
+    return text
+
+
 def sanitize_unsupported_quarter_wording(
     answer: str,
     df: pd.DataFrame,
@@ -232,9 +270,19 @@ def sanitize_unsupported_quarter_wording(
         return answer
     if not re.search(r"\bquarters?\b|\bquarterly\b", answer, re.I):
         return answer
-    text = re.sub(r"\bquarterly\b", "over time", answer, flags=re.I)
+    protected: Dict[str, str] = {}
+
+    def _protect_fraction(match: re.Match[str]) -> str:
+        key = f"__FRACQ_{len(protected)}__"
+        protected[key] = match.group(0)
+        return key
+
+    text = _FRACTION_QUARTER_RE.sub(_protect_fraction, answer)
+    text = re.sub(r"\bquarterly\b", "over time", text, flags=re.I)
     text = re.sub(r"\bquarters?\b", "time period", text, flags=re.I)
-    return text
+    for key, original in protected.items():
+        text = text.replace(key, original)
+    return fix_fraction_quarter_corruption(text)
 
 
 def fix_limitation_wording(answer: str) -> str:
@@ -260,7 +308,9 @@ def apply_micro_polish(
     if not answer:
         return answer
     text = fix_limitation_wording(answer)
+    text = fix_malformed_hedging(text)
     text = sanitize_unsupported_quarter_wording(text, df, profile, analysis_ctx)
+    text = fix_fraction_quarter_corruption(text)
     return text.strip()
 
 
@@ -304,6 +354,16 @@ def ensure_follow_up_opener(
     return f"{opener} {answer.lstrip()}".strip()
 
 
+def trim_why_followup_prose(answer: str, *, max_words: int = 130) -> str:
+    """Keep why follow-ups concise — evidence also appears in the UI panel."""
+    if not answer:
+        return answer
+    words = answer.split()
+    if len(words) <= max_words:
+        return answer
+    return " ".join(words[:max_words]).strip()
+
+
 def trim_executive_prose(answer: str, *, max_words: int = 200) -> str:
     if not answer:
         return answer
@@ -337,6 +397,8 @@ def polish_narrative_answer(
     text = answer
     if sidecar and sidecar.get("wasFollowUp"):
         text = ensure_follow_up_opener(text, question, sidecar, analysis_ctx)
+    if sidecar and sidecar.get("whyFollowUp"):
+        text = trim_why_followup_prose(text)
     if executive or is_executive_narrative_question(question, analysis_ctx):
         text = normalize_executive_sections(text)
         text = trim_executive_prose(text)
@@ -344,4 +406,6 @@ def polish_narrative_answer(
         text = apply_micro_polish(text, df, profile, analysis_ctx)
     else:
         text = fix_limitation_wording(text)
+        text = fix_malformed_hedging(text)
+        text = fix_fraction_quarter_corruption(text)
     return text.strip()

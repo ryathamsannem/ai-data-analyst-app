@@ -145,6 +145,36 @@ class NarrativePolishTests(unittest.TestCase):
         self.assertNotRegex(out.lower(), r"\bquarter\b")
         self.assertNotIn("quarterly", out.lower())
 
+    def test_fraction_three_quarters_preserved_when_quarter_sanitized(self):
+        df = pd.DataFrame({"report_date": ["2024-01-01"], "loan_balance": [100.0]})
+        raw = "Corporate holds nearly three-quarters of total loan balance."
+        out = sanitize_unsupported_quarter_wording(raw, df, {}, {})
+        self.assertIn("three-quarters", out.lower())
+        self.assertNotIn("three-time period", out.lower())
+
+    def test_fix_malformed_hedging_could_may(self):
+        from intent_engine.narrative_polish import fix_malformed_hedging
+
+        raw = "This could may be consistent with regional concentration."
+        out = fix_malformed_hedging(raw)
+        self.assertNotIn("could may", out.lower())
+        self.assertIn("may be consistent with", out.lower())
+
+    def test_fix_fraction_quarter_corruption(self):
+        from intent_engine.narrative_polish import fix_fraction_quarter_corruption
+
+        raw = "Corporate holds nearly three-time period of total loan balance."
+        out = fix_fraction_quarter_corruption(raw)
+        self.assertIn("three-quarters", out.lower())
+        self.assertNotIn("three-time period", out.lower())
+
+    def test_why_followup_trim_stays_concise(self):
+        from intent_engine.narrative_polish import trim_why_followup_prose
+
+        long = " ".join(["word"] * 200)
+        out = trim_why_followup_prose(long, max_words=130)
+        self.assertLessEqual(len(out.split()), 130)
+
     def test_quarter_kept_when_derived_quarter_bucket(self):
         df = pd.DataFrame({"report_date": ["2024-01-01"], "revenue": [100.0]})
         ctx = {"timeSeriesMeta": {"timeBucket": "Q"}}
