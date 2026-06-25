@@ -12,6 +12,8 @@ export type NarrativeToneInputs = {
   mappingConfidence?: ConfidenceLevel | string | null;
   mappingConfirmedByUser?: boolean;
   unifiedConfidenceLevel?: ConfidenceLevel | string | null;
+  /** Concentration / ranking evidence blocks from Phase A. */
+  hasStrongReasoningEvidence?: boolean;
   /** Time-series trend charts — avoid category ranking / breakdown copy. */
   isTrendChart?: boolean;
   /** Growth question without multi-period evidence. */
@@ -43,9 +45,12 @@ export function resolveNarrativeTone(inputs: NarrativeToneInputs): NarrativeTone
     : normLevel(inputs.mappingConfidence);
   const unified = normLevel(inputs.unifiedConfidenceLevel);
 
+  const isTrend = Boolean(inputs.isTrendChart);
   const thinRows = rows > 0 && rows < 100;
-  const fewCategories = pts > 0 && pts <= 5;
-  const sparseCategories = pts > 5 && pts <= 8;
+  const fewCategories =
+    !isTrend && pts > 0 && pts <= 5 && rows > 0 && rows < 1000;
+  const sparseCategories =
+    !isTrend && pts > 5 && pts <= 8 && rows > 0 && rows < 500;
   const mappingWeak = mapping === "low";
   const unifiedLow = unified === "low";
 
@@ -56,6 +61,31 @@ export function resolveNarrativeTone(inputs: NarrativeToneInputs): NarrativeTone
     return "balanced";
   }
   return "confident";
+}
+
+export type SoftenAssertiveProseOptions = {
+  analysisRowCount?: number | null;
+  hasStrongReasoningEvidence?: boolean;
+  /** When false, keep causal disclaimers even with strong descriptive evidence. */
+  isDescriptiveFact?: boolean;
+};
+
+function shouldUseLimitedEvidenceCaveat(
+  tone: NarrativeTone,
+  opts?: SoftenAssertiveProseOptions
+): boolean {
+  if (tone !== "cautious") return false;
+  const rows = Math.max(0, Number(opts?.analysisRowCount ?? 0));
+  if (rows >= 1000 && opts?.hasStrongReasoningEvidence) return false;
+  if (opts?.hasStrongReasoningEvidence && rows >= 500) return false;
+  return true;
+}
+
+function concentrationCaveat(opts?: SoftenAssertiveProseOptions): string | null {
+  const rows = Math.max(0, Number(opts?.analysisRowCount ?? 0));
+  if (!opts?.hasStrongReasoningEvidence || rows < 500) return null;
+  if (opts.isDescriptiveFact !== false) return null;
+  return "strong evidence of concentration; root cause not proven";
 }
 
 export function isCautiousNarrativeTone(tone: NarrativeTone): boolean {
@@ -173,17 +203,29 @@ export function softenSpeculativeOperationalDrivers(text: string): string {
 
 export function softenAssertiveProse(
   text: string,
-  tone: NarrativeTone
+  tone: NarrativeTone,
+  opts?: SoftenAssertiveProseOptions
 ): string {
   if (!text.trim() || tone === "confident") return text;
   let t = softenSpeculativeOperationalDrivers(text);
   for (const [re, repl] of DEFINITIVE_PATTERNS) {
     t = t.replace(re, repl);
   }
-  if (tone === "cautious" && !/\b(may|might|could|suggest|directional|tentative|limited sample)\b/i.test(t)) {
+  if (
+    tone === "cautious" &&
+    !/\b(may|might|could|suggest|directional|tentative|limited sample|limited evidence|root cause not proven)\b/i.test(
+      t
+    )
+  ) {
     const trimmed = t.trim();
     if (trimmed.length > 0 && trimmed.length < 480) {
-      return `${trimmed.replace(/\.$/, "")} (directional read — limited evidence in this cohort).`;
+      const alt = concentrationCaveat(opts);
+      if (alt) {
+        return `${trimmed.replace(/\.$/, "")} (${alt}).`;
+      }
+      if (shouldUseLimitedEvidenceCaveat(tone, opts)) {
+        return `${trimmed.replace(/\.$/, "")} (directional read — limited evidence in this cohort).`;
+      }
     }
   }
   return t;

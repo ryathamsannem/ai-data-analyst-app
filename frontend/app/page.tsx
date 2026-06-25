@@ -261,6 +261,10 @@ import {
   type NarrativeTone,
 } from "@/lib/insight-narrative-tone";
 import {
+  chartSnapshotMatchesAnalysis,
+  shouldPreservePinnedInsightChart,
+} from "@/lib/insight-chart-alignment";
+import {
   buildFollowupQuestion,
   fromAlignedAnalysis,
   fromAutoDashboardChart,
@@ -286,6 +290,11 @@ import {
   AiInsightAnswerBody,
   formatInsightSummary,
 } from "./components/ai-insight-answer-body";
+import {
+  parseRecommendedActions,
+  visibleRecommendedActions,
+  type RecommendedAction,
+} from "@/lib/recommended-actions";
 import {
   parseReasoningBlocks,
   type ReasoningBlock,
@@ -326,6 +335,11 @@ import {
   aiInsightsReasoningClaim,
   aiInsightsReasoningItem,
   aiInsightsReasoningList,
+  aiInsightsRecommendedChip,
+  aiInsightsRecommendedDesc,
+  aiInsightsRecommendedItem,
+  aiInsightsRecommendedList,
+  aiInsightsRecommendedTitle,
   aiInsightsAnswerHeader,
   aiInsightsAnswerKicker,
   aiInsightsAnswerLead,
@@ -1191,75 +1205,6 @@ function inferAggAndMetricFromChartTitle(title: string): {
 
 function normalizeQuestionForMatch(q: string): string {
   return q.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function snapshotMetricCategoryTokens(snap: ChartSnapshot): {
-  metric: string;
-  category: string;
-} {
-  const prov = snap.visualization as { provenance?: InsightProvenance } | null;
-  const fp = snap.finalPresentation;
-  return {
-    metric: normalizeIntentToken(
-      prov?.provenance?.numericColumn ?? fp?.metric ?? ""
-    ),
-    category: normalizeIntentToken(
-      prov?.provenance?.categoryColumn ?? fp?.dimension ?? ""
-    ),
-  };
-}
-
-function analysisMetricCategoryTokens(
-  parsed: AlignedAnalysisContext | null
-): { metric: string; category: string } {
-  return {
-    metric: normalizeIntentToken(parsed?.metricColumn ?? ""),
-    category: normalizeIntentToken(parsed?.categoryColumn ?? ""),
-  };
-}
-
-function metricCategoryTokensAlign(
-  a: { metric: string; category: string },
-  b: { metric: string; category: string }
-): boolean {
-  if (a.metric && b.metric && a.metric !== b.metric) return false;
-  if (a.category && b.category && a.category !== b.category) return false;
-  return true;
-}
-
-function chartSnapshotMatchesAnalysis(
-  snap: ChartSnapshot,
-  parsed: AlignedAnalysisContext | null
-): boolean {
-  if (!parsed) return false;
-  return metricCategoryTokensAlign(
-    snapshotMetricCategoryTokens(snap),
-    analysisMetricCategoryTokens(parsed)
-  );
-}
-
-/** Keep a pinned insight chart only for same-question re-asks or aligned follow-ups. */
-function shouldPreservePinnedInsightChart(args: {
-  pinned: ChartSnapshot;
-  question: string;
-  parsed: AlignedAnalysisContext | null;
-  followUpDetected: boolean;
-}): boolean {
-  const pinnedQ = normalizeQuestionForMatch(args.pinned.question ?? "");
-  const newQ = normalizeQuestionForMatch(args.question);
-  if (pinnedQ && newQ && pinnedQ === newQ) return true;
-
-  if (extractDashboardChartTitleFromPrefillQuestion(args.question)) {
-    return true;
-  }
-
-  if (isTrendMode(args.pinned.contract)) {
-    return args.followUpDetected;
-  }
-
-  if (!args.followUpDetected) return false;
-
-  return chartSnapshotMatchesAnalysis(args.pinned, args.parsed);
 }
 
 function resolveOriginChartRefSnapshot(args: {
@@ -3229,6 +3174,7 @@ type AlignedAnalysisContext = {
     lacksTimeSeries?: boolean;
   } | null;
   reasoningBlocks?: ReasoningBlock[];
+  recommendedActions?: RecommendedAction[];
 };
 
 type InsightConfidenceBreakdownComponent = {
@@ -3513,6 +3459,7 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
     requestedDimensionMissing: Boolean(o.requestedDimensionMissing),
     forecastGuardrails: parseForecastGuardrails(o.forecastGuardrails),
     reasoningBlocks: parseReasoningBlocks(o.reasoningBlocks),
+    recommendedActions: parseRecommendedActions(o.recommendedActions),
   };
 }
 
@@ -7870,6 +7817,7 @@ function HomeInner() {
             question: qRaw,
             parsed: parsedAnalysis,
             followUpDetected,
+            normalizeQuestion: normalizeQuestionForMatch,
           }) ||
             (askMode === "fresh_root_chart_entry" &&
               askPinnedSnapshot.source === "auto_dashboard" &&
@@ -8574,6 +8522,11 @@ function HomeInner() {
     [alignedAnalysis?.reasoningBlocks]
   );
 
+  const insightRecommendedActions = useMemo(
+    () => visibleRecommendedActions(alignedAnalysis?.recommendedActions ?? []),
+    [alignedAnalysis?.recommendedActions]
+  );
+
   const insightNarrativeTone = useMemo((): NarrativeTone => {
     if (!alignedAnalysis) return "balanced";
     const backendMap =
@@ -8594,6 +8547,11 @@ function HomeInner() {
       mappingConfidence: mapForTone,
       mappingConfirmedByUser,
       unifiedConfidenceLevel: insightUnifiedConfidence?.level,
+      hasStrongReasoningEvidence: (alignedAnalysis.reasoningBlocks?.length ?? 0) >= 2,
+      isTrendChart:
+        Boolean(insightSnapshot) &&
+        isTrendMode(insightSnapshot?.contract) &&
+        chartSnapshotMatchesAnalysis(insightSnapshot!, alignedAnalysis),
     });
   }, [
     alignedAnalysis,
@@ -8601,6 +8559,7 @@ function HomeInner() {
     mappingConfirmedByUser,
     mappingMetadata?.roles,
     mappingConfidence,
+    insightSnapshot,
   ]);
 
   const insightNarrativeDisclaimer = useMemo(() => {
@@ -9046,7 +9005,8 @@ function HomeInner() {
       insightSnapshot.questionTurnId &&
       insightSnapshot.questionTurnId === turnId
     ) {
-      return true;
+      if (!alignedAnalysis) return true;
+      return chartSnapshotMatchesAnalysis(insightSnapshot, alignedAnalysis);
     }
 
     if (lastConversationMeta?.followUpDetected && alignedAnalysis) {
@@ -10603,6 +10563,11 @@ function HomeInner() {
     );
     const c = insightSnapshot?.contract;
     const tone = insightNarrativeTone;
+    const softenProseOpts = {
+      analysisRowCount: alignedAnalysis?.analysisRowCount,
+      hasStrongReasoningEvidence: insightReasoningBlocks.length >= 2,
+      isDescriptiveFact: true,
+    };
     const isRelScatter =
       insightPresentationChartKind === "scatter" &&
       Boolean(insightVisualization?.relationshipInsights);
@@ -10618,7 +10583,9 @@ function HomeInner() {
           insightRelationshipEnriched?.pearson ?? null
         );
       }
-      return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone));
+      return polishInsightNarrativeText(
+        softenAssertiveProse(sanitized, tone, softenProseOpts)
+      );
     };
     const softenSummary = (t?: string) => {
       const raw = t?.trim() ? t.trim() : "";
@@ -10632,9 +10599,12 @@ function HomeInner() {
           insightRelationshipEnriched?.pearson ?? null
         );
       }
-      return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone), {
+      return polishInsightNarrativeText(
+        softenAssertiveProse(sanitized, tone, softenProseOpts),
+        {
         dualMetricRoasLead,
-      });
+      }
+      );
     };
     const summaryTextRaw =
       insightNumberedExecutiveBrief ??
@@ -13312,9 +13282,15 @@ function HomeInner() {
                   {answer.trim() || insightAskLoadingNarrative ? (
                     <div className={aiInsightsAnswerStack}>
                       {(() => {
+                        const leadChartKind = (
+                          insightChartMatchesCurrentQuestion
+                            ? insightPresentationChartKind
+                            : ((alignedAnalysis?.chartTypeInternal as ChartKind) ||
+                                insightPresentationChartKind)
+                        ) as ChartKind;
                         const lead = aiAnswerLeadIn(
                           datasetKind || "",
-                          insightPresentationChartKind,
+                          leadChartKind,
                           {
                             routingIntent:
                               alignedAnalysis?.routingPlan?.intent ?? null,
@@ -13326,9 +13302,9 @@ function HomeInner() {
                               alignedAnalysis?.metricColumn ??
                               insightVisualization?.provenance?.numericColumn ??
                               null,
-                            isTimeSeries: isTrendMode(
-                              insightSnapshot?.contract ?? null
-                            ),
+                            isTimeSeries:
+                              insightChartMatchesCurrentQuestion &&
+                              isTrendMode(insightSnapshot?.contract ?? null),
                           }
                         );
                         return lead ? (
@@ -13365,6 +13341,41 @@ function HomeInner() {
                                   <p className={aiInsightsReasoningBasis}>
                                     {block.reason}
                                   </p>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {insightRecommendedActions.length > 0 ? (
+                        <div className={aiInsightsAnswerDetailsGroup}>
+                          <p className={aiInsightsAnswerDetailsLabel}>
+                            Recommended next actions
+                          </p>
+                          <ul className={aiInsightsRecommendedList}>
+                            {insightRecommendedActions.map((action, idx) => (
+                              <li
+                                key={`${action.type}-${idx}-${action.title.slice(0, 32)}`}
+                                className={aiInsightsRecommendedItem}
+                              >
+                                <p className={aiInsightsRecommendedTitle}>
+                                  {idx + 1}. {action.title}
+                                </p>
+                                <p className={aiInsightsRecommendedDesc}>
+                                  {action.description}
+                                </p>
+                                {action.question ? (
+                                  <button
+                                    type="button"
+                                    className={aiInsightsRecommendedChip}
+                                    onClick={() =>
+                                      setQuestionAndResetInsightState(
+                                        action.question!
+                                      )
+                                    }
+                                  >
+                                    Ask: {action.question}
+                                  </button>
                                 ) : null}
                               </li>
                             ))}

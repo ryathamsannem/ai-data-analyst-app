@@ -15861,6 +15861,23 @@ def _compute_visualization_for_question_body(
         )
 
     try:
+        from intent_engine.recommended_actions import attach_recommended_actions_to_analysis
+
+        attach_recommended_actions_to_analysis(
+            analysis_ctx,
+            df=df,
+            profile=profile_live,
+            question=question,
+        )
+    except Exception as _ra_exc:
+        print(
+            "[recommended_actions] attach skipped:",
+            type(_ra_exc).__name__,
+            str(_ra_exc)[:300],
+            flush=True,
+        )
+
+    try:
         print(
             "[viz] outgoing_visualization=",
             str(

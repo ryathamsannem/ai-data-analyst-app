@@ -123,6 +123,21 @@ export const aiInsightsReasoningClaim =
 export const aiInsightsReasoningBasis =
   "ai-insights-reasoning-basis m-0 mt-1 text-[11px] leading-[1.45] text-slate-500 dark:text-[color:var(--insights-answer-label)]";
 
+export const aiInsightsRecommendedList =
+  "ai-insights-recommended-list my-0 list-none space-y-1.5 px-2 pb-2 pt-0.5";
+
+export const aiInsightsRecommendedItem =
+  "ai-insights-recommended-item rounded-lg border border-[color:var(--insights-border-soft)] bg-[color:var(--insights-layer-inset)] px-3 py-2 dark:border-[color:var(--insights-border-medium)] dark:bg-[color:color-mix(in_srgb,var(--insights-layer-card)_88%,var(--insights-layer-inset))]";
+
+export const aiInsightsRecommendedTitle =
+  "ai-insights-recommended-title m-0 text-[13px] font-medium leading-snug text-slate-800 dark:text-[color:var(--insights-answer-emphasis)]";
+
+export const aiInsightsRecommendedDesc =
+  "ai-insights-recommended-desc m-0 mt-1 text-[11px] leading-[1.45] text-slate-600 dark:text-[color:var(--insights-answer-body)]";
+
+export const aiInsightsRecommendedChip =
+  "ai-insights-recommended-chip mt-2 inline-flex max-w-full items-center rounded-md border border-[color:var(--insights-border-soft)] bg-[color:var(--insights-layer-card)] px-2 py-1 text-[10px] font-medium leading-snug text-slate-600 transition-colors hover:border-[color:var(--insights-border-medium)] hover:text-slate-800 dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-answer-label)] dark:hover:text-[color:var(--insights-answer-emphasis)]";
+
 export const aiInsightsAnswerDetail =
   "ai-insights-answer-detail group overflow-hidden rounded-lg border-0 border-b border-[color:var(--border-default)]/40 bg-transparent transition-[border-color,background-color] duration-200 last:border-b-0 open:border-b-[color:color-mix(in_srgb,var(--accent)_16%,var(--border-default))] open:shadow-none dark:border-b-[color:var(--insights-border-soft)] dark:bg-transparent dark:open:border-b-[color:var(--insights-border-soft)] dark:open:bg-transparent dark:open:shadow-none";
 

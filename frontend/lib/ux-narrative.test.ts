@@ -13,6 +13,17 @@ describe("aiAnswerLeadIn", () => {
     ).toBe("Workforce insight");
   });
 
+  it("uses Commercial insight for retail ranking when chart snapshot is stale trend", () => {
+    expect(
+      aiAnswerLeadIn("retail", "bar_horizontal", {
+        routingIntent: "ranking",
+        categoryColumn: "region",
+        metricColumn: "sales_amount",
+        isTimeSeries: false,
+      })
+    ).toBe("Commercial insight");
+  });
+
   it("uses Trend over time for true monthly trend charts", () => {
     expect(
       aiAnswerLeadIn("retail", "area", {
