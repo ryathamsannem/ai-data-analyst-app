@@ -256,6 +256,18 @@ export const aiInsightsSuggestedRecentList = "mt-2.5 flex flex-col gap-2.5";
 export const aiInsightsSuggestedRecentItem =
   "ai-insights-suggested-recent w-full rounded-xl border border-[color:var(--border-default)]/55 bg-[color:var(--surface-elevated)] px-3 py-2.5 text-left text-xs leading-snug text-[var(--text-muted)] shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,color] duration-200 hover:border-[color:color-mix(in_srgb,var(--accent)_20%,var(--border-default))] hover:bg-[color:color-mix(in_srgb,var(--accent-wash)_35%,var(--surface-elevated))] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/30 focus-visible:ring-offset-1 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-muted)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] dark:hover:border-[color:var(--insights-border-medium)] dark:hover:bg-[color:var(--insights-layer-nested)] dark:hover:text-[color:var(--insights-text-secondary)]";
 
+export const aiInsightsRecentInsightItemActive =
+  "border-[color:color-mix(in_srgb,var(--accent)_38%,var(--border-default))] bg-[color:color-mix(in_srgb,var(--accent-wash)_42%,var(--surface-elevated))] text-[var(--foreground)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_12%,transparent)] dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-nested)] dark:text-[color:var(--insights-text-secondary)]";
+
+export const aiInsightsRecentInsightBadge =
+  "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide";
+
+export const aiInsightsRecentInsightBadgeMain =
+  `${aiInsightsRecentInsightBadge} border-indigo-200/70 bg-indigo-50/90 text-indigo-900 dark:border-indigo-400/25 dark:bg-indigo-950/45 dark:text-indigo-100`;
+
+export const aiInsightsRecentInsightBadgeFollowUp =
+  `${aiInsightsRecentInsightBadge} border-violet-200/70 bg-violet-50/90 text-violet-900 dark:border-violet-400/25 dark:bg-violet-950/45 dark:text-violet-100`;
+
 /** Suggested follow-ups (after AI answer). */
 export const aiInsightsFollowupSection =
   "ai-insights-followup w-full min-w-0 rounded-xl border border-[color:var(--border-default)]/45 bg-[color:color-mix(in_srgb,var(--surface-subtle)_65%,var(--surface-elevated))] p-3.5 sm:p-4 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-card)]";

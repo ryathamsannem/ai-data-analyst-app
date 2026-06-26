@@ -379,6 +379,9 @@ import {
   aiInsightsSuggestedRecentList,
   aiInsightsSuggestedRecentSection,
   aiInsightsSuggestedRecentTitle,
+  aiInsightsRecentInsightBadgeFollowUp,
+  aiInsightsRecentInsightBadgeMain,
+  aiInsightsRecentInsightItemActive,
   aiInsightsMutedLabel,
   aiInsightsAskPanel,
   aiInsightsGrid,
@@ -720,6 +723,14 @@ import {
   type ChartInsightAnswerBundle,
   type ChartInsightAnswerStore,
 } from "@/lib/chart-insight-answers";
+import {
+  appendInsightSavedResult,
+  buildInsightRestorePayload,
+  chartExistsInHistory,
+  clearInsightResultHistory,
+  createInsightSavedResult,
+  type InsightSavedResult,
+} from "@/lib/insight-result-history";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   datasetKindLabel,
@@ -6662,7 +6673,16 @@ function HomeInner() {
     useState<ConversationMeta | null>(null);
   const [aiConversationState, setAiConversationState] =
     useState<AiConversationState>(() => emptyAiConversationState());
-  const [questionHistory, setQuestionHistory] = useState<string[]>([]);
+  const [insightResultHistory, setInsightResultHistory] = useState<
+    InsightSavedResult[]
+  >([]);
+  const [activeInsightResultId, setActiveInsightResultId] = useState<
+    string | null
+  >(null);
+  const insightResultHistoryRef = useRef<InsightSavedResult[]>([]);
+  const activeInsightResultIdRef = useRef<string | null>(null);
+  const lastSavedInsightResultIdRef = useRef<string | null>(null);
+  const insightParentResultIdAtAskStartRef = useRef<string | null>(null);
   /** True when the last /ask returned a chart payload (hydrated visualization). */
   const [lastAskVisualizationHydrated, setLastAskVisualizationHydrated] =
     useState(false);
@@ -6907,6 +6927,78 @@ function HomeInner() {
     []
   );
 
+  useEffect(() => {
+    insightResultHistoryRef.current = insightResultHistory;
+  }, [insightResultHistory]);
+
+  useEffect(() => {
+    activeInsightResultIdRef.current = activeInsightResultId;
+  }, [activeInsightResultId]);
+
+  const persistInsightSavedResult = useCallback(
+    (input: {
+      turnId?: string | null;
+      question: string;
+      answer: string;
+      hasValidAIAnswer: boolean;
+      alignedAnalysis: AlignedAnalysisContext | null;
+      chartId: string | null;
+      isFollowUp: boolean;
+      parentResultId: string | null;
+      lastAskVisualizationHydrated: boolean;
+    }) => {
+      const entry = createInsightSavedResult({
+        turnId: input.turnId ?? null,
+        question: input.question,
+        answer: input.answer,
+        hasValidAIAnswer: input.hasValidAIAnswer,
+        alignedAnalysis: input.alignedAnalysis,
+        chartId: input.chartId,
+        isFollowUp: input.isFollowUp,
+        parentResultId: input.parentResultId,
+        lastAskVisualizationHydrated: input.lastAskVisualizationHydrated,
+      });
+      lastSavedInsightResultIdRef.current = entry.id;
+      setInsightResultHistory((prev) => appendInsightSavedResult(prev, entry));
+      setActiveInsightResultId(entry.id);
+    },
+    []
+  );
+
+  const restoreInsightSavedResult = useCallback(
+    (resultId: string) => {
+      const hit = insightResultHistoryRef.current.find((r) => r.id === resultId);
+      if (!hit) return;
+
+      const payload = buildInsightRestorePayload(hit);
+      setActiveInsightResultId(payload.resultId);
+      setQuestion(payload.question);
+      setAnswer(payload.answer);
+      setHasValidAIAnswer(payload.hasValidAIAnswer);
+      setLastAskedQuestion(payload.question);
+      setAlignedAnalysis(
+        (payload.alignedAnalysis as AlignedAnalysisContext | null) ?? null
+      );
+      setLastAskVisualizationHydrated(payload.lastAskVisualizationHydrated);
+      setHowCalculatedOpen(false);
+
+      if (
+        payload.chartId &&
+        chartExistsInHistory(chartHistory, payload.chartId)
+      ) {
+        pinInsightChart(payload.chartId);
+        pinnedInsightChartIdRef.current = payload.chartId;
+        saveInsightBundleForChart(payload.chartId, {
+          answer: payload.answer,
+          lastAskedQuestion: payload.question,
+          hasValidAIAnswer: payload.hasValidAIAnswer,
+          alignedAnalysis: payload.alignedAnalysis,
+        });
+      }
+    },
+    [chartHistory, pinInsightChart, saveInsightBundleForChart]
+  );
+
   const selectChartWithInsightState = useCallback(
     (
       id: string | null,
@@ -7103,6 +7195,7 @@ function HomeInner() {
       const nextQ = value.trim();
       const snapQ = (insightSnapshot?.question ?? lastAskedQuestion).trim();
       if (nextQ !== lastAskedQuestion.trim() || (snapQ && nextQ !== snapQ)) {
+        setActiveInsightResultId(null);
         setHasValidAIAnswer(false);
         setAlignedAnalysis(null);
         setLastAskVisualizationHydrated(false);
@@ -7223,7 +7316,10 @@ function HomeInner() {
     setLastConversationMeta(null);
     setAiConversationState(emptyAiConversationState());
     clearInsightThread();
-    setQuestionHistory([]);
+    setInsightResultHistory(clearInsightResultHistory());
+    setActiveInsightResultId(null);
+    lastSavedInsightResultIdRef.current = null;
+    insightParentResultIdAtAskStartRef.current = null;
     setKpis(null);
     setKpiCards([]);
     setAlignedAnalysis(null);
@@ -7353,7 +7449,10 @@ function HomeInner() {
     setLastConversationMeta(null);
     setAiConversationState(emptyAiConversationState());
     clearInsightThread();
-    setQuestionHistory([]);
+    setInsightResultHistory(clearInsightResultHistory());
+    setActiveInsightResultId(null);
+    lastSavedInsightResultIdRef.current = null;
+    insightParentResultIdAtAskStartRef.current = null;
     setDashboardFilters([]);
     setDashDateStart("");
     setDashDateEnd("");
@@ -7495,7 +7594,10 @@ function HomeInner() {
     setAnswer("");
     setHasValidAIAnswer(false);
     setLastAskedQuestion("");
-    setQuestionHistory([]);
+    setInsightResultHistory(clearInsightResultHistory());
+    setActiveInsightResultId(null);
+    lastSavedInsightResultIdRef.current = null;
+    insightParentResultIdAtAskStartRef.current = null;
     setAlignedAnalysis(null);
     setLastAskVisualizationHydrated(false);
     setHowCalculatedOpen(false);
@@ -7520,7 +7622,7 @@ function HomeInner() {
     ) {
       return true;
     }
-    if (questionHistory.length > 0) return true;
+    if (insightResultHistory.length > 0) return true;
     if (conversationSnapshot?.lastQuestion?.trim()) return true;
     if (aiConversationState.followUpChain.length > 0) return true;
     if (aiConversationState.lastQuestion.trim()) return true;
@@ -7532,7 +7634,7 @@ function HomeInner() {
     answer,
     lastAskedQuestion,
     question,
-    questionHistory,
+    insightResultHistory,
     conversationSnapshot,
     aiConversationState.followUpChain,
     aiConversationState.lastQuestion,
@@ -7615,6 +7717,9 @@ function HomeInner() {
 
     const requestNonce = ++insightAskRequestNonceRef.current;
     insightAskInFlightTurnIdRef.current = null;
+
+    insightParentResultIdAtAskStartRef.current =
+      activeInsightResultIdRef.current ?? lastSavedInsightResultIdRef.current;
 
     setError("");
     setAnswer("");
@@ -7793,14 +7898,6 @@ function HomeInner() {
       const nextSnap = parseConversationSnapshot(chartData.conversation_context);
       const meta = parseConversationMeta(chartData.conversation_meta);
       setLastConversationMeta(meta);
-
-      const qTrim = qRaw;
-      if (qTrim) {
-        setQuestionHistory((prev) => {
-          const merged = [qTrim, ...prev.filter((x) => x !== qTrim)];
-          return merged.slice(0, 3);
-        });
-      }
 
       const hydrated = hydrateVisualizationFromApi(chartData.visualization);
       const parsedAnalysis = parseAlignedAnalysis(chartData.analysis);
@@ -8032,6 +8129,21 @@ function HomeInner() {
             alignedAnalysis: parsedAnalysis,
           });
         }
+        persistInsightSavedResult({
+          turnId: turnId || null,
+          question: qRaw,
+          answer: terminalAnswer,
+          hasValidAIAnswer: Boolean(terminalAnswer),
+          alignedAnalysis: parsedAnalysis,
+          chartId: bundleChartId,
+          isFollowUp: followUpDetected,
+          parentResultId: followUpDetected
+            ? insightParentResultIdAtAskStartRef.current
+            : null,
+          lastAskVisualizationHydrated: preservePinnedChart
+            ? true
+            : Boolean(hydrated),
+        });
         return;
       }
 
@@ -8194,6 +8306,23 @@ function HomeInner() {
           alignedAnalysis: analysisForBundle,
         });
       }
+
+      persistInsightSavedResult({
+        turnId: turnId || null,
+        question: qRaw,
+        answer: answerForBundle,
+        hasValidAIAnswer: validForBundle,
+        alignedAnalysis: analysisForBundle,
+        chartId: bundleChartId,
+        isFollowUp: Boolean(narrMeta?.followUpDetected ?? followUpDetected),
+        parentResultId:
+          narrMeta?.followUpDetected ?? followUpDetected
+            ? insightParentResultIdAtAskStartRef.current
+            : null,
+        lastAskVisualizationHydrated: preservePinnedChart
+          ? true
+          : Boolean(hydrated),
+      });
     } catch {
       if (!isStaleAsk()) {
         setAlignedAnalysis(null);
@@ -9216,10 +9345,10 @@ function HomeInner() {
   const visibleSuggestedQuestions = useMemo(
     () =>
       applySuggestionListHygiene(suggestedQuestions, [
-        ...questionHistory,
+        ...insightResultHistory.map((r) => r.question),
         question.trim(),
       ].filter(Boolean)).slice(0, 5),
-    [suggestedQuestions, questionHistory, question]
+    [suggestedQuestions, insightResultHistory, question]
   );
 
   const tickTruncate = useCallback((v: string | number) => {
@@ -13097,23 +13226,46 @@ function HomeInner() {
                       </button>
                     ))}
                   </div>
-                  {questionHistory.length > 0 ? (
+                  {insightResultHistory.length > 0 ? (
                     <div className={aiInsightsSuggestedRecentSection}>
-                      <h3 className={aiInsightsSuggestedRecentTitle}>Recent questions</h3>
+                      <h3 className={aiInsightsSuggestedRecentTitle}>
+                        Recent Insights
+                      </h3>
                       <p className={aiInsightsSuggestedRecentDesc}>
-                        Tap to refill the input (last 3).
+                        Tap to restore a saved answer instantly — no new AI call.
                       </p>
                       <div className={aiInsightsSuggestedRecentList}>
-                        {questionHistory.map((hq) => (
-                          <button
-                            key={hq}
-                            type="button"
-                            onClick={() => setQuestion(hq)}
-                            className={aiInsightsSuggestedRecentItem}
-                          >
-                            {hq.length > 72 ? `${hq.slice(0, 70)}…` : hq}
-                          </button>
-                        ))}
+                        {insightResultHistory.map((item) => {
+                          const isActive = activeInsightResultId === item.id;
+                          const label =
+                            item.question.length > 72
+                              ? `${item.question.slice(0, 70)}…`
+                              : item.question;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => restoreInsightSavedResult(item.id)}
+                              className={`${aiInsightsSuggestedRecentItem} ${
+                                isActive ? aiInsightsRecentInsightItemActive : ""
+                              }`}
+                              aria-current={isActive ? "true" : undefined}
+                            >
+                              <span className="flex items-start justify-between gap-2">
+                                <span className="min-w-0 flex-1">{label}</span>
+                                <span
+                                  className={
+                                    item.isFollowUp
+                                      ? aiInsightsRecentInsightBadgeFollowUp
+                                      : aiInsightsRecentInsightBadgeMain
+                                  }
+                                >
+                                  {item.isFollowUp ? "Follow-up" : "Main"}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : null}
