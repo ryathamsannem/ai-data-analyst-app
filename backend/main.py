@@ -1085,6 +1085,30 @@ def _pick_region_column_from_candidates(
     return None
 
 
+def _pick_date_column_from_candidates(
+    cands: List[Dict[str, Any]],
+    frame: pd.DataFrame,
+    profile: Optional[Dict[str, Any]],
+) -> Optional[str]:
+    """Require date dtype, date-like column name, or parseable time series — not arbitrary text."""
+    prof = profile or {}
+    for row in cands or []:
+        col = str(row.get("column") or "").strip()
+        if not col or col not in frame.columns:
+            continue
+        if prof.get("column_types", {}).get(col) == "date":
+            return col
+        rs = row.get("reasons") or []
+        if any(str(r).startswith("name:") for r in rs):
+            return col
+        if _group_column_is_time_series_eligible(frame, col):
+            return col
+    for c in frame.columns:
+        if prof.get("column_types", {}).get(c) == "date":
+            return str(c)
+    return None
+
+
 def _region_column_usable(
     col: Optional[str], profile: Optional[Dict[str, Any]] = None
 ) -> bool:
@@ -1641,12 +1665,10 @@ def compute_semantic_column_mapping(
     def pick(cands: List[Dict[str, Any]], role_key: str) -> Optional[str]:
         if role_key == "region":
             return _pick_region_column_from_candidates(cands, profile)
+        if role_key == "date":
+            return _pick_date_column_from_candidates(cands, frame, profile)
         if cands and float(cands[0].get("score", 0)) > 0:
             return str(cands[0]["column"])
-        if role_key == "date":
-            for c in columns:
-                if profile.get("column_types", {}).get(c) == "date":
-                    return str(c)
         return None
 
     proposed = {

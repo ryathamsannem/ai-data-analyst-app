@@ -26,8 +26,9 @@ Frozen H-Bar/V-Bar parity record: [`chart-visual-parity-open-items.md`](./chart-
 ### Error handling / loading states
 - **P1 audit complete (June 27, 2026):** See [`p1-error-loading-ux-audit.md`](./p1-error-loading-ux-audit.md). Eight P1 gaps fixed (empty states, filter error, mapping save/validation, export gating, friendly capture errors). P2 backlog: chart ErrorBoundary, PDF artifact warning, malformed CSV diagnostics.
 
-### Upload / mapping edge cases
-- Validate odd schemas: missing date, all-categorical, single-column, huge cardinality, mixed types, ambiguous domain; ensure mapping modal defaults degrade gracefully.
+### ~~Upload / mapping edge cases~~ — **COMPLETE (June 27, 2026)**
+- Validated empty, ambiguous, high-cardinality, and gold-fixture schemas; fixed all-categorical crash + spurious date mapping.
+- See [`p1-upload-mapping-edge-cases.md`](./p1-upload-mapping-edge-cases.md).
 
 ### ~~Export regression pass~~ — **COMPLETE (June 27, 2026)**
 - Closed after P1 pass: 87 targeted export tests + 722 full vitest + clean build; Phase 7 PDF 18/18.

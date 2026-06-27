@@ -1934,41 +1934,42 @@ def discover_chart_opportunities(
                     pass
 
     # C. Composition donuts — low cardinality only, part-to-whole
-    for di, dim_c in enumerate(breakdown_dims[:8]):
-        if not _composition_eligible_dim(
-            df, dim_c, deps.id_like_column, profile, cardinality_memo=cardinality_memo
-        ):
-            continue
-        num_c = numerics[0 if di % 2 else min(1, len(numerics) - 1)]
-        if not _metric_eligible_for_composition(num_c, inv):
-            continue
-        pair_key = ("composition", dim_c.lower(), num_c.lower())
-        if pair_key in used_pairs:
-            continue
-        try:
-            sub = df[[dim_c, num_c]].copy()
-            sub["_v"] = discover_deps.numeric_series(num_c)
-            sub = sub.dropna(subset=[dim_c, "_v"])
-            g = sub.groupby(dim_c)["_v"].sum().sort_values(ascending=False).head(8)
-            g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
-            if g.empty or len(g) < 2 or not _composition_shares_valid(g):
+    if numerics:
+        for di, dim_c in enumerate(breakdown_dims[:8]):
+            if not _composition_eligible_dim(
+                df, dim_c, deps.id_like_column, profile, cardinality_memo=cardinality_memo
+            ):
                 continue
-            tit = _executive_share_by_dim_title(num_c, dim_c, deps.pretty_label)
-            api_typ = "donut" if len(g) >= 3 else "pie"
-            add(
-                deps.series_payload(
-                    tit,
-                    g,
-                    chart_type=api_typ,
-                    category_column=dim_c,
-                    metric_column=num_c,
-                ),
-                "composition",
-                86 - di * 2,
-            )
-            used_pairs.add(pair_key)
-        except Exception:
-            pass
+            num_c = numerics[0 if di % 2 else min(1, len(numerics) - 1)]
+            if not _metric_eligible_for_composition(num_c, inv):
+                continue
+            pair_key = ("composition", dim_c.lower(), num_c.lower())
+            if pair_key in used_pairs:
+                continue
+            try:
+                sub = df[[dim_c, num_c]].copy()
+                sub["_v"] = discover_deps.numeric_series(num_c)
+                sub = sub.dropna(subset=[dim_c, "_v"])
+                g = sub.groupby(dim_c)["_v"].sum().sort_values(ascending=False).head(8)
+                g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
+                if g.empty or len(g) < 2 or not _composition_shares_valid(g):
+                    continue
+                tit = _executive_share_by_dim_title(num_c, dim_c, deps.pretty_label)
+                api_typ = "donut" if len(g) >= 3 else "pie"
+                add(
+                    deps.series_payload(
+                        tit,
+                        g,
+                        chart_type=api_typ,
+                        category_column=dim_c,
+                        metric_column=num_c,
+                    ),
+                    "composition",
+                    86 - di * 2,
+                )
+                used_pairs.add(pair_key)
+            except Exception:
+                pass
 
     # D. Correlation scatter
     corr_cols = numerics[:8]
