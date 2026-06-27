@@ -589,21 +589,25 @@ def _metric_semantic_strength(metric_key: str, title: str = "") -> int:
     if metric_key in ("__records__", "records"):
         return 5
     if re.search(
-        r"\b(revenue|profit|sales|order[_ ]?value|loan[_ ]?balance|spend|gmv|deposit[_ ]?balance)\b",
+        r"\b(revenue|profit|sales|order[_ ]?value|loan[_ ]?balance|spend|gmv|deposit[_ ]?balance|"
+        r"salary|compensation|bonus|pay|wage)\b",
         blob,
     ):
         return 100
     if re.search(
         r"\b(conversion[_ ]?rate|defect[_ ]?rate|satisfaction|utilization|delinquency|"
-        r"attrition|csat|nps|roas|resolution[_ ]?rate|attainment)\b",
+        r"attrition|csat|nps|roas|resolution[_ ]?rate|attainment|performance[_ ]?rating|"
+        r"engagement[_ ]?score)\b",
         blob,
     ):
         return 80
     if re.search(
         r"\b(account[_ ]?age|age months|tenure months|vintage|monthly income|credit score|"
-        r"transaction count)\b",
+        r"transaction count|monthly age|age trend|age band|age_band)\b",
         blob,
     ):
+        return 22
+    if re.search(r"\b(^age$| by age\b|records by age)\b", blob):
         return 22
     if re.search(
         r"\b(orders|tickets|incidents|patients|employees|headcount|admissions|claims|"
@@ -803,8 +807,245 @@ def _prune_geographic_risk_overview_charts(
 def _is_lifecycle_overview_metric(metric_key: str, title: str = "") -> bool:
     blob = f"{metric_key} {title}".lower().replace("_", " ")
     return bool(
-        re.search(r"\b(account[_ ]?age|age months|tenure months|vintage)\b", blob)
+        re.search(
+            r"\b(account[_ ]?age|age months|tenure months|vintage|monthly age|age trend)\b",
+            blob,
+        )
+        or re.search(r"\b(^age$| by age\b)\b", blob)
     )
+
+
+def _is_hr_workforce_dimension(dim: Optional[str], title: str = "") -> bool:
+    blob = f"{dim or ''} {title}".lower().replace("_", " ")
+    return bool(
+        re.search(
+            r"\b(department|dept|job level|job family|job_level|job_family)\b",
+            blob,
+        )
+    )
+
+
+def _is_hr_core_performance_breakdown_chart(
+    chart: Dict[str, Any], record_key: str
+) -> bool:
+    title = str(chart.get("title") or "").lower().replace("_", " ")
+    if not re.search(r"\bperformance[_ ]?rating\b", title):
+        return False
+    dk = _dimension_key(chart)
+    return _is_hr_workforce_dimension(dk, title)
+
+
+def _is_hr_secondary_engagement_breakdown(chart: Dict[str, Any], record_key: str) -> bool:
+    title = str(chart.get("title") or "").lower().replace("_", " ")
+    mk = _metric_key(chart, record_key)
+    blob = f"{title} {mk}".replace("_", " ")
+    return "engagement" in blob and _dimension_key(chart) is not None
+
+
+def _ensure_hr_workforce_core_charts(
+    selected: List[Dict[str, Any]],
+    candidates: List[Dict[str, Any]],
+    record_key: str,
+    *,
+    kind: str,
+) -> List[Dict[str, Any]]:
+    """Keep salary + performance workforce breakdowns when HR alternatives exist."""
+    if str(kind or "").lower() != "hr" or not selected:
+        return selected
+
+    def _title_blob(c: Dict[str, Any]) -> str:
+        return str(c.get("title") or "").lower()
+
+    has_salary_breakdown = any(
+        "salary" in _title_blob(c)
+        and _is_hr_workforce_dimension(_dimension_key(c), _title_blob(c))
+        for c in selected
+    )
+    has_perf_breakdown = any(
+        _is_hr_core_performance_breakdown_chart(c, record_key) for c in selected
+    )
+
+    pool = list(selected) + list(candidates)
+    out = list(selected)
+
+    def _best_match(
+        predicate: Callable[[Dict[str, Any]], bool],
+    ) -> Optional[Dict[str, Any]]:
+        best: Optional[Dict[str, Any]] = None
+        best_score = -1
+        for chart in pool:
+            if not predicate(chart):
+                continue
+            score = int(chart.get("_opportunityScore") or 0)
+            if score > best_score:
+                best_score = score
+                best = chart
+        return best
+
+    def _swap_in(chart: Optional[Dict[str, Any]]) -> None:
+        nonlocal out
+        if not chart:
+            return
+        clean = {k: v for k, v in chart.items() if not str(k).startswith("_")}
+        tit = normalize_canonical_chart_title(str(clean.get("title") or ""))
+        if tit:
+            clean["title"] = tit
+        if any(str(c.get("title") or "").strip().lower() == tit.lower() for c in out):
+            return
+        drop_idx: Optional[int] = None
+        for i, existing in enumerate(out):
+            if _is_hr_secondary_engagement_breakdown(existing, record_key):
+                drop_idx = i
+                break
+        if drop_idx is None:
+            for i, existing in enumerate(out):
+                if _is_hr_demographic_overview_chart(existing, record_key):
+                    drop_idx = i
+                    break
+        if drop_idx is None and len(out) >= 2:
+            drop_idx = len(out) - 1
+        if drop_idx is not None:
+            out[drop_idx] = clean
+
+    if not has_salary_breakdown:
+        _swap_in(
+            _best_match(
+                lambda c: "salary" in _title_blob(c)
+                and _is_hr_workforce_dimension(_dimension_key(c), _title_blob(c))
+            )
+        )
+    if not has_perf_breakdown:
+        _swap_in(
+            _best_match(lambda c: _is_hr_core_performance_breakdown_chart(c, record_key))
+        )
+    return out
+
+
+def _is_hr_demographic_column(col: str) -> bool:
+    n = _norm_col(col)
+    if n in (
+        "age",
+        "age_band",
+        "birth_year",
+        "dob",
+        "date_of_birth",
+        "gender",
+        "sex",
+    ):
+        return True
+    return bool(
+        re.search(
+            r"\b(age band|birth year|date of birth|gender|sex)\b",
+            n.replace("_", " "),
+        )
+    )
+
+
+def _is_hr_weak_flag_metric(col: str) -> bool:
+    n = _norm_col(col)
+    return bool(re.search(r"(_flag|_indicator|_binary)$", n)) or n.endswith(" flag")
+
+
+def _is_hr_weak_flag_overview_chart(
+    chart: Dict[str, Any], record_key: str
+) -> bool:
+    mk = _metric_key(chart, record_key)
+    return _is_hr_weak_flag_metric(mk)
+
+
+def _is_hr_demographic_overview_chart(
+    chart: Dict[str, Any], record_key: str
+) -> bool:
+    title = str(chart.get("title") or "").lower().replace("_", " ")
+    mk = _metric_key(chart, record_key)
+    dk = (_dimension_key(chart) or "").lower().replace("_", " ")
+    if _is_hr_demographic_column(mk) or _is_hr_demographic_column(dk):
+        return True
+    if re.search(r"\b(monthly age|age trend|records by age|age band)\b", title):
+        return True
+    if _is_lifecycle_overview_metric(mk, title):
+        return True
+    return False
+
+
+def _hr_preferred_metrics(
+    numerics: List[str],
+    primary: Optional[str],
+    secondary: Optional[str],
+) -> List[str]:
+    ordered: List[str] = []
+    for m in (primary, secondary):
+        if (
+            m
+            and m in numerics
+            and not _is_hr_demographic_column(m)
+            and not _is_lifecycle_overview_metric(m)
+            and m not in ordered
+        ):
+            ordered.append(m)
+    for key in (
+        "salary",
+        "performance_rating",
+        "bonus",
+        "compensation",
+        "engagement_score",
+        "attrition",
+    ):
+        for c in numerics:
+            if (
+                key in _norm_col(c)
+                and c not in ordered
+                and not _is_hr_demographic_column(c)
+            ):
+                ordered.append(c)
+                break
+    for c in numerics:
+        if c not in ordered and not _is_hr_demographic_column(c):
+            if not _is_hr_weak_flag_metric(c):
+                ordered.append(c)
+    if len(ordered) < 2:
+        for c in numerics:
+            if c not in ordered and not _is_hr_demographic_column(c):
+                ordered.append(c)
+    return ordered
+
+
+def _hr_has_strong_workforce_charts(
+    charts: List[Dict[str, Any]], record_key: str
+) -> bool:
+    workforce_dims = frozenset(
+        {"department", "job level", "job_level", "job family", "job_family", "dept"}
+    )
+    for chart in charts:
+        if _is_hr_demographic_overview_chart(chart, record_key):
+            continue
+        strength = _metric_semantic_strength(
+            _metric_key(chart, record_key), str(chart.get("title") or "")
+        )
+        if strength >= 80:
+            return True
+        dk = (_dimension_key(chart) or "").lower().replace("_", " ")
+        if dk in workforce_dims and strength >= 40:
+            return True
+    return False
+
+
+def _prune_hr_demographic_overview_charts(
+    charts: List[Dict[str, Any]], record_key: str, kind: str
+) -> List[Dict[str, Any]]:
+    """Drop age / age-band default charts when stronger HR workforce charts exist."""
+    if str(kind or "").lower() != "hr":
+        return charts
+    if not _hr_has_strong_workforce_charts(charts, record_key):
+        return charts
+    out = [
+        c
+        for c in charts
+        if not _is_hr_demographic_overview_chart(c, record_key)
+    ]
+    if _hr_has_strong_workforce_charts(out, record_key):
+        out = [c for c in out if not _is_hr_weak_flag_overview_chart(c, record_key)]
+    return out
 
 
 def _banking_preferred_metrics(
@@ -848,6 +1089,10 @@ def _preferred_breakdown_metric(
     """Prefer primary/secondary commercial metrics over quantity/lifecycle for each dimension."""
     if str(kind or "").lower() == "finance":
         prefs = _banking_preferred_metrics(numerics, primary, secondary)
+        if prefs:
+            return prefs[dim_index % len(prefs)]
+    if str(kind or "").lower() == "hr":
+        prefs = _hr_preferred_metrics(numerics, primary, secondary)
         if prefs:
             return prefs[dim_index % len(prefs)]
     prefs = [m for m in (primary, secondary) if m and m in numerics]
@@ -1293,6 +1538,27 @@ def _chart_redundant_with_kpi(
             "horizontalbar",
         ):
             if kpi.value and top_label and kpi.value.lower()[:24] == top_label[:24]:
+                chart_title = str(chart.get("title") or "").lower()
+                if mk == record_key.strip().lower() or mk in ("records", "__records__"):
+                    return True
+                chart_strength = _metric_semantic_strength(mk, chart_title)
+                kpi_blob = f"{kpi.title} {kpi.subtitle or ''}".lower()
+                workforce_tokens = (
+                    "salary",
+                    "compensation",
+                    "bonus",
+                    "pay",
+                    "wage",
+                    "performance",
+                    "rating",
+                    "engagement",
+                )
+                if chart_strength >= 80 and any(
+                    t in chart_title for t in workforce_tokens
+                ):
+                    kpi_title = kpi.title.lower()
+                    if not any(t in kpi_title for t in workforce_tokens):
+                        continue
                 return True
             if kpi.dimension_hint and kpi.dimension_hint in dk:
                 chart_title = str(chart.get("title") or "").lower()
@@ -1391,6 +1657,18 @@ def _score_candidate(
         and _is_banking_business_dimension(dk or "")
     ):
         base += 14
+    if str(kind or "").lower() == "hr":
+        title_l = str(chart.get("title") or "").lower().replace("_", " ")
+        if _is_hr_core_performance_breakdown_chart(chart, record_key):
+            base += 34
+        elif (
+            re.search(r"\b(salary|compensation)\b", title_l)
+            and _is_hr_workforce_dimension(dk, title_l)
+            and bucket in ("ranking", "compare")
+        ):
+            base += 14
+        if _is_hr_secondary_engagement_breakdown(chart, record_key):
+            base -= 24
     if strength <= 45 and primary and mk != str(primary).strip().lower():
         if secondary and mk != str(secondary).strip().lower():
             base -= 24
@@ -1576,6 +1854,7 @@ def select_diverse_charts(
         return []
 
     kpi_ctx = kpi_context or []
+    all_candidates = list(candidates)
     primary, secondary, _ = deps.priority_metrics(kind)
     remaining = list(candidates)
     selected: List[Dict[str, Any]] = []
@@ -1669,10 +1948,19 @@ def select_diverse_charts(
         kind=kind,
     )
     pruned = _prune_lifecycle_overview_charts(pruned, deps.record_metric_key)
+    pruned = _prune_hr_demographic_overview_charts(
+        pruned, deps.record_metric_key, kind=kind
+    )
     pruned = _prune_geographic_risk_overview_charts(
         pruned, deps.record_metric_key, kind=kind
     )
     pruned = _prune_scatter_when_business_rich(pruned, min_non_scatter=4)
+    pruned = _ensure_hr_workforce_core_charts(
+        pruned,
+        all_candidates,
+        deps.record_metric_key,
+        kind=kind,
+    )
     return pruned[:max_charts]
 
 
@@ -1792,6 +2080,7 @@ def discover_chart_opportunities(
     ]
     has_business_dims = len(business_breakdown_dims) >= 1
     is_finance = str(kind or "").lower() == "finance"
+    is_hr = str(kind or "").lower() == "hr"
 
     def add(payload: Optional[Dict[str, Any]], opp_type: str, score: int) -> None:
         if not payload:
@@ -1814,6 +2103,9 @@ def discover_chart_opportunities(
 
     # A. Trend + area (performance over time)
     trend_metrics = numerics[:3]
+    if is_hr:
+        hr_nums = _hr_preferred_metrics(numerics, primary, secondary)
+        trend_metrics = hr_nums[:3] if hr_nums else trend_metrics
     for ti, date_c in enumerate(inv.dates[:2]):
         for mi, num_c in enumerate(trend_metrics):
             try:
@@ -2034,6 +2326,8 @@ def discover_chart_opportunities(
 
     # F. Record distribution (low-cardinality categories only)
     for dim_c in inv.categories[:3]:
+        if is_hr and _is_hr_demographic_column(dim_c):
+            continue
         if not _composition_eligible_dim(
             df, dim_c, deps.id_like_column, profile, cardinality_memo=cardinality_memo
         ):
