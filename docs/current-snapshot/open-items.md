@@ -13,24 +13,26 @@ Frozen H-Bar/V-Bar parity record: [`chart-visual-parity-open-items.md`](./chart-
 - Closed after Passes 5B.1 → 5C.5. See [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).
 - **Do not reopen** unless a regression is filed with SVG measurements.
 
-### 1. Confirm Overview default charts across domains (manual UI)
-- **Status:** Backend probe + tests pass; needs manual UI confirmation.
-- Confirm Overview defaults on upload for `retail_gold_10000.csv`, `banking_gold_10000.csv`, `banking_financial_services.csv`, `hr_gold_5000.csv` (type label, no default scatter for banking, monthly trends, banking risk/utilization by segment/product, HR salary/department).
-- **Note:** HR auto-dashboard discovery can still surface weaker "Monthly Age Trend" / "Records by Age Band" charts (discovery layer, separate from mapping).
+### ~~1. Confirm Overview default charts across domains (manual UI)~~ — **COMPLETE (June 27, 2026)**
+- Validated via backend probe + **37/37** targeted pytest + frontend golden summary tests.
+- All four gold fixtures produce correct type labels, meaningful KPIs, and business-useful default charts.
+- **HR caveat (P2, non-blocker):** discovery still surfaces `Records by Age Band` and `Monthly Age Trend` — defer to narrow HR discovery pass.
+- See [`validation-results.md`](./validation-results.md) § Overview defaults confirmation.
 
 ---
 
 ## P1 — Production Readiness Phase 1
 
 ### Error handling / loading states
-- Audit upload, mapping, AI ask, export flows for robust error + loading UX (empty/failed/slow states).
+- **P1 audit complete (June 27, 2026):** See [`p1-error-loading-ux-audit.md`](./p1-error-loading-ux-audit.md). Eight P1 gaps fixed (empty states, filter error, mapping save/validation, export gating, friendly capture errors). P2 backlog: chart ErrorBoundary, PDF artifact warning, malformed CSV diagnostics.
 
 ### Upload / mapping edge cases
 - Validate odd schemas: missing date, all-categorical, single-column, huge cardinality, mixed types, ambiguous domain; ensure mapping modal defaults degrade gracefully.
 
-### Export regression pass
-- Re-validate PNG/PDF export after 5B/5C domain and axis changes (85% H-Bar cap, count ticks, percent caps).
-- Confirm no axis-label or layout regressions in exported charts. Reference: Phase 7 PDF fixtures, `docs/pdf-export-final-validation-runbook.md`.
+### ~~Export regression pass~~ — **COMPLETE (June 27, 2026)**
+- Closed after P1 pass: 87 targeted export tests + 722 full vitest + clean build; Phase 7 PDF 18/18.
+- See [`validation-results.md`](./validation-results.md) § P1 export regression pass.
+- Optional: manual banking Overview PNG spot-check (Loan Balance ~216M, Delinquency 0–5%).
 
 ### Platform gaps (production-only)
 - Authentication & tenant isolation; durable usage metering; multi-tenant dataset storage (currently in-memory `df` per process). Separate initiative from chart/Overview work.

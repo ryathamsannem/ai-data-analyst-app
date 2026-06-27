@@ -760,7 +760,13 @@ import {
   buildExportTabVisualizationPreview,
   exportTabAiAnswerAvailable,
 } from "@/lib/export-tab-preview";
+import { validateColumnMappingSelections } from "@/lib/column-mapping-validation";
 import { resolvePdfExportContext } from "@/lib/resolve-pdf-export-context";
+import {
+  exportTabBlockedReason,
+  FILTERED_DASHBOARD_ERROR,
+  friendlyChartCaptureErrorMessage,
+} from "@/lib/user-facing-export-errors";
 import {
   BarChart,
   Bar,
@@ -5325,11 +5331,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 });
                 downloadChartArtifact(artifact, request.filename);
               } catch (err) {
-                onChartExportError?.(
-                  err instanceof Error
-                    ? err.message
-                    : "Unable to export chart image."
-                );
+                onChartExportError?.(friendlyChartCaptureErrorMessage(err));
               } finally {
                 setOverviewPngCaptureRequest(null);
                 setExportingPng(false);
@@ -6479,6 +6481,9 @@ function HomeInner() {
   const [howCalculatedOpen, setHowCalculatedOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [mappingSaving, setMappingSaving] = useState(false);
+  const [pdfExportBusy, setPdfExportBusy] = useState(false);
+  const [mappingModalError, setMappingModalError] = useState("");
   const [insightAskLoadingChart, setInsightAskLoadingChart] = useState(false);
   const [insightAskLoadingNarrative, setInsightAskLoadingNarrative] =
     useState(false);
@@ -6812,7 +6817,10 @@ function HomeInner() {
               date_range: datePayload,
             }),
           });
-          if (!res.ok) return;
+          if (!res.ok) {
+            setError(FILTERED_DASHBOARD_ERROR);
+            return;
+          }
           const data = (await res.json()) as Record<string, unknown>;
           setDashboardEmpty(Boolean(data.empty));
           setFilterBreadcrumb(
@@ -6863,6 +6871,7 @@ function HomeInner() {
           }
         } catch (e) {
           if ((e as Error).name === "AbortError") return;
+          setError(FILTERED_DASHBOARD_ERROR);
         }
       })();
     }, 280);
@@ -6993,7 +7002,10 @@ function HomeInner() {
   const restoreInsightSavedResult = useCallback(
     (resultId: string) => {
       const hit = insightResultHistoryRef.current.find((r) => r.id === resultId);
-      if (!hit) return;
+      if (!hit) {
+        setError("Unable to restore that insight — it is no longer in this session.");
+        return;
+      }
 
       const payload = buildInsightRestorePayload(hit);
       setActiveInsightResultId(payload.resultId);
@@ -7189,7 +7201,7 @@ function HomeInner() {
       downloadChartArtifact(artifact, request.filename);
     } catch (err) {
       console.error("Chart PNG download failed:", err);
-      setError("Unable to download chart image.");
+      setError(friendlyChartCaptureErrorMessage(err));
     } finally {
       setChartsTabPngCaptureRequest(null);
       setExportingChartsTabPng(false);
@@ -8397,8 +8409,23 @@ function HomeInner() {
       return;
     }
 
+    const mappingValidation = validateColumnMappingSelections(columns, {
+      product: productColumn,
+      sales: salesColumn,
+      region: regionColumn,
+      customer: customerColumn,
+      profit: profitColumn,
+      date: dateColumn,
+    });
+    if (!mappingValidation.ok) {
+      setMappingModalError(mappingValidation.message);
+      return;
+    }
+
     setError("");
+    setMappingModalError("");
     dismissMappingMessage();
+    setMappingSaving(true);
 
     try {
       const response = await fetch(apiUrl("/update-column-mapping"), {
@@ -8417,7 +8444,16 @@ function HomeInner() {
       });
 
       if (!response.ok) {
-        throw new Error("Column mapping save failed");
+        let detail: unknown = null;
+        try {
+          const body = await response.json();
+          detail = body?.detail ?? body?.message ?? null;
+        } catch {
+          /* ignore parse errors */
+        }
+        throw new Error(
+          extractApiErrorMessage(detail) || "Column mapping save failed"
+        );
       }
 
       const data = await response.json();
@@ -8470,8 +8506,14 @@ function HomeInner() {
       setMappingMessage("Column mapping saved successfully.");
       setMappingConfirmedByUser(true);
       setMappingModalOpen(false);
-    } catch {
-      setError("Unable to save column mapping.");
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message.trim()
+          ? err.message.trim()
+          : "Unable to save column mapping.";
+      setMappingModalError(message);
+    } finally {
+      setMappingSaving(false);
     }
   };
 
@@ -10972,6 +11014,24 @@ function HomeInner() {
     [exportPdfPreviewContext, exportOptions.includeAIInsight, answer]
   );
 
+  const exportTabDownloadBlocked = useMemo(
+    () =>
+      exportTabBlockedReason({
+        hasDataset: columns.length > 0,
+        includeChart: exportOptions.includeChart,
+        chartAvailable: exportVizPreview.available,
+        includeAIInsight: exportOptions.includeAIInsight,
+        aiAnswerAvailable: exportAiAnswerAvailable,
+      }),
+    [
+      columns.length,
+      exportOptions.includeChart,
+      exportOptions.includeAIInsight,
+      exportVizPreview.available,
+      exportAiAnswerAvailable,
+    ]
+  );
+
   const exportExecutiveInsightsPreview = useMemo(() => {
     if (!exportOptions.includeChart || !exportOptions.includeAIInsight) return null;
     const ctx = exportPdfPreviewContext;
@@ -11066,6 +11126,7 @@ function HomeInner() {
       let insightPinRestored: string | null = null;
       try {
         setError("");
+        setPdfExportBusy(true);
         const pdfRemaining = planUsage?.usage.pdf_exports_remaining;
         if (!canExportPdf(planTier, pdfRemaining)) {
           const msg =
@@ -11726,6 +11787,7 @@ function HomeInner() {
       console.error("PDF generation failed:", err);
       setError("Unable to generate PDF report.");
     } finally {
+      setPdfExportBusy(false);
       if (pdfCaptureActive) setPdfCaptureMounted(false);
       if (insightPinRestored !== null) {
         flushSync(() => {
@@ -12259,7 +12321,10 @@ function HomeInner() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setMappingModalOpen(true)}
+                      onClick={() => {
+                        setMappingModalError("");
+                        setMappingModalOpen(true);
+                      }}
                       className={`shrink-0 ${ovOverviewSecondaryBtn}`}
                     >
                       Review mapping
@@ -12566,6 +12631,18 @@ function HomeInner() {
             ) : null}
             </div>
           )}
+
+        {activeTab === "preview" && columns.length === 0 && (
+          <section className="mb-6 min-w-0 w-full">
+            <div className="rounded-xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-6 py-10 text-center">
+              <h2 className={dpSectionTitle}>Data Preview</h2>
+              <p className={`mx-auto mt-2 max-w-md text-sm leading-relaxed ${ovMuted}`}>
+                Upload a CSV or Excel file on the Overview tab to inspect rows, column
+                types, and mapping quality here.
+              </p>
+            </div>
+          </section>
+        )}
 
         {activeTab === "preview" && columns.length > 0 && (
           <section className="mb-6 min-w-0 w-full">
@@ -13009,7 +13086,19 @@ function HomeInner() {
           </section>
         )}
 
-        {activeTab === "charts" && (
+        {activeTab === "charts" && columns.length === 0 && (
+          <section className={chartsTabPage}>
+            <div className={chartsTabEmptyState}>
+              <p className={chartsTabEmptyTitle}>Upload a dataset first</p>
+              <p className="mx-auto max-w-lg text-sm leading-relaxed text-[color:var(--text-muted)]">
+                Charts from Overview and AI Insights appear here after you upload a file
+                on the <span className={chartsTabDescEmphasis}>Overview</span> tab.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "charts" && columns.length > 0 && (
           <section className={chartsTabPage}>
             <div className={chartsTabHeaderRow}>
               <div className="min-w-0 max-w-2xl">
@@ -13248,7 +13337,19 @@ function HomeInner() {
           </section>
         )}
 
-        {activeTab === "insights" && (
+        {activeTab === "insights" && columns.length === 0 && (
+          <section className={`${aiInsightsPage} ${aiInsightsOuterShell}`}>
+            <div className="rounded-xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-6 py-10 text-center">
+              <h2 className={aiInsightsSuggestedHeading}>AI Insights</h2>
+              <p className={`mx-auto mt-2 max-w-md text-sm leading-relaxed ${ovMuted}`}>
+                Upload a dataset on the Overview tab to ask analytical questions and
+                generate charts with narrative insights.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "insights" && columns.length > 0 && (
           <section className={`${aiInsightsPage} ${aiInsightsOuterShell}`}>
             <div className={aiInsightsGrid}>
               <div className={aiInsightsPanelShell}>
@@ -14392,6 +14493,7 @@ function HomeInner() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
+                      disabled={pdfExportBusy}
                       onClick={() =>
                         downloadReport({
                           includeKPIs: true,
@@ -14403,9 +14505,9 @@ function HomeInner() {
                           chartScope: "insight",
                         })
                       }
-                      className={aiInsightsBtnExport}
+                      className={`${aiInsightsBtnExport} disabled:cursor-not-allowed disabled:opacity-50`}
                     >
-                      Export this insight (PDF)
+                      {pdfExportBusy ? "Exporting PDF…" : "Export this insight (PDF)"}
                     </button>
                   </div>
                 ) : null}
@@ -14723,14 +14825,19 @@ function HomeInner() {
 
               <div className={exportTabFooter}>
                 <p className={exportTabFooterHint}>
-                  Generates a business-ready PDF with your selected sections and branding.
+                  {exportTabDownloadBlocked
+                    ? exportTabDownloadBlocked
+                    : pdfExportBusy
+                      ? "Generating your PDF report…"
+                      : "Generates a business-ready PDF with your selected sections and branding."}
                 </p>
                 <button
                   type="button"
+                  disabled={Boolean(exportTabDownloadBlocked) || pdfExportBusy}
                   onClick={() => downloadReport()}
-                  className={exportTabDownloadBtn}
+                  className={`${exportTabDownloadBtn} disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  Download Report PDF
+                  {pdfExportBusy ? "Generating PDF…" : "Download Report PDF"}
                 </button>
               </div>
             </div>
@@ -14774,6 +14881,24 @@ function HomeInner() {
               </div>
 
               <div className="p-6">
+                {mappingConfidence === "Low" && !mappingConfirmedByUser ? (
+                  <p
+                    className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2.5 text-sm leading-relaxed text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-100"
+                    role="status"
+                  >
+                    Mapping confidence is low. Review the roles below or leave Auto
+                    Detect — dashboards and insights work best with a confirmed primary
+                    metric and date column.
+                  </p>
+                ) : null}
+                {mappingModalError ? (
+                  <p
+                    className="mb-4 rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2.5 text-sm leading-relaxed text-red-800 dark:border-rose-500/30 dark:bg-rose-950/35 dark:text-rose-100"
+                    role="alert"
+                  >
+                    {mappingModalError}
+                  </p>
+                ) : null}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
@@ -14883,10 +15008,10 @@ function HomeInner() {
                   <button
                     type="button"
                     onClick={saveColumnMapping}
-                    disabled={loading}
+                    disabled={loading || mappingSaving}
                     className={`${ovBtnSecondarySm} disabled:opacity-50`}
                   >
-                    {loading ? "Saving…" : "Save mapping"}
+                    {mappingSaving ? "Saving…" : "Save mapping"}
                   </button>
                   <button
                     type="button"

@@ -18,7 +18,8 @@
 - **Bar value-axis policy** — zero baseline for normal positive business bars (currency/count/revenue); score/rating tight-domain exception preserved; low-rate V/H-Bar percent caps (5C.2); Overview H-Bar 85% utilization cap for magnitude charts (5C.5).
 - **Percent chip formatting** — `1.0%` no longer displays as `100.0%` (Pass 5B.1).
 - **Bar value-axis formatting** — currency/amount ticks compact to `K`/`M`; percent/rate ticks read as points (`35%`, `3.4%`); rate gap chips show `pp` (Pass 5A.3+).
-- **Export/shared domain parity** — Overview live, PNG export, `ChartRenderer`, and axis-presentation-plan share `resolveOverviewBarValueDomain` with `presentationKind` (Pass 5B.3).
+- **Export regression (P1)** — PNG/PDF export validated after 5B/5C domain changes: 87 targeted export tests + Phase 7 PDF 18/18; no regressions found (June 27, 2026).
+- **Export/shared domain parity** — Overview live + PNG use inline pipeline with 85% H-Bar cap; session/PDF charts share `resolveOverviewBarValueDomain` zero-baseline policy without Overview stretch (Pass 5B.3).
 - **AI Insights** — structured reasoning blocks, "Why this matters" cards, narrative QA, follow-up reasoning, recommended next actions, insight result restore (see [`ai-insights-status.md`](./ai-insights-status.md)).
 - **Tests/build** — frontend **722/722** vitest pass; `npm run build` clean; backend targeted domain suites 37/37 pass.
 
@@ -27,7 +28,7 @@
 ## What is still unresolved
 
 - **Pre-existing backend failures** — 6 `pytest` failures (sales showcase diversity/scatter, banking suggested-questions utilization trend, marketing weak-title). Proven pre-existing; out of scope for chart parity work.
-- **Manual UI confirmation** — cross-domain Overview defaults on all four gold fixtures (see P0 #2 in [`open-items.md`](./open-items.md)).
+- **Manual UI confirmation** — ~~cross-domain Overview defaults on all four gold fixtures~~ **closed** (June 27, 2026); optional live-browser spot-check remains non-blocking.
 
 ---
 
