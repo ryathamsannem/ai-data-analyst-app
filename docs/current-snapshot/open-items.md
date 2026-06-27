@@ -1,84 +1,63 @@
-# Open Items
+# Open Items (Prioritized)
 
-**Snapshot:** June 20, 2026  
+**Snapshot:** June 27, 2026 (after Overview Pass **5C.5** — H-Bar/V-Bar parity **frozen**) · Branch `DEV`.
 
-Only **real remaining work** is listed. Completed Chart Premium Parity items are documented in [`chart-premium-parity-status.md`](./chart-premium-parity-status.md) and [`changelog-premium-chart-phase.md`](./changelog-premium-chart-phase.md) — not repeated here.
-
----
-
-## Pending Product / Chart Work
-
-### Histogram premium review
-
-| Field | Detail |
-|-------|--------|
-| **Status** | Pending |
-| **Current state** | Histogram renders as styled vertical bar (`barCategoryGap: 2`, flat top radius, wider bars) in both Overview inline path and `ChartRenderer` |
-| **Gap** | No dedicated occupancy/margin pass equivalent to Line/Area/Scatter; uses V-Bar layout helpers |
-| **Scope when started** | Histogram-only styling and domain review; do not regress V-Bar or change kind routing |
+Completed Overview 5A.x → 5C.x work is in [`overview-pass-status.md`](./overview-pass-status.md).
+Frozen H-Bar/V-Bar parity record: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).
 
 ---
 
-## Future / Non-Blocking
+## P0 — Do first
 
-### Large dataset performance optimization
+### ~~1. H-Bar / V-Bar visual parity~~ — **RESOLVED / FROZEN (Pass 5C.5)**
+- Closed after Passes 5B.1 → 5C.5. See [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).
+- **Do not reopen** unless a regression is filed with SVG measurements.
 
-| Field | Detail |
-|-------|--------|
-| **Status** | Future |
-| **Context** | Pilot supports up to 100k preview rows (paid tier); cold-start and filter latency documented in `docs/large-dataset-validation-*.md` |
-| **Not in scope now** | Virtualization of full analytics pipeline, server-side aggregation cache, WebWorker chart prep |
-
-### Browser E2E export regression suite
-
-| Field | Detail |
-|-------|--------|
-| **Status** | Future |
-| **Context** | 546 unit tests cover domain/margin/capture logic; no Playwright matrix for live PNG/PDF pixel regression |
-| **Reference** | `docs/pdf-export-final-validation-runbook.md`, Phase 7 PDF fixtures |
+### ~~1. Confirm Overview default charts across domains (manual UI)~~ — **COMPLETE (June 27, 2026)**
+- Validated via backend probe + **37/37** targeted pytest + frontend golden summary tests.
+- All four gold fixtures produce correct type labels, meaningful KPIs, and business-useful default charts.
+- **HR caveat (P2, non-blocker):** discovery still surfaces `Records by Age Band` and `Monthly Age Trend` — defer to narrow HR discovery pass.
+- See [`validation-results.md`](./validation-results.md) § Overview defaults confirmation.
 
 ---
 
-## Platform / Production Gaps
+## P1 — Production Readiness Phase 1
 
-| Item | Severity | Notes |
-|------|----------|-------|
-| Authentication & tenant isolation | High for production | Session-only; no user accounts |
-| Durable usage metering | Medium | PDF/AI quota client-side with API enforcement |
-| Multi-tenant dataset storage | High for production | In-memory `df` per backend process |
-| Payment integration | N/A pilot | Pricing UI informational only |
+### Error handling / loading states
+- **P1 audit complete (June 27, 2026):** See [`p1-error-loading-ux-audit.md`](./p1-error-loading-ux-audit.md). Eight P1 gaps fixed (empty states, filter error, mapping save/validation, export gating, friendly capture errors). P2 backlog: chart ErrorBoundary, PDF artifact warning, malformed CSV diagnostics.
+
+### ~~Upload / mapping edge cases~~ — **COMPLETE (June 27, 2026)**
+- Validated empty, ambiguous, high-cardinality, and gold-fixture schemas; fixed all-categorical crash + spurious date mapping.
+- See [`p1-upload-mapping-edge-cases.md`](./p1-upload-mapping-edge-cases.md).
+
+### ~~Export regression pass~~ — **COMPLETE (June 27, 2026)**
+- Closed after P1 pass: 87 targeted export tests + 722 full vitest + clean build; Phase 7 PDF 18/18.
+- See [`validation-results.md`](./validation-results.md) § P1 export regression pass.
+- Optional: manual banking Overview PNG spot-check (Loan Balance ~216M, Delinquency 0–5%).
+
+### Platform gaps (production-only)
+- Authentication & tenant isolation; durable usage metering; multi-tenant dataset storage (currently in-memory `df` per process). Separate initiative from chart/Overview work.
 
 ---
 
-## Technical Debt (accepted)
+## P2 — Nice to have
+
+### Further visual polish (only if product requests)
+- Histogram premium review (renders as styled V-Bar; no dedicated occupancy pass).
+- Any remaining cosmetic chart tuning **only after** explicit product approval — H-Bar/V-Bar parity is frozen.
+
+### Future / non-blocking
+- Large dataset performance optimization (100k+ rows).
+- Browser E2E export regression suite (Playwright).
+
+---
+
+## Technical debt (accepted)
 
 | Item | Notes |
 |------|-------|
-| **Dual renderer pipelines** | Overview inline vs `ChartRenderer` — managed via shared helpers; full convergence not scheduled |
-| **Monolithic `page.tsx`** | ~14.6k lines; incremental extraction only when scoped |
-| **Legacy PDF DOM capture** | Fallback path in `pdf-report.ts` when artifact missing; primary path is artifact PNG |
-| **Deprecated API aliases** | `getInsightLayoutMetrics`, `resolveDetailPlotHeight`, `pdfChartScatterUsesContentTightComposite` — remove when callers migrated |
-| **Axis presentation plan coverage** | Fully wired for H-Bar/V-Bar export; line/area/scatter use renderer domain helpers on live path |
-
----
-
-## Explicitly Not Open (completed this phase)
-
-Do **not** reopen unless regression found:
-
-- H-Bar premium baseline and margin model
-- Overview V-Bar centering and live plot band
-- Overview Line/Area/Scatter alignment and occupancy
-- Charts PNG domain parity (`detailViewLayout` on offscreen capture)
-- Charts/AI left-gutter fix (`sessionDetailVerticalOuterMargins`)
-- PDF V-Bar/scatter content-tight embed and kind-aware sizing
-- Scatter occupancy target (74%) and plot height boost parity
-
----
-
-## Suggested Next Steps (priority order)
-
-1. Manual QA pass on showcase dataset across six surfaces × six cartesian kinds (regression guard).
-2. Histogram premium review (narrow scope).
-3. E2E export smoke tests (Playwright or similar) — optional hardening.
-4. Production platform items — separate initiative from chart parity.
+| Dual renderer pipelines | Overview inline (`page.tsx`) vs shared `ChartRenderer` — managed via shared domain/visual helpers; full pixel convergence not scheduled. |
+| Orientation-natural H-Bar vs V-Bar | H-Bar length vs V-Bar thickness; 85% utilization cap is the agreed mitigation. |
+| Monolithic `page.tsx` | Large file; incremental extraction only when scoped. |
+| Pre-existing backend test failures | 6 `pytest` failures — pre-existing. See [`validation-results.md`](./validation-results.md). |
+| HR `customer` role = `age` | Minor; not a stated requirement. |

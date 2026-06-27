@@ -18,6 +18,13 @@ _BANKING_METRIC_HINTS: Tuple[Tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bdeposits?\b", re.I), "deposit balance"),
     (re.compile(r"\bdelinquency\b|\bdelinq\b", re.I), "delinquency rate"),
     (re.compile(r"\bnpl\b|non[- ]performing", re.I), "npl amount"),
+    (
+        re.compile(
+            r"\b(?:credit\s+)?utilization\b|\butilization\s+(?:rate|pct|percentage|trend)\b",
+            re.I,
+        ),
+        "utilization",
+    ),
     (re.compile(r"\bcredit\s+utilization\b|\butilization\s+rate\b", re.I), "credit utilization"),
     (re.compile(r"\binterest\s+income\b", re.I), "interest income"),
     (re.compile(r"\bcredit\s+risk\b|\bportfolio\s+risk\b", re.I), "npl amount"),

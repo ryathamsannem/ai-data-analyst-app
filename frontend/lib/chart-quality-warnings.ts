@@ -1,4 +1,4 @@
-import type { ChartRow } from "@/app/chart-types";
+import type { ChartKind, ChartRow } from "@/app/chart-types";
 import { chartTooltipMetricLabel } from "@/lib/chart-tooltip-format";
 import {
   coercePercentDisplayNumber,
@@ -6,6 +6,7 @@ import {
   readChartRowNormalizedValue,
   readChartRowRawValue,
 } from "@/lib/metric-value-format";
+import { radialShareDisplayAllowed } from "@/lib/radial-chart-format";
 
 export const RATE_EXCEEDS_100_WARNING =
   "Note: Some rate values exceed 100%. Verify metric definition.";
@@ -27,6 +28,27 @@ export function chartHasRateAbove100(
     );
     return display > 100;
   });
+}
+
+/** Suppress rate>100 warning on valid share/composition radial charts (normalized to ~100%). */
+export function resolveRateExceeds100Warning(args: {
+  rows: ChartRow[];
+  metricLabel: string | null | undefined;
+  presentationKind?: ChartKind;
+  chartTitle?: string | null;
+  question?: string | null;
+}): string | null {
+  if (!chartHasRateAbove100(args.rows, args.metricLabel)) return null;
+
+  const kind = args.presentationKind;
+  if (kind === "pie" || kind === "donut") {
+    const title = args.chartTitle ?? args.metricLabel;
+    if (radialShareDisplayAllowed(args.rows, title, args.question)) {
+      return null;
+    }
+  }
+
+  return RATE_EXCEEDS_100_WARNING;
 }
 
 /** Accessible explanation for percentage-point gap chips. */

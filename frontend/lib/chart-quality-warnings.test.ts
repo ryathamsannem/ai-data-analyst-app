@@ -3,6 +3,7 @@ import {
   chartHasRateAbove100,
   percentGapChipAriaLabel,
   RATE_EXCEEDS_100_WARNING,
+  resolveRateExceeds100Warning,
 } from "@/lib/chart-quality-warnings";
 import type { ChartRow } from "@/app/chart-types";
 
@@ -18,6 +19,53 @@ describe("chartHasRateAbove100", () => {
   it("ignores non-rate metrics", () => {
     const rows: ChartRow[] = [{ name: "A", value: 500_000 }];
     expect(chartHasRateAbove100(rows, "total_revenue")).toBe(false);
+  });
+});
+
+describe("resolveRateExceeds100Warning", () => {
+  it("suppresses warning for valid share/composition donut charts", () => {
+    const rows: ChartRow[] = [
+      { name: "Enterprise", value: 430_000 },
+      { name: "Mid-Market", value: 330_000 },
+      { name: "SMB", value: 240_000 },
+    ];
+    expect(
+      resolveRateExceeds100Warning({
+        rows,
+        metricLabel: "Customer Segment Revenue Share",
+        presentationKind: "donut",
+        chartTitle: "Customer Segment Revenue Share",
+      })
+    ).toBeNull();
+  });
+
+  it("still warns on pie charts when slices are not valid composition", () => {
+    const rows: ChartRow[] = [
+      { name: "A", value: 87.3 },
+      { name: "B", value: 251 },
+    ];
+    expect(
+      resolveRateExceeds100Warning({
+        rows,
+        metricLabel: "conversion_rate_pct",
+        presentationKind: "pie",
+        chartTitle: "Conversion Rate by Campaign",
+      })
+    ).toBe(RATE_EXCEEDS_100_WARNING);
+  });
+
+  it("still warns on non-radial charts with rate values above 100%", () => {
+    const rows: ChartRow[] = [
+      { name: "A", value: 87.3 },
+      { name: "B", value: 251 },
+    ];
+    expect(
+      resolveRateExceeds100Warning({
+        rows,
+        metricLabel: "conversion_rate_pct",
+        presentationKind: "bar",
+      })
+    ).toBe(RATE_EXCEEDS_100_WARNING);
   });
 });
 

@@ -1,6 +1,7 @@
 import type { ChartRow } from "@/app/chart-types";
 import {
   formatMetricNumber,
+  readChartRowRawValue,
   resolveMetricValueFormat,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
@@ -115,6 +116,28 @@ function buildTicks(lo: number, hi: number, step: number): number[] {
     ticks.push(Number(t.toFixed(6)));
   }
   return ticks.length >= 2 ? ticks : [lo, hi];
+}
+
+/**
+ * Clean integer ticks for zero-baseline count bar value axes (Overview live).
+ * Uses the resolved bar domain — does not change domain/baseline policy.
+ */
+export function resolveOverviewBarCountValueAxisTicks(
+  domain: readonly [number, number]
+): number[] | undefined {
+  const [dMin, dMax] = domain;
+  if (!Number.isFinite(dMin) || !Number.isFinite(dMax) || dMax <= dMin) {
+    return undefined;
+  }
+  if (dMin < -1e-9) return undefined;
+
+  const step = chooseOverviewPremiumStep(dMin, dMax);
+  const lo = snapDown(dMin, step);
+  const hi = snapUp(dMax, step);
+  const ticks = buildTicks(lo, hi, step);
+  if (ticks.length < 2 || ticks.length > 7) return undefined;
+  if (ticks.some((t) => Math.abs(t - Math.round(t)) > 1e-6)) return undefined;
+  return ticks;
 }
 
 /**
@@ -329,6 +352,40 @@ export function formatOverviewScatterAxisTick(
   tick: number,
   ctx: MetricFormatContext = {}
 ): string {
+  return formatOverviewLineYAxisTick(tick, ctx);
+}
+
+/**
+ * Premium value-axis ticks for bar / horizontal-bar charts.
+ *
+ * - Percent / rate metrics: coerce a 0–1 fraction domain to percentage points so
+ *   ticks read as `35%`, `45%` (utilization) or `3.4%`, `4.1%` (delinquency rate)
+ *   instead of `0.35`, `0.04`.
+ * - Currency / large numeric metrics: compact to `K` / `M` (e.g. `127.5M`) like the
+ *   line and scatter axes, instead of long raw decimals (`127,500,000`).
+ *
+ * `rows` is used only to detect the percent value scale; it never changes the
+ * underlying axis domain.
+ */
+export function formatOverviewBarValueAxisTick(
+  tick: number,
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext = {}
+): string {
+  if (!Number.isFinite(tick)) return String(tick);
+
+  const format = resolveMetricValueFormat(ctx);
+  if (format === "percent") {
+    const values = rows
+      .map((r) => readChartRowRawValue(r))
+      .filter((v) => Number.isFinite(v))
+      .map((v) => Math.abs(v));
+    const maxAbs = values.length ? Math.max(...values) : Math.abs(tick);
+    // Fraction-scale percents (0–1) display as points; 0–100 values pass through.
+    const display = maxAbs <= 1.05 ? tick * 100 : tick;
+    return formatMetricNumber(display, "percent");
+  }
+
   return formatOverviewLineYAxisTick(tick, ctx);
 }
 

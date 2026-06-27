@@ -54,30 +54,51 @@ describe("detectOverviewExportBarOrientation", () => {
 });
 
 describe("horizontalBarValueDomain", () => {
-  it("uses smart tight domains for low-spread breakdowns", () => {
-    expect(horizontalBarValueDomain([{ value: 23 }, { value: 17 }])).toEqual([
-      16,
-      25,
-    ]);
-    expect(
-      horizontalBarValueDomain([{ value: 122 }, { value: 108 }], undefined, {
+  it("uses zero baseline for low-spread count breakdowns (bar_horizontal policy)", () => {
+    const small = horizontalBarValueDomain([{ value: 23 }, { value: 17 }]);
+    expect(small[0]).toBe(0);
+    expect(small[1]).toBeGreaterThanOrEqual(23 / 0.85);
+    const domain = horizontalBarValueDomain(
+      [{ value: 122 }, { value: 108 }],
+      undefined,
+      {
         chartTitle: "Delivery Days by Payment Method",
         metricLabel: "Delivery Days",
-      })
-    ).toEqual([100, 130]);
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(122 / 0.85);
   });
 
   it("keeps zero baseline when values start well below the maximum", () => {
-    expect(
-      horizontalBarValueDomain(
-        [{ value: 120_000 }, { value: 240_000 }, { value: 310_000 }],
-        undefined,
-        {
-          chartTitle: "Revenue by Region",
-          metricLabel: "Revenue",
-        }
-      )
-    ).toEqual([0, 330_000]);
+    const domain = horizontalBarValueDomain(
+      [{ value: 120_000 }, { value: 240_000 }, { value: 310_000 }],
+      undefined,
+      {
+        chartTitle: "Revenue by Region",
+        metricLabel: "Revenue",
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(310_000 / 0.85);
+  });
+
+  it("PNG/export H-Bar loan balance uses the same ~85% utilization cap", () => {
+    const maxRaw = 183_916_971;
+    const domain = horizontalBarValueDomain(
+      [
+        { name: "Mortgage", value: maxRaw },
+        { name: "Credit Card", value: 132_661_579 },
+      ],
+      undefined,
+      {
+        chartTitle: "Loan Balance by Product Type",
+        metricLabel: "Loan Balance",
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(maxRaw / 0.85);
+    expect(maxRaw / domain[1]).toBeLessThanOrEqual(0.851);
   });
 
   it("uses tight PNG domain for low-variance satisfaction scores", () => {
@@ -103,6 +124,41 @@ describe("horizontalBarValueDomain", () => {
   it("handles empty or non-positive max", () => {
     expect(horizontalBarValueDomain([])).toEqual([0, 1]);
     expect(horizontalBarValueDomain([{ value: 0 }])).toEqual([0, 1]);
+  });
+
+  it("PNG/export H-Bar profit domain starts at 0", () => {
+    const domain = horizontalBarValueDomain(
+      [
+        { value: 205_126 },
+        { value: 210_000 },
+        { value: 215_087 },
+      ],
+      undefined,
+      {
+        chartTitle: "Profit by Department",
+        metricLabel: "Profit",
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThan(215_087);
+  });
+
+  it("PNG/export H-Bar utilization domain starts at 0", () => {
+    const domain = horizontalBarValueDomain(
+      [
+        { value: 0.357 },
+        { value: 0.390 },
+        { value: 0.415 },
+        { value: 0.440 },
+      ],
+      undefined,
+      {
+        chartTitle: "Credit Utilization by Product Type",
+        metricLabel: "Utilization Rate",
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThan(0.44);
   });
 });
 

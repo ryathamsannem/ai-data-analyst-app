@@ -520,6 +520,44 @@ def narrative_guardrails_prompt_block(
     return "\n".join(lines).strip()
 
 
+def soften_unsupported_causal_language(answer: str) -> str:
+    """Replace definitive causal phrasing with hedged observation wording."""
+    if not answer:
+        return answer
+    text = answer
+    text = re.sub(
+        r"\b(is|are|was|were)\s+clearly caused by\b",
+        r"\1 potentially associated with",
+        text,
+        flags=re.I,
+    )
+    text = re.sub(
+        r"\b(is|are|was|were)\s+caused by\b",
+        "may be associated with",
+        text,
+        flags=re.I,
+    )
+    text = re.sub(
+        r"\b(is|are|was|were)\s+driven by\b",
+        "may reflect",
+        text,
+        flags=re.I,
+    )
+    text = re.sub(
+        r"\bproves that\b",
+        "is consistent with",
+        text,
+        flags=re.I,
+    )
+    text = re.sub(
+        r"\bdefinitively\b",
+        "tentatively",
+        text,
+        flags=re.I,
+    )
+    return text
+
+
 _LIMITATION_LEAD_RE = re.compile(
     r"cannot|not available|no column|unsupported|don't have|do not have|"
     r"not in (?:the|this) (?:data|dataset)|limitation|missing metric|"
@@ -578,6 +616,17 @@ def sanitize_narrative_answer(
             text = fix_limitation_wording(text)
         except Exception:
             pass
+
+    text = soften_unsupported_causal_language(text)
+
+    try:
+        from intent_engine.narrative_polish import apply_final_narrative_polish
+
+        text = apply_final_narrative_polish(
+            text, df=df, profile=profile, analysis_ctx=analysis_ctx
+        )
+    except Exception:
+        pass
 
     return text.strip()
 

@@ -1,5 +1,14 @@
 import type { ChartRow } from "@/app/chart-types";
 import { shareCompositionAllowed } from "@/lib/final-chart-presentation";
+import {
+  formatExecutiveMetricValue,
+  formatMetricNumber,
+  readChartRowRawValue,
+  type MetricFormatContext,
+} from "@/lib/metric-value-format";
+
+/** Middle dot separator for radial legend / tooltip / footer lines. */
+export const RADIAL_LEGEND_SEP = " · ";
 
 /** Tolerance when validating that share percentages sum to ~100%. */
 export const RADIAL_SHARE_SUM_TOLERANCE = 1.5;
@@ -103,20 +112,88 @@ export function radialShareDisplayAllowed(
   return radialShouldUseSharePercentDisplay(rows);
 }
 
-function formatRadialNumeric(value: number): string {
-  if (Math.abs(value) >= 1000) {
-    return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+function formatRadialContributionValue(
+  row: ChartRow,
+  ctx?: MetricFormatContext
+): string {
+  const raw = readChartRowRawValue(row);
+  if (!Number.isFinite(raw)) {
+    return row.displayValue?.trim() || "—";
   }
-  if (Number.isInteger(value)) return String(value);
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (Math.abs(raw) >= 10_000) {
+    return formatMetricNumber(raw, "compact");
+  }
+  return formatExecutiveMetricValue(row, ctx ?? { chartRows: [row] });
 }
 
-/** Tooltip value line: raw contribution or share % depending on data shape. */
+function formatRadialSharePercentRounded(value: number, total: number): string | null {
+  const share = radialSharePercent(value, total);
+  if (share == null) return null;
+  return `${Math.round(share)}%`;
+}
+
+/** Legend / footer line: Category · 54% · 4.27M */
+export function formatRadialLegendEntry(
+  rows: ChartRow[],
+  categoryName: string,
+  ctx?: MetricFormatContext
+): string {
+  const name = categoryName.trim();
+  const row = rows.find((r) => String(r.name ?? "").trim() === name);
+  if (!row || rows.length < 2) return name;
+
+  const total = radialSliceTotal(rows);
+  if (total <= 0) return name;
+
+  if (!radialShouldUseSharePercentDisplay(rows)) {
+    return `${name}${RADIAL_LEGEND_SEP}${formatRadialContributionValue(row, ctx)}`;
+  }
+
+  const shareText = formatRadialSharePercentRounded(row.value, total) ?? "—";
+  if (radialRawValuesSumTo100Percent(rows)) {
+    return `${name}${RADIAL_LEGEND_SEP}${shareText}`;
+  }
+
+  const valueText = formatRadialContributionValue(row, ctx);
+  return `${name}${RADIAL_LEGEND_SEP}${shareText}${RADIAL_LEGEND_SEP}${valueText}`;
+}
+
+/** Formatted slice total for radial footer chips. */
+export function formatRadialSliceTotalLabel(
+  rows: ChartRow[],
+  ctx?: MetricFormatContext
+): string {
+  const total = radialSliceTotal(rows);
+  if (total <= 0) return "—";
+  if (radialShouldUseSharePercentDisplay(rows) && !radialRawValuesSumTo100Percent(rows)) {
+    return formatMetricNumber(total, "compact");
+  }
+  return "100%";
+}
+
+/** Recharts Pie soft-edge props for premium donut/pie presentation. */
+export function resolveRadialPieEdgeProps(args: {
+  kind: "pie" | "donut";
+  overviewMiniRadial?: boolean;
+}): { paddingAngle: number; cornerRadius: number } {
+  const paddingAngle = args.overviewMiniRadial ? 3 : 2;
+  const cornerRadius = args.kind === "donut" ? (args.overviewMiniRadial ? 4 : 3) : 0;
+  return { paddingAngle, cornerRadius };
+}
+
+/** Tooltip value line: Category · share · contribution when composition is valid. */
 export function formatRadialTooltipValue(
   rows: ChartRow[],
   payload: ChartRow | undefined,
-  rawValue: unknown
+  rawValue: unknown,
+  ctx?: MetricFormatContext
 ): string {
+  const name = String(payload?.name ?? "").trim();
+  if (name && rows.length >= 2) {
+    const legendLine = formatRadialLegendEntry(rows, name, ctx);
+    if (legendLine.includes(RADIAL_LEGEND_SEP)) return legendLine;
+  }
+
   const num =
     typeof rawValue === "number"
       ? rawValue
@@ -124,7 +201,7 @@ export function formatRadialTooltipValue(
   const display = payload?.displayValue?.trim();
   const valueText =
     display ||
-    (Number.isFinite(num) ? formatRadialNumeric(num) : String(rawValue ?? "—"));
+    (Number.isFinite(num) ? formatRadialContributionValue(payload ?? { name: "", value: num }, ctx) : String(rawValue ?? "—"));
 
   if (!Number.isFinite(num) || rows.length < 2) return valueText;
 
@@ -133,12 +210,12 @@ export function formatRadialTooltipValue(
   }
 
   const total = radialSliceTotal(rows);
-  const share = radialSharePercent(num, total);
-  if (share == null) return valueText;
+  const shareText = formatRadialSharePercentRounded(num, total);
+  if (shareText == null) return valueText;
 
   if (radialRawValuesSumTo100Percent(rows)) {
-    return `${share.toFixed(1)}%`;
+    return shareText;
   }
 
-  return `${valueText} (${share.toFixed(1)}%)`;
+  return `${shareText}${RADIAL_LEGEND_SEP}${valueText}`;
 }

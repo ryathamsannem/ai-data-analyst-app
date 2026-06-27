@@ -1,7 +1,12 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
 import {
+  OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE,
+  partitionOverviewAiSummaryBullets,
+} from "@/lib/overview-ai-summary";
+import {
+  ovBtnSecondarySm,
   ovCardElevated,
   ovChipAccent,
   ovLabel,
@@ -44,6 +49,13 @@ export const OverviewAiSummaryPanel = memo(function OverviewAiSummaryPanel({
 }: {
   bullets: string[];
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const { initial, extra, hasMore } = useMemo(
+    () => partitionOverviewAiSummaryBullets(bullets, OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE),
+    [bullets]
+  );
+  const visibleBullets = expanded ? bullets : initial;
+
   return (
     <section
       className={`overview-ai-summary-card relative overflow-hidden p-4 sm:p-5 ${ovCardElevated} ring-1 ring-[color:var(--accent)]/8`}
@@ -72,9 +84,9 @@ export const OverviewAiSummaryPanel = memo(function OverviewAiSummaryPanel({
       </div>
 
       <ul className="relative mt-3.5 space-y-2">
-        {bullets.map((line, idx) => (
+        {visibleBullets.map((line, idx) => (
           <li
-            key={idx}
+            key={`${idx}-${line.slice(0, 24)}`}
             className="overview-ai-summary-card__insight saas-btn-premium !flex !h-auto !w-full !cursor-default !justify-start gap-2.5 !rounded-lg !px-3 !py-2.5 !text-left !text-sm !font-normal !leading-relaxed hover:!translate-y-0"
           >
             <InsightRowIcon />
@@ -82,6 +94,21 @@ export const OverviewAiSummaryPanel = memo(function OverviewAiSummaryPanel({
           </li>
         ))}
       </ul>
+
+      {hasMore ? (
+        <div className="relative mt-2.5 flex justify-start">
+          <button
+            type="button"
+            className={`${ovBtnSecondarySm} !text-[color:var(--accent)]`}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded
+              ? "Show less"
+              : `Show more insights (${extra.length} more)`}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 });

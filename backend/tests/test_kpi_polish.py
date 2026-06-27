@@ -18,6 +18,7 @@ if str(BACKEND_ROOT) not in sys.path:
 import main  # noqa: E402
 from services.kpi_polish import (  # noqa: E402
     ROAS_SUSPICIOUS_THRESHOLD,
+    average_kpi_title,
     is_valid_kpi_leader_value,
     roas_validation_meta,
     subtitle_looks_weak,
@@ -93,6 +94,16 @@ class TestKpiPolish(unittest.TestCase):
                         is_valid_kpi_leader_value(val),
                         msg=f"{name} invalid leader {val!r} on {card.get('title')}",
                     )
+
+    def test_sales_amount_average_label_uses_sales_wording(self) -> None:
+        self.assertEqual(
+            average_kpi_title("sales_amount", domain="retail"),
+            "Average Sales per Record",
+        )
+        self.assertEqual(
+            average_kpi_title("revenue", domain="retail"),
+            "Average Revenue per Record",
+        )
 
     def test_sales_average_label_normalized(self) -> None:
         cards = _bind("sales.csv")

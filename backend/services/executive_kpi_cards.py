@@ -112,7 +112,33 @@ def infer_executive_domain(columns: List[str]) -> ExecutiveDomain:
     )
     healthcare_score = _score(
         blob,
-        ("patient volume", "readmissions", "admissions", "length of stay", "ward"),
+        (
+            "patient_id",
+            "patient segment",
+            "visit date",
+            "claim amount",
+            "readmission rate",
+            "visit count",
+            "wait time",
+            "payer type",
+            "patient volume",
+            "readmissions",
+            "admissions",
+            "length of stay",
+            "ward",
+        ),
+    )
+    saas_score = _score(
+        blob,
+        (
+            "mrr",
+            "churn rate",
+            "plan type",
+            "new signups",
+            "expansion revenue",
+            "active users",
+            "customer segment",
+        ),
     )
     support_score = _score(
         blob,
@@ -156,6 +182,8 @@ def infer_executive_domain(columns: List[str]) -> ExecutiveDomain:
 
     if banking_score >= 2 and banking_score >= sales_score:
         return "banking"
+    if saas_score >= 3 and saas_score >= sales_score:
+        return "saas"
     if healthcare_score >= 2:
         return "healthcare"
     if support_score >= 2 and support_score >= sales_score:
@@ -192,6 +220,7 @@ def executive_domain_to_auto_kind(domain: ExecutiveDomain) -> str:
         "retail": "sales",
         "sales": "sales",
         "ecommerce": "sales",
+        "saas": "finance",
         "generic": "generic",
     }.get(domain, "generic")
 
@@ -203,7 +232,15 @@ def executive_domain_to_kpi_domain(domain: ExecutiveDomain) -> str:
         return "operations"
     if domain in ("retail", "ecommerce"):
         return "ecommerce"
-    if domain in ("sales", "geography", "banking", "marketing", "finance_fpa", "healthcare", "customer_support"):
+    if domain == "banking":
+        return "banking"
+    if domain == "finance_fpa":
+        return "finance"
+    if domain == "marketing":
+        return "marketing"
+    if domain == "saas":
+        return "finance"
+    if domain in ("sales", "geography", "healthcare", "customer_support"):
         return "sales"
     return "generic"
 
@@ -1039,6 +1076,49 @@ def _build_generic_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
     return cards[:6]
 
 
+def _build_saas_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
+    cards: List[Dict[str, Any]] = []
+    cols = ctx.columns
+
+    mrr_col = _find_col(cols, ("mrr",))
+    churn_col = _find_col(cols, ("churn_rate", "churn rate"))
+    users_col = _find_col(cols, ("active_users", "active users"))
+    signup_col = _find_col(cols, ("new_signups", "new signups"))
+    plan_col = _find_col(cols, ("plan_type", "plan type"))
+
+    if mrr_col:
+        sv = ctx.numeric_series(mrr_col)
+        if sv.notna().any():
+            _append_card(cards, "Total MRR", f"{float(sv.sum(skipna=True)):,.0f}")
+
+    if churn_col:
+        cv = ctx.numeric_series(churn_col)
+        if cv.notna().any():
+            _append_card(cards, "Average Churn Rate", f"{float(cv.mean(skipna=True)) * 100:.2f}%")
+
+    if users_col:
+        uv = ctx.numeric_series(users_col)
+        if uv.notna().any():
+            _append_card(cards, "Total Active Users", f"{float(uv.sum(skipna=True)):,.0f}")
+
+    if signup_col:
+        nv = ctx.numeric_series(signup_col)
+        if nv.notna().any():
+            _append_card(cards, "Total New Signups", f"{float(nv.sum(skipna=True)):,.0f}")
+
+    if plan_col and mrr_col:
+        _top_group_card(
+            ctx,
+            cards,
+            plan_col,
+            mrr_col,
+            metric_phrase="mrr",
+            title="Top Plan Type",
+        )
+
+    return cards[:6]
+
+
 def build_executive_kpi_cards(domain: ExecutiveDomain, ctx: KpiBuildContext) -> List[Dict[str, Any]]:
     builders = {
         "hr": _build_hr_kpi_cards,
@@ -1052,6 +1132,7 @@ def build_executive_kpi_cards(domain: ExecutiveDomain, ctx: KpiBuildContext) -> 
         "retail": lambda c: _build_sales_retail_kpi_cards(c, retail=True, domain="retail"),
         "sales": lambda c: _build_sales_retail_kpi_cards(c, retail=False, domain="sales"),
         "ecommerce": lambda c: _build_sales_retail_kpi_cards(c, retail=True, domain="ecommerce"),
+        "saas": _build_saas_kpi_cards,
         "generic": _build_generic_kpi_cards,
     }
     builder = builders.get(domain, _build_generic_kpi_cards)

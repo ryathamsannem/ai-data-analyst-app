@@ -221,7 +221,7 @@ describe("formatOverviewMiniInsightChips trend wording", () => {
     expect(chips[1]?.text).toMatch(/^Lowest: /);
   });
 
-  it("uses share-aware chips for overview donut charts", () => {
+  it("uses share-aware chips with percent and compact value for overview donut charts", () => {
     const chips = formatOverviewMiniInsightChips(
       [
         { name: "Electronics", value: 360000 },
@@ -233,10 +233,11 @@ describe("formatOverviewMiniInsightChips trend wording", () => {
         presentationKind: "donut",
       }
     );
-    expect(chips[0]?.text).toMatch(/^Largest: Electronics /);
-    expect(chips[0]?.text).toMatch(/%$/);
-    expect(chips[1]?.text).toMatch(/^Smallest: Furniture /);
-    expect(chips[2]?.text).toBe("Total: 100%");
+    expect(chips[0]?.text).toMatch(/^Largest: Electronics · /);
+    expect(chips[0]?.text).toMatch(/\d+%/);
+    expect(chips[0]?.text).toMatch(/360K|360,000/i);
+    expect(chips[1]?.text).toMatch(/^Smallest: Furniture · /);
+    expect(chips[2]?.text).toMatch(/^Total: /);
   });
 
   it("preserves small score gaps in breakdown chips", () => {
@@ -252,6 +253,85 @@ describe("formatOverviewMiniInsightChips trend wording", () => {
       }
     );
     expect(chips[2]?.text).toBe("Gap: 0.03");
+  });
+
+  it("formats small-spread rate breakdown chips as percent with a pp gap", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "Prime", value: 0.031 },
+        { name: "Near Prime", value: 0.038 },
+        { name: "Subprime", value: 0.041 },
+      ],
+      {
+        chartTitle: "Average Delinquency Rate by Customer Segment",
+        presentationKind: "bar",
+      }
+    );
+    expect(chips[0]?.text).toBe("Top: Subprime (4.1%)");
+    expect(chips[1]?.text).toBe("Lowest: Prime (3.1%)");
+    const gapChip = chips.find((c) => c.key === "gap");
+    expect(gapChip?.text).toMatch(/^Gap: .+ pp$/);
+    expect(gapChip?.text).toBe("Gap: 1.0 pp");
+  });
+
+  it("formats utilization breakdown chips as percent points", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "Credit Card", value: 0.62 },
+        { name: "Auto", value: 0.41 },
+        { name: "Mortgage", value: 0.28 },
+      ],
+      {
+        chartTitle: "Average Utilization Pct by Product Type",
+        presentationKind: "bar",
+      }
+    );
+    expect(chips[0]?.text).toBe("Top: Credit Card (62.0%)");
+    const gapChip = chips.find((c) => c.key === "gap");
+    expect(gapChip?.text).toMatch(/pp$/);
+  });
+
+  it("does not convert 0-100 scale rate value of 1.0 to 100.0%", () => {
+    // Bug: East=1.0 (meaning 1% in 0-100 scale) was displayed as "100.0%" because
+    // coercePercentDisplayNumber(1.0) treated 1.0 as a 0-1 fraction.
+    // Fix: dataset-max (7.9 > 1.05) disambiguates to 0-100 scale.
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "North", value: 7.9 },
+        { name: "South", value: 5.2 },
+        { name: "West", value: 3.5 },
+        { name: "East", value: 1.0 },
+      ],
+      {
+        chartTitle: "Defect Rate by Region",
+        presentationKind: "bar",
+      }
+    );
+    const lowest = chips.find((c) => c.key === "lowest");
+    expect(lowest?.text).toBe("Lowest: East (1.0%)");
+    expect(lowest?.text).not.toContain("100.0%");
+
+    const top = chips.find((c) => c.key === "top");
+    expect(top?.text).toBe("Top: North (7.9%)");
+  });
+
+  it("fraction-scale rate chips continue to format correctly (no regression)", () => {
+    // Fraction-scale values (0-1): max 0.041 ≤ 1.05 → multiply by 100 → correct %.
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "Prime", value: 0.031 },
+        { name: "Near Prime", value: 0.038 },
+        { name: "Subprime", value: 0.041 },
+      ],
+      {
+        chartTitle: "Delinquency Rate by Segment",
+        presentationKind: "bar",
+      }
+    );
+    const top = chips.find((c) => c.key === "top");
+    expect(top?.text).toBe("Top: Subprime (4.1%)");
+    const lowest = chips.find((c) => c.key === "lowest");
+    expect(lowest?.text).toBe("Lowest: Prime (3.1%)");
   });
 
   it("uses executive scatter chip labels", () => {

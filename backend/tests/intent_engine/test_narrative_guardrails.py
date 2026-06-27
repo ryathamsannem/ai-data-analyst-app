@@ -152,6 +152,13 @@ class NarrativeGuardrailsTests(unittest.TestCase):
         self.assertNotIn("conversion rate", out.lower())
         self.assertNotIn("an the", out.lower())
 
+    def test_sanitize_softens_unsupported_causal(self):
+        df = _retail_df()
+        raw = "North is clearly caused by regional pricing."
+        out = sanitize_narrative_answer(raw, df, {}, "Which region leads?")
+        self.assertNotIn("caused by", out.lower())
+        self.assertIn("associated with", out.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

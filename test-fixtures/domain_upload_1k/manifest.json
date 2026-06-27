@@ -1,0 +1,160 @@
+{
+  "seed": 20260627,
+  "target_rows": 1000,
+  "datasets": [
+    {
+      "domain_key": "retail_1k",
+      "file": "retail_ecommerce_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "order_id",
+        "order_date",
+        "product_category",
+        "region",
+        "customer_segment",
+        "sales_amount",
+        "profit",
+        "quantity",
+        "discount_pct"
+      ]
+    },
+    {
+      "domain_key": "banking_1k",
+      "file": "banking_financial_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "account_id",
+        "report_month",
+        "product_type",
+        "customer_segment",
+        "loan_balance",
+        "deposit_balance",
+        "spend_amount",
+        "credit_utilization",
+        "delinquency_rate"
+      ]
+    },
+    {
+      "domain_key": "hr_1k",
+      "file": "hr_workforce_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "employee_id",
+        "hire_date",
+        "department",
+        "job_level",
+        "employee_status",
+        "salary",
+        "bonus",
+        "performance_rating",
+        "attrition_flag"
+      ]
+    },
+    {
+      "domain_key": "healthcare_1k",
+      "file": "healthcare_patient_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "patient_id",
+        "visit_date",
+        "department",
+        "payer_type",
+        "patient_segment",
+        "visit_count",
+        "claim_amount",
+        "readmission_rate",
+        "wait_time_minutes"
+      ]
+    },
+    {
+      "domain_key": "manufacturing_1k",
+      "file": "manufacturing_quality_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "batch_id",
+        "production_date",
+        "plant",
+        "product_line",
+        "shift",
+        "units_produced",
+        "defect_rate",
+        "downtime_minutes",
+        "scrap_cost"
+      ]
+    },
+    {
+      "domain_key": "marketing_1k",
+      "file": "marketing_campaign_1k.csv",
+      "rows": 1000,
+      "columns": 10,
+      "column_names": [
+        "campaign_date",
+        "channel",
+        "campaign_name",
+        "region",
+        "impressions",
+        "clicks",
+        "conversions",
+        "spend",
+        "revenue",
+        "conversion_rate"
+      ]
+    },
+    {
+      "domain_key": "saas_1k",
+      "file": "saas_subscription_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "account_id",
+        "month",
+        "plan_type",
+        "customer_segment",
+        "mrr",
+        "churn_rate",
+        "active_users",
+        "new_signups",
+        "expansion_revenue"
+      ]
+    },
+    {
+      "domain_key": "supply_chain_1k",
+      "file": "supply_chain_logistics_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "shipment_id",
+        "ship_date",
+        "origin_region",
+        "destination_region",
+        "carrier",
+        "shipment_count",
+        "freight_cost",
+        "delivery_days",
+        "on_time_rate"
+      ]
+    },
+    {
+      "domain_key": "education_1k",
+      "file": "education_student_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "student_id",
+        "term_date",
+        "grade_level",
+        "subject",
+        "school_region",
+        "enrollment_count",
+        "attendance_rate",
+        "test_score",
+        "pass_rate"
+      ]
+    }
+  ]
+}

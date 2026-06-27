@@ -230,6 +230,20 @@ def _unique_count_for_column(
     return nu
 
 
+def _period_column_usable_for_trends(df: pd.DataFrame, col: str) -> bool:
+    """True when a date-part-named column holds parseable period timestamps (e.g. 2022-01)."""
+    try:
+        dd = pd.to_datetime(df[col], errors="coerce")
+    except Exception:
+        return False
+    n_rows = max(len(df), 1)
+    valid = int(dd.notna().sum())
+    if valid < max(8, int(0.1 * n_rows)):
+        return False
+    periods = dd.dropna().dt.to_period("M")
+    return int(periods.nunique()) >= 2
+
+
 def classify_columns(
     df: pd.DataFrame,
     profile: Dict[str, Any],
@@ -242,6 +256,11 @@ def classify_columns(
     n_rows = max(len(df), 1)
     ns = numeric_series_fn or (lambda c: _numeric_series_from_frame(df, c))
 
+    try:
+        from intent_engine.column_resolve import is_date_part_column
+    except Exception:
+        is_date_part_column = lambda _c: False  # type: ignore[misc, assignment]
+
     for col in df.columns:
         c = str(col)
         tp = ct.get(c)
@@ -249,6 +268,13 @@ def classify_columns(
             inv.dates.append(c)
             continue
         if tp == "number" and not id_like_fn(c):
+            if is_date_part_column(c):
+                nu = _unique_count_for_column(
+                    df, c, profile, string_normalized=True
+                )
+                if 2 <= nu <= 60:
+                    inv.categories.append(c)
+                continue
             n = _norm_col(c)
             if n in _LAT_LON:
                 continue
@@ -271,12 +297,26 @@ def classify_columns(
         c = str(col)
         if c in inv.dates:
             continue
-        if "date" in _norm_col(c) or "timestamp" in _norm_col(c):
+        if is_date_part_column(c) and not _period_column_usable_for_trends(df, c):
+            continue
+        if (
+            _norm_col(c) in ("month", "report_month", "reporting_month", "period_month")
+            or "date" in _norm_col(c)
+            or "timestamp" in _norm_col(c)
+        ):
             dd = pd.to_datetime(df[c], errors="coerce")
             if dd.notna().sum() >= max(8, int(0.1 * n_rows)):
                 inv.dates.append(c)
 
     inv.dates = _dedupe_preserve(inv.dates)
+    if inv.dates:
+        primary_dates = [
+            d
+            for d in inv.dates
+            if not is_date_part_column(d) or _period_column_usable_for_trends(df, d)
+        ]
+        if primary_dates:
+            inv.dates = primary_dates
     inv.numerics = _dedupe_preserve(inv.numerics)
     inv.categories = _dedupe_preserve(inv.categories)
     inv.geographic = _dedupe_preserve(inv.geographic)
@@ -549,15 +589,26 @@ def _metric_semantic_strength(metric_key: str, title: str = "") -> int:
     if metric_key in ("__records__", "records"):
         return 5
     if re.search(
-        r"\b(revenue|profit|sales|order[_ ]?value|loan[_ ]?balance|spend|gmv)\b", blob
+        r"\b(revenue|profit|sales|order[_ ]?value|loan[_ ]?balance|spend|gmv|deposit[_ ]?balance|"
+        r"salary|compensation|bonus|pay|wage)\b",
+        blob,
     ):
         return 100
     if re.search(
         r"\b(conversion[_ ]?rate|defect[_ ]?rate|satisfaction|utilization|delinquency|"
-        r"attrition|csat|nps|roas|resolution[_ ]?rate|attainment)\b",
+        r"attrition|csat|nps|roas|resolution[_ ]?rate|attainment|performance[_ ]?rating|"
+        r"engagement[_ ]?score)\b",
         blob,
     ):
         return 80
+    if re.search(
+        r"\b(account[_ ]?age|age months|tenure months|vintage|monthly income|credit score|"
+        r"transaction count|monthly age|age trend|age band|age_band)\b",
+        blob,
+    ):
+        return 22
+    if re.search(r"\b(^age$| by age\b|records by age)\b", blob):
+        return 22
     if re.search(
         r"\b(orders|tickets|incidents|patients|employees|headcount|admissions|claims|"
         r"customers|hires|terminations|downtime)\b",
@@ -674,6 +725,477 @@ def _prune_duplicate_chart_stories(
     return kept
 
 
+def _is_banking_risk_metric(metric_key: str, title: str = "") -> bool:
+    blob = f"{metric_key} {title}".lower().replace("_", " ")
+    return bool(
+        re.search(
+            r"\b(delinquency|utilization|credit score|credit_score)\b",
+            blob,
+        )
+    )
+
+
+def _is_banking_executive_risk_metric(metric_key: str, title: str = "") -> bool:
+    """Delinquency/utilization — preferred Overview risk metrics (not credit score)."""
+    blob = f"{metric_key} {title}".lower().replace("_", " ")
+    return bool(re.search(r"\b(delinquency|utilization)\b", blob))
+
+
+def _is_geographic_overview_dimension(dim_key: str, title: str = "") -> bool:
+    blob = f"{dim_key} {title}".lower().replace("_", " ")
+    return bool(
+        re.search(r"\b(city|cities|region|state|country|province|geo)\b", blob)
+    )
+
+
+def _is_banking_business_dimension(dim_key: str) -> bool:
+    blob = str(dim_key or "").lower().replace("_", " ")
+    return bool(
+        re.search(r"\b(customer segment|product type|segment|product)\b", blob)
+    )
+
+
+def _finance_geographic_risk_pair_blocked(
+    kind: str,
+    metric_key: str,
+    dim_key: str,
+    *,
+    title: str = "",
+    business_dims_available: bool,
+) -> bool:
+    if str(kind or "").lower() != "finance" or not business_dims_available:
+        return False
+    if not _is_banking_risk_metric(metric_key, title):
+        return False
+    return _is_geographic_overview_dimension(dim_key, title)
+
+
+def _prune_geographic_risk_overview_charts(
+    charts: List[Dict[str, Any]], record_key: str, *, kind: str
+) -> List[Dict[str, Any]]:
+    """Drop city/region risk charts when segment/product dimensions are in play."""
+    if str(kind or "").lower() != "finance":
+        return charts
+    has_business_dims = any(
+        _is_banking_business_dimension(_dimension_key(c) or "")
+        or _is_banking_business_dimension(
+            str(c.get("title") or "").split(" by ")[-1] if " by " in str(c.get("title") or "") else ""
+        )
+        for c in charts
+    )
+    if not has_business_dims:
+        return charts
+    out: List[Dict[str, Any]] = []
+    for chart in charts:
+        mk = _metric_key(chart, record_key)
+        title = str(chart.get("title") or "")
+        dk = _dimension_key(chart) or (
+            title.split(" by ")[-1].strip().lower() if " by " in title else ""
+        )
+        if _finance_geographic_risk_pair_blocked(
+            kind,
+            mk,
+            dk,
+            title=title,
+            business_dims_available=True,
+        ):
+            continue
+        out.append(chart)
+    return out
+
+
+def _is_lifecycle_overview_metric(metric_key: str, title: str = "") -> bool:
+    blob = f"{metric_key} {title}".lower().replace("_", " ")
+    return bool(
+        re.search(
+            r"\b(account[_ ]?age|age months|tenure months|vintage|monthly age|age trend)\b",
+            blob,
+        )
+        or re.search(r"\b(^age$| by age\b)\b", blob)
+    )
+
+
+def _is_hr_workforce_dimension(dim: Optional[str], title: str = "") -> bool:
+    blob = f"{dim or ''} {title}".lower().replace("_", " ")
+    return bool(
+        re.search(
+            r"\b(department|dept|job level|job family|job_level|job_family)\b",
+            blob,
+        )
+    )
+
+
+def _is_hr_core_performance_breakdown_chart(
+    chart: Dict[str, Any], record_key: str
+) -> bool:
+    title = str(chart.get("title") or "").lower().replace("_", " ")
+    if not re.search(r"\bperformance[_ ]?rating\b", title):
+        return False
+    dk = _dimension_key(chart)
+    return _is_hr_workforce_dimension(dk, title)
+
+
+def _is_hr_secondary_engagement_breakdown(chart: Dict[str, Any], record_key: str) -> bool:
+    title = str(chart.get("title") or "").lower().replace("_", " ")
+    mk = _metric_key(chart, record_key)
+    blob = f"{title} {mk}".replace("_", " ")
+    return "engagement" in blob and _dimension_key(chart) is not None
+
+
+def _ensure_hr_workforce_core_charts(
+    selected: List[Dict[str, Any]],
+    candidates: List[Dict[str, Any]],
+    record_key: str,
+    *,
+    kind: str,
+) -> List[Dict[str, Any]]:
+    """Keep salary + performance workforce breakdowns when HR alternatives exist."""
+    if str(kind or "").lower() != "hr" or not selected:
+        return selected
+
+    def _title_blob(c: Dict[str, Any]) -> str:
+        return str(c.get("title") or "").lower()
+
+    has_salary_breakdown = any(
+        "salary" in _title_blob(c)
+        and _is_hr_workforce_dimension(_dimension_key(c), _title_blob(c))
+        for c in selected
+    )
+    has_perf_breakdown = any(
+        _is_hr_core_performance_breakdown_chart(c, record_key) for c in selected
+    )
+
+    pool = list(selected) + list(candidates)
+    out = list(selected)
+
+    def _best_match(
+        predicate: Callable[[Dict[str, Any]], bool],
+    ) -> Optional[Dict[str, Any]]:
+        best: Optional[Dict[str, Any]] = None
+        best_score = -1
+        for chart in pool:
+            if not predicate(chart):
+                continue
+            score = int(chart.get("_opportunityScore") or 0)
+            if score > best_score:
+                best_score = score
+                best = chart
+        return best
+
+    def _swap_in(chart: Optional[Dict[str, Any]]) -> None:
+        nonlocal out
+        if not chart:
+            return
+        clean = {k: v for k, v in chart.items() if not str(k).startswith("_")}
+        tit = normalize_canonical_chart_title(str(clean.get("title") or ""))
+        if tit:
+            clean["title"] = tit
+        if any(str(c.get("title") or "").strip().lower() == tit.lower() for c in out):
+            return
+        drop_idx: Optional[int] = None
+        for i, existing in enumerate(out):
+            if _is_hr_secondary_engagement_breakdown(existing, record_key):
+                drop_idx = i
+                break
+        if drop_idx is None:
+            for i, existing in enumerate(out):
+                if _is_hr_demographic_overview_chart(existing, record_key):
+                    drop_idx = i
+                    break
+        if drop_idx is None and len(out) >= 2:
+            drop_idx = len(out) - 1
+        if drop_idx is not None:
+            out[drop_idx] = clean
+
+    if not has_salary_breakdown:
+        _swap_in(
+            _best_match(
+                lambda c: "salary" in _title_blob(c)
+                and _is_hr_workforce_dimension(_dimension_key(c), _title_blob(c))
+            )
+        )
+    if not has_perf_breakdown:
+        _swap_in(
+            _best_match(lambda c: _is_hr_core_performance_breakdown_chart(c, record_key))
+        )
+    return out
+
+
+def _is_hr_demographic_column(col: str) -> bool:
+    n = _norm_col(col)
+    if n in (
+        "age",
+        "age_band",
+        "birth_year",
+        "dob",
+        "date_of_birth",
+        "gender",
+        "sex",
+    ):
+        return True
+    return bool(
+        re.search(
+            r"\b(age band|birth year|date of birth|gender|sex)\b",
+            n.replace("_", " "),
+        )
+    )
+
+
+def _is_hr_weak_flag_metric(col: str) -> bool:
+    n = _norm_col(col)
+    return bool(re.search(r"(_flag|_indicator|_binary)$", n)) or n.endswith(" flag")
+
+
+def _is_hr_weak_flag_overview_chart(
+    chart: Dict[str, Any], record_key: str
+) -> bool:
+    mk = _metric_key(chart, record_key)
+    return _is_hr_weak_flag_metric(mk)
+
+
+def _is_hr_demographic_overview_chart(
+    chart: Dict[str, Any], record_key: str
+) -> bool:
+    title = str(chart.get("title") or "").lower().replace("_", " ")
+    mk = _metric_key(chart, record_key)
+    dk = (_dimension_key(chart) or "").lower().replace("_", " ")
+    if _is_hr_demographic_column(mk) or _is_hr_demographic_column(dk):
+        return True
+    if re.search(r"\b(monthly age|age trend|records by age|age band)\b", title):
+        return True
+    if _is_lifecycle_overview_metric(mk, title):
+        return True
+    return False
+
+
+def _hr_preferred_metrics(
+    numerics: List[str],
+    primary: Optional[str],
+    secondary: Optional[str],
+) -> List[str]:
+    ordered: List[str] = []
+    for m in (primary, secondary):
+        if (
+            m
+            and m in numerics
+            and not _is_hr_demographic_column(m)
+            and not _is_lifecycle_overview_metric(m)
+            and m not in ordered
+        ):
+            ordered.append(m)
+    for key in (
+        "salary",
+        "performance_rating",
+        "bonus",
+        "compensation",
+        "engagement_score",
+        "attrition",
+    ):
+        for c in numerics:
+            if (
+                key in _norm_col(c)
+                and c not in ordered
+                and not _is_hr_demographic_column(c)
+            ):
+                ordered.append(c)
+                break
+    for c in numerics:
+        if c not in ordered and not _is_hr_demographic_column(c):
+            if not _is_hr_weak_flag_metric(c):
+                ordered.append(c)
+    if len(ordered) < 2:
+        for c in numerics:
+            if c not in ordered and not _is_hr_demographic_column(c):
+                ordered.append(c)
+    return ordered
+
+
+def _hr_has_strong_workforce_charts(
+    charts: List[Dict[str, Any]], record_key: str
+) -> bool:
+    workforce_dims = frozenset(
+        {"department", "job level", "job_level", "job family", "job_family", "dept"}
+    )
+    for chart in charts:
+        if _is_hr_demographic_overview_chart(chart, record_key):
+            continue
+        strength = _metric_semantic_strength(
+            _metric_key(chart, record_key), str(chart.get("title") or "")
+        )
+        if strength >= 80:
+            return True
+        dk = (_dimension_key(chart) or "").lower().replace("_", " ")
+        if dk in workforce_dims and strength >= 40:
+            return True
+    return False
+
+
+def _prune_hr_demographic_overview_charts(
+    charts: List[Dict[str, Any]], record_key: str, kind: str
+) -> List[Dict[str, Any]]:
+    """Drop age / age-band default charts when stronger HR workforce charts exist."""
+    if str(kind or "").lower() != "hr":
+        return charts
+    if not _hr_has_strong_workforce_charts(charts, record_key):
+        return charts
+    out = [
+        c
+        for c in charts
+        if not _is_hr_demographic_overview_chart(c, record_key)
+    ]
+    if _hr_has_strong_workforce_charts(out, record_key):
+        out = [c for c in out if not _is_hr_weak_flag_overview_chart(c, record_key)]
+    return out
+
+
+def _banking_preferred_metrics(
+    numerics: List[str],
+    primary: Optional[str],
+    secondary: Optional[str],
+) -> List[str]:
+    ordered: List[str] = []
+    for m in (primary, secondary):
+        if (
+            m
+            and m in numerics
+            and not _is_lifecycle_overview_metric(m)
+            and m not in ordered
+        ):
+            ordered.append(m)
+    for key in (
+        "spend_amount",
+        "loan_balance",
+        "deposit_balance",
+        "utilization_pct",
+        "delinquency_flag",
+    ):
+        for c in numerics:
+            if key in _norm_col(c) and c not in ordered and not _is_lifecycle_overview_metric(c):
+                ordered.append(c)
+                break
+    for c in numerics:
+        if c not in ordered and not _is_lifecycle_overview_metric(c):
+            ordered.append(c)
+    return ordered
+
+
+def _preferred_breakdown_metric(
+    numerics: List[str],
+    dim_index: int,
+    primary: Optional[str],
+    secondary: Optional[str],
+    kind: str = "generic",
+) -> str:
+    """Prefer primary/secondary commercial metrics over quantity/lifecycle for each dimension."""
+    if str(kind or "").lower() == "finance":
+        prefs = _banking_preferred_metrics(numerics, primary, secondary)
+        if prefs:
+            return prefs[dim_index % len(prefs)]
+    if str(kind or "").lower() == "hr":
+        prefs = _hr_preferred_metrics(numerics, primary, secondary)
+        if prefs:
+            return prefs[dim_index % len(prefs)]
+    prefs = [m for m in (primary, secondary) if m and m in numerics]
+    if prefs:
+        return prefs[dim_index % len(prefs)]
+    if numerics:
+        return numerics[dim_index % len(numerics)]
+    return ""
+
+
+def _prune_inferior_metric_by_dimension(
+    charts: List[Dict[str, Any]],
+    record_key: str,
+    *,
+    primary: Optional[str],
+    secondary: Optional[str],
+    kind: str,
+) -> List[Dict[str, Any]]:
+    """Drop low-priority metrics (e.g. quantity) when a stronger metric covers the same dimension."""
+    commercial_kinds = frozenset(
+        {"sales", "retail", "ecommerce", "geography", "marketing", "finance"}
+    )
+    if str(kind or "").lower() not in commercial_kinds:
+        return charts
+    strong_floor = 60
+    by_dim: Dict[str, int] = {}
+    for chart in charts:
+        dk = _dimension_key(chart)
+        if not dk:
+            continue
+        strength = _metric_semantic_strength(
+            _metric_key(chart, record_key),
+            str(chart.get("title") or ""),
+        )
+        by_dim[dk.lower()] = max(by_dim.get(dk.lower(), 0), strength)
+    out: List[Dict[str, Any]] = []
+    for chart in charts:
+        dk = _dimension_key(chart)
+        if not dk:
+            out.append(chart)
+            continue
+        strength = _metric_semantic_strength(
+            _metric_key(chart, record_key),
+            str(chart.get("title") or ""),
+        )
+        dim_best = by_dim.get(dk.lower(), strength)
+        if strength < strong_floor and dim_best >= 80 and dim_best - strength >= 20:
+            continue
+        mk = _metric_key(chart, record_key)
+        if (
+            primary
+            and mk != str(primary).strip().lower()
+            and strength <= 45
+            and dim_best >= 80
+        ):
+            continue
+        if (
+            secondary
+            and mk != str(secondary).strip().lower()
+            and strength <= 45
+            and dim_best >= 80
+            and _norm_col(mk).find("quantity") >= 0
+        ):
+            continue
+        out.append(chart)
+    return out
+
+
+def _prune_lifecycle_overview_charts(
+    charts: List[Dict[str, Any]], record_key: str
+) -> List[Dict[str, Any]]:
+    """Drop account-age / tenure charts when stronger banking or commercial metrics exist."""
+    has_strong = any(
+        _metric_semantic_strength(
+            _metric_key(chart, record_key), str(chart.get("title") or "")
+        )
+        >= 80
+        for chart in charts
+        if _norm_chart_type(chart.get("chartType")) != "scatter"
+    )
+    if not has_strong:
+        return charts
+    out: List[Dict[str, Any]] = []
+    for chart in charts:
+        mk = _metric_key(chart, record_key)
+        title = str(chart.get("title") or "")
+        if _is_lifecycle_overview_metric(mk, title):
+            continue
+        out.append(chart)
+    return out
+
+
+def _prune_scatter_when_business_rich(
+    charts: List[Dict[str, Any]], *, min_non_scatter: int = 4
+) -> List[Dict[str, Any]]:
+    non_scatter = [
+        c for c in charts if _norm_chart_type(c.get("chartType")) != "scatter"
+    ]
+    if len(non_scatter) < min_non_scatter:
+        return charts
+    return [c for c in charts if _norm_chart_type(c.get("chartType")) != "scatter"]
+
+
 def _executive_trend_title(metric_col: str, time_bucket: str, pretty_label: Callable[..., str]) -> str:
     met = _title_case_phrase(pretty_label(metric_col))
     tb = str(time_bucket or "period").strip().capitalize()
@@ -688,7 +1210,16 @@ def _executive_metric_by_dim_title(
 ) -> str:
     met = _title_case_phrase(pretty_label(metric_col))
     dim = _title_case_phrase(pretty_label(dim_col))
-    return normalize_canonical_chart_title(f"{met} by {dim}")
+    agg_lc = str(agg).lower()
+    try:
+        from intent_engine.column_resolve import column_prefers_mean_aggregation
+
+        if column_prefers_mean_aggregation(metric_col):
+            agg_lc = "mean"
+    except Exception:
+        pass
+    prefix = "Average " if agg_lc == "mean" else ""
+    return normalize_canonical_chart_title(f"{prefix}{met} by {dim}")
 
 
 def _executive_share_by_dim_title(
@@ -1007,15 +1538,53 @@ def _chart_redundant_with_kpi(
             "horizontalbar",
         ):
             if kpi.value and top_label and kpi.value.lower()[:24] == top_label[:24]:
+                chart_title = str(chart.get("title") or "").lower()
+                if mk == record_key.strip().lower() or mk in ("records", "__records__"):
+                    return True
+                chart_strength = _metric_semantic_strength(mk, chart_title)
+                kpi_blob = f"{kpi.title} {kpi.subtitle or ''}".lower()
+                workforce_tokens = (
+                    "salary",
+                    "compensation",
+                    "bonus",
+                    "pay",
+                    "wage",
+                    "performance",
+                    "rating",
+                    "engagement",
+                )
+                if chart_strength >= 80 and any(
+                    t in chart_title for t in workforce_tokens
+                ):
+                    kpi_title = kpi.title.lower()
+                    if not any(t in kpi_title for t in workforce_tokens):
+                        continue
                 return True
             if kpi.dimension_hint and kpi.dimension_hint in dk:
-                return True
+                chart_title = str(chart.get("title") or "").lower()
+                if _is_banking_executive_risk_metric(mk, chart_title):
+                    return False
+                kpi_blob = f"{kpi.title} {kpi.subtitle or ''}".lower()
+                metric_tokens = (
+                    "loan balance",
+                    "loan",
+                    "spend amount",
+                    "spend",
+                    "deposit balance",
+                    "deposit",
+                    "revenue",
+                    "sales",
+                    "profit",
+                )
+                if any(t in kpi_blob and t in chart_title for t in metric_tokens):
+                    return True
     return False
 
 
 def _score_candidate(
     chart: Dict[str, Any],
     *,
+    kind: str,
     primary: Optional[str],
     secondary: Optional[str],
     types_used: Set[str],
@@ -1069,7 +1638,40 @@ def _score_candidate(
         base -= 6
 
     if bucket == "relationship" and "scatter" not in types_used:
-        base += 18
+        base += 6
+
+    strength = _metric_semantic_strength(mk, str(chart.get("title") or ""))
+    if ct == "scatter" and strength < 90:
+        base -= 18
+    if ct == "scatter" and str(kind or "").lower() == "finance":
+        base -= 28
+    if (
+        str(kind or "").lower() == "finance"
+        and _is_banking_risk_metric(mk, str(chart.get("title") or ""))
+        and _is_geographic_overview_dimension(dk or "", str(chart.get("title") or ""))
+    ):
+        base -= 36
+    if (
+        str(kind or "").lower() == "finance"
+        and _is_banking_executive_risk_metric(mk, str(chart.get("title") or ""))
+        and _is_banking_business_dimension(dk or "")
+    ):
+        base += 14
+    if str(kind or "").lower() == "hr":
+        title_l = str(chart.get("title") or "").lower().replace("_", " ")
+        if _is_hr_core_performance_breakdown_chart(chart, record_key):
+            base += 34
+        elif (
+            re.search(r"\b(salary|compensation)\b", title_l)
+            and _is_hr_workforce_dimension(dk, title_l)
+            and bucket in ("ranking", "compare")
+        ):
+            base += 14
+        if _is_hr_secondary_engagement_breakdown(chart, record_key):
+            base -= 24
+    if strength <= 45 and primary and mk != str(primary).strip().lower():
+        if secondary and mk != str(secondary).strip().lower():
+            base -= 24
 
     if bucket == "trend" and ct == "area" and "line" in types_used:
         base += 6
@@ -1151,6 +1753,7 @@ def _chart_story_blocked_by_selected(
 def _pick_best_candidate(
     remaining: List[Dict[str, Any]],
     *,
+    kind: str,
     selected: List[Dict[str, Any]],
     primary: Optional[str],
     secondary: Optional[str],
@@ -1181,8 +1784,21 @@ def _pick_best_candidate(
         bucket = _coverage_bucket(chart)
         if prefer_bucket and bucket != prefer_bucket:
             continue
+        if (
+            prefer_bucket == "relationship"
+            and str(kind or "").lower() == "finance"
+            and _norm_chart_type(chart.get("chartType")) == "scatter"
+        ):
+            non_scatter_pool = sum(
+                1
+                for c in remaining
+                if _norm_chart_type(c.get("chartType")) != "scatter"
+            )
+            if non_scatter_pool >= 4:
+                continue
         sc = _score_candidate(
             chart,
+            kind=kind,
             primary=primary,
             secondary=secondary,
             types_used=types_used,
@@ -1238,6 +1854,7 @@ def select_diverse_charts(
         return []
 
     kpi_ctx = kpi_context or []
+    all_candidates = list(candidates)
     primary, secondary, _ = deps.priority_metrics(kind)
     remaining = list(candidates)
     selected: List[Dict[str, Any]] = []
@@ -1262,6 +1879,7 @@ def select_diverse_charts(
             continue
         idx, score = _pick_best_candidate(
             remaining,
+            kind=kind,
             selected=selected,
             primary=primary,
             secondary=secondary,
@@ -1293,6 +1911,7 @@ def select_diverse_charts(
     while len(selected) < max_charts and remaining:
         idx, score = _pick_best_candidate(
             remaining,
+            kind=kind,
             selected=selected,
             primary=primary,
             secondary=secondary,
@@ -1321,6 +1940,27 @@ def select_diverse_charts(
 
     pruned = _prune_duplicate_chart_stories(selected, deps.record_metric_key)
     pruned = _prune_redundant_records_charts(pruned, deps.record_metric_key)
+    pruned = _prune_inferior_metric_by_dimension(
+        pruned,
+        deps.record_metric_key,
+        primary=primary,
+        secondary=secondary,
+        kind=kind,
+    )
+    pruned = _prune_lifecycle_overview_charts(pruned, deps.record_metric_key)
+    pruned = _prune_hr_demographic_overview_charts(
+        pruned, deps.record_metric_key, kind=kind
+    )
+    pruned = _prune_geographic_risk_overview_charts(
+        pruned, deps.record_metric_key, kind=kind
+    )
+    pruned = _prune_scatter_when_business_rich(pruned, min_non_scatter=4)
+    pruned = _ensure_hr_workforce_core_charts(
+        pruned,
+        all_candidates,
+        deps.record_metric_key,
+        kind=kind,
+    )
     return pruned[:max_charts]
 
 
@@ -1435,6 +2075,12 @@ def discover_chart_opportunities(
         profile,
         cardinality_memo=cardinality_memo,
     )
+    business_breakdown_dims = [
+        d for d in breakdown_dims if _is_banking_business_dimension(d)
+    ]
+    has_business_dims = len(business_breakdown_dims) >= 1
+    is_finance = str(kind or "").lower() == "finance"
+    is_hr = str(kind or "").lower() == "hr"
 
     def add(payload: Optional[Dict[str, Any]], opp_type: str, score: int) -> None:
         if not payload:
@@ -1457,6 +2103,9 @@ def discover_chart_opportunities(
 
     # A. Trend + area (performance over time)
     trend_metrics = numerics[:3]
+    if is_hr:
+        hr_nums = _hr_preferred_metrics(numerics, primary, secondary)
+        trend_metrics = hr_nums[:3] if hr_nums else trend_metrics
     for ti, date_c in enumerate(inv.dates[:2]):
         for mi, num_c in enumerate(trend_metrics):
             try:
@@ -1484,7 +2133,16 @@ def discover_chart_opportunities(
 
     # B. Rankings — one metric per dimension, spread dimensions
     for di, dim_c in enumerate(breakdown_dims[:6]):
-        num_c = numerics[di % max(1, len(numerics))]
+        num_c = _preferred_breakdown_metric(numerics, di, primary, secondary, kind)
+        if not num_c:
+            continue
+        if _finance_geographic_risk_pair_blocked(
+            kind,
+            num_c,
+            dim_c,
+            business_dims_available=has_business_dims,
+        ):
+            continue
         pair_key = ("ranking", dim_c.lower(), num_c.lower())
         if pair_key in used_pairs:
             continue
@@ -1517,42 +2175,93 @@ def discover_chart_opportunities(
         except Exception:
             pass
 
+    # B2. Banking risk metrics on segment/product (avoid city for delinquency/utilization)
+    if is_finance and has_business_dims:
+        risk_metrics = [
+            m
+            for m in _banking_preferred_metrics(numerics, primary, secondary)
+            if _is_banking_executive_risk_metric(m)
+        ]
+        for di, dim_c in enumerate(business_breakdown_dims[:3]):
+            for ri, num_c in enumerate(risk_metrics[:3]):
+                pair_key = ("ranking", dim_c.lower(), num_c.lower())
+                if pair_key in used_pairs:
+                    continue
+                try:
+                    agg = _metric_agg_key(num_c, inv)
+                    sub = df[[dim_c, num_c]].copy()
+                    sub["_v"] = discover_deps.numeric_series(num_c)
+                    sub = sub.dropna(subset=[dim_c, "_v"])
+                    nu = _dimension_cardinality(
+                        df, dim_c, profile, memo=cardinality_memo
+                    )
+                    if sub.empty or nu < 2 or nu > 20:
+                        continue
+                    g = (
+                        sub.groupby(dim_c)["_v"]
+                        .agg(agg)
+                        .sort_values(ascending=False)
+                        .head(10)
+                    )
+                    g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
+                    if g.empty:
+                        continue
+                    tit = _executive_metric_by_dim_title(
+                        num_c, dim_c, agg, deps.pretty_label
+                    )
+                    add(
+                        deps.series_payload(
+                            tit,
+                            g,
+                            chart_type="horizontalBar",
+                            max_points=10,
+                            category_column=dim_c,
+                            metric_column=num_c,
+                        ),
+                        "ranking",
+                        90 - di * 2 - ri,
+                    )
+                    used_pairs.add(pair_key)
+                except Exception:
+                    pass
+
     # C. Composition donuts — low cardinality only, part-to-whole
-    for di, dim_c in enumerate(breakdown_dims[:8]):
-        if not _composition_eligible_dim(
-            df, dim_c, deps.id_like_column, profile, cardinality_memo=cardinality_memo
-        ):
-            continue
-        num_c = numerics[0 if di % 2 else min(1, len(numerics) - 1)]
-        if not _metric_eligible_for_composition(num_c, inv):
-            continue
-        pair_key = ("composition", dim_c.lower(), num_c.lower())
-        if pair_key in used_pairs:
-            continue
-        try:
-            sub = df[[dim_c, num_c]].copy()
-            sub["_v"] = discover_deps.numeric_series(num_c)
-            sub = sub.dropna(subset=[dim_c, "_v"])
-            g = sub.groupby(dim_c)["_v"].sum().sort_values(ascending=False).head(8)
-            g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
-            if g.empty or len(g) < 2 or not _composition_shares_valid(g):
+    if numerics:
+        for di, dim_c in enumerate(breakdown_dims[:8]):
+            if not _composition_eligible_dim(
+                df, dim_c, deps.id_like_column, profile, cardinality_memo=cardinality_memo
+            ):
                 continue
-            tit = _executive_share_by_dim_title(num_c, dim_c, deps.pretty_label)
-            api_typ = "donut" if len(g) >= 3 else "pie"
-            add(
-                deps.series_payload(
-                    tit,
-                    g,
-                    chart_type=api_typ,
-                    category_column=dim_c,
-                    metric_column=num_c,
-                ),
-                "composition",
-                86 - di * 2,
-            )
-            used_pairs.add(pair_key)
-        except Exception:
-            pass
+            num_c = numerics[0 if di % 2 else min(1, len(numerics) - 1)]
+            if not _metric_eligible_for_composition(num_c, inv):
+                continue
+            pair_key = ("composition", dim_c.lower(), num_c.lower())
+            if pair_key in used_pairs:
+                continue
+            try:
+                sub = df[[dim_c, num_c]].copy()
+                sub["_v"] = discover_deps.numeric_series(num_c)
+                sub = sub.dropna(subset=[dim_c, "_v"])
+                g = sub.groupby(dim_c)["_v"].sum().sort_values(ascending=False).head(8)
+                g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
+                if g.empty or len(g) < 2 or not _composition_shares_valid(g):
+                    continue
+                tit = _executive_share_by_dim_title(num_c, dim_c, deps.pretty_label)
+                api_typ = "donut" if len(g) >= 3 else "pie"
+                add(
+                    deps.series_payload(
+                        tit,
+                        g,
+                        chart_type=api_typ,
+                        category_column=dim_c,
+                        metric_column=num_c,
+                    ),
+                    "composition",
+                    86 - di * 2,
+                )
+                used_pairs.add(pair_key)
+            except Exception:
+                pass
 
     # D. Correlation scatter
     corr_cols = numerics[:8]
@@ -1570,7 +2279,18 @@ def discover_chart_opportunities(
 
     # E. Supporting comparisons — rotate dimension × metric (max one per dim)
     for di, dim_c in enumerate(breakdown_dims[:6]):
-        num_c = numerics[(di + 1) % max(1, len(numerics))]
+        num_c = _preferred_breakdown_metric(
+            numerics, di + 1, primary, secondary, kind
+        )
+        if not num_c:
+            continue
+        if _finance_geographic_risk_pair_blocked(
+            kind,
+            num_c,
+            dim_c,
+            business_dims_available=has_business_dims,
+        ):
+            continue
         pair_key = ("compare", dim_c.lower(), num_c.lower())
         if pair_key in used_pairs:
             continue
@@ -1606,6 +2326,8 @@ def discover_chart_opportunities(
 
     # F. Record distribution (low-cardinality categories only)
     for dim_c in inv.categories[:3]:
+        if is_hr and _is_hr_demographic_column(dim_c):
+            continue
         if not _composition_eligible_dim(
             df, dim_c, deps.id_like_column, profile, cardinality_memo=cardinality_memo
         ):

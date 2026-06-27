@@ -12,7 +12,11 @@ import {
   metricFormatUsesPercent,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
-import { radialSharePercent, radialSliceTotal } from "@/lib/radial-chart-format";
+import {
+  formatRadialLegendEntry,
+  formatRadialSliceTotalLabel,
+  radialSliceTotal,
+} from "@/lib/radial-chart-format";
 
 export type OverviewMiniInsightChip = {
   key: "top" | "lowest" | "gap" | "relationship";
@@ -267,26 +271,31 @@ function formatScatterInsightChips(
 function formatShareInsightChips(
   rows: ChartRow[],
   hi: ChartRow,
-  lo: ChartRow
+  lo: ChartRow,
+  opts?: {
+    chartTitle?: string;
+    presentationKind?: ChartKind;
+  }
 ): OverviewMiniInsightChip[] {
   const total = radialSliceTotal(rows);
   if (total <= 0) return [];
-  const hiPct = radialSharePercent(hi.value, total);
-  const loPct = radialSharePercent(lo.value, total);
-  const hiShare =
-    hiPct == null ? "—" : `${Math.round(hiPct)}%`;
-  const loShare =
-    loPct == null ? "—" : `${Math.round(loPct)}%`;
+  const metricCtx: MetricFormatContext = {
+    metricLabel: opts?.chartTitle,
+    chartTitle: opts?.chartTitle,
+    presentationKind: opts?.presentationKind,
+    chartRows: rows,
+  };
+  const totalLabel = formatRadialSliceTotalLabel(rows, metricCtx);
   return [
     {
       key: "top",
-      text: `Largest: ${String(hi.name)} ${hiShare}`,
+      text: `Largest: ${formatRadialLegendEntry(rows, String(hi.name), metricCtx)}`,
     },
     {
       key: "lowest",
-      text: `Smallest: ${String(lo.name)} ${loShare}`,
+      text: `Smallest: ${formatRadialLegendEntry(rows, String(lo.name), metricCtx)}`,
     },
-    { key: "gap", text: "Total: 100%" },
+    { key: "gap", text: `Total: ${totalLabel}` },
   ];
 }
 
@@ -315,7 +324,7 @@ export function formatOverviewMiniInsightChips(
   const isRadialShare =
     opts?.presentationKind === "donut" || opts?.presentationKind === "pie";
   if (isRadialShare) {
-    return formatShareInsightChips(rows, hi, lo);
+    return formatShareInsightChips(rows, hi, lo, opts);
   }
 
   const isScatter =

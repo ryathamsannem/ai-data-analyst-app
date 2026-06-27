@@ -111,6 +111,33 @@ export const aiInsightsAnswerDetailsGroup =
 export const aiInsightsAnswerDetailsLabel =
   "ai-insights-answer-details-label px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-[color:var(--insights-answer-label)]";
 
+export const aiInsightsReasoningList =
+  "ai-insights-reasoning-list my-0 list-none space-y-1.5 px-2 pb-2 pt-0.5";
+
+export const aiInsightsReasoningItem =
+  "ai-insights-reasoning-item rounded-lg border border-[color:var(--insights-border-soft)] bg-[color:var(--insights-layer-inset)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:border-[color:var(--insights-border-medium)] dark:bg-[color:color-mix(in_srgb,var(--insights-layer-card)_88%,var(--insights-layer-inset))]";
+
+export const aiInsightsReasoningClaim =
+  "ai-insights-reasoning-claim m-0 text-[13px] font-medium leading-snug text-slate-800 dark:text-[color:var(--insights-answer-emphasis)]";
+
+export const aiInsightsReasoningBasis =
+  "ai-insights-reasoning-basis m-0 mt-1 text-[11px] leading-[1.45] text-slate-500 dark:text-[color:var(--insights-answer-label)]";
+
+export const aiInsightsRecommendedList =
+  "ai-insights-recommended-list my-0 list-none space-y-1.5 px-2 pb-2 pt-0.5";
+
+export const aiInsightsRecommendedItem =
+  "ai-insights-recommended-item rounded-lg border border-[color:var(--insights-border-soft)] bg-[color:var(--insights-layer-inset)] px-3 py-2 dark:border-[color:var(--insights-border-medium)] dark:bg-[color:color-mix(in_srgb,var(--insights-layer-card)_88%,var(--insights-layer-inset))]";
+
+export const aiInsightsRecommendedTitle =
+  "ai-insights-recommended-title m-0 text-[13px] font-medium leading-snug text-slate-800 dark:text-[color:var(--insights-answer-emphasis)]";
+
+export const aiInsightsRecommendedDesc =
+  "ai-insights-recommended-desc m-0 mt-1 text-[11px] leading-[1.45] text-slate-600 dark:text-[color:var(--insights-answer-body)]";
+
+export const aiInsightsRecommendedChip =
+  "ai-insights-recommended-chip mt-2 inline-flex max-w-full items-center rounded-md border border-[color:var(--insights-border-soft)] bg-[color:var(--insights-layer-card)] px-2 py-1 text-[10px] font-medium leading-snug text-slate-600 transition-colors hover:border-[color:var(--insights-border-medium)] hover:text-slate-800 dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-answer-label)] dark:hover:text-[color:var(--insights-answer-emphasis)]";
+
 export const aiInsightsAnswerDetail =
   "ai-insights-answer-detail group overflow-hidden rounded-lg border-0 border-b border-[color:var(--border-default)]/40 bg-transparent transition-[border-color,background-color] duration-200 last:border-b-0 open:border-b-[color:color-mix(in_srgb,var(--accent)_16%,var(--border-default))] open:shadow-none dark:border-b-[color:var(--insights-border-soft)] dark:bg-transparent dark:open:border-b-[color:var(--insights-border-soft)] dark:open:bg-transparent dark:open:shadow-none";
 
@@ -228,6 +255,18 @@ export const aiInsightsSuggestedRecentList = "mt-2.5 flex flex-col gap-2.5";
 
 export const aiInsightsSuggestedRecentItem =
   "ai-insights-suggested-recent w-full rounded-xl border border-[color:var(--border-default)]/55 bg-[color:var(--surface-elevated)] px-3 py-2.5 text-left text-xs leading-snug text-[var(--text-muted)] shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,color] duration-200 hover:border-[color:color-mix(in_srgb,var(--accent)_20%,var(--border-default))] hover:bg-[color:color-mix(in_srgb,var(--accent-wash)_35%,var(--surface-elevated))] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]/30 focus-visible:ring-offset-1 dark:border-[color:var(--insights-border-soft)] dark:bg-[color:var(--insights-layer-inset)] dark:text-[color:var(--insights-text-muted)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] dark:hover:border-[color:var(--insights-border-medium)] dark:hover:bg-[color:var(--insights-layer-nested)] dark:hover:text-[color:var(--insights-text-secondary)]";
+
+export const aiInsightsRecentInsightItemActive =
+  "border-[color:color-mix(in_srgb,var(--accent)_38%,var(--border-default))] bg-[color:color-mix(in_srgb,var(--accent-wash)_42%,var(--surface-elevated))] text-[var(--foreground)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_12%,transparent)] dark:border-[color:var(--insights-border-medium)] dark:bg-[color:var(--insights-layer-nested)] dark:text-[color:var(--insights-text-secondary)]";
+
+export const aiInsightsRecentInsightBadge =
+  "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide";
+
+export const aiInsightsRecentInsightBadgeMain =
+  `${aiInsightsRecentInsightBadge} border-indigo-200/70 bg-indigo-50/90 text-indigo-900 dark:border-indigo-400/25 dark:bg-indigo-950/45 dark:text-indigo-100`;
+
+export const aiInsightsRecentInsightBadgeFollowUp =
+  `${aiInsightsRecentInsightBadge} border-violet-200/70 bg-violet-50/90 text-violet-900 dark:border-violet-400/25 dark:bg-violet-950/45 dark:text-violet-100`;
 
 /** Suggested follow-ups (after AI answer). */
 export const aiInsightsFollowupSection =

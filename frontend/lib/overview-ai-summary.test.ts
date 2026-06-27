@@ -8,6 +8,11 @@ import {
   computeOverviewAiSummaryBullets,
   DURATION_LATENCY_METRIC_RE,
   inferOverviewSummaryDomain,
+  OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE,
+  OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+  partitionOverviewAiSummaryBullets,
+  selectOverviewAiSummaryInsights,
+  shouldIncludeLongTailProfileInsight,
   type ComputeOverviewAiSummaryArgs,
 } from "@/lib/overview-ai-summary";
 
@@ -83,7 +88,7 @@ describe("computeOverviewAiSummaryBullets per domain fixture", () => {
     (domain, payload) => {
       const bullets = bulletsFor(payload);
       expect(bullets.length).toBeGreaterThanOrEqual(3);
-      expect(bullets.length).toBeLessThanOrEqual(5);
+      expect(bullets.length).toBeLessThanOrEqual(OVERVIEW_AI_SUMMARY_MAX_BULLETS);
       for (const line of bullets) {
         expect(line.trim().length).toBeGreaterThan(10);
         expect(/\bn\/a\b/i.test(line)).toBe(false);
@@ -92,6 +97,100 @@ describe("computeOverviewAiSummaryBullets per domain fixture", () => {
       expect(frame.toLowerCase()).toContain("snapshot");
     }
   );
+
+  it("rich retail fixture produces more than initial visible insights", () => {
+    const retail = DOMAIN_PAYLOADS.find((p) => p.domain === "retail")!;
+    const bullets = bulletsFor(retail);
+    expect(bullets.length).toBeGreaterThan(OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE);
+    const { initial, extra, hasMore } = partitionOverviewAiSummaryBullets(bullets);
+    expect(initial).toHaveLength(OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE);
+    expect(extra.length).toBeGreaterThan(0);
+    expect(hasMore).toBe(true);
+  });
+
+  it("sparse monthly_sales fixture keeps meaningful insights without filler noise", () => {
+    const payload = DOMAIN_PAYLOADS.find((p) => p.domain === "monthly_sales")!;
+    const bullets = bulletsFor(payload);
+    expect(bullets.length).toBeGreaterThanOrEqual(3);
+    expect(bullets.some((b) => /sales/i.test(b) && /trend|improving|steady/i.test(b))).toBe(
+      true
+    );
+    expect(bullets.some((b) => /ask a focused question in ai insights/i.test(b))).toBe(
+      false
+    );
+  });
+
+  it("minimal dashboard yields at most initial visible insights without show-more", () => {
+    const bullets = computeOverviewAiSummaryBullets({
+      rows: 5,
+      columns: ["month", "sales"],
+      autoDashboard: {
+        kind: "sales",
+        type_label: "Sales",
+        cards: [{ title: "Total Revenue", value: "500", subtitle: null }],
+        charts: [],
+      },
+      profile: {
+        column_types: { sales: "number", month: "category" },
+        summary_stats: { mean: { sales: 100 }, std: { sales: 10 }, max: { sales: 120 }, min: { sales: 80 } },
+      },
+      primaryMetricColumn: "sales",
+      groupingColumn: null,
+      dateColumn: "month",
+    });
+    expect(bullets.length).toBeLessThanOrEqual(OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE);
+    expect(partitionOverviewAiSummaryBullets(bullets).hasMore).toBe(false);
+  });
+
+  it("showcase dataset can surface 8–12 ranked insights when charts and KPIs are rich", () => {
+    const showcase = DOMAIN_PAYLOADS.find((p) => p.domain === "dashboard_showcase_dataset")!;
+    const bullets = bulletsFor(showcase);
+    expect(bullets.length).toBeGreaterThanOrEqual(8);
+    expect(bullets.length).toBeLessThanOrEqual(OVERVIEW_AI_SUMMARY_MAX_BULLETS);
+    expect(partitionOverviewAiSummaryBullets(bullets).extra.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("skips correlation scatter charts for misleading breakdown bullets", () => {
+    const bullets = computeOverviewAiSummaryBullets({
+      rows: 120,
+      columns: ["revenue", "profit", "region"],
+      autoDashboard: {
+        kind: "sales",
+        cards: [{ title: "Total Revenue", value: "1,000,000", subtitle: null }],
+        charts: [
+          {
+            title: "revenue vs profit (correlation)",
+            chartType: "scatter",
+            labels: ["100 / 20", "200 / 40"],
+            values: [0.9, 0.85],
+          },
+          {
+            title: "Top region by revenue",
+            chartType: "bar",
+            labels: ["North", "South"],
+            values: [500, 300],
+          },
+        ],
+      },
+      profile: {
+        column_types: { revenue: "number", profit: "number", region: "category" },
+      },
+      primaryMetricColumn: "revenue",
+      groupingColumn: "region",
+      dateColumn: null,
+    });
+    expect(bullets.some((b) => /\b100\s*\/\s*20\b/.test(b))).toBe(false);
+    expect(bullets.some((b) => /north/i.test(b) && /leading|highest/i.test(b))).toBe(
+      true
+    );
+  });
+
+  it("partitionOverviewAiSummaryBullets keeps ranking order", () => {
+    const sample = ["a", "b", "c", "d", "e", "f", "g"];
+    const { initial, extra } = partitionOverviewAiSummaryBullets(sample, 5);
+    expect(initial).toEqual(["a", "b", "c", "d", "e"]);
+    expect(extra).toEqual(["f", "g"]);
+  });
 
   it("hr fixture uses workforce language, not employee-count HR KPI echo", () => {
     const hr = DOMAIN_PAYLOADS.find((p) => p.domain === "hr")!;
@@ -151,11 +250,12 @@ describe("computeOverviewAiSummaryBullets per domain fixture", () => {
       dateColumn: null,
     });
     expect(bullets.some((b) => /\bn\/a\b/i.test(b))).toBe(false);
-    expect(bullets.some((b) => /total revenue/i.test(b))).toBe(true);
+    expect(bullets.some((b) => /north/i.test(b))).toBe(true);
     expect(bullets.some((b) => /average revenue/i.test(b))).toBe(false);
+    expect(bullets.some((b) => /total revenue is \d/i.test(b))).toBe(false);
   });
 
-  it("aligns KPI bullets with populated card values", () => {
+  it("aligns summary bullets with populated card values via interpretive lines", () => {
     const showcase = DOMAIN_PAYLOADS.find(
       (p) => p.domain === "dashboard_showcase_dataset"
     )!;
@@ -167,20 +267,20 @@ describe("computeOverviewAiSummaryBullets per domain fixture", () => {
     expect(
       bullets.some(
         (b) =>
-          b.includes(String(revenueCard?.value)) ||
-          /total revenue/i.test(b)
+          /revenue|profit|north|electronics/i.test(b) &&
+          !/total revenue is \d/i.test(b)
       )
     ).toBe(true);
   });
 
-  it("showcase summary stays grounded in revenue and profit KPIs", () => {
+  it("showcase summary stays grounded in commercial metrics without KPI card echo", () => {
     const showcase = DOMAIN_PAYLOADS.find(
       (p) => p.domain === "dashboard_showcase_dataset"
     )!;
     const bullets = bulletsFor(showcase).join(" ").toLowerCase();
-    expect(bullets).toMatch(/total revenue/);
-    expect(bullets).toMatch(/average revenue/);
-    expect(bullets).toMatch(/total profit/);
+    expect(bullets).toMatch(/total revenue|revenue concentration|profit|north|electronics/);
+    expect(bullets).not.toMatch(/total revenue is \d/i);
+    expect(bullets).not.toMatch(/total profit is \d/i);
   });
 
   it.each(DOMAIN_PAYLOADS.map((p) => [p.domain, p] as const))(
@@ -367,5 +467,203 @@ describe("executive wording helpers", () => {
     expect(
       bullets.some((b) => /loan balance is concentrated in the/i.test(b))
     ).toBe(true);
+  });
+
+  it("selectOverviewAiSummaryInsights dedupes leader and concentration on same finding", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+      {
+        text: "Electronics is the leading product category by sales amount.",
+        score: 90,
+        kind: "leader",
+        entity: "electronics",
+        metricKey: "sales amount",
+        dimensionKey: "product category",
+        topicKey: "leader|electronics|sales amount|product category",
+      },
+      {
+        text: "Electronics accounts for about 54% of total sales amount in this breakdown.",
+        score: 80,
+        kind: "concentration",
+        entity: "electronics",
+        metricKey: "sales amount",
+        dimensionKey: "product category",
+        topicKey: "concentration|electronics|sales amount|product category",
+      },
+      {
+        text: "Total Sales is 7,849,721 across filtered rows.",
+        score: 95,
+        kind: "kpi",
+        metricKey: "total sales",
+      },
+    ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "retail"
+    );
+    expect(out).toHaveLength(2);
+    expect(out.some((b) => /total sales/i.test(b))).toBe(true);
+    expect(out.some((b) => /54%/i.test(b))).toBe(false);
+  });
+
+  it("selectOverviewAiSummaryInsights limits repeated entity coverage in top slots", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+      { text: "Frame", score: 100, kind: "frame" },
+      {
+        text: "Engineering has the highest salary.",
+        score: 92,
+        kind: "leader",
+        entity: "engineering",
+        metricKey: "salary",
+        dimensionKey: "department",
+      },
+      {
+        text: "Engineering has the most training hours.",
+        score: 88,
+        kind: "leader",
+        entity: "engineering",
+        metricKey: "training hours",
+        dimensionKey: "department",
+      },
+      {
+        text: "Sales shows the highest attrition rate among departments.",
+        score: 94,
+        kind: "impact",
+        entity: "sales",
+        metricKey: "attrition",
+        dimensionKey: "department",
+      },
+    ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "hr"
+    );
+    expect(out.filter((b) => /engineering/i.test(b))).toHaveLength(1);
+    expect(out.some((b) => /attrition/i.test(b))).toBe(true);
+  });
+
+  it("selectOverviewAiSummaryInsights dedupes equivalent loan segment outcomes", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+        { text: "Banking analytics snapshot.", score: 100, kind: "frame" },
+        {
+          text: "Loan balance is concentrated in the Corporate segment.",
+          score: 95,
+          kind: "impact",
+          entity: "corporate",
+          outcomeKey: "loan_segment_dominance|corporate",
+          topicCategory: "segments",
+        },
+        {
+          text: "Top Customer Segment by Loan balance is Corporate in the current slice.",
+          score: 70,
+          kind: "kpi",
+          entity: "corporate",
+        },
+        {
+          text: "About 9% of records carry a delinquency flag — prioritize credit-score and utilization review.",
+          score: 96,
+          kind: "impact",
+          topicCategory: "risk",
+        },
+      ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "banking"
+    );
+    expect(out.filter((b) => /corporate/i.test(b) && /loan balance/i.test(b))).toHaveLength(1);
+    expect(out.some((b) => /delinquency flag/i.test(b))).toBe(true);
+  });
+
+  it("selectOverviewAiSummaryInsights keeps region coverage in top 5 for retail topic targets", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+        { text: "Retail analytics snapshot.", score: 100, kind: "frame" },
+        {
+          text: "Electronics has the highest product category sales amount share.",
+          score: 110,
+          kind: "leader",
+          entity: "electronics",
+          topicCategory: "concentration",
+        },
+        {
+          text: "Sales concentration is highest in the North region.",
+          score: 96,
+          kind: "impact",
+          topicCategory: "region",
+          entity: "north",
+          outcomeKey: "region_activity|north",
+        },
+        { text: "Sales trend shows moderation.", score: 90, kind: "trend", topicCategory: "trend" },
+      ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "retail"
+    );
+    const top = out.slice(0, OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE);
+    expect(top.some((b) => /north region|sales concentration is highest in the north/i.test(b))).toBe(
+      true
+    );
+  });
+
+  it("selectOverviewAiSummaryInsights demotes HR demographic chart insights below business floor", () => {
+    const out = selectOverviewAiSummaryInsights(
+      [
+        { text: "Workforce analytics snapshot.", score: 100, kind: "frame" },
+        {
+          text: "Sales and Support departments typically drive the highest attrition pressure in workforce slices like this.",
+          score: 94,
+          kind: "impact",
+          topicCategory: "attrition",
+        },
+        {
+          text: "Average Salary is 90,000 across filtered rows.",
+          score: 101,
+          kind: "kpi",
+          metricKey: "salary",
+          topicCategory: "compensation",
+        },
+        {
+          text: "35-44 is the leading age band by age.",
+          score: 35,
+          kind: "leader",
+          entity: "35 44",
+          metricKey: "age",
+          dimensionKey: "age band",
+          topicCategory: "demographics",
+        },
+        {
+          text: "Male is the leading gender by bonus.",
+          score: 32,
+          kind: "leader",
+          entity: "male",
+          metricKey: "bonus",
+          dimensionKey: "gender",
+          topicCategory: "demographics",
+        },
+      ],
+      OVERVIEW_AI_SUMMARY_MAX_BULLETS,
+      "hr"
+    );
+    expect(out.some((b) => /\bage band\b/i.test(b))).toBe(false);
+    expect(out.some((b) => /\bgender\b/i.test(b))).toBe(false);
+    expect(out.some((b) => /\battrition\b/i.test(b))).toBe(true);
+  });
+});
+
+describe("shouldIncludeLongTailProfileInsight", () => {
+  it("suppresses long-tail warnings for retail and sales domains", () => {
+    expect(shouldIncludeLongTailProfileInsight("retail", 4, 4)).toBe(false);
+    expect(shouldIncludeLongTailProfileInsight("sales", 4, 4)).toBe(false);
+  });
+
+  it("requires extreme skew for generic domains", () => {
+    expect(shouldIncludeLongTailProfileInsight("generic", 4, 4)).toBe(false);
+    expect(shouldIncludeLongTailProfileInsight("generic", 6, 3)).toBe(true);
+  });
+
+  it("retail fixture avoids generic long-tail copy in top 5", () => {
+    const retail = DOMAIN_PAYLOADS.find((p) => p.domain === "retail")!;
+    const top = partitionOverviewAiSummaryBullets(bulletsFor(retail)).initial;
+    expect(top.some((b) => /\blong tails\b/i.test(b))).toBe(false);
+    expect(top.some((b) => /total sales is \d/i.test(b))).toBe(false);
+    expect(top.some((b) => /total profit is \d/i.test(b))).toBe(false);
   });
 });

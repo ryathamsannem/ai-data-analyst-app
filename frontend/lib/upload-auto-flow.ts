@@ -12,7 +12,7 @@ import {
 
 export type UploadPickValidation =
   | { ok: true; file: File }
-  | { ok: false; reason: "invalid_type" | "file_too_large"; message: string };
+  | { ok: false; reason: "invalid_type" | "file_too_large" | "empty_file"; message: string };
 
 export function validateOverviewUploadPick(
   file: File,
@@ -20,6 +20,13 @@ export function validateOverviewUploadPick(
 ): UploadPickValidation {
   if (!OVERVIEW_UPLOAD_EXT_PATTERN.test(file.name)) {
     return { ok: false, reason: "invalid_type", message: OVERVIEW_UPLOAD_INVALID_MSG };
+  }
+  if (file.size <= 0) {
+    return {
+      ok: false,
+      reason: "empty_file",
+      message: "The selected file is empty. Choose a CSV or Excel file with data.",
+    };
   }
   if (!isFileWithinPlanLimit(tier, file.size)) {
     const message = fileSizeLimitMessage(tier, file.size);

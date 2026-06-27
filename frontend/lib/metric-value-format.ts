@@ -236,15 +236,22 @@ export function metricFormatUsesPercent(ctx: MetricFormatContext): boolean {
 /**
  * When the stored metric is percent-based, map fractions (0–1) to display percent points.
  * Values already on a 0–100 scale are left unchanged.
+ *
+ * `maxContextValue` resolves the 1.0 boundary ambiguity: if any value in the dataset
+ * exceeds 1.05, the data is on a 0–100 scale and a value of 1.0 means 1%, not 100%.
+ * Callers should pass `Math.max(...abs(chartRows.values))` when available.
  */
 export function coercePercentDisplayNumber(
   raw: number,
-  normalizedValue?: number
+  normalizedValue?: number,
+  maxContextValue?: number
 ): number {
   if (typeof normalizedValue === "number" && Number.isFinite(normalizedValue)) {
     return normalizedValue;
   }
   if (!Number.isFinite(raw)) return raw;
+  // If the dataset max exceeds 1.05, values are on a 0–100 scale already.
+  if (typeof maxContextValue === "number" && maxContextValue > 1.05) return raw;
   if (raw > 1 && raw <= 100) return raw;
   if (raw >= 0 && raw <= 1) return raw * 100;
   return raw;
@@ -488,7 +495,13 @@ export function formatExecutiveMetricValue(
     return dv || "—";
   }
   if (format === "percent") {
-    const n = coercePercentDisplayNumber(raw, readChartRowNormalizedValue(row));
+    // Use dataset max to resolve the 1.0 boundary ambiguity: a value of 1.0 in a
+    // dataset where maxAbs > 1.05 is 1% (0–100 scale), not 100% (0–1 fraction scale).
+    const allVals = (ctx.chartRows ?? [])
+      .map((r) => Math.abs(readChartRowRawValue(r)))
+      .filter(Number.isFinite);
+    const maxCtx = allVals.length ? Math.max(...allVals) : undefined;
+    const n = coercePercentDisplayNumber(raw, readChartRowNormalizedValue(row), maxCtx);
     return formatExecutivePercentValue(n);
   }
   const dv = row.displayValue?.trim();

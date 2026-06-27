@@ -365,6 +365,45 @@ def build_ask_narrative_prompt(
     except Exception:
         pass
 
+    why_followup_block = ""
+    why_followup_active = False
+    why_ctx = analysis_ctx.get("whyFollowupContext")
+    if isinstance(why_ctx, dict) and why_ctx.get("type") == "why_followup":
+        why_followup_active = True
+        try:
+            from intent_engine.why_followup_reasoning import why_followup_prompt_block
+
+            why_followup_block = why_followup_prompt_block(why_ctx)
+            if why_followup_block:
+                why_followup_block = f"\n{why_followup_block}\n"
+        except Exception:
+            pass
+
+    reasoning_block = ""
+    if not why_followup_active:
+        try:
+            from intent_engine.reasoning_blocks import reasoning_blocks_prompt_block
+
+            rb_raw = analysis_ctx.get("reasoningBlocks")
+            if isinstance(rb_raw, list) and rb_raw:
+                reasoning_block = reasoning_blocks_prompt_block(rb_raw)
+                if reasoning_block:
+                    reasoning_block = f"\n{reasoning_block}\n"
+        except Exception:
+            pass
+
+    recommended_actions_block = ""
+    try:
+        from intent_engine.recommended_actions import recommended_actions_prompt_block
+
+        ra_raw = analysis_ctx.get("recommendedActions")
+        if isinstance(ra_raw, list) and ra_raw:
+            recommended_actions_block = recommended_actions_prompt_block(ra_raw)
+            if recommended_actions_block:
+                recommended_actions_block = f"\n{recommended_actions_block}\n"
+    except Exception:
+        pass
+
     semantic_correction = m._semantic_intent_correction_prompt_block(question)
     needs_cautious = bool(
         analysis_ctx.get("cautiousNarrativeRequired")
@@ -390,12 +429,13 @@ Dataset context (use this, do not invent columns):
 
 Exact calculated result (ground truth metrics / table):
 {exact_result}
-{focus_line}
+{why_followup_block}{focus_line}
 {geo_block}
 {outlier_block}
 {forecast_block}
 {exec_rank_block}
-{guard_block}
+{reasoning_block}
+{recommended_actions_block}{guard_block}
 {polish_block}
 {viz_anchor}
 {evidence_line}{rationale_line}
