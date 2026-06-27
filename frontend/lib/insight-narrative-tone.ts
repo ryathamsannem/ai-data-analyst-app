@@ -3,6 +3,7 @@
  */
 
 import type { ConfidenceLevel } from "@/lib/insight-confidence";
+import { aggregateMappingConfidenceFromMetadata } from "@/lib/column-mapping-validation";
 
 export type NarrativeTone = "cautious" | "balanced" | "confident";
 
@@ -248,15 +249,7 @@ export function softenExecutiveTakeaway(
 
 /** Worst-case mapping confidence from API role metadata. */
 export function mappingConfidenceFromRoleMetadata(
-  roles: Record<string, { confidence?: string } | undefined> | null | undefined
+  roles: Record<string, { confidence?: string; selected?: string | null } | undefined> | null | undefined
 ): ConfidenceLevel {
-  if (!roles || typeof roles !== "object") return "low";
-  const keys = ["sales", "product", "date", "region", "customer"] as const;
-  let worst: ConfidenceLevel = "high";
-  for (const k of keys) {
-    const c = normLevel(roles[k]?.confidence);
-    if (c === "low") return "low";
-    if (c === "medium") worst = "medium";
-  }
-  return worst;
+  return aggregateMappingConfidenceFromMetadata({ roles });
 }

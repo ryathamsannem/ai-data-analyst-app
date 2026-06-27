@@ -351,5 +351,23 @@ class TestHrGoldMappingConfidenceRegression(unittest.TestCase):
         self.assertIn(agg, ("high", "medium"), msg=f"aggregate={agg} roles={meta.get('roles')}")
 
 
+class TestUploadPayloadMappingConfidence(unittest.TestCase):
+    """Upload payload exposes aggregate mapping_confidence aligned with role metadata."""
+
+    def tearDown(self) -> None:
+        main.df = None
+        main.dataset_profile = None
+        main.column_mapping_metadata = None
+        main.column_mapping = {k: None for k in main.column_mapping}
+
+    def test_compose_upload_payload_includes_mapping_confidence(self) -> None:
+        path = FIXTURE_DIR / "hr_workforce_1k.csv"
+        _proposed, meta, _profile, _dash = _parse_fixture(path)
+        payload = main.build_upload_response([])
+        self.assertIn("mapping_confidence", payload)
+        self.assertEqual(payload["mapping_confidence"], _aggregate_mapping_confidence(meta))
+        self.assertIn(payload["mapping_confidence"], ("high", "medium"))
+
+
 if __name__ == "__main__":
     unittest.main()

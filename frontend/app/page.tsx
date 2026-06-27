@@ -760,7 +760,12 @@ import {
   buildExportTabVisualizationPreview,
   exportTabAiAnswerAvailable,
 } from "@/lib/export-tab-preview";
-import { validateColumnMappingSelections } from "@/lib/column-mapping-validation";
+import {
+  aggregateMappingConfidenceFromMetadata,
+  mappingConfidenceDisplayLabel,
+  shouldShowMappingLowConfidenceWarning,
+  validateColumnMappingSelections,
+} from "@/lib/column-mapping-validation";
 import { resolvePdfExportContext } from "@/lib/resolve-pdf-export-context";
 import {
   exportTabBlockedReason,
@@ -6680,6 +6685,9 @@ function HomeInner() {
   ]);
 
   const [mappingConfirmedByUser, setMappingConfirmedByUser] = useState(false);
+  const [apiMappingConfidence, setApiMappingConfidence] = useState<string | null>(
+    null
+  );
   const [mappingMetadata, setMappingMetadata] = useState<MappingMetadata | null>(
     null
   );
@@ -7373,6 +7381,7 @@ function HomeInner() {
     setMappingConfirmedByUser(false);
     setMappingModalOpen(false);
     setMappingMetadata(null);
+    setApiMappingConfidence(null);
     setLoading(true);
 
     try {
@@ -7459,6 +7468,12 @@ function HomeInner() {
       } else {
         setMappingMetadata(null);
       }
+      setApiMappingConfidence(
+        typeof data.mapping_confidence === "string" &&
+          data.mapping_confidence.trim()
+          ? data.mapping_confidence.trim().toLowerCase()
+          : null
+      );
 
       setUploadMessage(
         `File uploaded successfully • ${data.rows} rows • ${data.columns.length} columns`
@@ -7497,6 +7512,7 @@ function HomeInner() {
     setFilterBreadcrumb("");
     setDashboardEmpty(false);
     setMappingMetadata(null);
+    setApiMappingConfidence(null);
     setLoading(true);
 
     try {
@@ -7572,6 +7588,12 @@ function HomeInner() {
       } else {
         setMappingMetadata(null);
       }
+      setApiMappingConfidence(
+        typeof data.mapping_confidence === "string" &&
+          data.mapping_confidence.trim()
+          ? data.mapping_confidence.trim().toLowerCase()
+          : null
+      );
 
       setUploadMessage(
         `Sheet changed successfully • ${data.rows} rows • ${data.columns.length} columns`
@@ -8485,6 +8507,13 @@ function HomeInner() {
       if (data.mapping_metadata && typeof data.mapping_metadata === "object") {
         setMappingMetadata(data.mapping_metadata as MappingMetadata);
       }
+      setApiMappingConfidence(
+        typeof data.mapping_confidence === "string" &&
+          data.mapping_confidence.trim()
+          ? data.mapping_confidence.trim().toLowerCase()
+          : "high"
+      );
+
       setSuggestedQuestions(
         dedupeSuggestedQuestionsNear(
           dedupeSuggestedQuestions(
@@ -8545,16 +8574,25 @@ function HomeInner() {
   let mappingConfidence: "High" | "Medium" | "Low" = "Low";
   if (mappingConfirmedByUser) {
     mappingConfidence = "High";
-  } else if (mappingMetadata?.roles) {
-    const fromRoles = mappingConfidenceFromRoleMetadata(mappingMetadata.roles);
-    mappingConfidence =
-      fromRoles === "high" ? "High" : fromRoles === "medium" ? "Medium" : "Low";
+  } else if (mappingMetadata?.roles || apiMappingConfidence) {
+    mappingConfidence = mappingConfidenceDisplayLabel(
+      aggregateMappingConfidenceFromMetadata(
+        mappingMetadata,
+        apiMappingConfidence
+      )
+    );
   } else {
     const resolvedCount = [effectiveSales, effectiveDate, effectiveProduct].filter(
       Boolean
     ).length;
     mappingConfidence = resolvedCount >= 2 ? "Medium" : "Low";
   }
+
+  const showMappingLowConfidenceWarning = shouldShowMappingLowConfidenceWarning(
+    mappingMetadata,
+    mappingConfirmedByUser,
+    apiMappingConfidence
+  );
 
   const insightRelationshipBundle = useMemo((): {
     correlation: RelationshipCorrelationSnapshot;
@@ -12346,21 +12384,20 @@ function HomeInner() {
                           ? "bg-amber-500/10 text-amber-900 ring-amber-500/25 dark:text-amber-100"
                           : "bg-[color:var(--surface-subtle)] text-foreground ring-[color:var(--border-default)]";
                     const colHint = (explicit: string, inferred: string | null) => {
-                      if (explicit.trim()) {
+                      const hasValue = Boolean(explicit.trim() || inferred);
+                      if (!hasValue) return null;
+                      if (mappingConfirmedByUser && explicit.trim()) {
                         return (
                           <span className={`ml-1 ${ovDataHint}`}>
                             (manual)
                           </span>
                         );
                       }
-                      if (inferred) {
-                        return (
-                          <span className={`ml-1 ${ovDataHint}`}>
-                            (auto-detect)
-                          </span>
-                        );
-                      }
-                      return null;
+                      return (
+                        <span className={`ml-1 ${ovDataHint}`}>
+                          (auto-detect)
+                        </span>
+                      );
                     };
                     const colValue = (explicit: string, inferred: string | null) => {
                       const v = explicit.trim() || inferred;
@@ -12404,11 +12441,11 @@ function HomeInner() {
                                 <span className={ovDataValueMono}>
                                   {regionDisplay}
                                 </span>
-                                {regionColumn.trim() ? (
+                                {regionColumn.trim() && mappingConfirmedByUser ? (
                                   <span className={`ml-1 ${ovDataHint}`}>
                                     (manual)
                                   </span>
-                                ) : engineRegion ? (
+                                ) : regionDisplay ? (
                                   <span className={`ml-1 ${ovDataHint}`}>
                                     (auto-detect)
                                   </span>
@@ -14881,7 +14918,7 @@ function HomeInner() {
               </div>
 
               <div className="p-6">
-                {mappingConfidence === "Low" && !mappingConfirmedByUser ? (
+                {showMappingLowConfidenceWarning ? (
                   <p
                     className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2.5 text-sm leading-relaxed text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-100"
                     role="status"

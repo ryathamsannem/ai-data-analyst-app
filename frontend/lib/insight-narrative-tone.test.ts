@@ -2,7 +2,23 @@ import { describe, expect, it } from "vitest";
 import {
   resolveNarrativeTone,
   softenAssertiveProse,
+  mappingConfidenceFromRoleMetadata,
 } from "@/lib/insight-narrative-tone";
+
+describe("mappingConfidenceFromRoleMetadata", () => {
+  it("ignores unselected optional roles with low confidence", () => {
+    expect(
+      mappingConfidenceFromRoleMetadata({
+        sales: { confidence: "high", selected: "salary" },
+        product: { confidence: "high", selected: "department" },
+        date: { confidence: "high", selected: "hire_date" },
+        profit: { confidence: "high", selected: "performance_rating" },
+        region: { confidence: "low", selected: null },
+        customer: { confidence: "high", selected: "employee_status" },
+      })
+    ).toBe("high");
+  });
+});
 
 describe("resolveNarrativeTone", () => {
   it("does not downgrade large cohorts with few ranking categories", () => {

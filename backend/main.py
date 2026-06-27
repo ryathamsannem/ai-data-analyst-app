@@ -5534,6 +5534,7 @@ def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
         "filter_summary": [],
         "empty": False,
         "mapping_metadata": column_mapping_metadata,
+        "mapping_confidence": _aggregate_mapping_confidence_from_meta(),
     }
     return _json_safe(payload)
 
@@ -5938,6 +5939,7 @@ def update_column_mapping(data: ColumnMappingRequest):
         "dimension_options": build_dimension_catalog_for_ui(df, prof),
         "filter_breadcrumb": build_filter_breadcrumb(df, prof, [], None),
         "mapping_metadata": column_mapping_metadata,
+        "mapping_confidence": _aggregate_mapping_confidence_from_meta(),
         "column_mapping": {
             "product_column": column_mapping.get("product"),
             "sales_column": column_mapping.get("sales"),
