@@ -418,6 +418,15 @@ def detect_column_types(input_df: pd.DataFrame):
             result[col] = "text"
             continue
 
+        try:
+            from intent_engine.column_resolve import is_date_part_column
+
+            if is_date_part_column(str(col)):
+                result[col] = "category"
+                continue
+        except Exception:
+            pass
+
         # Numeric (handles commas/currency too)
         numeric = pd.to_numeric(
             non_null.astype(str)
@@ -3066,9 +3075,9 @@ def _dash_series_payload(
     ct_in = chart_type.strip().lower()
     if ct_in in ("line", "area"):
         try:
-            series = _sort_chronologically_by_bucket_labels(series).head(max_points)
+            series = _sort_chronologically_by_bucket_labels(series).tail(max_points)
         except Exception:
-            series = series.head(max_points)
+            series = series.tail(max_points)
     else:
         series = series.sort_values(ascending=False).head(max_points)
     labels = [_pretty_label_text(x) for x in series.index.tolist()]

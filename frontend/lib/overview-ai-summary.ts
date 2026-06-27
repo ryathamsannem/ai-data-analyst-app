@@ -121,6 +121,15 @@ const HR_LONG_TAIL_Z_MIN = 3.5;
 const HR_PROFILE_LONG_TAIL_SCORE = 28;
 const HR_DEMOGRAPHIC_SCORE_PENALTY = 46;
 
+/** Non-HR domains: only surface long-tail copy when skew is extreme. */
+const GENERIC_LONG_TAIL_Z_MIN = 5.25;
+const GENERIC_PROFILE_LONG_TAIL_SCORE = 44;
+
+const HEADLINE_KPI_TITLE_RE =
+  /^(total sales|total profit|total revenue|total loan balance|total spend|total order value)$/i;
+const REDUNDANT_TOP_KPI_TITLE_RE =
+  /^top (?:product category|region|customer segment|department|segment)\b/i;
+
 const DOMAIN_METRIC_PRIORITY: Partial<Record<SummaryDomain, RegExp[]>> = {
   retail: [
     /\b(sales|revenue|profit|margin)\b/i,
@@ -814,8 +823,56 @@ function parseKpiInsightMeta(card: OverviewAiSummaryCard): {
   return { metricKey: normalizeInsightKey(card.title) };
 }
 
-function scoreKpiInsight(card: OverviewAiSummaryCard, domain: SummaryDomain): number {
+function kpiInsightEchoesCardOnly(card: OverviewAiSummaryCard, domain: SummaryDomain): boolean {
+  const title = card.title.trim();
+  if (domain === "retail" || domain === "sales") {
+    if (HEADLINE_KPI_TITLE_RE.test(title)) return true;
+    if (REDUNDANT_TOP_KPI_TITLE_RE.test(title)) return true;
+  }
+  if (domain === "banking" && /^total loan balance$/i.test(title)) return true;
+  if (domain === "hr" && /^total employees$/i.test(title)) return true;
+  return false;
+}
+
+function summaryHasInterpretiveCoverage(scored: OverviewScoredInsight[]): boolean {
+  return scored.some(
+    (item) =>
+      item.kind === "impact" ||
+      item.kind === "leader" ||
+      item.kind === "concentration" ||
+      item.kind === "trend" ||
+      item.kind === "laggard"
+  );
+}
+
+/** Whether profile stats justify a long-tail warning for the active summary domain. */
+export function shouldIncludeLongTailProfileInsight(
+  domain: SummaryDomain,
+  zHi: number,
+  zLo: number
+): boolean {
+  if (domain === "hr") {
+    return zHi > HR_LONG_TAIL_Z_MIN || zLo > HR_LONG_TAIL_Z_MIN;
+  }
+  if (
+    domain === "retail" ||
+    domain === "sales" ||
+    domain === "marketing" ||
+    domain === "banking" ||
+    domain === "geography"
+  ) {
+    return false;
+  }
+  return zHi > GENERIC_LONG_TAIL_Z_MIN || zLo > GENERIC_LONG_TAIL_Z_MIN;
+}
+
+function scoreKpiInsight(
+  card: OverviewAiSummaryCard,
+  domain: SummaryDomain,
+  hasInterpretiveCoverage: boolean
+): number {
   if (isLowValueKpiTitle(card.title, domain)) return 0;
+  if (hasInterpretiveCoverage && kpiInsightEchoesCardOnly(card, domain)) return 0;
   const titleLc = card.title.toLowerCase();
   const comparative = /\b(top|highest|lowest|lead|best|worst|maximum|minimum|peak)\b/.test(
     titleLc
@@ -1194,6 +1251,29 @@ function isDuplicateOverviewInsight(
     ) {
       return true;
     }
+    if (candidate.kind === "kpi" && existing.kind === "impact") {
+      if (
+        candidate.entity &&
+        existing.entity &&
+        candidate.entity === existing.entity
+      ) {
+        return true;
+      }
+      const candidateTitle = normalizeInsightKey(candidate.text.split(/\s+is\s+/i)[0] ?? "");
+      if (
+        candidateTitle &&
+        existing.text.toLowerCase().includes(candidateTitle.replace(/\s+/g, " "))
+      ) {
+        return true;
+      }
+    }
+    if (
+      candidate.kind === "kpi" &&
+      existing.kind === "trend" &&
+      HEADLINE_KPI_TITLE_RE.test(String(candidate.metricKey ?? ""))
+    ) {
+      return true;
+    }
   }
   return false;
 }
@@ -1452,12 +1532,28 @@ function collectBusinessImpactLines(args: {
       const regionName = truncateOverviewPhrase(String(topRegion.value), 28);
       const regionKey = normalizeInsightKey(regionName);
       push({
-        text: `Revenue concentration is highest in the ${regionName} region.`,
+        text: `Sales concentration is highest in the ${regionName} region.`,
         score: 96,
-        topicKey: `impact|revenue|region|${regionKey}`,
+        topicKey: `impact|sales|region|${regionKey}`,
         topicCategory: "region",
         outcomeKey: `region_activity|${regionKey}`,
         entity: regionKey,
+      });
+    }
+
+    const topCategory = args.cards.find((c) =>
+      /^top product category\b/i.test(c.title.trim())
+    );
+    if (topCategory && !isNaDisplayValue(String(topCategory.value))) {
+      const categoryName = truncateOverviewPhrase(String(topCategory.value), 28);
+      const categoryKey = normalizeInsightKey(categoryName);
+      push({
+        text: `${categoryName} dominates category sales in the current slice.`,
+        score: 94,
+        topicKey: `impact|sales|category|${categoryKey}`,
+        topicCategory: "concentration",
+        outcomeKey: `category_dominance|${categoryKey}`,
+        entity: categoryKey,
       });
     }
 
@@ -1847,7 +1943,8 @@ export function computeOverviewAiSummaryBullets(
   for (const card of cards) {
     const line = formatKpiSummaryLine(card);
     if (!line) continue;
-    const kpiScore = scoreKpiInsight(card, domain);
+    const interpretiveCoverage = summaryHasInterpretiveCoverage(scored);
+    const kpiScore = scoreKpiInsight(card, domain, interpretiveCoverage);
     if (kpiScore <= 0) continue;
     const meta = parseKpiInsightMeta(card);
     const subtitleEntity = kpiSubtitleEchoesEntityLeader(card.subtitle)
@@ -1881,14 +1978,20 @@ export function computeOverviewAiSummaryBullets(
     ) {
       const zHi = (max - mean) / std;
       const zLo = (mean - min) / std;
-      const longTailZMin = domain === "hr" ? HR_LONG_TAIL_Z_MIN : 2.75;
-      if (zHi > longTailZMin || zLo > longTailZMin) {
+      if (shouldIncludeLongTailProfileInsight(domain, zHi, zLo)) {
         pushInsight({
           text: `The primary measure shows long tails—spot-check extremes before trusting aggregates.`,
-          score: domain === "hr" ? HR_PROFILE_LONG_TAIL_SCORE : 58,
+          score:
+            domain === "hr" ? HR_PROFILE_LONG_TAIL_SCORE : GENERIC_PROFILE_LONG_TAIL_SCORE,
           kind: "profile",
         });
-      } else if (max != null && min != null && mean != null) {
+      } else if (
+        domain !== "retail" &&
+        domain !== "sales" &&
+        max != null &&
+        min != null &&
+        mean != null
+      ) {
         const span = Math.abs(max - min);
         const noise = std * 4;
         if (Number.isFinite(span) && Number.isFinite(noise) && span > noise * 2.5) {

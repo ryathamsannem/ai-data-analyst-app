@@ -61,7 +61,7 @@
           }
         },
         {
-          "title": "Average Revenue per Record",
+          "title": "Average Sales per Record",
           "value": "785",
           "subtitle": "Electronics leads on average revenue",
           "kpi_meta": {

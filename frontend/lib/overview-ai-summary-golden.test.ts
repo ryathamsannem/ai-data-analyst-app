@@ -164,9 +164,10 @@ describe("golden dataset AI summary quality", () => {
     const retail = GOLDEN_PAYLOADS.find((p) => p.domain === "retail_gold_10000")!;
     const top = partitionOverviewAiSummaryBullets(bulletsFor(retail)).initial;
     expect(top[0]).toMatch(/retail analytics snapshot/i);
-    expect(top.some((b) => /total sales|total profit|revenue concentration|north/i.test(b))).toBe(
+    expect(top.some((b) => /total sales|total profit|sales concentration|north/i.test(b))).toBe(
       true
     );
     expect(top.some((b) => /electronics/i.test(b))).toBe(true);
+    expect(top.some((b) => /total sales is \d/i.test(b))).toBe(false);
   });
 });

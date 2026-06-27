@@ -12,6 +12,7 @@ import {
   OVERVIEW_AI_SUMMARY_MAX_BULLETS,
   partitionOverviewAiSummaryBullets,
   selectOverviewAiSummaryInsights,
+  shouldIncludeLongTailProfileInsight,
   type ComputeOverviewAiSummaryArgs,
 } from "@/lib/overview-ai-summary";
 
@@ -249,11 +250,12 @@ describe("computeOverviewAiSummaryBullets per domain fixture", () => {
       dateColumn: null,
     });
     expect(bullets.some((b) => /\bn\/a\b/i.test(b))).toBe(false);
-    expect(bullets.some((b) => /total revenue/i.test(b))).toBe(true);
+    expect(bullets.some((b) => /north/i.test(b))).toBe(true);
     expect(bullets.some((b) => /average revenue/i.test(b))).toBe(false);
+    expect(bullets.some((b) => /total revenue is \d/i.test(b))).toBe(false);
   });
 
-  it("aligns KPI bullets with populated card values", () => {
+  it("aligns summary bullets with populated card values via interpretive lines", () => {
     const showcase = DOMAIN_PAYLOADS.find(
       (p) => p.domain === "dashboard_showcase_dataset"
     )!;
@@ -265,20 +267,20 @@ describe("computeOverviewAiSummaryBullets per domain fixture", () => {
     expect(
       bullets.some(
         (b) =>
-          b.includes(String(revenueCard?.value)) ||
-          /total revenue/i.test(b)
+          /revenue|profit|north|electronics/i.test(b) &&
+          !/total revenue is \d/i.test(b)
       )
     ).toBe(true);
   });
 
-  it("showcase summary stays grounded in revenue and profit KPIs", () => {
+  it("showcase summary stays grounded in commercial metrics without KPI card echo", () => {
     const showcase = DOMAIN_PAYLOADS.find(
       (p) => p.domain === "dashboard_showcase_dataset"
     )!;
     const bullets = bulletsFor(showcase).join(" ").toLowerCase();
-    expect(bullets).toMatch(/total revenue/);
-    expect(bullets).toMatch(/average revenue/);
-    expect(bullets).toMatch(/total profit/);
+    expect(bullets).toMatch(/total revenue|revenue concentration|profit|north|electronics/);
+    expect(bullets).not.toMatch(/total revenue is \d/i);
+    expect(bullets).not.toMatch(/total profit is \d/i);
   });
 
   it.each(DOMAIN_PAYLOADS.map((p) => [p.domain, p] as const))(
@@ -575,8 +577,6 @@ describe("executive wording helpers", () => {
     const out = selectOverviewAiSummaryInsights(
       [
         { text: "Retail analytics snapshot.", score: 100, kind: "frame" },
-        { text: "Total Sales is 100 across filtered rows.", score: 101, kind: "kpi", metricKey: "sales" },
-        { text: "Total Profit is 10 across filtered rows.", score: 101, kind: "kpi", metricKey: "profit" },
         {
           text: "Electronics has the highest product category sales amount share.",
           score: 110,
@@ -585,7 +585,7 @@ describe("executive wording helpers", () => {
           topicCategory: "concentration",
         },
         {
-          text: "Revenue concentration is highest in the North region.",
+          text: "Sales concentration is highest in the North region.",
           score: 96,
           kind: "impact",
           topicCategory: "region",
@@ -598,7 +598,7 @@ describe("executive wording helpers", () => {
       "retail"
     );
     const top = out.slice(0, OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE);
-    expect(top.some((b) => /north region|revenue concentration is highest in the north/i.test(b))).toBe(
+    expect(top.some((b) => /north region|sales concentration is highest in the north/i.test(b))).toBe(
       true
     );
   });
@@ -645,5 +645,25 @@ describe("executive wording helpers", () => {
     expect(out.some((b) => /\bage band\b/i.test(b))).toBe(false);
     expect(out.some((b) => /\bgender\b/i.test(b))).toBe(false);
     expect(out.some((b) => /\battrition\b/i.test(b))).toBe(true);
+  });
+});
+
+describe("shouldIncludeLongTailProfileInsight", () => {
+  it("suppresses long-tail warnings for retail and sales domains", () => {
+    expect(shouldIncludeLongTailProfileInsight("retail", 4, 4)).toBe(false);
+    expect(shouldIncludeLongTailProfileInsight("sales", 4, 4)).toBe(false);
+  });
+
+  it("requires extreme skew for generic domains", () => {
+    expect(shouldIncludeLongTailProfileInsight("generic", 4, 4)).toBe(false);
+    expect(shouldIncludeLongTailProfileInsight("generic", 6, 3)).toBe(true);
+  });
+
+  it("retail fixture avoids generic long-tail copy in top 5", () => {
+    const retail = DOMAIN_PAYLOADS.find((p) => p.domain === "retail")!;
+    const top = partitionOverviewAiSummaryBullets(bulletsFor(retail)).initial;
+    expect(top.some((b) => /\blong tails\b/i.test(b))).toBe(false);
+    expect(top.some((b) => /total sales is \d/i.test(b))).toBe(false);
+    expect(top.some((b) => /total profit is \d/i.test(b))).toBe(false);
   });
 });

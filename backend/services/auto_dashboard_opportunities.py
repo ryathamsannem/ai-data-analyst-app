@@ -242,6 +242,11 @@ def classify_columns(
     n_rows = max(len(df), 1)
     ns = numeric_series_fn or (lambda c: _numeric_series_from_frame(df, c))
 
+    try:
+        from intent_engine.column_resolve import is_date_part_column
+    except Exception:
+        is_date_part_column = lambda _c: False  # type: ignore[misc, assignment]
+
     for col in df.columns:
         c = str(col)
         tp = ct.get(c)
@@ -249,6 +254,13 @@ def classify_columns(
             inv.dates.append(c)
             continue
         if tp == "number" and not id_like_fn(c):
+            if is_date_part_column(c):
+                nu = _unique_count_for_column(
+                    df, c, profile, string_normalized=True
+                )
+                if 2 <= nu <= 60:
+                    inv.categories.append(c)
+                continue
             n = _norm_col(c)
             if n in _LAT_LON:
                 continue
@@ -271,12 +283,18 @@ def classify_columns(
         c = str(col)
         if c in inv.dates:
             continue
+        if is_date_part_column(c):
+            continue
         if "date" in _norm_col(c) or "timestamp" in _norm_col(c):
             dd = pd.to_datetime(df[c], errors="coerce")
             if dd.notna().sum() >= max(8, int(0.1 * n_rows)):
                 inv.dates.append(c)
 
     inv.dates = _dedupe_preserve(inv.dates)
+    if inv.dates:
+        primary_dates = [d for d in inv.dates if not is_date_part_column(d)]
+        if primary_dates:
+            inv.dates = primary_dates
     inv.numerics = _dedupe_preserve(inv.numerics)
     inv.categories = _dedupe_preserve(inv.categories)
     inv.geographic = _dedupe_preserve(inv.geographic)
@@ -688,7 +706,8 @@ def _executive_metric_by_dim_title(
 ) -> str:
     met = _title_case_phrase(pretty_label(metric_col))
     dim = _title_case_phrase(pretty_label(dim_col))
-    return normalize_canonical_chart_title(f"{met} by {dim}")
+    prefix = "Average " if str(agg).lower() == "mean" else ""
+    return normalize_canonical_chart_title(f"{prefix}{met} by {dim}")
 
 
 def _executive_share_by_dim_title(

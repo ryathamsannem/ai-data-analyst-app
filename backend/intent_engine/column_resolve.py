@@ -12,6 +12,53 @@ def _norm_col(name: str) -> str:
     return re.sub(r"[_\s]+", " ", str(name).lower()).strip()
 
 
+_DATE_PART_EXACT = frozenset(
+    {
+        "year",
+        "month",
+        "month num",
+        "month number",
+        "month_num",
+        "month_number",
+        "quarter",
+        "week",
+        "week num",
+        "week number",
+        "week_num",
+        "week_number",
+        "day",
+        "day of week",
+        "day_of_week",
+        "dow",
+        "iso week",
+        "iso_week",
+        "fiscal year",
+        "fiscal_year",
+        "fiscal month",
+        "fiscal_month",
+        "fiscal quarter",
+        "fiscal_quarter",
+    }
+)
+
+
+def is_date_part_column(col_name: Optional[str]) -> bool:
+    """
+    Calendar part columns (year, month, quarter, …) are dimensions or time buckets,
+    never additive business measures.
+    """
+    if not col_name or not str(col_name).strip():
+        return False
+    n = _norm_col(str(col_name))
+    if n in _DATE_PART_EXACT:
+        return True
+    if re.fullmatch(r"(?:fiscal )?(?:year|month|quarter|week|day)(?: num| number| no)?", n):
+        return True
+    if re.fullmatch(r"(?:year|month|quarter|week)_(?:num|number|no)", n.replace(" ", "_")):
+        return True
+    return False
+
+
 def _singularize_dimension_phrase(phrase: str) -> str:
     p = _norm_col(phrase)
     if not p:
@@ -430,17 +477,40 @@ def resolve_synonym_metric_column(
 
 
 def column_prefers_mean_aggregation(col_name: Optional[str]) -> bool:
-    """Score/rating/rate/pct columns should aggregate with mean, not sum."""
+    """Score/rating/rate/pct/duration columns should aggregate with mean, not sum."""
     if not col_name:
         return False
     cn = _norm_col(str(col_name))
     if any(k in cn for k in ("revenue", "sales", "cost", "spend", "profit", "units")):
-        return False
+        if not any(
+            k in cn
+            for k in (
+                "delivery",
+                "ship",
+                "lead time",
+                "lead_time",
+                "duration",
+                "latency",
+                "resolution",
+                "turnaround",
+                "wait time",
+                "wait_time",
+            )
+        ):
+            return False
     if any(sub in cn for sub in _SCORE_RATING_SUBSTRINGS):
         return True
     if any(sub in cn for sub in _RATE_PCT_SUBSTRINGS):
         return True
     if re.search(r"(_rate|_pct|_percent|_percentage|_ratio)(?:_|$)", cn):
+        return True
+    if "delivery" in cn and ("day" in cn or "days" in cn):
+        return True
+    if cn.endswith("_days") or cn.endswith(" days"):
+        return True
+    if cn.endswith("_hours") or cn.endswith("_minutes"):
+        return True
+    if any(k in cn for k in ("duration", "latency", "turnaround", "lead time", "lead_time")):
         return True
     if "resolution" in cn and any(k in cn for k in ("hour", "minute", "time", "duration")):
         return True

@@ -62,6 +62,7 @@ HR_CARD_TITLES = frozenset(
 SALES_CARD_PATTERNS = (
     "Total Revenue",
     "Average Revenue",
+    "Average Sales per Record",
     "Average Revenue per Record",
     "Total Sales",
     "Total Order Value",

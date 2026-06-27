@@ -510,6 +510,7 @@ import {
   saasRequestHeaders,
   setPlanTier,
 } from "@/lib/saas-session";
+import { buildOverviewDashboardContextChips } from "@/lib/overview-dashboard-context-chips";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
 import { OverviewLandingHero } from "./components/home/overview-landing-hero";
 import { OverviewLandingTrustRow } from "./components/home/overview-landing-trust-row";
@@ -8757,6 +8758,24 @@ function HomeInner() {
     }));
   }, [autoDashboard]);
 
+  const overviewDashboardContextChips = useMemo(
+    () =>
+      buildOverviewDashboardContextChips({
+        datasetKind: datasetKind || "",
+        mappingDomain: mappingMetadata?.domain ?? null,
+        dashboardFilters,
+        filterBreadcrumb,
+        chartCount: overviewRenderableCharts.length,
+      }),
+    [
+      datasetKind,
+      mappingMetadata?.domain,
+      dashboardFilters,
+      filterBreadcrumb,
+      overviewRenderableCharts.length,
+    ]
+  );
+
   const dataPreviewDerivationsActive =
     activeTab === "preview" || activeTab === "export";
 
@@ -12435,11 +12454,11 @@ function HomeInner() {
                   {(autoDashboard?.cards?.length ?? 0) > 0 &&
                   (autoDashboard?.charts?.length ?? 0) > 0 ? (
                     <div className="flex flex-wrap gap-2 mb-2">
-                      {autoDashboardKpiRows.map(({ card }, idx) => (
+                      {overviewDashboardContextChips.map((chip) => (
                         <OverviewInlineKpiChip
-                          key={`dash-kpi-${idx}-${card.title}`}
-                          title={card.title}
-                          value={card.value}
+                          key={`dash-ctx-${chip.title}`}
+                          title={chip.title}
+                          value={chip.value}
                         />
                       ))}
                     </div>
