@@ -289,6 +289,61 @@ function clampDomainToBounds(
   return [lo, hiRaw];
 }
 
+/** Whether stored values are 0–1 fractions displayed as percentage points. */
+export function barRateValuesOnFractionScale(
+  maxRaw: number,
+  maxDisplay: number
+): boolean {
+  return maxRaw <= 1.05 && maxDisplay <= 100 && maxDisplay > maxRaw * 5;
+}
+
+/**
+ * Clean percentage-point axis cap for zero-baseline bar charts.
+ * Keeps domainMin at 0 while avoiding excessive headroom on low single-digit rates.
+ */
+export function resolveBarChartRateDisplayCap(maxDisplay: number): number {
+  if (!Number.isFinite(maxDisplay) || maxDisplay <= 0) return 1;
+
+  if (maxDisplay <= 5) {
+    const padded = maxDisplay * 1.22;
+    if (padded <= 5.25) return 5;
+    if (padded <= 5.75) return 5.5;
+    return snapBarDomainBound(padded, 1, "ceil");
+  }
+
+  if (maxDisplay <= 10) {
+    const padded = maxDisplay * 1.15;
+    const step = maxDisplay <= 8 ? 0.5 : 1;
+    return snapBarDomainBound(padded, step, "ceil");
+  }
+
+  if (maxDisplay <= 50) {
+    const padded = maxDisplay * (1 + DEFAULT_BAR_RIGHT_PAD_RATIO);
+    return snapBarDomainBound(padded, 1, "ceil");
+  }
+
+  return maxDisplay * (1 + DEFAULT_BAR_RIGHT_PAD_RATIO);
+}
+
+/** Raw-axis upper bound for zero-baseline percent/rate bar charts. */
+export function resolveBarChartRateUpperBound(args: {
+  maxDisplay: number;
+  maxRaw: number;
+}): number {
+  const { maxDisplay, maxRaw } = args;
+  if (!Number.isFinite(maxDisplay) || !Number.isFinite(maxRaw)) return maxRaw;
+
+  if (maxDisplay > 50) {
+    return maxRaw * (1 + DEFAULT_BAR_RIGHT_PAD_RATIO);
+  }
+
+  const capDisplay = resolveBarChartRateDisplayCap(maxDisplay);
+  if (barRateValuesOnFractionScale(maxRaw, maxDisplay)) {
+    return capDisplay / 100;
+  }
+  return capDisplay;
+}
+
 /** Smart bar value-axis domain — tight scale for low-spread / percent metrics. */
 export function resolveOverviewBarValueDomain(
   rows: readonly { value: number }[],
@@ -429,6 +484,20 @@ export function resolveOverviewBarValueDomain(
         boundedBounds
       );
     }
+  }
+
+  // Zero-baseline rate bars: replace tight-domain / executive-rounding inflation
+  // (e.g. 3.4–4.1% → 9.1% top tick) with modest headroom and clean percent ticks.
+  if (
+    isBarChartKind &&
+    isPercent &&
+    !isScoreOrRatingLike &&
+    !hasBoundedRatingScale &&
+    domainMin === 0 &&
+    minRaw >= 0
+  ) {
+    const refinedMax = resolveBarChartRateUpperBound({ maxDisplay, maxRaw });
+    domainMax = Math.max(maxRaw * 1.01, refinedMax);
   }
 
   if (domainMax <= domainMin) {
