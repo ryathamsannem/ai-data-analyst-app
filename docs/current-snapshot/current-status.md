@@ -1,100 +1,51 @@
 # Current Status
 
-**Snapshot date:** June 20, 2026  
-**Baseline:** Chart Premium Parity phase complete  
-**Branch:** working tree at snapshot time  
+**Snapshot date:** June 27, 2026
+**Phase:** After Overview Pass 5A.3 (H-Bar/V-Bar visual parity + cross-domain mapping QA)
+**Branch:** `DEV`
+**Latest commit:** `f648151` — `f648151ba730de39eec921d810014aa1abd6783d` ("AI Summary repetitive kpi fix")
+
+> Note: the Overview Pass 5A.x work (including 5A.3) is in the **working tree**, not yet committed.
+> `DEV` is ahead of `origin/DEV` by 2 commits. The 5A.x changes show as modified/untracked files
+> (`backend/main.py`, `backend/services/*`, `frontend/app/page.tsx`, `frontend/lib/*`, new tests).
 
 ---
 
-## Production Readiness Status
+## What is working
 
-| Area | Readiness | Notes |
-|------|-----------|-------|
-| **Demo / pilot UX** | High | Modern SaaS dashboard; stable Overview, Data Preview, AI Insights, Charts, Export tabs |
-| **Chart visual parity** | High | H-Bar premium baseline; V-Bar/Line/Area/Scatter aligned on session surfaces; Overview mini-cards polished |
-| **Export reliability** | High | Artifact PNG capture + readiness gates; PDF prefers `ChartArtifact` over legacy DOM capture |
-| **Multi-user production** | Low | No auth; in-memory dataset per process; client-spoofable plan tier |
-| **Backend scale** | Low | Single-process pandas; no durable usage DB; limited integration tests |
-| **Automated E2E** | Low | Strong unit coverage; no Playwright export regression suite |
-
----
-
-## Major Completed Features
-
-### Product surfaces
-
-| Surface | Status |
-|---------|--------|
-| **Overview** | Upload, KPI cards, filters, auto-dashboard grid, drill path, per-card PNG export |
-| **Data Preview** | Paginated table, schema/quality metadata, search/sort, profile popovers |
-| **AI Insights** | Ask AI, alignment gates, suggested questions, executive cards, AI Read, insight PDF |
-| **Charts tab** | Session timeline, selected chart preview, SmartChartInsightPanel, PNG export |
-| **Export** | Executive PDF with section selection, branding, quota preflight |
-
-### Chart platform (Chart Premium Parity phase)
-
-1. **H-Bar premium baseline** — category labels on `YAxis.width`; outer `margin.left` ~10–14px only.
-2. **V-Bar alignment** — Overview live centering; session detail outer margins; PDF content-tight embed.
-3. **Line / Area / Scatter** — occupancy-tuned Y domains on live/session; left-gutter fix on Charts/AI/PDF.
-4. **Capture artifact platform** — `ChartPngCaptureRequest` → `ChartCaptureHost` → `captureChartPngArtifact()` → `ChartArtifact`.
-5. **Presentation profiles** — per-surface read-only profiles (`overviewLive`, `overviewPng`, `chartsLive`, `chartsPng`, `aiInsightsLive`, `pdfChart`).
-6. **PDF embed sizing** — kind-aware `resolvePdfChartEmbedPolicy()`; content-tight composite for scatter and V-Bar.
+- **Overview tab** — upload, KPI cards, filters, auto-dashboard grid, drill path, per-card PNG export.
+- **Banking default charts** — no default scatter; lifecycle (`account_age_months`) demoted; segment/product breakdowns, delinquency, utilization, loan/deposit/spend trends preferred (Passes 5A / 5A.1).
+- **Banking / Financial Services labeling** — consistent "Banking / Financial Services" dataset type across KPI section, auto-dashboard chips, data setup, AI summary; monthly snapshot cadence detected; no "Sales / commercial" leak (Pass 5A.2).
+- **Cross-domain mapping** — retail, banking (gold + financial services), HR all resolve correct domain, type label, primary/secondary metric, date column, and main dimension (Pass 5A.3, Issue 3).
+- **Bar value-axis formatting** — currency/amount ticks compact to `K`/`M` (e.g. `127.5M`); percent/rate ticks read as points (`35%`, `3.4%`); V-Bar rate gap chips show percentage points (`Gap: 1.0 pp`) (Pass 5A.3, Issues 1 & 2).
+- **AI Insights** — structured reasoning blocks, "Why this matters" cards, narrative QA, follow-up reasoning, recommended next actions, insight result restore (see [`ai-insights-status.md`](./ai-insights-status.md)).
+- **Tests/build** — frontend 668/668 vitest pass; `npm run build` clean; backend targeted domain suites 37/37 pass.
 
 ---
 
-## Test / Build Status (snapshot time)
+## What is still unresolved
 
-```bash
-cd frontend && npm run test   # 71 files / 546 tests passed
-cd frontend && npm run build  # passed (Next.js 16.2.4)
-```
-
-Backend: FastAPI + pandas; no automated suite counted in this snapshot.
+- **H-Bar / V-Bar visual parity (NOT fully achieved).** Overview Pass 5A.3 adjusted H-Bar radius/thickness and axis formatting, but the horizontal bar still does **not** visually match the V-Bar premium finish in the latest manual screenshots. Constants were aligned proportionally, yet the rendered result still differs. See [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).
+- **Pre-existing backend failures** — 6 `pytest` failures exist in the full suite (sales showcase diversity/scatter, banking suggested-questions utilization trend, marketing weak-title). Proven pre-existing (fail identically on reverted `main.py`); out of scope for 5A.3.
 
 ---
 
-## Open Items (summary)
+## Overview Pass 5A.3 — status
 
-See [`open-items.md`](./open-items.md) for the full list. Highlights:
-
-- **Histogram review** — implemented as styled V-Bar; dedicated premium pass pending
-- **Large dataset performance** — future optimization (100k+ row datasets)
-- **Dual renderer pipelines** — Overview inline Recharts vs shared `ChartRenderer` (intentional; drift managed by shared helpers)
-- **Production platform** — auth, multi-tenant isolation, durable usage tracking
+Pass 5A.3 was **completed** (visual constants, axis formatting, V-Bar rate formatting, cross-domain mapping QA, tests, build all green) **but H-Bar/V-Bar visual parity still needs review.** The next session should start with a geometry-level investigation rather than another constant tweak.
 
 ---
 
-## Known Limitations
-
-- **Two chart pipelines:** Overview mini-cards render inline in `page.tsx`; Charts / AI Insights / PDF use `ChartRenderer`. Shared helpers reduce drift; surfaces are not a single DOM path.
-- **Overview vs session styling:** Overview Area live uses higher `fillOpacity` (0.26) than PNG (0.18); export stroke weights differ by design.
-- **PDF generation:** Main-thread jsPDF + PNG embed; legacy DOM capture retained as fallback.
-- **Pilot constraints:** Free tier file/row/AI/PDF limits; no payment integration.
-- **Histogram:** No separate Recharts chart type; histogram semantics via `barCategoryGap: 2` and flat-top radius on vertical bars.
-
----
-
-## Safe Change Boundaries
-
-Per root [`AGENTS.md`](../../AGENTS.md):
-
-- Incremental fixes only — do not broad-redesign working Overview, Insights, Charts, or PDF layouts.
-- Preserve AI Insights alignment gates (`insightChartMatchesCurrentQuestion`, `chartSnapshotMatchesQuestionIntent`).
-- Preserve shell widths: Insights 760/850/900px plan viewports; Charts ≤860px; Overview mini 360px + boosts.
-- H-Bar internals, Donut/Pie routing, and chart-kind semantics are frozen unless explicitly scoped.
-
----
-
-## Snapshot Doc Index
+## Snapshot Doc Index (this snapshot)
 
 | File | Purpose |
 |------|---------|
 | [`current-status.md`](./current-status.md) | This file |
-| [`chart-rendering-summary.md`](./chart-rendering-summary.md) | Per-kind, per-surface rendering map |
-| [`chart-premium-parity-status.md`](./chart-premium-parity-status.md) | Completed parity work and design principles |
-| [`architecture-map.md`](./architecture-map.md) | Pipelines and file ownership |
-| [`file-map.md`](./file-map.md) | Chart-related file inventory |
-| [`open-items.md`](./open-items.md) | Remaining work only |
-| [`changelog-premium-chart-phase.md`](./changelog-premium-chart-phase.md) | Phase changelog |
+| [`overview-pass-status.md`](./overview-pass-status.md) | Overview Passes 5A → 5A.3 detail |
+| [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md) | Unresolved H-Bar/V-Bar parity items + constants |
+| [`ai-insights-status.md`](./ai-insights-status.md) | AI Insights completed work |
+| [`file-map.md`](./file-map.md) | Key files by area |
+| [`open-items.md`](./open-items.md) | Prioritized open items (P0/P1/P2) |
+| [`validation-results.md`](./validation-results.md) | Latest test/build/manual results |
 
-**Prior snapshot:** [`docs/latest-project-snapshot/`](../latest-project-snapshot/) (June 18, 2026 — pre left-gutter / occupancy pass).
+Prior parity-phase docs remain in this folder: `chart-rendering-summary.md`, `chart-premium-parity-status.md`, `architecture-map.md`, `changelog-premium-chart-phase.md`.

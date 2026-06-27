@@ -334,6 +334,13 @@ export function resolveOverviewBarValueDomain(
     boundedBounds,
   });
 
+  // Bar charts encode absolute value via bar length — a truncated axis is misleading
+  // for rate/percent metrics where the minimum is low (< 50pp). Scatter and trend
+  // charts benefit from tight domains (position = relative value), but bar charts do not.
+  const isBarChartKind =
+    options.presentationKind === "bar" ||
+    options.presentationKind === "bar_horizontal";
+
   const padRatio =
     options.rightPadRatio ?? DEFAULT_BAR_RIGHT_PAD_RATIO;
   let domainMin: number;
@@ -378,6 +385,31 @@ export function resolveOverviewBarValueDomain(
     domainMin = minRaw - pad;
     domainMax = maxRaw + pad;
     if (minRaw >= 0) domainMin = Math.max(0, domainMin);
+  }
+
+  // Post-process: bar charts encode absolute value via bar length, so a non-zero baseline
+  // is misleading for normal positive metrics. Force zero baseline for bar/horizontal-bar
+  // unless:
+  //   1. Score/rating/NPS-like metrics — zero has no natural origin (satisfaction 4.0–4.5).
+  //   2. 0-5 or 0-10 bounded rating scales — safety net for unlabeled rating metrics.
+  //   3. Values include negatives (delta/change charts) — guarded by minRaw >= 0.
+  // Callers without presentationKind (legacy / non-bar surfaces) skip this override.
+  const isScoreOrRatingLike = metricLabelImpliesScoreLike(
+    options.metricLabel ?? null,
+    options.chartTitle ?? null
+  );
+  const hasBoundedRatingScale =
+    boundedBounds != null &&
+    (boundedBounds.kind === "rating5" || boundedBounds.kind === "rating10");
+
+  if (
+    isBarChartKind &&
+    minRaw >= 0 &&
+    !isScoreOrRatingLike &&
+    !hasBoundedRatingScale &&
+    domainMin > 0
+  ) {
+    domainMin = 0;
   }
 
   if (options.executiveRounding) {

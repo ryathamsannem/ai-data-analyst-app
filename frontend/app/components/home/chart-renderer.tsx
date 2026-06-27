@@ -65,6 +65,7 @@ import {
   resolveTrendValueAxisProps,
 } from "@/lib/cartesian-chart-decisions";
 import {
+  formatOverviewBarValueAxisTick,
   formatOverviewLineYAxisTick,
   formatOverviewScatterAxisTick,
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
@@ -84,6 +85,14 @@ import {
 } from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
 import { formatRadialLegendEntry, resolveRadialPieEdgeProps } from "@/lib/radial-chart-format";
+import {
+  HORIZONTAL_BAR_END_RADIUS,
+  HORIZONTAL_BAR_STACKED_MAX_SIZE,
+  HORIZONTAL_BAR_STACKED_RADIUS,
+  resolveHorizontalBarCategoryGap,
+  resolveHorizontalBarGap,
+  resolveHorizontalBarMaxSize,
+} from "@/lib/horizontal-bar-visual";
 import { buildChartCartesianTooltipHandlers, chartTooltipMetricLabel, formatChartTooltipCategoryLine } from "@/lib/chart-tooltip-format";
 import { type MetricFormatContext } from "@/lib/metric-value-format";
 import {
@@ -249,6 +258,14 @@ function ChartRendererInner({
       presentationKind: rKind,
     }),
     [rAxes.valueAxis, rKind]
+  );
+
+  // Metric-aware bar value ticks: currency/large numbers compact to K/M and
+  // percent/rate metrics read as points (35%, 3.4%) instead of raw decimals.
+  const barValueTickFormatter = useMemo(
+    () => (tick: number) =>
+      formatOverviewBarValueAxisTick(tick, rData, metricTooltipCtx),
+    [rData, metricTooltipCtx]
   );
 
   const cartesianTooltip = useMemo(
@@ -495,6 +512,14 @@ function ChartRendererInner({
         <BarChart
           layout="vertical"
           data={rData}
+          barCategoryGap={resolveHorizontalBarCategoryGap({
+            categoryCount: rData.length,
+            detailLayout,
+          })}
+          barGap={resolveHorizontalBarGap({
+            categoryCount: rData.length,
+            detailLayout,
+          })}
           margin={{
             left: hmBalanced.marginLeft,
             right: hmBalanced.marginRight,
@@ -567,8 +592,14 @@ function ChartRendererInner({
               dataKey={k}
               name={stackedSpec.seriesLabels[k] ?? k}
               fill={PIE_COLORS[i % PIE_COLORS.length]}
-              radius={[0, 6, 6, 0]}
-              maxBarSize={compact ? 22 : detailLayout ? 32 : 26}
+              radius={HORIZONTAL_BAR_STACKED_RADIUS}
+              maxBarSize={
+                compact
+                  ? HORIZONTAL_BAR_STACKED_MAX_SIZE.compact
+                  : detailLayout
+                    ? HORIZONTAL_BAR_STACKED_MAX_SIZE.detail
+                    : HORIZONTAL_BAR_STACKED_MAX_SIZE.default
+              }
               isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
               cursor={canInsightDrill ? "pointer" : "default"}
@@ -1003,6 +1034,10 @@ function ChartRendererInner({
         <BarChart
           layout="vertical"
           data={rData}
+          barCategoryGap={resolveHorizontalBarCategoryGap({
+            categoryCount: rData.length,
+            detailLayout,
+          })}
           margin={{
             left: hmBalanced.marginLeft,
             right: hmBalanced.marginRight,
@@ -1023,7 +1058,7 @@ function ChartRendererInner({
             tick={{ fontSize: 11, fill: AXIS_TICK }}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
-            tickFormatter={valueTickFormatter}
+            tickFormatter={barValueTickFormatter}
           >
             {hb.showValueAxisTitle ? (
               <Label
@@ -1056,8 +1091,11 @@ function ChartRendererInner({
           <Bar
             dataKey="value"
             fill="#6366f1"
-            radius={[0, 8, 8, 0]}
-            maxBarSize={compact ? 28 : detailLayout ? 48 : 36}
+            radius={HORIZONTAL_BAR_END_RADIUS}
+            maxBarSize={resolveHorizontalBarMaxSize({
+              compact,
+              detailLayout,
+            })}
             activeBar={{ opacity: 0.88 }}
             isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
@@ -1328,7 +1366,7 @@ function ChartRendererInner({
         </XAxis>
         <YAxis
           tick={AXIS_Y_TICK_VAL}
-          tickFormatter={valueTickFormatter}
+          tickFormatter={barValueTickFormatter}
           axisLine={{ stroke: CHART_AXIS_LINE }}
           tickLine={{ stroke: CHART_AXIS_LINE }}
           width={verticalValueLayout.yAxisWidth}

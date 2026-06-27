@@ -202,3 +202,60 @@ describe("resolveScatterValueAxisProps — shared entry", () => {
     expect(a!.y.allowDataOverflow).toBe(false);
   });
 });
+
+describe("bar domain parity — ChartRenderer / session pipeline", () => {
+  const profitRows = [
+    { name: "Engineering", value: 205_126 },
+    { name: "Sales", value: 210_000 },
+    { name: "Marketing", value: 215_087 },
+  ];
+  const ordersRows = [
+    { name: "Bengaluru", value: 1008 },
+    { name: "Mumbai", value: 1015 },
+    { name: "Delhi", value: 1002 },
+    { name: "Pune", value: 1011 },
+  ];
+
+  it("Charts/AI Insights live V-Bar revenue starts at 0 via session pipeline", () => {
+    const props = resolveCartesianBarValueAxisProps({
+      chartKind: "bar",
+      rows: profitRows,
+      chartTitle: "Profit by Department",
+      metricLabel: "Profit",
+      context: { pipeline: "session", capture: false },
+    });
+    expect(props!.domain![0]).toBe(0);
+    expect(props!.domain![1]).toBeGreaterThan(215_087);
+  });
+
+  it("Charts/AI Insights live H-Bar orders/count starts at 0 via session pipeline", () => {
+    const props = resolveCartesianBarValueAxisProps({
+      chartKind: "bar_horizontal",
+      rows: ordersRows,
+      chartTitle: "Orders by City",
+      metricLabel: "Orders",
+      context: { pipeline: "session", capture: false },
+    });
+    expect(props!.domain![0]).toBe(0);
+    expect(props!.domain![1]).toBeGreaterThan(1015);
+  });
+
+  it("Overview live path matches session fallback for the same profit data", () => {
+    const overview = resolveCartesianBarValueAxisProps({
+      chartKind: "bar",
+      rows: profitRows,
+      chartTitle: "Profit by Department",
+      metricLabel: "Profit",
+      context: { pipeline: "overview", capture: false },
+    });
+    const session = resolveCartesianBarValueAxisProps({
+      chartKind: "bar",
+      rows: profitRows,
+      chartTitle: "Profit by Department",
+      metricLabel: "Profit",
+      context: { pipeline: "session", capture: false },
+    });
+    expect(overview!.domain).toEqual(session!.domain);
+    expect(overview!.domain![0]).toBe(0);
+  });
+});

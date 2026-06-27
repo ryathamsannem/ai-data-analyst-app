@@ -203,7 +203,13 @@ def executive_domain_to_kpi_domain(domain: ExecutiveDomain) -> str:
         return "operations"
     if domain in ("retail", "ecommerce"):
         return "ecommerce"
-    if domain in ("sales", "geography", "banking", "marketing", "finance_fpa", "healthcare", "customer_support"):
+    if domain == "banking":
+        return "banking"
+    if domain == "finance_fpa":
+        return "finance"
+    if domain == "marketing":
+        return "marketing"
+    if domain in ("sales", "geography", "healthcare", "customer_support"):
         return "sales"
     return "generic"
 

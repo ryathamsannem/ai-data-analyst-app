@@ -98,6 +98,17 @@ describe("golden dataset AI summary quality", () => {
     expect(top.some((b) => /\baccount age months trend\b/i.test(b))).toBe(false);
   });
 
+  it("golden retail dedupes duplicate Electronics category conclusions", () => {
+    const retail = GOLDEN_PAYLOADS.find((p) => p.domain === "retail_gold_10000")!;
+    const top = partitionOverviewAiSummaryBullets(bulletsFor(retail)).initial;
+    const electronics = top.filter(
+      (b) =>
+        /electronics/i.test(b) &&
+        /(share|dominates|leading|highest|category sales)/i.test(b)
+    );
+    expect(electronics.length).toBeLessThanOrEqual(1);
+  });
+
   it("golden retail dedupes KPI top-category echo from chart leader", () => {
     const retail = GOLDEN_PAYLOADS.find((p) => p.domain === "retail_gold_10000")!;
     const bullets = bulletsFor(retail);

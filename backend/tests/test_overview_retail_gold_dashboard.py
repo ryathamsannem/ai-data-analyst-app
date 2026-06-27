@@ -73,6 +73,25 @@ class TestRetailGoldOverviewCharts(unittest.TestCase):
         main.dataset_profile = None
         main.column_mapping = {k: None for k in main.column_mapping}
 
+    def test_prefers_sales_over_quantity_for_customer_segment(self) -> None:
+        _load_retail_gold()
+        dash = main.build_auto_dashboard()
+        titles = [str(c.get("title") or "") for c in dash.get("charts") or []]
+        joined = " | ".join(titles).lower()
+        self.assertNotIn(
+            "quantity by customer segment",
+            joined,
+            msg=f"Expected sales/profit segment chart, got: {titles}",
+        )
+        self.assertTrue(
+            any(
+                "customer segment" in t.lower()
+                and ("sales" in t.lower() or "profit" in t.lower())
+                for t in titles
+            ),
+            msg=titles,
+        )
+
     def test_no_invalid_year_measure_charts(self) -> None:
         _load_retail_gold()
         dash = main.build_auto_dashboard()

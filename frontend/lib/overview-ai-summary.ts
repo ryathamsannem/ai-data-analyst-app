@@ -964,6 +964,14 @@ function scoreBreakdownChartInsight(args: {
     });
   }
 
+  if (
+    (args.domain === "retail" || args.domain === "sales") &&
+    /\b(quantity|units|qty)\b/.test(ctx.metricKey) &&
+    /\b(customer segment|segment)\b/.test(ctx.dimensionKey)
+  ) {
+    score -= 38;
+  }
+
   return clampInsightScore(score);
 }
 
@@ -1274,6 +1282,26 @@ function isDuplicateOverviewInsight(
     ) {
       return true;
     }
+    if (
+      candidate.entity &&
+      existing.entity &&
+      candidate.entity === existing.entity
+    ) {
+      const categoryKinds = new Set(["leader", "impact", "concentration"]);
+      if (
+        categoryKinds.has(candidate.kind) &&
+        categoryKinds.has(existing.kind)
+      ) {
+        const blob = `${candidate.text} ${existing.text}`.toLowerCase();
+        if (
+          /\b(product category|category sales|sales amount share|dominates category)\b/.test(
+            blob
+          )
+        ) {
+          return true;
+        }
+      }
+    }
   }
   return false;
 }
@@ -1547,14 +1575,23 @@ function collectBusinessImpactLines(args: {
     if (topCategory && !isNaDisplayValue(String(topCategory.value))) {
       const categoryName = truncateOverviewPhrase(String(topCategory.value), 28);
       const categoryKey = normalizeInsightKey(categoryName);
-      push({
-        text: `${categoryName} dominates category sales in the current slice.`,
-        score: 94,
-        topicKey: `impact|sales|category|${categoryKey}`,
-        topicCategory: "concentration",
-        outcomeKey: `category_dominance|${categoryKey}`,
-        entity: categoryKey,
+      const hasCategoryLeader = args.charts.some((chart) => {
+        if (!/product category/i.test(chart.title)) return false;
+        const pairs = chartPairs(chart);
+        if (pairs.length < 2) return false;
+        const hi = pairs.reduce((a, b) => (b.value > a.value ? b : a));
+        return normalizeInsightKey(hi.name) === categoryKey;
       });
+      if (!hasCategoryLeader) {
+        push({
+          text: `${categoryName} dominates category sales in the current slice.`,
+          score: 88,
+          topicKey: `impact|sales|category|${categoryKey}`,
+          topicCategory: "concentration",
+          outcomeKey: `category_dominance|${categoryKey}`,
+          entity: categoryKey,
+        });
+      }
     }
 
     const revTrend =

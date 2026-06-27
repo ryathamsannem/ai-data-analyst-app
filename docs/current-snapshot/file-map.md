@@ -1,8 +1,75 @@
 # Chart-Related File Map
 
-**Snapshot:** June 20, 2026  
+**Snapshot:** June 27, 2026 (updated after Overview Pass 5A.3)
 
-Paths relative to `frontend/` unless noted.
+Paths relative to repo root.
+
+---
+
+## Key files by area (5A.3 snapshot)
+
+### Overview chart selection (backend)
+| File | Purpose |
+|------|---------|
+| `backend/services/auto_dashboard_opportunities.py` | Chart discovery/scoring/pruning; banking/finance preferences; lifecycle + geographic-risk pruning; scatter penalty |
+| `backend/main.py` | `build_auto_dashboard`, `_dash_priority_metric_columns`, time-grain (`_detect_monthly_snapshot_cadence`, `_adaptive_time_series_grouped`), dataset type label |
+| `backend/services/executive_kpi_cards.py` | `infer_executive_domain`, `executive_domain_to_auto_kind`, `executive_domain_to_kpi_domain` |
+
+### Overview chart rendering (frontend)
+| File | Purpose |
+|------|---------|
+| `frontend/app/page.tsx` | Overview inline Recharts (H-Bar/V-Bar/Line/Area/Scatter mini-cards); `barValueTickFormatter`; drill; PNG/PDF orchestration |
+| `frontend/app/components/home/chart-renderer.tsx` | Shared renderer (AI Insights / Charts / capture); H-Bar + V-Bar branches; `barValueTickFormatter` |
+| `frontend/lib/overview-dashboard-chart-renderable.ts` | Frontend Overview chart filtering safety net |
+| `frontend/lib/overview-premium-axis-domain.ts` | `formatOverviewBarValueAxisTick`, line/scatter tick formatters, premium domains |
+| `frontend/lib/cartesian-chart-decisions.ts` | `resolveCartesianBarValueAxisProps` (H-Bar/V-Bar value-axis props) |
+
+### H-Bar / V-Bar visual constants
+| File | Purpose |
+|------|---------|
+| `frontend/lib/horizontal-bar-visual.ts` | `HORIZONTAL_BAR_END_RADIUS`, `HORIZONTAL_BAR_MAX_SIZE`, stacked variants |
+| `frontend/lib/shared-chart-layout.ts` | `SHARED_CHART_LAYOUT.verticalBar` gaps/category rules |
+| `frontend/lib/overview-dashboard-export.ts` | `OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE`, `OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE` |
+| (V-Bar radius/maxBarSize literals) | inline in `page.tsx` and `chart-renderer.tsx` |
+
+### AI Summary
+| File | Purpose |
+|------|---------|
+| `frontend/lib/overview-ai-summary.ts` | Overview AI summary composition + QA |
+| `frontend/lib/overview-ai-summary-golden.test.ts` | Golden AI summary tests |
+| `frontend/lib/resolved-dataset-type-label.ts` | Shared dataset-type label resolver (summary/chips/data-setup) |
+
+### AI Insights reasoning / recommendations
+| File | Purpose |
+|------|---------|
+| `frontend/lib/reasoning-blocks.ts` | Structured reasoning blocks |
+| `frontend/lib/recommended-actions.ts` | Recommended next actions |
+| `frontend/lib/ai-follow-up-suggestions.ts` | "Why" follow-up reasoning chips |
+| `frontend/lib/ai-conversation-context.ts` | Conversation continuity context |
+| `frontend/lib/insight-result-history.ts` | Recent insight result restore |
+| `frontend/lib/insight-chart-alignment.ts` | Alignment gates (viz/AI Read/export) |
+
+### Mapping / domain detection
+| File | Purpose |
+|------|---------|
+| `backend/main.py` | `compute_semantic_column_mapping`, role scorers (`_sales_/_profit_/_product_/_date_role_keyword_score`), `_infer_business_domain` |
+| `backend/services/executive_kpi_cards.py` | Executive domain inference + KPI/auto-kind mapping |
+| `frontend/lib/resolved-dataset-type-label.ts` | Frontend dataset-type label resolution |
+| `frontend/app/pdf-report.ts` | `datasetKindLabel` |
+
+### Tests (5A.x)
+| File | Covers |
+|------|--------|
+| `backend/tests/test_cross_domain_mapping_qa.py` | Cross-domain mapping/domain/label QA (retail, banking gold, banking FS, HR) |
+| `backend/tests/test_overview_banking_gold_dashboard.py` | Banking gold default charts (5A / 5A.1) |
+| `backend/tests/test_overview_banking_financial_services.py` | Banking FS label/cadence/scatter (5A.2) |
+| `backend/tests/test_overview_retail_gold_dashboard.py` | Retail default charts |
+| `backend/tests/test_executive_kpi_domains.py` | Executive KPI domain mapping |
+| `frontend/lib/overview-premium-axis-domain.test.ts` | `formatOverviewBarValueAxisTick` + domains |
+| `frontend/lib/overview-dash-chart-insights.test.ts` | Rate breakdown chips (% + `pp` gap) |
+| `frontend/lib/horizontal-bar-visual.test.ts` | H-Bar radius/thickness constants |
+| `frontend/lib/resolved-dataset-type-label.test.ts` | Dataset-type label resolver |
+| `frontend/lib/overview-dashboard-context-chips.test.ts` | Context chips + type label |
 
 ---
 

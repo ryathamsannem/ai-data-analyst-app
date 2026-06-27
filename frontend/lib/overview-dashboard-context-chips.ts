@@ -1,4 +1,4 @@
-import { datasetKindLabel } from "@/app/pdf-report";
+import { resolveOverviewDatasetTypeLabel } from "@/lib/resolved-dataset-type-label";
 
 export type OverviewDashboardContextChip = {
   title: string;
@@ -8,21 +8,18 @@ export type OverviewDashboardContextChip = {
 /** Context-only chips for Auto Dashboard Charts — not KPI card duplicates. */
 export function buildOverviewDashboardContextChips(args: {
   datasetKind: string;
+  typeLabel?: string | null;
   mappingDomain?: string | null;
   dashboardFilters: readonly unknown[];
   filterBreadcrumb: string;
   chartCount: number;
 }): OverviewDashboardContextChip[] {
   const chips: OverviewDashboardContextChip[] = [];
-  const domainKind = (args.datasetKind || "").trim().toLowerCase();
-  const datasetTypeLabel =
-    domainKind && domainKind !== "generic"
-      ? datasetKindLabel(args.datasetKind)
-      : args.mappingDomain
-        ? args.mappingDomain
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (ch) => ch.toUpperCase())
-        : datasetKindLabel("generic");
+  const datasetTypeLabel = resolveOverviewDatasetTypeLabel({
+    datasetKind: args.datasetKind,
+    typeLabel: args.typeLabel,
+    mappingDomain: args.mappingDomain,
+  });
   chips.push({ title: "Dataset", value: datasetTypeLabel });
 
   const activeFilterCount =

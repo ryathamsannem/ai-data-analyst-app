@@ -1,84 +1,70 @@
-# Open Items
+# Open Items (Prioritized)
 
-**Snapshot:** June 20, 2026  
+**Snapshot:** June 27, 2026 (after Overview Pass 5A.3) · Branch `DEV` · Latest commit `f648151`.
 
-Only **real remaining work** is listed. Completed Chart Premium Parity items are documented in [`chart-premium-parity-status.md`](./chart-premium-parity-status.md) and [`changelog-premium-chart-phase.md`](./changelog-premium-chart-phase.md) — not repeated here.
-
----
-
-## Pending Product / Chart Work
-
-### Histogram premium review
-
-| Field | Detail |
-|-------|--------|
-| **Status** | Pending |
-| **Current state** | Histogram renders as styled vertical bar (`barCategoryGap: 2`, flat top radius, wider bars) in both Overview inline path and `ChartRenderer` |
-| **Gap** | No dedicated occupancy/margin pass equivalent to Line/Area/Scatter; uses V-Bar layout helpers |
-| **Scope when started** | Histogram-only styling and domain review; do not regress V-Bar or change kind routing |
+Only **real remaining work** is listed. Completed Overview 5A.x work is in
+[`overview-pass-status.md`](./overview-pass-status.md); completed chart-parity-phase work is in
+`chart-premium-parity-status.md` / `changelog-premium-chart-phase.md`.
 
 ---
 
-## Future / Non-Blocking
+## P0 — Do first
 
-### Large dataset performance optimization
+### 1. H-Bar / V-Bar visual parity — root-cause investigation
+- **Status:** UNRESOLVED (top priority).
+- H-Bar still does not visually match the V-Bar premium finish despite 5A.3 radius/thickness/axis changes.
+- **Action:** compare *rendered* plot bands and bar geometry (SVG measurements) for a V-Bar vs H-Bar on the
+  same data **before** changing any constants. Detail + constants in
+  [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).
+- **Do not** keep blindly editing constants.
 
-| Field | Detail |
-|-------|--------|
-| **Status** | Future |
-| **Context** | Pilot supports up to 100k preview rows (paid tier); cold-start and filter latency documented in `docs/large-dataset-validation-*.md` |
-| **Not in scope now** | Virtualization of full analytics pipeline, server-side aggregation cache, WebWorker chart prep |
-
-### Browser E2E export regression suite
-
-| Field | Detail |
-|-------|--------|
-| **Status** | Future |
-| **Context** | 546 unit tests cover domain/margin/capture logic; no Playwright matrix for live PNG/PDF pixel regression |
-| **Reference** | `docs/pdf-export-final-validation-runbook.md`, Phase 7 PDF fixtures |
-
----
-
-## Platform / Production Gaps
-
-| Item | Severity | Notes |
-|------|----------|-------|
-| Authentication & tenant isolation | High for production | Session-only; no user accounts |
-| Durable usage metering | Medium | PDF/AI quota client-side with API enforcement |
-| Multi-tenant dataset storage | High for production | In-memory `df` per backend process |
-| Payment integration | N/A pilot | Pricing UI informational only |
+### 2. Confirm Overview default charts across domains
+- **Status:** Validated via backend probe + tests; needs a manual UI confirmation pass.
+- Confirm Overview defaults look correct on upload for `retail_gold_10000.csv`, `banking_gold_10000.csv`,
+  `banking_financial_services.csv`, `hr_gold_5000.csv` (type label, no default scatter for banking, monthly
+  trends, banking risk/utilization by segment/product, HR salary/department).
+- **Note:** HR auto-dashboard discovery can still surface weaker "Monthly Age Trend" / "Records by Age Band"
+  charts (discovery layer, separate from mapping) — verify acceptability or schedule a narrow HR pass.
 
 ---
 
-## Technical Debt (accepted)
+## P1 — Production Readiness Phase 1
+
+### Error handling / loading states
+- Audit upload, mapping, AI ask, export flows for robust error + loading UX (empty/failed/slow states).
+
+### Upload / mapping edge cases
+- Validate odd schemas: missing date, all-categorical, single-column, huge cardinality, mixed types,
+  ambiguous domain; ensure mapping modal defaults degrade gracefully.
+
+### Export regression pass
+- Re-validate PNG/PDF export after 5A.3 (shared `barValueTickFormatter` now affects axis labels in capture).
+- Confirm no axis-label or layout regressions in exported charts. Reference: Phase 7 PDF fixtures,
+  `docs/pdf-export-final-validation-runbook.md`.
+
+### Platform gaps (production-only)
+- Authentication & tenant isolation; durable usage metering; multi-tenant dataset storage (currently
+  in-memory `df` per process). Separate initiative from chart/Overview work.
+
+---
+
+## P2 — Nice to have
+
+### Further visual polish (only if needed)
+- Histogram premium review (renders as styled V-Bar; no dedicated occupancy pass).
+- Any remaining cosmetic chart tuning **only after** P0 parity is root-caused and resolved.
+
+### Future / non-blocking
+- Large dataset performance optimization (100k+ rows).
+- Browser E2E export regression suite (Playwright).
+
+---
+
+## Technical debt (accepted)
 
 | Item | Notes |
 |------|-------|
-| **Dual renderer pipelines** | Overview inline vs `ChartRenderer` — managed via shared helpers; full convergence not scheduled |
-| **Monolithic `page.tsx`** | ~14.6k lines; incremental extraction only when scoped |
-| **Legacy PDF DOM capture** | Fallback path in `pdf-report.ts` when artifact missing; primary path is artifact PNG |
-| **Deprecated API aliases** | `getInsightLayoutMetrics`, `resolveDetailPlotHeight`, `pdfChartScatterUsesContentTightComposite` — remove when callers migrated |
-| **Axis presentation plan coverage** | Fully wired for H-Bar/V-Bar export; line/area/scatter use renderer domain helpers on live path |
-
----
-
-## Explicitly Not Open (completed this phase)
-
-Do **not** reopen unless regression found:
-
-- H-Bar premium baseline and margin model
-- Overview V-Bar centering and live plot band
-- Overview Line/Area/Scatter alignment and occupancy
-- Charts PNG domain parity (`detailViewLayout` on offscreen capture)
-- Charts/AI left-gutter fix (`sessionDetailVerticalOuterMargins`)
-- PDF V-Bar/scatter content-tight embed and kind-aware sizing
-- Scatter occupancy target (74%) and plot height boost parity
-
----
-
-## Suggested Next Steps (priority order)
-
-1. Manual QA pass on showcase dataset across six surfaces × six cartesian kinds (regression guard).
-2. Histogram premium review (narrow scope).
-3. E2E export smoke tests (Playwright or similar) — optional hardening.
-4. Production platform items — separate initiative from chart parity.
+| Dual renderer pipelines | Overview inline (`page.tsx`) vs shared `ChartRenderer` — managed via shared helpers; full convergence not scheduled. Relevant to P0 parity. |
+| Monolithic `page.tsx` | Large file; incremental extraction only when scoped. |
+| Pre-existing backend test failures | 6 `pytest` failures (sales showcase diversity/scatter, banking suggested-questions utilization trend, marketing weak-title) — pre-existing, not from 5A.3. See [`validation-results.md`](./validation-results.md). |
+| HR `customer` role = `age` | Minor; not a stated requirement. |

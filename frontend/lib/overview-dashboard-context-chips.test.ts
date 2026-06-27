@@ -5,6 +5,18 @@ import {
 } from "@/lib/overview-dashboard-context-chips";
 
 describe("buildOverviewDashboardContextChips", () => {
+  it("uses type_label when provided for banking datasets", () => {
+    const chips = buildOverviewDashboardContextChips({
+      datasetKind: "banking",
+      typeLabel: "Banking / Financial Services",
+      mappingDomain: null,
+      dashboardFilters: [],
+      filterBreadcrumb: "",
+      chartCount: 6,
+    });
+    expect(chips[0]?.value).toBe("Banking / Financial Services");
+  });
+
   it("returns context chips instead of KPI card titles", () => {
     const chips = buildOverviewDashboardContextChips({
       datasetKind: "retail",

@@ -666,11 +666,27 @@ def _product_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("severity", 26),
         ("plant", 24),
         ("machine", 22),
+        # Workforce / HR primary dimensions — preferred over demographic age bands.
+        ("department", 42),
+        ("job_family", 42),
+        ("job_role", 36),
+        ("job_title", 36),
+        ("job_level", 30),
+        ("division", 30),
+        ("function", 22),
+        ("team", 22),
+        # Banking / financial product breakdown.
+        ("product_type", 44),
     )
     for kw, w in pairs:
         if kw in n:
             score += w
             reasons.append(f"name:{kw}+{w}")
+
+    # Age bands are demographic slices, not the primary business dimension.
+    if "age_band" in n or n == "age" or n.endswith("_age"):
+        score -= 30
+        reasons.append("dim_penalty:age_band(-30)")
     return score, reasons
 
 
@@ -707,6 +723,14 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         ("subtotal", 36),
         ("spend", 34),
         ("sales", 36),
+        ("salary", 44),
+        ("wages", 40),
+        ("wage", 38),
+        ("payroll", 42),
+        ("compensation", 42),
+        ("gross_pay", 40),
+        ("net_pay", 38),
+        ("base_pay", 38),
         ("amount", 30),
         ("total", 22),
         ("unit_price", 34),
@@ -783,6 +807,21 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         if kw in n:
             score -= pen
             reasons.append(f"domain_penalty:{kw}-{-pen}")
+
+    # Lifecycle / tenure / age columns are demographics, never a primary value metric.
+    lifecycle_penalties = (
+        ("account_age_months", 64),
+        ("account_age", 60),
+        ("age_band", 60),
+        ("tenure_months", 52),
+        ("tenure", 46),
+        ("months_since", 40),
+        ("age", 30),
+    )
+    for kw, pen in lifecycle_penalties:
+        if kw in n:
+            score -= pen
+            reasons.append(f"lifecycle_penalty:{kw}-{-pen}")
 
     entity_penalties = (
         ("sales_rep", 90),
@@ -864,10 +903,35 @@ def _profit_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("ebitda", 22),
         ("earnings", 18),
         ("net_income", 24),
+        # Banking / financial secondary (comparison) metrics — prefer these over
+        # generic lifecycle columns like account_age_months.
+        ("deposit_balance", 40),
+        ("credit_utilization", 38),
+        ("utilization_pct", 38),
+        ("utilization", 32),
+        ("delinquency_rate", 36),
+        ("delinquency", 28),
+        ("interest_income", 30),
+        ("npl_amount", 28),
+        ("npl", 22),
+        ("loan_balance", 30),
+        ("spend_amount", 26),
     ):
         if kw in n:
             score += w
             reasons.append(f"name:{kw}+{w}")
+
+    # Tenure / age columns are demographics, not a secondary value metric.
+    for kw, pen in (
+        ("account_age_months", 60),
+        ("account_age", 56),
+        ("age_band", 56),
+        ("tenure", 44),
+        ("age", 26),
+    ):
+        if kw in n:
+            score -= pen
+            reasons.append(f"lifecycle_penalty:{kw}-{-pen}")
     return score, reasons
 
 
@@ -880,6 +944,8 @@ def _date_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("invoice_date", 34),
         ("ship_date", 28),
         ("transaction_date", 32),
+        ("report_date", 34),
+        ("hire_date", 30),
         ("created_at", 22),
         ("timestamp", 18),
         ("date", 20),
@@ -2928,6 +2994,28 @@ def _dash_chart_metric_column(chart: Dict[str, Any]) -> str:
     return title
 
 
+def _dash_lifecycle_overview_metric(col: Optional[str]) -> bool:
+    if not col:
+        return False
+    blob = str(col).lower().replace("_", " ")
+    return bool(
+        re.search(
+            r"\b(account age|age months|tenure|vintage|credit score|"
+            r"transaction count|monthly income)\b",
+            blob,
+        )
+    )
+
+
+def _dash_banking_schema(columns: List[str]) -> bool:
+    lower = {str(c).strip().lower() for c in columns}
+    return (
+        "loan_balance" in lower
+        and "spend_amount" in lower
+        and ("deposit_balance" in lower or "utilization_pct" in lower)
+    )
+
+
 def _dash_priority_metric_columns(kind: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Primary metric, secondary metric, record-count column (if any)."""
     global df, dataset_profile
@@ -2945,6 +3033,37 @@ def _dash_priority_metric_columns(kind: str) -> Tuple[Optional[str], Optional[st
         "profit", ["profit", "margin", "net profit", "earnings", "gp"]
     )
 
+    if str(kind or "").lower() == "finance" or _dash_banking_schema(columns):
+        for pref in (
+            "spend_amount",
+            "loan_balance",
+            "deposit_balance",
+            "utilization_pct",
+        ):
+            for c in columns:
+                if str(c).strip().lower() == pref and ct.get(c) == "number":
+                    if not primary or _dash_lifecycle_overview_metric(primary):
+                        primary = c
+                    break
+        if not secondary or _dash_lifecycle_overview_metric(secondary):
+            secondary = None
+            for pref in (
+                "loan_balance",
+                "deposit_balance",
+                "utilization_pct",
+                "delinquency_flag",
+            ):
+                for c in columns:
+                    if (
+                        str(c).strip().lower() == pref
+                        and ct.get(c) == "number"
+                        and (not primary or str(c).lower() != str(primary).lower())
+                    ):
+                        secondary = c
+                        break
+                if secondary:
+                    break
+
     if not secondary:
         nums = [
             c
@@ -2953,6 +3072,8 @@ def _dash_priority_metric_columns(kind: str) -> Tuple[Optional[str], Optional[st
         ]
         for c in nums:
             if primary and str(c).lower() == str(primary).lower():
+                continue
+            if _dash_lifecycle_overview_metric(c):
                 continue
             secondary = c
             break
@@ -3687,6 +3808,8 @@ def build_auto_dashboard_charts_bundle(
         seed = _dash_sales_dashboard_charts()
     elif kind == "operations":
         seed = _dash_operations_dashboard_charts()
+    elif kind == "finance" and _dash_banking_schema(df.columns.tolist()):
+        seed = []
     else:
         seed = _dash_generic_dashboard_charts(kind)
     deps = DashboardDeps(
@@ -5087,6 +5210,9 @@ def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
         "kpis": kp,
         "kpi_cards": kpi_cards,
         "dataset_kind": dataset_kind,
+        "executive_domain": exec_domain,
+        "dataset_type_label": auto_dashboard.get("type_label")
+        or EXECUTIVE_DASHBOARD_LABELS.get(exec_domain, "Generic"),
         "auto_dashboard": auto_dashboard,
         "suggested_questions": build_suggested_questions(),
         "column_mapping": {
@@ -7711,6 +7837,31 @@ def _time_coverage_meta(dt_clean: pd.Series, n_input_rows: int) -> Dict[str, Any
     }
 
 
+def _detect_monthly_snapshot_cadence(dt: pd.Series) -> bool:
+    """
+    True when distinct timestamps are month-start snapshots (e.g. 2024-01-01, 2024-02-01).
+    """
+    ser = pd.to_datetime(dt, errors="coerce").dropna()
+    if len(ser) < 2:
+        return False
+    unique = ser.dt.normalize().drop_duplicates().sort_values()
+    n = int(len(unique))
+    if n < 2:
+        return False
+    days_of_month = unique.dt.day.unique()
+    if len(days_of_month) == 1 and int(days_of_month[0]) <= 3:
+        gaps = unique.diff().dropna().dt.days
+        if len(gaps) > 0 and all(27 <= int(g) <= 32 for g in gaps):
+            return True
+    month_periods = unique.dt.to_period("M")
+    if int(month_periods.nunique()) == n:
+        span_days = (unique.max() - unique.min()).days
+        avg_gap = span_days / max(n - 1, 1)
+        if 27 <= avg_gap <= 32:
+            return True
+    return False
+
+
 def _preferred_time_bucket_from_span(span_days: float) -> str:
     """
     Adaptive granularity:
@@ -8370,7 +8521,13 @@ def _adaptive_time_series_grouped(
 
     span = _time_series_span_days(tmp["_dt"])
     coverage = _time_coverage_meta(tmp["_dt"], n_in)
-    preferred = force_freq or _preferred_time_bucket_from_span(span)
+    if not force_freq and _detect_monthly_snapshot_cadence(tmp["_dt"]):
+        preferred = "M"
+        meta["selectionReason"] = (
+            "Monthly snapshot dates detected (month-start report periods)."
+        )
+    else:
+        preferred = force_freq or _preferred_time_bucket_from_span(span)
     meta["spanDays"] = round(span, 4)
     meta["timeCoverage"] = coverage
 

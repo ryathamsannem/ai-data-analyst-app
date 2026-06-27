@@ -1,5 +1,8 @@
 import type { ChartKind } from "@/app/chart-types";
 import {
+  OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE,
+} from "@/lib/horizontal-bar-visual";
+import {
   resolveOverviewBarValueDomain,
   roundExecutiveAxisMaximum,
 } from "@/lib/overview-bar-value-domain";
@@ -14,7 +17,8 @@ export const OVERVIEW_PNG_EXPORT_LINE_STROKE_PX = 4;
 export const OVERVIEW_PNG_EXPORT_MARKER_R_PX = 6;
 export const OVERVIEW_PNG_EXPORT_HBAR_VALUE_PAD_RATIO = 0.06;
 export const OVERVIEW_PNG_EXPORT_HBAR_CATEGORY_PAD_PX = 14;
-export const OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE = 48;
+/** Re-export — canonical value lives in horizontal-bar-visual.ts */
+export const OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE = OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE;
 export const OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE = 52;
 /** Touching histogram bins on overview mini cards (live). */
 export const OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE = 52;
@@ -97,6 +101,7 @@ export function horizontalBarValueDomain(
   const smart = resolveOverviewBarValueDomain(rows, {
     chartTitle: options?.chartTitle,
     metricLabel: options?.metricLabel,
+    presentationKind: "bar_horizontal",
     executiveRounding: true,
     rightPadRatio,
   });

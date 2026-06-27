@@ -1877,6 +1877,7 @@ export function datasetKindLabel(kind: string): string {
     manufacturing: "Manufacturing / operations",
     hr: "Human resources / people analytics",
     sales: "Sales / commercial",
+    banking: "Banking / Financial Services",
     finance: "Finance / accounting",
     operations: "Operations / incidents",
     marketing: "Marketing / growth",

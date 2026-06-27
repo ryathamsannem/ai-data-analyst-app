@@ -54,9 +54,9 @@ describe("detectOverviewExportBarOrientation", () => {
 });
 
 describe("horizontalBarValueDomain", () => {
-  it("uses smart tight domains for low-spread breakdowns", () => {
+  it("uses zero baseline for low-spread count breakdowns (bar_horizontal policy)", () => {
     expect(horizontalBarValueDomain([{ value: 23 }, { value: 17 }])).toEqual([
-      16,
+      0,
       25,
     ]);
     expect(
@@ -64,7 +64,7 @@ describe("horizontalBarValueDomain", () => {
         chartTitle: "Delivery Days by Payment Method",
         metricLabel: "Delivery Days",
       })
-    ).toEqual([100, 130]);
+    ).toEqual([0, 130]);
   });
 
   it("keeps zero baseline when values start well below the maximum", () => {
@@ -103,6 +103,41 @@ describe("horizontalBarValueDomain", () => {
   it("handles empty or non-positive max", () => {
     expect(horizontalBarValueDomain([])).toEqual([0, 1]);
     expect(horizontalBarValueDomain([{ value: 0 }])).toEqual([0, 1]);
+  });
+
+  it("PNG/export H-Bar profit domain starts at 0", () => {
+    const domain = horizontalBarValueDomain(
+      [
+        { value: 205_126 },
+        { value: 210_000 },
+        { value: 215_087 },
+      ],
+      undefined,
+      {
+        chartTitle: "Profit by Department",
+        metricLabel: "Profit",
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThan(215_087);
+  });
+
+  it("PNG/export H-Bar utilization domain starts at 0", () => {
+    const domain = horizontalBarValueDomain(
+      [
+        { value: 0.357 },
+        { value: 0.390 },
+        { value: 0.415 },
+        { value: 0.440 },
+      ],
+      undefined,
+      {
+        chartTitle: "Credit Utilization by Product Type",
+        metricLabel: "Utilization Rate",
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThan(0.44);
   });
 });
 

@@ -90,7 +90,6 @@ import {
 import {
   OVERVIEW_PNG_EXPORT_AXIS_TICK_PX,
   OVERVIEW_PNG_EXPORT_AXIS_TITLE_PX,
-  OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE,
   OVERVIEW_PNG_EXPORT_LINE_STROKE_PX,
   OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR,
   OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_VBAR,
@@ -99,7 +98,6 @@ import {
   OVERVIEW_PNG_EXPORT_MARKER_R_PX,
   OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE,
   OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE,
-  OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE,
   shouldShowOverviewBarValueLabels,
 } from "@/lib/overview-dashboard-export";
 import {
@@ -132,12 +130,19 @@ import {
   resolveOverviewDashLivePlotHeight,
 } from "@/lib/overview-dashboard-plot-layout";
 import {
+  formatOverviewBarValueAxisTick,
   formatOverviewLineYAxisTick,
   formatOverviewScatterAxisTick,
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
 } from "@/lib/overview-premium-axis-domain";
+import {
+  HORIZONTAL_BAR_END_RADIUS,
+  resolveHorizontalBarCategoryGap,
+  resolveOverviewHorizontalBarMaxSize,
+  OVERVIEW_VBAR_MAX_BAR_SIZE,
+} from "@/lib/horizontal-bar-visual";
 import { ChartCaptureHost } from "@/app/components/chart-platform/ChartCaptureHost";
 import {
   captureChartPngArtifact,
@@ -511,6 +516,7 @@ import {
   setPlanTier,
 } from "@/lib/saas-session";
 import { buildOverviewDashboardContextChips } from "@/lib/overview-dashboard-context-chips";
+import { resolveOverviewDatasetTypeLabel } from "@/lib/resolved-dataset-type-label";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
 import { OverviewLandingHero } from "./components/home/overview-landing-hero";
 import { OverviewLandingTrustRow } from "./components/home/overview-landing-trust-row";
@@ -528,6 +534,7 @@ import {
   overviewChartGridSoloRowStyle,
 } from "@/lib/overview-chart-grid-layout";
 import {
+  filterOverviewAutoDashboardCharts,
   filterOverviewRenderableCharts,
   overviewChartHasRenderableData,
 } from "@/lib/overview-dashboard-chart-renderable";
@@ -4378,6 +4385,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chartRows]
   );
 
+  // Metric-aware bar value ticks: currency/large numbers compact to K/M and
+  // percent/rate metrics read as points (35%, 3.4%) instead of raw decimals.
+  const barValueTickFormatter = useCallback(
+    (tick: number) =>
+      formatOverviewBarValueAxisTick(tick, chartRows, overviewMetricCtx),
+    [chartRows, overviewMetricCtx]
+  );
+
   const overviewVerticalBarAxisProps = useMemo(
     () =>
       displayKind === "bar" || displayKind === "histogram"
@@ -4491,7 +4506,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       : dashGrid.opacity;
     const showBarEndLabels = shouldShowOverviewBarValueLabels(
       chartRows,
-      valueTickFormatter
+      barValueTickFormatter
     );
     const localCategoryPlan = computeOverviewMiniCategoryPlan(
       displayKind,
@@ -4755,6 +4770,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           <BarChart
             layout="vertical"
             data={chartRows}
+            barCategoryGap={resolveHorizontalBarCategoryGap({
+              categoryCount: chartRows.length,
+            })}
             margin={{
               left: hbBalanced.marginLeft,
               right: hBarRightMargin,
@@ -4773,7 +4791,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               type="number"
               {...(hBarValueAxisProps ?? {})}
               tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK }}
-              tickFormatter={valueTickFormatter}
+              tickFormatter={barValueTickFormatter}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             />
@@ -4799,8 +4817,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             <Bar
               dataKey="value"
               fill="#6366f1"
-              radius={[0, 6, 6, 0]}
-              maxBarSize={pngCapture ? OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE : 32}
+              radius={HORIZONTAL_BAR_END_RADIUS}
+              maxBarSize={resolveOverviewHorizontalBarMaxSize(pngCapture)}
               isAnimationActive={plotAnimOn}
               animationDuration={plotAnimDuration}
               cursor={drillable ? "pointer" : "default"}
@@ -4821,7 +4839,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 <LabelList
                   dataKey="value"
                   position="insideRight"
-                  formatter={(v) => valueTickFormatter(Number(v ?? 0))}
+                  formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
                   style={{
                     fill: "#e2e8f0",
                     fontSize: 13,
@@ -5151,7 +5169,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             </XAxis>
             <YAxis
               tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK, dx: 2 }}
-              tickFormatter={valueTickFormatter}
+              tickFormatter={barValueTickFormatter}
               width={vLay.yAxisWidth}
               {...(overviewVerticalBarAxisProps ?? {})}
               axisLine={{ stroke: OV_AXIS_LINE }}
@@ -5171,7 +5189,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                   ? pngCapture
                     ? OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE
                     : OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE
-                  : OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE
+                  : OVERVIEW_VBAR_MAX_BAR_SIZE
               }
               isAnimationActive={plotAnimOn}
               animationDuration={plotAnimDuration}
@@ -5193,7 +5211,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 <LabelList
                   dataKey="value"
                   position="top"
-                  formatter={(v) => valueTickFormatter(Number(v ?? 0))}
+                  formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
                   style={{
                     fill: "#e2e8f0",
                     fontSize: 13,
@@ -5529,6 +5547,7 @@ type DatasetKindSlug =
   | "ecommerce"
   | "manufacturing"
   | "finance"
+  | "banking"
   | "operations"
   | "marketing"
   | "generic"
@@ -5545,6 +5564,7 @@ function coerceDatasetKind(raw: unknown): DatasetKindSlug {
     case "finance":
     case "operations":
     case "marketing":
+    case "banking":
     case "generic":
       return k;
     default:
@@ -8744,7 +8764,7 @@ function HomeInner() {
   );
 
   const overviewRenderableCharts = useMemo(
-    () => filterOverviewRenderableCharts(autoDashboard?.charts ?? []),
+    () => filterOverviewAutoDashboardCharts(autoDashboard?.charts ?? []),
     [autoDashboard?.charts]
   );
 
@@ -8762,6 +8782,7 @@ function HomeInner() {
     () =>
       buildOverviewDashboardContextChips({
         datasetKind: datasetKind || "",
+        typeLabel: autoDashboard?.type_label ?? null,
         mappingDomain: mappingMetadata?.domain ?? null,
         dashboardFilters,
         filterBreadcrumb,
@@ -8769,6 +8790,7 @@ function HomeInner() {
       }),
     [
       datasetKind,
+      autoDashboard?.type_label,
       mappingMetadata?.domain,
       dashboardFilters,
       filterBreadcrumb,
@@ -12240,15 +12262,11 @@ function HomeInner() {
                     </button>
                   </div>
                   {(() => {
-                    const domainKind = (datasetKind || "").trim().toLowerCase();
-                    const datasetTypeLabel =
-                      domainKind && domainKind !== "generic"
-                        ? datasetKindLabel(datasetKind)
-                        : mappingMetadata?.domain
-                          ? mappingMetadata.domain
-                              .replace(/_/g, " ")
-                              .replace(/\b\w/g, (ch) => ch.toUpperCase())
-                          : datasetKindLabel("generic");
+                    const datasetTypeLabel = resolveOverviewDatasetTypeLabel({
+                      datasetKind: datasetKind || "",
+                      typeLabel: autoDashboard?.type_label ?? null,
+                      mappingDomain: mappingMetadata?.domain ?? null,
+                    });
                     const engineRegion = mappingMetadata?.roles?.region?.selected?.trim();
                     const regionDisplay =
                       regionColumn.trim() || (engineRegion && engineRegion) || "";
@@ -14823,7 +14841,7 @@ function HomeInner() {
                   </div>
                   <div>
                     <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
-                      Secondary metric (e.g. profit)
+                      Secondary metric / comparison metric
                     </label>
                     <select
                       value={profitColumn}

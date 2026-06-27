@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { ChartRow } from "@/app/chart-types";
 import {
+  formatOverviewBarValueAxisTick,
   formatOverviewLineYAxisTick,
   formatOverviewScatterAxisTick,
   OVERVIEW_LINE_PREMIUM_PAD_RATIO,
@@ -14,6 +16,102 @@ import {
   sessionLineAreaDetailBottomMargin,
   sessionTrendDetailPlotMargins,
 } from "./overview-premium-axis-domain";
+
+describe("formatOverviewBarValueAxisTick", () => {
+  const loanRows: ChartRow[] = [
+    { name: "Mortgage", value: 189_000_000 },
+    { name: "Personal", value: 147_500_000 },
+    { name: "Auto", value: 127_500_000 },
+  ];
+
+  it("compacts large currency loan/deposit/spend ticks to M (no raw decimals)", () => {
+    const ctx = {
+      metricLabel: "Loan Balance by Product Type",
+      chartTitle: "Loan Balance by Product Type",
+    };
+    expect(formatOverviewBarValueAxisTick(127_500_000, loanRows, ctx)).toBe(
+      "127.5M"
+    );
+    expect(formatOverviewBarValueAxisTick(147_500_000, loanRows, ctx)).toBe(
+      "147.5M"
+    );
+    expect(formatOverviewBarValueAxisTick(189_000_000, loanRows, ctx)).toBe(
+      "189M"
+    );
+    // Never falls back to long raw decimal/grouped values.
+    expect(formatOverviewBarValueAxisTick(127_500_000, loanRows, ctx)).not.toMatch(
+      /127,500,000|\.\d{3}/
+    );
+  });
+
+  it("renders fraction-scale utilization ticks as whole percents", () => {
+    const rows: ChartRow[] = [
+      { name: "Credit Card", value: 0.62 },
+      { name: "Auto", value: 0.41 },
+      { name: "Mortgage", value: 0.28 },
+    ];
+    const ctx = {
+      metricLabel: "Average Utilization Pct by Product Type",
+      chartTitle: "Average Utilization Pct by Product Type",
+    };
+    expect(formatOverviewBarValueAxisTick(0.35, rows, ctx)).toBe("35%");
+    expect(formatOverviewBarValueAxisTick(0.4, rows, ctx)).toBe("40%");
+    expect(formatOverviewBarValueAxisTick(0.45, rows, ctx)).toBe("45%");
+  });
+
+  it("renders low fraction-scale delinquency rate ticks with one decimal percent", () => {
+    const rows: ChartRow[] = [
+      { name: "Prime", value: 0.031 },
+      { name: "Subprime", value: 0.041 },
+    ];
+    const ctx = {
+      metricLabel: "Average Delinquency Rate by Customer Segment",
+      chartTitle: "Average Delinquency Rate by Customer Segment",
+    };
+    expect(formatOverviewBarValueAxisTick(0.034, rows, ctx)).toBe("3.4%");
+    expect(formatOverviewBarValueAxisTick(0.041, rows, ctx)).toBe("4.1%");
+  });
+
+  it("passes through already-scaled (0-100) percent values without doubling", () => {
+    const rows: ChartRow[] = [
+      { name: "A", value: 35 },
+      { name: "B", value: 45 },
+    ];
+    const ctx = { metricLabel: "Attendance Rate", chartTitle: "Attendance Rate" };
+    expect(formatOverviewBarValueAxisTick(40, rows, ctx)).toBe("40%");
+  });
+
+  it("does not double-scale 0-100 range values that include 1.0 (East=1% bug)", () => {
+    // If dataset contains values like [1.0, 3.5, 7.9] (0-100 percent scale),
+    // maxAbs = 7.9 > 1.05 → treat as 0-100 scale → tick 1.0 → "1%", not "100%".
+    const rows: ChartRow[] = [
+      { name: "East", value: 1.0 },
+      { name: "West", value: 3.5 },
+      { name: "North", value: 7.9 },
+    ];
+    const ctx = {
+      metricLabel: "Defect Rate by Region",
+      chartTitle: "Defect Rate by Region",
+    };
+    expect(formatOverviewBarValueAxisTick(1.0, rows, ctx)).toBe("1%");
+    expect(formatOverviewBarValueAxisTick(7.9, rows, ctx)).toBe("7.9%");
+    expect(formatOverviewBarValueAxisTick(1.0, rows, ctx)).not.toBe("100%");
+  });
+
+  it("keeps small HR count ticks readable as plain integers", () => {
+    const rows: ChartRow[] = [
+      { name: "Engineering", value: 120 },
+      { name: "Sales", value: 80 },
+      { name: "HR", value: 30 },
+    ];
+    const ctx = {
+      metricLabel: "Records by Department",
+      chartTitle: "Records by Department",
+    };
+    expect(formatOverviewBarValueAxisTick(50, rows, ctx)).toBe("50");
+    expect(formatOverviewBarValueAxisTick(100, rows, ctx)).toBe("100");
+  });
+});
 
 describe("resolveOverviewPremiumAxisScale", () => {
   it("uses rounded revenue ticks for monthly trend values", () => {
