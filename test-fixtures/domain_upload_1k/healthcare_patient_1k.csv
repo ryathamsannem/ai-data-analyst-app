@@ -1,0 +1,1001 @@
+patient_id,visit_date,department,payer_type,patient_segment,visit_count,claim_amount,readmission_rate,wait_time_minutes
+PAT-000001,2024-01-01,Emergency,Commercial,Inpatient,162,71903.84,0.0669,19.2
+PAT-000002,2024-01-01,Emergency,Medicare,Chronic Care,124,47154.23,0.1194,17.7
+PAT-000003,2024-01-01,Emergency,Medicaid,Chronic Care,137,74228.34,0.0823,38.5
+PAT-000004,2024-01-01,Emergency,Self Pay,Outpatient,202,104137.63,0.1177,17.5
+PAT-000005,2024-01-01,Cardiology,Commercial,Outpatient,217,105497.28,0.0744,33.3
+PAT-000006,2024-01-01,Cardiology,Medicare,Chronic Care,237,72665.18,0.0453,34.0
+PAT-000007,2024-01-01,Cardiology,Medicaid,Inpatient,146,76415.12,0.0682,36.3
+PAT-000008,2024-01-01,Cardiology,Self Pay,Inpatient,172,51626.35,0.158,19.5
+PAT-000009,2024-01-01,Orthopedics,Commercial,Inpatient,178,59582.58,0.0604,23.3
+PAT-000010,2024-01-01,Orthopedics,Medicare,Chronic Care,117,61706.96,0.1508,25.6
+PAT-000011,2024-01-01,Orthopedics,Medicaid,Outpatient,160,85167.09,0.0601,24.5
+PAT-000012,2024-01-01,Orthopedics,Self Pay,Outpatient,187,92993.39,0.125,18.1
+PAT-000013,2024-01-01,Oncology,Commercial,Chronic Care,162,58131.65,0.1224,28.6
+PAT-000014,2024-01-01,Oncology,Medicare,Outpatient,221,81885.27,0.1348,29.0
+PAT-000015,2024-01-01,Oncology,Medicaid,Chronic Care,123,52689.14,0.1364,24.0
+PAT-000016,2024-01-01,Oncology,Self Pay,Outpatient,186,56513.13,0.0891,19.7
+PAT-000017,2024-01-01,Pediatrics,Commercial,Outpatient,190,55868.28,0.0879,37.6
+PAT-000018,2024-01-01,Pediatrics,Medicare,Inpatient,223,73048.69,0.1218,30.8
+PAT-000019,2024-01-01,Pediatrics,Medicaid,Outpatient,165,50649.01,0.0645,35.9
+PAT-000020,2024-01-01,Pediatrics,Self Pay,Emergency,205,95179.47,0.098,25.7
+PAT-000021,2024-01-01,Radiology,Commercial,Emergency,233,92835.81,0.1018,31.7
+PAT-000022,2024-01-01,Radiology,Medicare,Emergency,235,107846.74,0.1159,35.5
+PAT-000023,2024-01-01,Radiology,Medicaid,Emergency,144,44284.91,0.0627,28.8
+PAT-000024,2024-01-01,Radiology,Self Pay,Emergency,143,49026.46,0.0795,35.7
+PAT-000025,2024-02-01,Emergency,Commercial,Inpatient,217,86861.45,0.1416,21.7
+PAT-000026,2024-02-01,Emergency,Medicare,Emergency,228,90347.79,0.142,27.5
+PAT-000027,2024-02-01,Emergency,Medicaid,Emergency,202,65239.52,0.0897,26.0
+PAT-000028,2024-02-01,Emergency,Self Pay,Chronic Care,206,88816.85,0.1477,32.2
+PAT-000029,2024-02-01,Cardiology,Commercial,Emergency,187,80051.38,0.0409,19.8
+PAT-000030,2024-02-01,Cardiology,Medicare,Inpatient,209,74826.22,0.1315,17.9
+PAT-000031,2024-02-01,Cardiology,Medicaid,Inpatient,240,95142.71,0.0743,21.8
+PAT-000032,2024-02-01,Cardiology,Self Pay,Chronic Care,165,65094.84,0.0963,31.6
+PAT-000033,2024-02-01,Orthopedics,Commercial,Outpatient,119,57162.13,0.1461,34.2
+PAT-000034,2024-02-01,Orthopedics,Medicare,Emergency,212,104208.59,0.1577,24.3
+PAT-000035,2024-02-01,Orthopedics,Medicaid,Outpatient,187,93728.33,0.0719,37.1
+PAT-000036,2024-02-01,Orthopedics,Self Pay,Chronic Care,210,114651.28,0.1284,35.3
+PAT-000037,2024-02-01,Oncology,Commercial,Emergency,179,85969.77,0.1259,33.5
+PAT-000038,2024-02-01,Oncology,Medicare,Emergency,183,65544.99,0.0467,20.4
+PAT-000039,2024-02-01,Oncology,Medicaid,Outpatient,196,91209.45,0.1331,23.3
+PAT-000040,2024-02-01,Oncology,Self Pay,Inpatient,124,42284.78,0.0673,22.5
+PAT-000041,2024-02-01,Pediatrics,Commercial,Inpatient,234,96307.98,0.1398,36.2
+PAT-000042,2024-02-01,Pediatrics,Medicare,Emergency,180,88658.98,0.068,21.3
+PAT-000043,2024-02-01,Pediatrics,Medicaid,Chronic Care,185,54840.18,0.1442,17.0
+PAT-000044,2024-02-01,Pediatrics,Self Pay,Emergency,143,52774.44,0.126,38.3
+PAT-000045,2024-02-01,Radiology,Commercial,Outpatient,210,64954.53,0.1515,22.7
+PAT-000046,2024-02-01,Radiology,Medicare,Chronic Care,234,104389.84,0.1314,36.4
+PAT-000047,2024-02-01,Radiology,Medicaid,Inpatient,201,71680.93,0.0856,36.6
+PAT-000048,2024-02-01,Radiology,Self Pay,Outpatient,208,112254.98,0.1116,33.5
+PAT-000049,2024-03-01,Emergency,Commercial,Outpatient,169,63805.34,0.1012,35.9
+PAT-000050,2024-03-01,Emergency,Medicare,Emergency,129,43301.56,0.0953,23.5
+PAT-000051,2024-03-01,Emergency,Medicaid,Outpatient,202,100830.28,0.047,32.2
+PAT-000052,2024-03-01,Emergency,Self Pay,Emergency,223,97172.55,0.1008,39.0
+PAT-000053,2024-03-01,Cardiology,Commercial,Inpatient,156,53473.4,0.0832,17.2
+PAT-000054,2024-03-01,Cardiology,Medicare,Chronic Care,183,79758.65,0.1434,22.2
+PAT-000055,2024-03-01,Cardiology,Medicaid,Emergency,233,86971.57,0.1323,30.1
+PAT-000056,2024-03-01,Cardiology,Self Pay,Emergency,183,81330.78,0.0572,17.0
+PAT-000057,2024-03-01,Orthopedics,Commercial,Outpatient,159,53491.22,0.1213,27.7
+PAT-000058,2024-03-01,Orthopedics,Medicare,Inpatient,129,70395.36,0.113,38.9
+PAT-000059,2024-03-01,Orthopedics,Medicaid,Emergency,123,49366.52,0.1167,29.4
+PAT-000060,2024-03-01,Orthopedics,Self Pay,Emergency,190,88918.32,0.0481,35.9
+PAT-000061,2024-03-01,Oncology,Commercial,Outpatient,166,52335.36,0.1413,20.7
+PAT-000062,2024-03-01,Oncology,Medicare,Emergency,140,75425.76,0.101,28.5
+PAT-000063,2024-03-01,Oncology,Medicaid,Outpatient,240,89286.96,0.1031,28.1
+PAT-000064,2024-03-01,Oncology,Self Pay,Outpatient,152,70886.26,0.1579,33.6
+PAT-000065,2024-03-01,Pediatrics,Commercial,Outpatient,125,58947.92,0.089,38.3
+PAT-000066,2024-03-01,Pediatrics,Medicare,Inpatient,127,46713.96,0.0697,35.7
+PAT-000067,2024-03-01,Pediatrics,Medicaid,Inpatient,159,66572.38,0.1585,17.0
+PAT-000068,2024-03-01,Pediatrics,Self Pay,Outpatient,217,115440.05,0.1143,36.6
+PAT-000069,2024-03-01,Radiology,Commercial,Outpatient,180,93819.27,0.1424,39.1
+PAT-000070,2024-03-01,Radiology,Medicare,Inpatient,223,89888.4,0.1083,22.8
+PAT-000071,2024-03-01,Radiology,Medicaid,Inpatient,205,90944.86,0.0822,34.3
+PAT-000072,2024-03-01,Radiology,Self Pay,Outpatient,122,39035.48,0.0877,25.7
+PAT-000073,2024-04-01,Emergency,Commercial,Emergency,213,96764.57,0.1585,18.0
+PAT-000074,2024-04-01,Emergency,Medicare,Inpatient,163,71439.11,0.1418,32.2
+PAT-000075,2024-04-01,Emergency,Medicaid,Outpatient,225,114812.42,0.0553,31.4
+PAT-000076,2024-04-01,Emergency,Self Pay,Inpatient,132,44661.64,0.0883,24.3
+PAT-000077,2024-04-01,Cardiology,Commercial,Outpatient,151,60742.12,0.1493,28.5
+PAT-000078,2024-04-01,Cardiology,Medicare,Chronic Care,213,113671.7,0.0817,34.6
+PAT-000079,2024-04-01,Cardiology,Medicaid,Inpatient,220,80224.86,0.0516,21.4
+PAT-000080,2024-04-01,Cardiology,Self Pay,Chronic Care,145,68925.58,0.145,28.0
+PAT-000081,2024-04-01,Orthopedics,Commercial,Chronic Care,199,81308.39,0.1494,20.6
+PAT-000082,2024-04-01,Orthopedics,Medicare,Emergency,170,80586.16,0.1088,17.3
+PAT-000083,2024-04-01,Orthopedics,Medicaid,Outpatient,230,75421.91,0.088,23.8
+PAT-000084,2024-04-01,Orthopedics,Self Pay,Inpatient,166,82183.24,0.0955,17.0
+PAT-000085,2024-04-01,Oncology,Commercial,Emergency,156,68648.33,0.1025,25.7
+PAT-000086,2024-04-01,Oncology,Medicare,Emergency,205,93989.46,0.1127,17.5
+PAT-000087,2024-04-01,Oncology,Medicaid,Inpatient,121,50831.6,0.1389,37.7
+PAT-000088,2024-04-01,Oncology,Self Pay,Inpatient,232,122766.01,0.054,38.6
+PAT-000089,2024-04-01,Pediatrics,Commercial,Chronic Care,142,46239.05,0.1553,20.3
+PAT-000090,2024-04-01,Pediatrics,Medicare,Chronic Care,126,54396.67,0.0766,24.4
+PAT-000091,2024-04-01,Pediatrics,Medicaid,Inpatient,151,58615.22,0.1213,29.7
+PAT-000092,2024-04-01,Pediatrics,Self Pay,Chronic Care,197,68031.36,0.1174,29.8
+PAT-000093,2024-04-01,Radiology,Commercial,Inpatient,121,50836.46,0.0457,22.7
+PAT-000094,2024-04-01,Radiology,Medicare,Chronic Care,154,75112.64,0.0597,27.8
+PAT-000095,2024-04-01,Radiology,Medicaid,Inpatient,162,53591.1,0.1579,20.4
+PAT-000096,2024-04-01,Radiology,Self Pay,Chronic Care,164,81382.26,0.1043,33.1
+PAT-000097,2024-05-01,Emergency,Commercial,Inpatient,148,50349.9,0.1005,36.2
+PAT-000098,2024-05-01,Emergency,Medicare,Inpatient,138,56833.99,0.0896,30.4
+PAT-000099,2024-05-01,Emergency,Medicaid,Inpatient,224,104882.81,0.0622,22.3
+PAT-000100,2024-05-01,Emergency,Self Pay,Chronic Care,198,63593.96,0.0984,17.4
+PAT-000101,2024-05-01,Cardiology,Commercial,Emergency,164,51597.28,0.0461,38.3
+PAT-000102,2024-05-01,Cardiology,Medicare,Emergency,214,93029.37,0.0728,28.2
+PAT-000103,2024-05-01,Cardiology,Medicaid,Emergency,145,72121.11,0.0982,19.7
+PAT-000104,2024-05-01,Cardiology,Self Pay,Outpatient,186,58973.1,0.0747,21.2
+PAT-000105,2024-05-01,Orthopedics,Commercial,Emergency,189,62370.7,0.1176,17.0
+PAT-000106,2024-05-01,Orthopedics,Medicare,Chronic Care,235,72206.33,0.0592,37.3
+PAT-000107,2024-05-01,Orthopedics,Medicaid,Outpatient,168,66431.21,0.0503,25.6
+PAT-000108,2024-05-01,Orthopedics,Self Pay,Outpatient,158,77468.78,0.1076,28.7
+PAT-000109,2024-05-01,Oncology,Commercial,Chronic Care,242,90805.83,0.0603,22.8
+PAT-000110,2024-05-01,Oncology,Medicare,Inpatient,142,41965.89,0.0727,32.3
+PAT-000111,2024-05-01,Oncology,Medicaid,Inpatient,205,86119.29,0.0703,34.2
+PAT-000112,2024-05-01,Oncology,Self Pay,Chronic Care,157,80123.74,0.1002,27.6
+PAT-000113,2024-05-01,Pediatrics,Commercial,Chronic Care,203,103646.05,0.0787,23.1
+PAT-000114,2024-05-01,Pediatrics,Medicare,Emergency,149,77283.47,0.1268,38.0
+PAT-000115,2024-05-01,Pediatrics,Medicaid,Chronic Care,164,73350.98,0.1056,25.6
+PAT-000116,2024-05-01,Pediatrics,Self Pay,Chronic Care,228,84337.28,0.1496,32.5
+PAT-000117,2024-05-01,Radiology,Commercial,Outpatient,125,62542.1,0.108,25.6
+PAT-000118,2024-05-01,Radiology,Medicare,Emergency,169,76338.88,0.1497,23.9
+PAT-000119,2024-05-01,Radiology,Medicaid,Emergency,146,58010.2,0.0646,28.8
+PAT-000120,2024-05-01,Radiology,Self Pay,Outpatient,117,39028.57,0.0536,18.5
+PAT-000121,2024-06-01,Emergency,Commercial,Emergency,231,98848.67,0.0858,22.8
+PAT-000122,2024-06-01,Emergency,Medicare,Emergency,129,39554.6,0.1224,32.7
+PAT-000123,2024-06-01,Emergency,Medicaid,Chronic Care,206,63932.09,0.1537,28.0
+PAT-000124,2024-06-01,Emergency,Self Pay,Inpatient,145,61349.77,0.0752,32.6
+PAT-000125,2024-06-01,Cardiology,Commercial,Outpatient,200,92668.91,0.1411,17.6
+PAT-000126,2024-06-01,Cardiology,Medicare,Emergency,127,46138.67,0.1579,35.1
+PAT-000127,2024-06-01,Cardiology,Medicaid,Chronic Care,211,109650.77,0.0986,34.0
+PAT-000128,2024-06-01,Cardiology,Self Pay,Inpatient,180,58699.81,0.0753,32.1
+PAT-000129,2024-06-01,Orthopedics,Commercial,Emergency,179,56019.92,0.0928,19.3
+PAT-000130,2024-06-01,Orthopedics,Medicare,Inpatient,242,100238.43,0.1565,28.2
+PAT-000131,2024-06-01,Orthopedics,Medicaid,Outpatient,223,95240.26,0.131,22.0
+PAT-000132,2024-06-01,Orthopedics,Self Pay,Inpatient,156,80983.86,0.064,26.0
+PAT-000133,2024-06-01,Oncology,Commercial,Emergency,189,100277.0,0.125,28.7
+PAT-000134,2024-06-01,Oncology,Medicare,Outpatient,194,82816.11,0.1319,33.2
+PAT-000135,2024-06-01,Oncology,Medicaid,Inpatient,145,51491.1,0.1151,22.7
+PAT-000136,2024-06-01,Oncology,Self Pay,Outpatient,137,60616.88,0.0841,18.4
+PAT-000137,2024-06-01,Pediatrics,Commercial,Inpatient,171,79676.71,0.1421,33.2
+PAT-000138,2024-06-01,Pediatrics,Medicare,Emergency,148,62587.42,0.0526,34.9
+PAT-000139,2024-06-01,Pediatrics,Medicaid,Inpatient,225,99260.47,0.1155,28.4
+PAT-000140,2024-06-01,Pediatrics,Self Pay,Emergency,171,69915.13,0.1232,24.7
+PAT-000141,2024-06-01,Radiology,Commercial,Inpatient,181,93546.58,0.053,17.3
+PAT-000142,2024-06-01,Radiology,Medicare,Inpatient,151,80136.53,0.1395,26.7
+PAT-000143,2024-06-01,Radiology,Medicaid,Inpatient,193,80896.67,0.0534,33.4
+PAT-000144,2024-06-01,Radiology,Self Pay,Outpatient,223,88792.96,0.0602,21.6
+PAT-000145,2024-07-01,Emergency,Commercial,Outpatient,152,68222.21,0.148,31.7
+PAT-000146,2024-07-01,Emergency,Medicare,Inpatient,169,84325.71,0.0909,33.5
+PAT-000147,2024-07-01,Emergency,Medicaid,Outpatient,168,60668.43,0.1046,34.9
+PAT-000148,2024-07-01,Emergency,Self Pay,Emergency,236,95582.2,0.1052,34.7
+PAT-000149,2024-07-01,Cardiology,Commercial,Outpatient,132,44605.48,0.0703,35.4
+PAT-000150,2024-07-01,Cardiology,Medicare,Inpatient,238,114929.37,0.0613,20.2
+PAT-000151,2024-07-01,Cardiology,Medicaid,Emergency,173,92471.09,0.0517,30.3
+PAT-000152,2024-07-01,Cardiology,Self Pay,Chronic Care,143,43298.72,0.0922,35.1
+PAT-000153,2024-07-01,Orthopedics,Commercial,Chronic Care,170,58276.11,0.094,33.8
+PAT-000154,2024-07-01,Orthopedics,Medicare,Emergency,228,68720.66,0.1503,31.3
+PAT-000155,2024-07-01,Orthopedics,Medicaid,Outpatient,222,65975.71,0.1139,23.1
+PAT-000156,2024-07-01,Orthopedics,Self Pay,Emergency,241,129549.13,0.1419,33.2
+PAT-000157,2024-07-01,Oncology,Commercial,Inpatient,180,62120.36,0.0924,29.8
+PAT-000158,2024-07-01,Oncology,Medicare,Inpatient,184,65043.5,0.0753,23.6
+PAT-000159,2024-07-01,Oncology,Medicaid,Outpatient,159,71097.25,0.0768,22.8
+PAT-000160,2024-07-01,Oncology,Self Pay,Inpatient,233,110541.18,0.1087,26.3
+PAT-000161,2024-07-01,Pediatrics,Commercial,Outpatient,172,59205.46,0.0655,19.8
+PAT-000162,2024-07-01,Pediatrics,Medicare,Inpatient,231,82542.75,0.0461,28.0
+PAT-000163,2024-07-01,Pediatrics,Medicaid,Outpatient,173,64018.97,0.1166,32.4
+PAT-000164,2024-07-01,Pediatrics,Self Pay,Outpatient,202,91908.23,0.1147,35.2
+PAT-000165,2024-07-01,Radiology,Commercial,Chronic Care,148,73362.21,0.1241,24.1
+PAT-000166,2024-07-01,Radiology,Medicare,Emergency,198,86446.55,0.1007,36.1
+PAT-000167,2024-07-01,Radiology,Medicaid,Chronic Care,190,90454.54,0.0418,34.3
+PAT-000168,2024-07-01,Radiology,Self Pay,Outpatient,210,73417.98,0.1375,29.5
+PAT-000169,2024-08-01,Emergency,Commercial,Outpatient,152,48992.46,0.1436,24.2
+PAT-000170,2024-08-01,Emergency,Medicare,Inpatient,126,42339.14,0.1147,33.8
+PAT-000171,2024-08-01,Emergency,Medicaid,Chronic Care,214,79165.18,0.1472,23.4
+PAT-000172,2024-08-01,Emergency,Self Pay,Inpatient,153,66801.18,0.1351,26.1
+PAT-000173,2024-08-01,Cardiology,Commercial,Inpatient,218,74587.61,0.0847,22.1
+PAT-000174,2024-08-01,Cardiology,Medicare,Outpatient,186,94410.91,0.1103,30.2
+PAT-000175,2024-08-01,Cardiology,Medicaid,Outpatient,230,93456.38,0.0666,23.6
+PAT-000176,2024-08-01,Cardiology,Self Pay,Inpatient,176,89809.0,0.1464,27.8
+PAT-000177,2024-08-01,Orthopedics,Commercial,Inpatient,220,97802.25,0.0751,21.8
+PAT-000178,2024-08-01,Orthopedics,Medicare,Inpatient,153,53304.97,0.0409,18.6
+PAT-000179,2024-08-01,Orthopedics,Medicaid,Inpatient,229,88595.73,0.1296,25.4
+PAT-000180,2024-08-01,Orthopedics,Self Pay,Emergency,158,47519.11,0.1417,29.8
+PAT-000181,2024-08-01,Oncology,Commercial,Outpatient,118,41594.65,0.129,18.8
+PAT-000182,2024-08-01,Oncology,Medicare,Chronic Care,165,68431.39,0.077,23.1
+PAT-000183,2024-08-01,Oncology,Medicaid,Inpatient,169,88292.48,0.0469,23.7
+PAT-000184,2024-08-01,Oncology,Self Pay,Emergency,188,79398.08,0.0641,18.2
+PAT-000185,2024-08-01,Pediatrics,Commercial,Emergency,153,62681.84,0.078,34.7
+PAT-000186,2024-08-01,Pediatrics,Medicare,Inpatient,196,68835.79,0.0882,31.0
+PAT-000187,2024-08-01,Pediatrics,Medicaid,Emergency,122,53838.35,0.1107,28.5
+PAT-000188,2024-08-01,Pediatrics,Self Pay,Outpatient,231,123327.02,0.1482,38.3
+PAT-000189,2024-08-01,Radiology,Commercial,Outpatient,163,75358.94,0.1105,31.1
+PAT-000190,2024-08-01,Radiology,Medicare,Inpatient,218,113281.49,0.1202,21.1
+PAT-000191,2024-08-01,Radiology,Medicaid,Outpatient,177,79570.49,0.0611,38.3
+PAT-000192,2024-08-01,Radiology,Self Pay,Chronic Care,237,96234.14,0.1553,17.7
+PAT-000193,2024-09-01,Emergency,Commercial,Inpatient,147,80195.83,0.0735,24.6
+PAT-000194,2024-09-01,Emergency,Medicare,Emergency,221,115031.66,0.1168,20.8
+PAT-000195,2024-09-01,Emergency,Medicaid,Chronic Care,157,52911.75,0.0424,38.6
+PAT-000196,2024-09-01,Emergency,Self Pay,Chronic Care,222,86568.17,0.0603,28.8
+PAT-000197,2024-09-01,Cardiology,Commercial,Chronic Care,195,81456.35,0.0612,26.3
+PAT-000198,2024-09-01,Cardiology,Medicare,Inpatient,137,45093.98,0.1017,36.8
+PAT-000199,2024-09-01,Cardiology,Medicaid,Chronic Care,156,83040.78,0.0496,34.6
+PAT-000200,2024-09-01,Cardiology,Self Pay,Chronic Care,152,49293.65,0.1103,32.9
+PAT-000201,2024-09-01,Orthopedics,Commercial,Outpatient,229,94492.28,0.1293,35.4
+PAT-000202,2024-09-01,Orthopedics,Medicare,Inpatient,122,59560.39,0.0915,34.0
+PAT-000203,2024-09-01,Orthopedics,Medicaid,Chronic Care,204,99913.16,0.1527,21.0
+PAT-000204,2024-09-01,Orthopedics,Self Pay,Chronic Care,133,43345.99,0.1352,37.6
+PAT-000205,2024-09-01,Oncology,Commercial,Inpatient,164,64564.58,0.1575,28.6
+PAT-000206,2024-09-01,Oncology,Medicare,Inpatient,211,70385.18,0.123,24.9
+PAT-000207,2024-09-01,Oncology,Medicaid,Chronic Care,197,72798.19,0.1164,37.9
+PAT-000208,2024-09-01,Oncology,Self Pay,Inpatient,158,60289.01,0.0484,22.4
+PAT-000209,2024-09-01,Pediatrics,Commercial,Inpatient,237,104394.84,0.0408,29.9
+PAT-000210,2024-09-01,Pediatrics,Medicare,Emergency,224,79472.82,0.1567,19.2
+PAT-000211,2024-09-01,Pediatrics,Medicaid,Outpatient,241,121870.87,0.1429,37.5
+PAT-000212,2024-09-01,Pediatrics,Self Pay,Inpatient,118,47165.34,0.0753,19.5
+PAT-000213,2024-09-01,Radiology,Commercial,Chronic Care,211,81623.62,0.097,33.8
+PAT-000214,2024-09-01,Radiology,Medicare,Emergency,229,94328.86,0.0986,33.2
+PAT-000215,2024-09-01,Radiology,Medicaid,Chronic Care,153,72435.91,0.1021,34.6
+PAT-000216,2024-09-01,Radiology,Self Pay,Inpatient,145,56299.51,0.1012,31.7
+PAT-000217,2024-10-01,Emergency,Commercial,Emergency,239,107677.86,0.0852,25.6
+PAT-000218,2024-10-01,Emergency,Medicare,Outpatient,210,83593.01,0.1129,26.0
+PAT-000219,2024-10-01,Emergency,Medicaid,Outpatient,123,41581.85,0.1155,25.2
+PAT-000220,2024-10-01,Emergency,Self Pay,Inpatient,120,42998.07,0.0897,17.1
+PAT-000221,2024-10-01,Cardiology,Commercial,Outpatient,232,89344.5,0.1402,25.4
+PAT-000222,2024-10-01,Cardiology,Medicare,Outpatient,165,81664.91,0.1312,38.1
+PAT-000223,2024-10-01,Cardiology,Medicaid,Inpatient,181,84159.02,0.158,21.2
+PAT-000224,2024-10-01,Cardiology,Self Pay,Inpatient,123,51327.64,0.0415,35.3
+PAT-000225,2024-10-01,Orthopedics,Commercial,Emergency,185,67359.4,0.1552,24.5
+PAT-000226,2024-10-01,Orthopedics,Medicare,Inpatient,227,89688.74,0.0913,18.9
+PAT-000227,2024-10-01,Orthopedics,Medicaid,Chronic Care,226,83904.65,0.0422,20.0
+PAT-000228,2024-10-01,Orthopedics,Self Pay,Inpatient,129,45048.58,0.0584,32.7
+PAT-000229,2024-10-01,Oncology,Commercial,Chronic Care,221,83364.61,0.1195,33.1
+PAT-000230,2024-10-01,Oncology,Medicare,Emergency,237,114415.1,0.1128,20.7
+PAT-000231,2024-10-01,Oncology,Medicaid,Chronic Care,119,38192.74,0.0569,30.6
+PAT-000232,2024-10-01,Oncology,Self Pay,Inpatient,235,95492.06,0.134,23.0
+PAT-000233,2024-10-01,Pediatrics,Commercial,Chronic Care,216,77902.12,0.1174,26.7
+PAT-000234,2024-10-01,Pediatrics,Medicare,Inpatient,188,69866.23,0.0742,23.7
+PAT-000235,2024-10-01,Pediatrics,Medicaid,Chronic Care,209,110633.0,0.1327,38.6
+PAT-000236,2024-10-01,Pediatrics,Self Pay,Emergency,153,48997.69,0.0957,33.3
+PAT-000237,2024-10-01,Radiology,Commercial,Chronic Care,178,73781.61,0.0589,20.3
+PAT-000238,2024-10-01,Radiology,Medicare,Outpatient,180,74987.16,0.0577,19.0
+PAT-000239,2024-10-01,Radiology,Medicaid,Inpatient,234,103430.28,0.0863,21.5
+PAT-000240,2024-10-01,Radiology,Self Pay,Inpatient,189,56670.97,0.0609,30.0
+PAT-000241,2024-11-01,Emergency,Commercial,Emergency,147,75205.96,0.0707,38.2
+PAT-000242,2024-11-01,Emergency,Medicare,Outpatient,227,92670.86,0.0598,28.0
+PAT-000243,2024-11-01,Emergency,Medicaid,Emergency,140,51681.0,0.152,34.1
+PAT-000244,2024-11-01,Emergency,Self Pay,Emergency,242,106290.47,0.1352,36.0
+PAT-000245,2024-11-01,Cardiology,Commercial,Emergency,207,82931.88,0.1188,17.2
+PAT-000246,2024-11-01,Cardiology,Medicare,Chronic Care,164,76224.39,0.114,33.7
+PAT-000247,2024-11-01,Cardiology,Medicaid,Chronic Care,167,89102.25,0.154,33.4
+PAT-000248,2024-11-01,Cardiology,Self Pay,Chronic Care,174,69016.61,0.088,31.5
+PAT-000249,2024-11-01,Orthopedics,Commercial,Emergency,186,64285.81,0.1016,23.4
+PAT-000250,2024-11-01,Orthopedics,Medicare,Outpatient,175,95452.23,0.1002,29.6
+PAT-000251,2024-11-01,Orthopedics,Medicaid,Chronic Care,237,73770.16,0.0726,29.2
+PAT-000252,2024-11-01,Orthopedics,Self Pay,Emergency,203,85162.79,0.1555,35.0
+PAT-000253,2024-11-01,Oncology,Commercial,Outpatient,178,81050.47,0.1505,24.0
+PAT-000254,2024-11-01,Oncology,Medicare,Inpatient,177,85322.39,0.1134,34.8
+PAT-000255,2024-11-01,Oncology,Medicaid,Inpatient,202,83000.94,0.1258,27.0
+PAT-000256,2024-11-01,Oncology,Self Pay,Inpatient,187,85201.56,0.065,35.2
+PAT-000257,2024-11-01,Pediatrics,Commercial,Outpatient,134,40085.21,0.06,30.5
+PAT-000258,2024-11-01,Pediatrics,Medicare,Outpatient,212,73676.51,0.1214,25.5
+PAT-000259,2024-11-01,Pediatrics,Medicaid,Emergency,225,92133.86,0.097,39.0
+PAT-000260,2024-11-01,Pediatrics,Self Pay,Inpatient,149,58638.17,0.0654,30.3
+PAT-000261,2024-11-01,Radiology,Commercial,Outpatient,159,59338.63,0.0682,34.6
+PAT-000262,2024-11-01,Radiology,Medicare,Chronic Care,177,52544.34,0.1371,30.3
+PAT-000263,2024-11-01,Radiology,Medicaid,Outpatient,202,92821.04,0.1194,30.6
+PAT-000264,2024-11-01,Radiology,Self Pay,Outpatient,127,56381.4,0.1353,35.6
+PAT-000265,2024-12-01,Emergency,Commercial,Chronic Care,201,68396.91,0.1348,18.6
+PAT-000266,2024-12-01,Emergency,Medicare,Emergency,204,81540.59,0.1588,24.5
+PAT-000267,2024-12-01,Emergency,Medicaid,Emergency,211,84194.14,0.139,24.3
+PAT-000268,2024-12-01,Emergency,Self Pay,Inpatient,119,43498.24,0.1105,29.1
+PAT-000269,2024-12-01,Cardiology,Commercial,Emergency,126,68747.91,0.0957,19.1
+PAT-000270,2024-12-01,Cardiology,Medicare,Emergency,236,95934.26,0.064,37.5
+PAT-000271,2024-12-01,Cardiology,Medicaid,Outpatient,197,62542.41,0.1523,18.8
+PAT-000272,2024-12-01,Cardiology,Self Pay,Chronic Care,129,42000.45,0.131,37.7
+PAT-000273,2024-12-01,Orthopedics,Commercial,Inpatient,209,76965.2,0.0581,30.0
+PAT-000274,2024-12-01,Orthopedics,Medicare,Inpatient,213,104302.78,0.0607,16.8
+PAT-000275,2024-12-01,Orthopedics,Medicaid,Chronic Care,220,102900.04,0.0849,18.2
+PAT-000276,2024-12-01,Orthopedics,Self Pay,Chronic Care,154,53267.91,0.0657,21.8
+PAT-000277,2024-12-01,Oncology,Commercial,Outpatient,210,111819.58,0.0442,31.2
+PAT-000278,2024-12-01,Oncology,Medicare,Inpatient,119,62598.19,0.1313,17.4
+PAT-000279,2024-12-01,Oncology,Medicaid,Inpatient,126,39459.0,0.1175,36.0
+PAT-000280,2024-12-01,Oncology,Self Pay,Outpatient,180,78738.15,0.0947,24.9
+PAT-000281,2024-12-01,Pediatrics,Commercial,Outpatient,221,97128.83,0.0685,26.1
+PAT-000282,2024-12-01,Pediatrics,Medicare,Outpatient,117,52334.91,0.1441,38.5
+PAT-000283,2024-12-01,Pediatrics,Medicaid,Emergency,228,97987.43,0.1193,30.1
+PAT-000284,2024-12-01,Pediatrics,Self Pay,Emergency,159,72543.45,0.0552,36.6
+PAT-000285,2024-12-01,Radiology,Commercial,Chronic Care,154,55534.06,0.0682,38.0
+PAT-000286,2024-12-01,Radiology,Medicare,Outpatient,167,73018.96,0.0754,28.2
+PAT-000287,2024-12-01,Radiology,Medicaid,Outpatient,136,56223.07,0.0764,38.2
+PAT-000288,2024-12-01,Radiology,Self Pay,Inpatient,180,66787.41,0.1352,37.6
+PAT-000001,2024-01-01,Emergency,Commercial,Inpatient,162,71903.84,0.0669,19.2
+PAT-000002,2024-01-01,Emergency,Medicare,Chronic Care,124,47154.23,0.1194,17.7
+PAT-000003,2024-01-01,Emergency,Medicaid,Chronic Care,137,74228.34,0.0823,38.5
+PAT-000004,2024-01-01,Emergency,Self Pay,Outpatient,202,104137.63,0.1177,17.5
+PAT-000005,2024-01-01,Cardiology,Commercial,Outpatient,217,105497.28,0.0744,33.3
+PAT-000006,2024-01-01,Cardiology,Medicare,Chronic Care,237,72665.18,0.0453,34.0
+PAT-000007,2024-01-01,Cardiology,Medicaid,Inpatient,146,76415.12,0.0682,36.3
+PAT-000008,2024-01-01,Cardiology,Self Pay,Inpatient,172,51626.35,0.158,19.5
+PAT-000009,2024-01-01,Orthopedics,Commercial,Inpatient,178,59582.58,0.0604,23.3
+PAT-000010,2024-01-01,Orthopedics,Medicare,Chronic Care,117,61706.96,0.1508,25.6
+PAT-000011,2024-01-01,Orthopedics,Medicaid,Outpatient,160,85167.09,0.0601,24.5
+PAT-000012,2024-01-01,Orthopedics,Self Pay,Outpatient,187,92993.39,0.125,18.1
+PAT-000013,2024-01-01,Oncology,Commercial,Chronic Care,162,58131.65,0.1224,28.6
+PAT-000014,2024-01-01,Oncology,Medicare,Outpatient,221,81885.27,0.1348,29.0
+PAT-000015,2024-01-01,Oncology,Medicaid,Chronic Care,123,52689.14,0.1364,24.0
+PAT-000016,2024-01-01,Oncology,Self Pay,Outpatient,186,56513.13,0.0891,19.7
+PAT-000017,2024-01-01,Pediatrics,Commercial,Outpatient,190,55868.28,0.0879,37.6
+PAT-000018,2024-01-01,Pediatrics,Medicare,Inpatient,223,73048.69,0.1218,30.8
+PAT-000019,2024-01-01,Pediatrics,Medicaid,Outpatient,165,50649.01,0.0645,35.9
+PAT-000020,2024-01-01,Pediatrics,Self Pay,Emergency,205,95179.47,0.098,25.7
+PAT-000021,2024-01-01,Radiology,Commercial,Emergency,233,92835.81,0.1018,31.7
+PAT-000022,2024-01-01,Radiology,Medicare,Emergency,235,107846.74,0.1159,35.5
+PAT-000023,2024-01-01,Radiology,Medicaid,Emergency,144,44284.91,0.0627,28.8
+PAT-000024,2024-01-01,Radiology,Self Pay,Emergency,143,49026.46,0.0795,35.7
+PAT-000025,2024-02-01,Emergency,Commercial,Inpatient,217,86861.45,0.1416,21.7
+PAT-000026,2024-02-01,Emergency,Medicare,Emergency,228,90347.79,0.142,27.5
+PAT-000027,2024-02-01,Emergency,Medicaid,Emergency,202,65239.52,0.0897,26.0
+PAT-000028,2024-02-01,Emergency,Self Pay,Chronic Care,206,88816.85,0.1477,32.2
+PAT-000029,2024-02-01,Cardiology,Commercial,Emergency,187,80051.38,0.0409,19.8
+PAT-000030,2024-02-01,Cardiology,Medicare,Inpatient,209,74826.22,0.1315,17.9
+PAT-000031,2024-02-01,Cardiology,Medicaid,Inpatient,240,95142.71,0.0743,21.8
+PAT-000032,2024-02-01,Cardiology,Self Pay,Chronic Care,165,65094.84,0.0963,31.6
+PAT-000033,2024-02-01,Orthopedics,Commercial,Outpatient,119,57162.13,0.1461,34.2
+PAT-000034,2024-02-01,Orthopedics,Medicare,Emergency,212,104208.59,0.1577,24.3
+PAT-000035,2024-02-01,Orthopedics,Medicaid,Outpatient,187,93728.33,0.0719,37.1
+PAT-000036,2024-02-01,Orthopedics,Self Pay,Chronic Care,210,114651.28,0.1284,35.3
+PAT-000037,2024-02-01,Oncology,Commercial,Emergency,179,85969.77,0.1259,33.5
+PAT-000038,2024-02-01,Oncology,Medicare,Emergency,183,65544.99,0.0467,20.4
+PAT-000039,2024-02-01,Oncology,Medicaid,Outpatient,196,91209.45,0.1331,23.3
+PAT-000040,2024-02-01,Oncology,Self Pay,Inpatient,124,42284.78,0.0673,22.5
+PAT-000041,2024-02-01,Pediatrics,Commercial,Inpatient,234,96307.98,0.1398,36.2
+PAT-000042,2024-02-01,Pediatrics,Medicare,Emergency,180,88658.98,0.068,21.3
+PAT-000043,2024-02-01,Pediatrics,Medicaid,Chronic Care,185,54840.18,0.1442,17.0
+PAT-000044,2024-02-01,Pediatrics,Self Pay,Emergency,143,52774.44,0.126,38.3
+PAT-000045,2024-02-01,Radiology,Commercial,Outpatient,210,64954.53,0.1515,22.7
+PAT-000046,2024-02-01,Radiology,Medicare,Chronic Care,234,104389.84,0.1314,36.4
+PAT-000047,2024-02-01,Radiology,Medicaid,Inpatient,201,71680.93,0.0856,36.6
+PAT-000048,2024-02-01,Radiology,Self Pay,Outpatient,208,112254.98,0.1116,33.5
+PAT-000049,2024-03-01,Emergency,Commercial,Outpatient,169,63805.34,0.1012,35.9
+PAT-000050,2024-03-01,Emergency,Medicare,Emergency,129,43301.56,0.0953,23.5
+PAT-000051,2024-03-01,Emergency,Medicaid,Outpatient,202,100830.28,0.047,32.2
+PAT-000052,2024-03-01,Emergency,Self Pay,Emergency,223,97172.55,0.1008,39.0
+PAT-000053,2024-03-01,Cardiology,Commercial,Inpatient,156,53473.4,0.0832,17.2
+PAT-000054,2024-03-01,Cardiology,Medicare,Chronic Care,183,79758.65,0.1434,22.2
+PAT-000055,2024-03-01,Cardiology,Medicaid,Emergency,233,86971.57,0.1323,30.1
+PAT-000056,2024-03-01,Cardiology,Self Pay,Emergency,183,81330.78,0.0572,17.0
+PAT-000057,2024-03-01,Orthopedics,Commercial,Outpatient,159,53491.22,0.1213,27.7
+PAT-000058,2024-03-01,Orthopedics,Medicare,Inpatient,129,70395.36,0.113,38.9
+PAT-000059,2024-03-01,Orthopedics,Medicaid,Emergency,123,49366.52,0.1167,29.4
+PAT-000060,2024-03-01,Orthopedics,Self Pay,Emergency,190,88918.32,0.0481,35.9
+PAT-000061,2024-03-01,Oncology,Commercial,Outpatient,166,52335.36,0.1413,20.7
+PAT-000062,2024-03-01,Oncology,Medicare,Emergency,140,75425.76,0.101,28.5
+PAT-000063,2024-03-01,Oncology,Medicaid,Outpatient,240,89286.96,0.1031,28.1
+PAT-000064,2024-03-01,Oncology,Self Pay,Outpatient,152,70886.26,0.1579,33.6
+PAT-000065,2024-03-01,Pediatrics,Commercial,Outpatient,125,58947.92,0.089,38.3
+PAT-000066,2024-03-01,Pediatrics,Medicare,Inpatient,127,46713.96,0.0697,35.7
+PAT-000067,2024-03-01,Pediatrics,Medicaid,Inpatient,159,66572.38,0.1585,17.0
+PAT-000068,2024-03-01,Pediatrics,Self Pay,Outpatient,217,115440.05,0.1143,36.6
+PAT-000069,2024-03-01,Radiology,Commercial,Outpatient,180,93819.27,0.1424,39.1
+PAT-000070,2024-03-01,Radiology,Medicare,Inpatient,223,89888.4,0.1083,22.8
+PAT-000071,2024-03-01,Radiology,Medicaid,Inpatient,205,90944.86,0.0822,34.3
+PAT-000072,2024-03-01,Radiology,Self Pay,Outpatient,122,39035.48,0.0877,25.7
+PAT-000073,2024-04-01,Emergency,Commercial,Emergency,213,96764.57,0.1585,18.0
+PAT-000074,2024-04-01,Emergency,Medicare,Inpatient,163,71439.11,0.1418,32.2
+PAT-000075,2024-04-01,Emergency,Medicaid,Outpatient,225,114812.42,0.0553,31.4
+PAT-000076,2024-04-01,Emergency,Self Pay,Inpatient,132,44661.64,0.0883,24.3
+PAT-000077,2024-04-01,Cardiology,Commercial,Outpatient,151,60742.12,0.1493,28.5
+PAT-000078,2024-04-01,Cardiology,Medicare,Chronic Care,213,113671.7,0.0817,34.6
+PAT-000079,2024-04-01,Cardiology,Medicaid,Inpatient,220,80224.86,0.0516,21.4
+PAT-000080,2024-04-01,Cardiology,Self Pay,Chronic Care,145,68925.58,0.145,28.0
+PAT-000081,2024-04-01,Orthopedics,Commercial,Chronic Care,199,81308.39,0.1494,20.6
+PAT-000082,2024-04-01,Orthopedics,Medicare,Emergency,170,80586.16,0.1088,17.3
+PAT-000083,2024-04-01,Orthopedics,Medicaid,Outpatient,230,75421.91,0.088,23.8
+PAT-000084,2024-04-01,Orthopedics,Self Pay,Inpatient,166,82183.24,0.0955,17.0
+PAT-000085,2024-04-01,Oncology,Commercial,Emergency,156,68648.33,0.1025,25.7
+PAT-000086,2024-04-01,Oncology,Medicare,Emergency,205,93989.46,0.1127,17.5
+PAT-000087,2024-04-01,Oncology,Medicaid,Inpatient,121,50831.6,0.1389,37.7
+PAT-000088,2024-04-01,Oncology,Self Pay,Inpatient,232,122766.01,0.054,38.6
+PAT-000089,2024-04-01,Pediatrics,Commercial,Chronic Care,142,46239.05,0.1553,20.3
+PAT-000090,2024-04-01,Pediatrics,Medicare,Chronic Care,126,54396.67,0.0766,24.4
+PAT-000091,2024-04-01,Pediatrics,Medicaid,Inpatient,151,58615.22,0.1213,29.7
+PAT-000092,2024-04-01,Pediatrics,Self Pay,Chronic Care,197,68031.36,0.1174,29.8
+PAT-000093,2024-04-01,Radiology,Commercial,Inpatient,121,50836.46,0.0457,22.7
+PAT-000094,2024-04-01,Radiology,Medicare,Chronic Care,154,75112.64,0.0597,27.8
+PAT-000095,2024-04-01,Radiology,Medicaid,Inpatient,162,53591.1,0.1579,20.4
+PAT-000096,2024-04-01,Radiology,Self Pay,Chronic Care,164,81382.26,0.1043,33.1
+PAT-000097,2024-05-01,Emergency,Commercial,Inpatient,148,50349.9,0.1005,36.2
+PAT-000098,2024-05-01,Emergency,Medicare,Inpatient,138,56833.99,0.0896,30.4
+PAT-000099,2024-05-01,Emergency,Medicaid,Inpatient,224,104882.81,0.0622,22.3
+PAT-000100,2024-05-01,Emergency,Self Pay,Chronic Care,198,63593.96,0.0984,17.4
+PAT-000101,2024-05-01,Cardiology,Commercial,Emergency,164,51597.28,0.0461,38.3
+PAT-000102,2024-05-01,Cardiology,Medicare,Emergency,214,93029.37,0.0728,28.2
+PAT-000103,2024-05-01,Cardiology,Medicaid,Emergency,145,72121.11,0.0982,19.7
+PAT-000104,2024-05-01,Cardiology,Self Pay,Outpatient,186,58973.1,0.0747,21.2
+PAT-000105,2024-05-01,Orthopedics,Commercial,Emergency,189,62370.7,0.1176,17.0
+PAT-000106,2024-05-01,Orthopedics,Medicare,Chronic Care,235,72206.33,0.0592,37.3
+PAT-000107,2024-05-01,Orthopedics,Medicaid,Outpatient,168,66431.21,0.0503,25.6
+PAT-000108,2024-05-01,Orthopedics,Self Pay,Outpatient,158,77468.78,0.1076,28.7
+PAT-000109,2024-05-01,Oncology,Commercial,Chronic Care,242,90805.83,0.0603,22.8
+PAT-000110,2024-05-01,Oncology,Medicare,Inpatient,142,41965.89,0.0727,32.3
+PAT-000111,2024-05-01,Oncology,Medicaid,Inpatient,205,86119.29,0.0703,34.2
+PAT-000112,2024-05-01,Oncology,Self Pay,Chronic Care,157,80123.74,0.1002,27.6
+PAT-000113,2024-05-01,Pediatrics,Commercial,Chronic Care,203,103646.05,0.0787,23.1
+PAT-000114,2024-05-01,Pediatrics,Medicare,Emergency,149,77283.47,0.1268,38.0
+PAT-000115,2024-05-01,Pediatrics,Medicaid,Chronic Care,164,73350.98,0.1056,25.6
+PAT-000116,2024-05-01,Pediatrics,Self Pay,Chronic Care,228,84337.28,0.1496,32.5
+PAT-000117,2024-05-01,Radiology,Commercial,Outpatient,125,62542.1,0.108,25.6
+PAT-000118,2024-05-01,Radiology,Medicare,Emergency,169,76338.88,0.1497,23.9
+PAT-000119,2024-05-01,Radiology,Medicaid,Emergency,146,58010.2,0.0646,28.8
+PAT-000120,2024-05-01,Radiology,Self Pay,Outpatient,117,39028.57,0.0536,18.5
+PAT-000121,2024-06-01,Emergency,Commercial,Emergency,231,98848.67,0.0858,22.8
+PAT-000122,2024-06-01,Emergency,Medicare,Emergency,129,39554.6,0.1224,32.7
+PAT-000123,2024-06-01,Emergency,Medicaid,Chronic Care,206,63932.09,0.1537,28.0
+PAT-000124,2024-06-01,Emergency,Self Pay,Inpatient,145,61349.77,0.0752,32.6
+PAT-000125,2024-06-01,Cardiology,Commercial,Outpatient,200,92668.91,0.1411,17.6
+PAT-000126,2024-06-01,Cardiology,Medicare,Emergency,127,46138.67,0.1579,35.1
+PAT-000127,2024-06-01,Cardiology,Medicaid,Chronic Care,211,109650.77,0.0986,34.0
+PAT-000128,2024-06-01,Cardiology,Self Pay,Inpatient,180,58699.81,0.0753,32.1
+PAT-000129,2024-06-01,Orthopedics,Commercial,Emergency,179,56019.92,0.0928,19.3
+PAT-000130,2024-06-01,Orthopedics,Medicare,Inpatient,242,100238.43,0.1565,28.2
+PAT-000131,2024-06-01,Orthopedics,Medicaid,Outpatient,223,95240.26,0.131,22.0
+PAT-000132,2024-06-01,Orthopedics,Self Pay,Inpatient,156,80983.86,0.064,26.0
+PAT-000133,2024-06-01,Oncology,Commercial,Emergency,189,100277.0,0.125,28.7
+PAT-000134,2024-06-01,Oncology,Medicare,Outpatient,194,82816.11,0.1319,33.2
+PAT-000135,2024-06-01,Oncology,Medicaid,Inpatient,145,51491.1,0.1151,22.7
+PAT-000136,2024-06-01,Oncology,Self Pay,Outpatient,137,60616.88,0.0841,18.4
+PAT-000137,2024-06-01,Pediatrics,Commercial,Inpatient,171,79676.71,0.1421,33.2
+PAT-000138,2024-06-01,Pediatrics,Medicare,Emergency,148,62587.42,0.0526,34.9
+PAT-000139,2024-06-01,Pediatrics,Medicaid,Inpatient,225,99260.47,0.1155,28.4
+PAT-000140,2024-06-01,Pediatrics,Self Pay,Emergency,171,69915.13,0.1232,24.7
+PAT-000141,2024-06-01,Radiology,Commercial,Inpatient,181,93546.58,0.053,17.3
+PAT-000142,2024-06-01,Radiology,Medicare,Inpatient,151,80136.53,0.1395,26.7
+PAT-000143,2024-06-01,Radiology,Medicaid,Inpatient,193,80896.67,0.0534,33.4
+PAT-000144,2024-06-01,Radiology,Self Pay,Outpatient,223,88792.96,0.0602,21.6
+PAT-000145,2024-07-01,Emergency,Commercial,Outpatient,152,68222.21,0.148,31.7
+PAT-000146,2024-07-01,Emergency,Medicare,Inpatient,169,84325.71,0.0909,33.5
+PAT-000147,2024-07-01,Emergency,Medicaid,Outpatient,168,60668.43,0.1046,34.9
+PAT-000148,2024-07-01,Emergency,Self Pay,Emergency,236,95582.2,0.1052,34.7
+PAT-000149,2024-07-01,Cardiology,Commercial,Outpatient,132,44605.48,0.0703,35.4
+PAT-000150,2024-07-01,Cardiology,Medicare,Inpatient,238,114929.37,0.0613,20.2
+PAT-000151,2024-07-01,Cardiology,Medicaid,Emergency,173,92471.09,0.0517,30.3
+PAT-000152,2024-07-01,Cardiology,Self Pay,Chronic Care,143,43298.72,0.0922,35.1
+PAT-000153,2024-07-01,Orthopedics,Commercial,Chronic Care,170,58276.11,0.094,33.8
+PAT-000154,2024-07-01,Orthopedics,Medicare,Emergency,228,68720.66,0.1503,31.3
+PAT-000155,2024-07-01,Orthopedics,Medicaid,Outpatient,222,65975.71,0.1139,23.1
+PAT-000156,2024-07-01,Orthopedics,Self Pay,Emergency,241,129549.13,0.1419,33.2
+PAT-000157,2024-07-01,Oncology,Commercial,Inpatient,180,62120.36,0.0924,29.8
+PAT-000158,2024-07-01,Oncology,Medicare,Inpatient,184,65043.5,0.0753,23.6
+PAT-000159,2024-07-01,Oncology,Medicaid,Outpatient,159,71097.25,0.0768,22.8
+PAT-000160,2024-07-01,Oncology,Self Pay,Inpatient,233,110541.18,0.1087,26.3
+PAT-000161,2024-07-01,Pediatrics,Commercial,Outpatient,172,59205.46,0.0655,19.8
+PAT-000162,2024-07-01,Pediatrics,Medicare,Inpatient,231,82542.75,0.0461,28.0
+PAT-000163,2024-07-01,Pediatrics,Medicaid,Outpatient,173,64018.97,0.1166,32.4
+PAT-000164,2024-07-01,Pediatrics,Self Pay,Outpatient,202,91908.23,0.1147,35.2
+PAT-000165,2024-07-01,Radiology,Commercial,Chronic Care,148,73362.21,0.1241,24.1
+PAT-000166,2024-07-01,Radiology,Medicare,Emergency,198,86446.55,0.1007,36.1
+PAT-000167,2024-07-01,Radiology,Medicaid,Chronic Care,190,90454.54,0.0418,34.3
+PAT-000168,2024-07-01,Radiology,Self Pay,Outpatient,210,73417.98,0.1375,29.5
+PAT-000169,2024-08-01,Emergency,Commercial,Outpatient,152,48992.46,0.1436,24.2
+PAT-000170,2024-08-01,Emergency,Medicare,Inpatient,126,42339.14,0.1147,33.8
+PAT-000171,2024-08-01,Emergency,Medicaid,Chronic Care,214,79165.18,0.1472,23.4
+PAT-000172,2024-08-01,Emergency,Self Pay,Inpatient,153,66801.18,0.1351,26.1
+PAT-000173,2024-08-01,Cardiology,Commercial,Inpatient,218,74587.61,0.0847,22.1
+PAT-000174,2024-08-01,Cardiology,Medicare,Outpatient,186,94410.91,0.1103,30.2
+PAT-000175,2024-08-01,Cardiology,Medicaid,Outpatient,230,93456.38,0.0666,23.6
+PAT-000176,2024-08-01,Cardiology,Self Pay,Inpatient,176,89809.0,0.1464,27.8
+PAT-000177,2024-08-01,Orthopedics,Commercial,Inpatient,220,97802.25,0.0751,21.8
+PAT-000178,2024-08-01,Orthopedics,Medicare,Inpatient,153,53304.97,0.0409,18.6
+PAT-000179,2024-08-01,Orthopedics,Medicaid,Inpatient,229,88595.73,0.1296,25.4
+PAT-000180,2024-08-01,Orthopedics,Self Pay,Emergency,158,47519.11,0.1417,29.8
+PAT-000181,2024-08-01,Oncology,Commercial,Outpatient,118,41594.65,0.129,18.8
+PAT-000182,2024-08-01,Oncology,Medicare,Chronic Care,165,68431.39,0.077,23.1
+PAT-000183,2024-08-01,Oncology,Medicaid,Inpatient,169,88292.48,0.0469,23.7
+PAT-000184,2024-08-01,Oncology,Self Pay,Emergency,188,79398.08,0.0641,18.2
+PAT-000185,2024-08-01,Pediatrics,Commercial,Emergency,153,62681.84,0.078,34.7
+PAT-000186,2024-08-01,Pediatrics,Medicare,Inpatient,196,68835.79,0.0882,31.0
+PAT-000187,2024-08-01,Pediatrics,Medicaid,Emergency,122,53838.35,0.1107,28.5
+PAT-000188,2024-08-01,Pediatrics,Self Pay,Outpatient,231,123327.02,0.1482,38.3
+PAT-000189,2024-08-01,Radiology,Commercial,Outpatient,163,75358.94,0.1105,31.1
+PAT-000190,2024-08-01,Radiology,Medicare,Inpatient,218,113281.49,0.1202,21.1
+PAT-000191,2024-08-01,Radiology,Medicaid,Outpatient,177,79570.49,0.0611,38.3
+PAT-000192,2024-08-01,Radiology,Self Pay,Chronic Care,237,96234.14,0.1553,17.7
+PAT-000193,2024-09-01,Emergency,Commercial,Inpatient,147,80195.83,0.0735,24.6
+PAT-000194,2024-09-01,Emergency,Medicare,Emergency,221,115031.66,0.1168,20.8
+PAT-000195,2024-09-01,Emergency,Medicaid,Chronic Care,157,52911.75,0.0424,38.6
+PAT-000196,2024-09-01,Emergency,Self Pay,Chronic Care,222,86568.17,0.0603,28.8
+PAT-000197,2024-09-01,Cardiology,Commercial,Chronic Care,195,81456.35,0.0612,26.3
+PAT-000198,2024-09-01,Cardiology,Medicare,Inpatient,137,45093.98,0.1017,36.8
+PAT-000199,2024-09-01,Cardiology,Medicaid,Chronic Care,156,83040.78,0.0496,34.6
+PAT-000200,2024-09-01,Cardiology,Self Pay,Chronic Care,152,49293.65,0.1103,32.9
+PAT-000201,2024-09-01,Orthopedics,Commercial,Outpatient,229,94492.28,0.1293,35.4
+PAT-000202,2024-09-01,Orthopedics,Medicare,Inpatient,122,59560.39,0.0915,34.0
+PAT-000203,2024-09-01,Orthopedics,Medicaid,Chronic Care,204,99913.16,0.1527,21.0
+PAT-000204,2024-09-01,Orthopedics,Self Pay,Chronic Care,133,43345.99,0.1352,37.6
+PAT-000205,2024-09-01,Oncology,Commercial,Inpatient,164,64564.58,0.1575,28.6
+PAT-000206,2024-09-01,Oncology,Medicare,Inpatient,211,70385.18,0.123,24.9
+PAT-000207,2024-09-01,Oncology,Medicaid,Chronic Care,197,72798.19,0.1164,37.9
+PAT-000208,2024-09-01,Oncology,Self Pay,Inpatient,158,60289.01,0.0484,22.4
+PAT-000209,2024-09-01,Pediatrics,Commercial,Inpatient,237,104394.84,0.0408,29.9
+PAT-000210,2024-09-01,Pediatrics,Medicare,Emergency,224,79472.82,0.1567,19.2
+PAT-000211,2024-09-01,Pediatrics,Medicaid,Outpatient,241,121870.87,0.1429,37.5
+PAT-000212,2024-09-01,Pediatrics,Self Pay,Inpatient,118,47165.34,0.0753,19.5
+PAT-000213,2024-09-01,Radiology,Commercial,Chronic Care,211,81623.62,0.097,33.8
+PAT-000214,2024-09-01,Radiology,Medicare,Emergency,229,94328.86,0.0986,33.2
+PAT-000215,2024-09-01,Radiology,Medicaid,Chronic Care,153,72435.91,0.1021,34.6
+PAT-000216,2024-09-01,Radiology,Self Pay,Inpatient,145,56299.51,0.1012,31.7
+PAT-000217,2024-10-01,Emergency,Commercial,Emergency,239,107677.86,0.0852,25.6
+PAT-000218,2024-10-01,Emergency,Medicare,Outpatient,210,83593.01,0.1129,26.0
+PAT-000219,2024-10-01,Emergency,Medicaid,Outpatient,123,41581.85,0.1155,25.2
+PAT-000220,2024-10-01,Emergency,Self Pay,Inpatient,120,42998.07,0.0897,17.1
+PAT-000221,2024-10-01,Cardiology,Commercial,Outpatient,232,89344.5,0.1402,25.4
+PAT-000222,2024-10-01,Cardiology,Medicare,Outpatient,165,81664.91,0.1312,38.1
+PAT-000223,2024-10-01,Cardiology,Medicaid,Inpatient,181,84159.02,0.158,21.2
+PAT-000224,2024-10-01,Cardiology,Self Pay,Inpatient,123,51327.64,0.0415,35.3
+PAT-000225,2024-10-01,Orthopedics,Commercial,Emergency,185,67359.4,0.1552,24.5
+PAT-000226,2024-10-01,Orthopedics,Medicare,Inpatient,227,89688.74,0.0913,18.9
+PAT-000227,2024-10-01,Orthopedics,Medicaid,Chronic Care,226,83904.65,0.0422,20.0
+PAT-000228,2024-10-01,Orthopedics,Self Pay,Inpatient,129,45048.58,0.0584,32.7
+PAT-000229,2024-10-01,Oncology,Commercial,Chronic Care,221,83364.61,0.1195,33.1
+PAT-000230,2024-10-01,Oncology,Medicare,Emergency,237,114415.1,0.1128,20.7
+PAT-000231,2024-10-01,Oncology,Medicaid,Chronic Care,119,38192.74,0.0569,30.6
+PAT-000232,2024-10-01,Oncology,Self Pay,Inpatient,235,95492.06,0.134,23.0
+PAT-000233,2024-10-01,Pediatrics,Commercial,Chronic Care,216,77902.12,0.1174,26.7
+PAT-000234,2024-10-01,Pediatrics,Medicare,Inpatient,188,69866.23,0.0742,23.7
+PAT-000235,2024-10-01,Pediatrics,Medicaid,Chronic Care,209,110633.0,0.1327,38.6
+PAT-000236,2024-10-01,Pediatrics,Self Pay,Emergency,153,48997.69,0.0957,33.3
+PAT-000237,2024-10-01,Radiology,Commercial,Chronic Care,178,73781.61,0.0589,20.3
+PAT-000238,2024-10-01,Radiology,Medicare,Outpatient,180,74987.16,0.0577,19.0
+PAT-000239,2024-10-01,Radiology,Medicaid,Inpatient,234,103430.28,0.0863,21.5
+PAT-000240,2024-10-01,Radiology,Self Pay,Inpatient,189,56670.97,0.0609,30.0
+PAT-000241,2024-11-01,Emergency,Commercial,Emergency,147,75205.96,0.0707,38.2
+PAT-000242,2024-11-01,Emergency,Medicare,Outpatient,227,92670.86,0.0598,28.0
+PAT-000243,2024-11-01,Emergency,Medicaid,Emergency,140,51681.0,0.152,34.1
+PAT-000244,2024-11-01,Emergency,Self Pay,Emergency,242,106290.47,0.1352,36.0
+PAT-000245,2024-11-01,Cardiology,Commercial,Emergency,207,82931.88,0.1188,17.2
+PAT-000246,2024-11-01,Cardiology,Medicare,Chronic Care,164,76224.39,0.114,33.7
+PAT-000247,2024-11-01,Cardiology,Medicaid,Chronic Care,167,89102.25,0.154,33.4
+PAT-000248,2024-11-01,Cardiology,Self Pay,Chronic Care,174,69016.61,0.088,31.5
+PAT-000249,2024-11-01,Orthopedics,Commercial,Emergency,186,64285.81,0.1016,23.4
+PAT-000250,2024-11-01,Orthopedics,Medicare,Outpatient,175,95452.23,0.1002,29.6
+PAT-000251,2024-11-01,Orthopedics,Medicaid,Chronic Care,237,73770.16,0.0726,29.2
+PAT-000252,2024-11-01,Orthopedics,Self Pay,Emergency,203,85162.79,0.1555,35.0
+PAT-000253,2024-11-01,Oncology,Commercial,Outpatient,178,81050.47,0.1505,24.0
+PAT-000254,2024-11-01,Oncology,Medicare,Inpatient,177,85322.39,0.1134,34.8
+PAT-000255,2024-11-01,Oncology,Medicaid,Inpatient,202,83000.94,0.1258,27.0
+PAT-000256,2024-11-01,Oncology,Self Pay,Inpatient,187,85201.56,0.065,35.2
+PAT-000257,2024-11-01,Pediatrics,Commercial,Outpatient,134,40085.21,0.06,30.5
+PAT-000258,2024-11-01,Pediatrics,Medicare,Outpatient,212,73676.51,0.1214,25.5
+PAT-000259,2024-11-01,Pediatrics,Medicaid,Emergency,225,92133.86,0.097,39.0
+PAT-000260,2024-11-01,Pediatrics,Self Pay,Inpatient,149,58638.17,0.0654,30.3
+PAT-000261,2024-11-01,Radiology,Commercial,Outpatient,159,59338.63,0.0682,34.6
+PAT-000262,2024-11-01,Radiology,Medicare,Chronic Care,177,52544.34,0.1371,30.3
+PAT-000263,2024-11-01,Radiology,Medicaid,Outpatient,202,92821.04,0.1194,30.6
+PAT-000264,2024-11-01,Radiology,Self Pay,Outpatient,127,56381.4,0.1353,35.6
+PAT-000265,2024-12-01,Emergency,Commercial,Chronic Care,201,68396.91,0.1348,18.6
+PAT-000266,2024-12-01,Emergency,Medicare,Emergency,204,81540.59,0.1588,24.5
+PAT-000267,2024-12-01,Emergency,Medicaid,Emergency,211,84194.14,0.139,24.3
+PAT-000268,2024-12-01,Emergency,Self Pay,Inpatient,119,43498.24,0.1105,29.1
+PAT-000269,2024-12-01,Cardiology,Commercial,Emergency,126,68747.91,0.0957,19.1
+PAT-000270,2024-12-01,Cardiology,Medicare,Emergency,236,95934.26,0.064,37.5
+PAT-000271,2024-12-01,Cardiology,Medicaid,Outpatient,197,62542.41,0.1523,18.8
+PAT-000272,2024-12-01,Cardiology,Self Pay,Chronic Care,129,42000.45,0.131,37.7
+PAT-000273,2024-12-01,Orthopedics,Commercial,Inpatient,209,76965.2,0.0581,30.0
+PAT-000274,2024-12-01,Orthopedics,Medicare,Inpatient,213,104302.78,0.0607,16.8
+PAT-000275,2024-12-01,Orthopedics,Medicaid,Chronic Care,220,102900.04,0.0849,18.2
+PAT-000276,2024-12-01,Orthopedics,Self Pay,Chronic Care,154,53267.91,0.0657,21.8
+PAT-000277,2024-12-01,Oncology,Commercial,Outpatient,210,111819.58,0.0442,31.2
+PAT-000278,2024-12-01,Oncology,Medicare,Inpatient,119,62598.19,0.1313,17.4
+PAT-000279,2024-12-01,Oncology,Medicaid,Inpatient,126,39459.0,0.1175,36.0
+PAT-000280,2024-12-01,Oncology,Self Pay,Outpatient,180,78738.15,0.0947,24.9
+PAT-000281,2024-12-01,Pediatrics,Commercial,Outpatient,221,97128.83,0.0685,26.1
+PAT-000282,2024-12-01,Pediatrics,Medicare,Outpatient,117,52334.91,0.1441,38.5
+PAT-000283,2024-12-01,Pediatrics,Medicaid,Emergency,228,97987.43,0.1193,30.1
+PAT-000284,2024-12-01,Pediatrics,Self Pay,Emergency,159,72543.45,0.0552,36.6
+PAT-000285,2024-12-01,Radiology,Commercial,Chronic Care,154,55534.06,0.0682,38.0
+PAT-000286,2024-12-01,Radiology,Medicare,Outpatient,167,73018.96,0.0754,28.2
+PAT-000287,2024-12-01,Radiology,Medicaid,Outpatient,136,56223.07,0.0764,38.2
+PAT-000288,2024-12-01,Radiology,Self Pay,Inpatient,180,66787.41,0.1352,37.6
+PAT-000001,2024-01-01,Emergency,Commercial,Inpatient,162,71903.84,0.0669,19.2
+PAT-000002,2024-01-01,Emergency,Medicare,Chronic Care,124,47154.23,0.1194,17.7
+PAT-000003,2024-01-01,Emergency,Medicaid,Chronic Care,137,74228.34,0.0823,38.5
+PAT-000004,2024-01-01,Emergency,Self Pay,Outpatient,202,104137.63,0.1177,17.5
+PAT-000005,2024-01-01,Cardiology,Commercial,Outpatient,217,105497.28,0.0744,33.3
+PAT-000006,2024-01-01,Cardiology,Medicare,Chronic Care,237,72665.18,0.0453,34.0
+PAT-000007,2024-01-01,Cardiology,Medicaid,Inpatient,146,76415.12,0.0682,36.3
+PAT-000008,2024-01-01,Cardiology,Self Pay,Inpatient,172,51626.35,0.158,19.5
+PAT-000009,2024-01-01,Orthopedics,Commercial,Inpatient,178,59582.58,0.0604,23.3
+PAT-000010,2024-01-01,Orthopedics,Medicare,Chronic Care,117,61706.96,0.1508,25.6
+PAT-000011,2024-01-01,Orthopedics,Medicaid,Outpatient,160,85167.09,0.0601,24.5
+PAT-000012,2024-01-01,Orthopedics,Self Pay,Outpatient,187,92993.39,0.125,18.1
+PAT-000013,2024-01-01,Oncology,Commercial,Chronic Care,162,58131.65,0.1224,28.6
+PAT-000014,2024-01-01,Oncology,Medicare,Outpatient,221,81885.27,0.1348,29.0
+PAT-000015,2024-01-01,Oncology,Medicaid,Chronic Care,123,52689.14,0.1364,24.0
+PAT-000016,2024-01-01,Oncology,Self Pay,Outpatient,186,56513.13,0.0891,19.7
+PAT-000017,2024-01-01,Pediatrics,Commercial,Outpatient,190,55868.28,0.0879,37.6
+PAT-000018,2024-01-01,Pediatrics,Medicare,Inpatient,223,73048.69,0.1218,30.8
+PAT-000019,2024-01-01,Pediatrics,Medicaid,Outpatient,165,50649.01,0.0645,35.9
+PAT-000020,2024-01-01,Pediatrics,Self Pay,Emergency,205,95179.47,0.098,25.7
+PAT-000021,2024-01-01,Radiology,Commercial,Emergency,233,92835.81,0.1018,31.7
+PAT-000022,2024-01-01,Radiology,Medicare,Emergency,235,107846.74,0.1159,35.5
+PAT-000023,2024-01-01,Radiology,Medicaid,Emergency,144,44284.91,0.0627,28.8
+PAT-000024,2024-01-01,Radiology,Self Pay,Emergency,143,49026.46,0.0795,35.7
+PAT-000025,2024-02-01,Emergency,Commercial,Inpatient,217,86861.45,0.1416,21.7
+PAT-000026,2024-02-01,Emergency,Medicare,Emergency,228,90347.79,0.142,27.5
+PAT-000027,2024-02-01,Emergency,Medicaid,Emergency,202,65239.52,0.0897,26.0
+PAT-000028,2024-02-01,Emergency,Self Pay,Chronic Care,206,88816.85,0.1477,32.2
+PAT-000029,2024-02-01,Cardiology,Commercial,Emergency,187,80051.38,0.0409,19.8
+PAT-000030,2024-02-01,Cardiology,Medicare,Inpatient,209,74826.22,0.1315,17.9
+PAT-000031,2024-02-01,Cardiology,Medicaid,Inpatient,240,95142.71,0.0743,21.8
+PAT-000032,2024-02-01,Cardiology,Self Pay,Chronic Care,165,65094.84,0.0963,31.6
+PAT-000033,2024-02-01,Orthopedics,Commercial,Outpatient,119,57162.13,0.1461,34.2
+PAT-000034,2024-02-01,Orthopedics,Medicare,Emergency,212,104208.59,0.1577,24.3
+PAT-000035,2024-02-01,Orthopedics,Medicaid,Outpatient,187,93728.33,0.0719,37.1
+PAT-000036,2024-02-01,Orthopedics,Self Pay,Chronic Care,210,114651.28,0.1284,35.3
+PAT-000037,2024-02-01,Oncology,Commercial,Emergency,179,85969.77,0.1259,33.5
+PAT-000038,2024-02-01,Oncology,Medicare,Emergency,183,65544.99,0.0467,20.4
+PAT-000039,2024-02-01,Oncology,Medicaid,Outpatient,196,91209.45,0.1331,23.3
+PAT-000040,2024-02-01,Oncology,Self Pay,Inpatient,124,42284.78,0.0673,22.5
+PAT-000041,2024-02-01,Pediatrics,Commercial,Inpatient,234,96307.98,0.1398,36.2
+PAT-000042,2024-02-01,Pediatrics,Medicare,Emergency,180,88658.98,0.068,21.3
+PAT-000043,2024-02-01,Pediatrics,Medicaid,Chronic Care,185,54840.18,0.1442,17.0
+PAT-000044,2024-02-01,Pediatrics,Self Pay,Emergency,143,52774.44,0.126,38.3
+PAT-000045,2024-02-01,Radiology,Commercial,Outpatient,210,64954.53,0.1515,22.7
+PAT-000046,2024-02-01,Radiology,Medicare,Chronic Care,234,104389.84,0.1314,36.4
+PAT-000047,2024-02-01,Radiology,Medicaid,Inpatient,201,71680.93,0.0856,36.6
+PAT-000048,2024-02-01,Radiology,Self Pay,Outpatient,208,112254.98,0.1116,33.5
+PAT-000049,2024-03-01,Emergency,Commercial,Outpatient,169,63805.34,0.1012,35.9
+PAT-000050,2024-03-01,Emergency,Medicare,Emergency,129,43301.56,0.0953,23.5
+PAT-000051,2024-03-01,Emergency,Medicaid,Outpatient,202,100830.28,0.047,32.2
+PAT-000052,2024-03-01,Emergency,Self Pay,Emergency,223,97172.55,0.1008,39.0
+PAT-000053,2024-03-01,Cardiology,Commercial,Inpatient,156,53473.4,0.0832,17.2
+PAT-000054,2024-03-01,Cardiology,Medicare,Chronic Care,183,79758.65,0.1434,22.2
+PAT-000055,2024-03-01,Cardiology,Medicaid,Emergency,233,86971.57,0.1323,30.1
+PAT-000056,2024-03-01,Cardiology,Self Pay,Emergency,183,81330.78,0.0572,17.0
+PAT-000057,2024-03-01,Orthopedics,Commercial,Outpatient,159,53491.22,0.1213,27.7
+PAT-000058,2024-03-01,Orthopedics,Medicare,Inpatient,129,70395.36,0.113,38.9
+PAT-000059,2024-03-01,Orthopedics,Medicaid,Emergency,123,49366.52,0.1167,29.4
+PAT-000060,2024-03-01,Orthopedics,Self Pay,Emergency,190,88918.32,0.0481,35.9
+PAT-000061,2024-03-01,Oncology,Commercial,Outpatient,166,52335.36,0.1413,20.7
+PAT-000062,2024-03-01,Oncology,Medicare,Emergency,140,75425.76,0.101,28.5
+PAT-000063,2024-03-01,Oncology,Medicaid,Outpatient,240,89286.96,0.1031,28.1
+PAT-000064,2024-03-01,Oncology,Self Pay,Outpatient,152,70886.26,0.1579,33.6
+PAT-000065,2024-03-01,Pediatrics,Commercial,Outpatient,125,58947.92,0.089,38.3
+PAT-000066,2024-03-01,Pediatrics,Medicare,Inpatient,127,46713.96,0.0697,35.7
+PAT-000067,2024-03-01,Pediatrics,Medicaid,Inpatient,159,66572.38,0.1585,17.0
+PAT-000068,2024-03-01,Pediatrics,Self Pay,Outpatient,217,115440.05,0.1143,36.6
+PAT-000069,2024-03-01,Radiology,Commercial,Outpatient,180,93819.27,0.1424,39.1
+PAT-000070,2024-03-01,Radiology,Medicare,Inpatient,223,89888.4,0.1083,22.8
+PAT-000071,2024-03-01,Radiology,Medicaid,Inpatient,205,90944.86,0.0822,34.3
+PAT-000072,2024-03-01,Radiology,Self Pay,Outpatient,122,39035.48,0.0877,25.7
+PAT-000073,2024-04-01,Emergency,Commercial,Emergency,213,96764.57,0.1585,18.0
+PAT-000074,2024-04-01,Emergency,Medicare,Inpatient,163,71439.11,0.1418,32.2
+PAT-000075,2024-04-01,Emergency,Medicaid,Outpatient,225,114812.42,0.0553,31.4
+PAT-000076,2024-04-01,Emergency,Self Pay,Inpatient,132,44661.64,0.0883,24.3
+PAT-000077,2024-04-01,Cardiology,Commercial,Outpatient,151,60742.12,0.1493,28.5
+PAT-000078,2024-04-01,Cardiology,Medicare,Chronic Care,213,113671.7,0.0817,34.6
+PAT-000079,2024-04-01,Cardiology,Medicaid,Inpatient,220,80224.86,0.0516,21.4
+PAT-000080,2024-04-01,Cardiology,Self Pay,Chronic Care,145,68925.58,0.145,28.0
+PAT-000081,2024-04-01,Orthopedics,Commercial,Chronic Care,199,81308.39,0.1494,20.6
+PAT-000082,2024-04-01,Orthopedics,Medicare,Emergency,170,80586.16,0.1088,17.3
+PAT-000083,2024-04-01,Orthopedics,Medicaid,Outpatient,230,75421.91,0.088,23.8
+PAT-000084,2024-04-01,Orthopedics,Self Pay,Inpatient,166,82183.24,0.0955,17.0
+PAT-000085,2024-04-01,Oncology,Commercial,Emergency,156,68648.33,0.1025,25.7
+PAT-000086,2024-04-01,Oncology,Medicare,Emergency,205,93989.46,0.1127,17.5
+PAT-000087,2024-04-01,Oncology,Medicaid,Inpatient,121,50831.6,0.1389,37.7
+PAT-000088,2024-04-01,Oncology,Self Pay,Inpatient,232,122766.01,0.054,38.6
+PAT-000089,2024-04-01,Pediatrics,Commercial,Chronic Care,142,46239.05,0.1553,20.3
+PAT-000090,2024-04-01,Pediatrics,Medicare,Chronic Care,126,54396.67,0.0766,24.4
+PAT-000091,2024-04-01,Pediatrics,Medicaid,Inpatient,151,58615.22,0.1213,29.7
+PAT-000092,2024-04-01,Pediatrics,Self Pay,Chronic Care,197,68031.36,0.1174,29.8
+PAT-000093,2024-04-01,Radiology,Commercial,Inpatient,121,50836.46,0.0457,22.7
+PAT-000094,2024-04-01,Radiology,Medicare,Chronic Care,154,75112.64,0.0597,27.8
+PAT-000095,2024-04-01,Radiology,Medicaid,Inpatient,162,53591.1,0.1579,20.4
+PAT-000096,2024-04-01,Radiology,Self Pay,Chronic Care,164,81382.26,0.1043,33.1
+PAT-000097,2024-05-01,Emergency,Commercial,Inpatient,148,50349.9,0.1005,36.2
+PAT-000098,2024-05-01,Emergency,Medicare,Inpatient,138,56833.99,0.0896,30.4
+PAT-000099,2024-05-01,Emergency,Medicaid,Inpatient,224,104882.81,0.0622,22.3
+PAT-000100,2024-05-01,Emergency,Self Pay,Chronic Care,198,63593.96,0.0984,17.4
+PAT-000101,2024-05-01,Cardiology,Commercial,Emergency,164,51597.28,0.0461,38.3
+PAT-000102,2024-05-01,Cardiology,Medicare,Emergency,214,93029.37,0.0728,28.2
+PAT-000103,2024-05-01,Cardiology,Medicaid,Emergency,145,72121.11,0.0982,19.7
+PAT-000104,2024-05-01,Cardiology,Self Pay,Outpatient,186,58973.1,0.0747,21.2
+PAT-000105,2024-05-01,Orthopedics,Commercial,Emergency,189,62370.7,0.1176,17.0
+PAT-000106,2024-05-01,Orthopedics,Medicare,Chronic Care,235,72206.33,0.0592,37.3
+PAT-000107,2024-05-01,Orthopedics,Medicaid,Outpatient,168,66431.21,0.0503,25.6
+PAT-000108,2024-05-01,Orthopedics,Self Pay,Outpatient,158,77468.78,0.1076,28.7
+PAT-000109,2024-05-01,Oncology,Commercial,Chronic Care,242,90805.83,0.0603,22.8
+PAT-000110,2024-05-01,Oncology,Medicare,Inpatient,142,41965.89,0.0727,32.3
+PAT-000111,2024-05-01,Oncology,Medicaid,Inpatient,205,86119.29,0.0703,34.2
+PAT-000112,2024-05-01,Oncology,Self Pay,Chronic Care,157,80123.74,0.1002,27.6
+PAT-000113,2024-05-01,Pediatrics,Commercial,Chronic Care,203,103646.05,0.0787,23.1
+PAT-000114,2024-05-01,Pediatrics,Medicare,Emergency,149,77283.47,0.1268,38.0
+PAT-000115,2024-05-01,Pediatrics,Medicaid,Chronic Care,164,73350.98,0.1056,25.6
+PAT-000116,2024-05-01,Pediatrics,Self Pay,Chronic Care,228,84337.28,0.1496,32.5
+PAT-000117,2024-05-01,Radiology,Commercial,Outpatient,125,62542.1,0.108,25.6
+PAT-000118,2024-05-01,Radiology,Medicare,Emergency,169,76338.88,0.1497,23.9
+PAT-000119,2024-05-01,Radiology,Medicaid,Emergency,146,58010.2,0.0646,28.8
+PAT-000120,2024-05-01,Radiology,Self Pay,Outpatient,117,39028.57,0.0536,18.5
+PAT-000121,2024-06-01,Emergency,Commercial,Emergency,231,98848.67,0.0858,22.8
+PAT-000122,2024-06-01,Emergency,Medicare,Emergency,129,39554.6,0.1224,32.7
+PAT-000123,2024-06-01,Emergency,Medicaid,Chronic Care,206,63932.09,0.1537,28.0
+PAT-000124,2024-06-01,Emergency,Self Pay,Inpatient,145,61349.77,0.0752,32.6
+PAT-000125,2024-06-01,Cardiology,Commercial,Outpatient,200,92668.91,0.1411,17.6
+PAT-000126,2024-06-01,Cardiology,Medicare,Emergency,127,46138.67,0.1579,35.1
+PAT-000127,2024-06-01,Cardiology,Medicaid,Chronic Care,211,109650.77,0.0986,34.0
+PAT-000128,2024-06-01,Cardiology,Self Pay,Inpatient,180,58699.81,0.0753,32.1
+PAT-000129,2024-06-01,Orthopedics,Commercial,Emergency,179,56019.92,0.0928,19.3
+PAT-000130,2024-06-01,Orthopedics,Medicare,Inpatient,242,100238.43,0.1565,28.2
+PAT-000131,2024-06-01,Orthopedics,Medicaid,Outpatient,223,95240.26,0.131,22.0
+PAT-000132,2024-06-01,Orthopedics,Self Pay,Inpatient,156,80983.86,0.064,26.0
+PAT-000133,2024-06-01,Oncology,Commercial,Emergency,189,100277.0,0.125,28.7
+PAT-000134,2024-06-01,Oncology,Medicare,Outpatient,194,82816.11,0.1319,33.2
+PAT-000135,2024-06-01,Oncology,Medicaid,Inpatient,145,51491.1,0.1151,22.7
+PAT-000136,2024-06-01,Oncology,Self Pay,Outpatient,137,60616.88,0.0841,18.4
+PAT-000137,2024-06-01,Pediatrics,Commercial,Inpatient,171,79676.71,0.1421,33.2
+PAT-000138,2024-06-01,Pediatrics,Medicare,Emergency,148,62587.42,0.0526,34.9
+PAT-000139,2024-06-01,Pediatrics,Medicaid,Inpatient,225,99260.47,0.1155,28.4
+PAT-000140,2024-06-01,Pediatrics,Self Pay,Emergency,171,69915.13,0.1232,24.7
+PAT-000141,2024-06-01,Radiology,Commercial,Inpatient,181,93546.58,0.053,17.3
+PAT-000142,2024-06-01,Radiology,Medicare,Inpatient,151,80136.53,0.1395,26.7
+PAT-000143,2024-06-01,Radiology,Medicaid,Inpatient,193,80896.67,0.0534,33.4
+PAT-000144,2024-06-01,Radiology,Self Pay,Outpatient,223,88792.96,0.0602,21.6
+PAT-000145,2024-07-01,Emergency,Commercial,Outpatient,152,68222.21,0.148,31.7
+PAT-000146,2024-07-01,Emergency,Medicare,Inpatient,169,84325.71,0.0909,33.5
+PAT-000147,2024-07-01,Emergency,Medicaid,Outpatient,168,60668.43,0.1046,34.9
+PAT-000148,2024-07-01,Emergency,Self Pay,Emergency,236,95582.2,0.1052,34.7
+PAT-000149,2024-07-01,Cardiology,Commercial,Outpatient,132,44605.48,0.0703,35.4
+PAT-000150,2024-07-01,Cardiology,Medicare,Inpatient,238,114929.37,0.0613,20.2
+PAT-000151,2024-07-01,Cardiology,Medicaid,Emergency,173,92471.09,0.0517,30.3
+PAT-000152,2024-07-01,Cardiology,Self Pay,Chronic Care,143,43298.72,0.0922,35.1
+PAT-000153,2024-07-01,Orthopedics,Commercial,Chronic Care,170,58276.11,0.094,33.8
+PAT-000154,2024-07-01,Orthopedics,Medicare,Emergency,228,68720.66,0.1503,31.3
+PAT-000155,2024-07-01,Orthopedics,Medicaid,Outpatient,222,65975.71,0.1139,23.1
+PAT-000156,2024-07-01,Orthopedics,Self Pay,Emergency,241,129549.13,0.1419,33.2
+PAT-000157,2024-07-01,Oncology,Commercial,Inpatient,180,62120.36,0.0924,29.8
+PAT-000158,2024-07-01,Oncology,Medicare,Inpatient,184,65043.5,0.0753,23.6
+PAT-000159,2024-07-01,Oncology,Medicaid,Outpatient,159,71097.25,0.0768,22.8
+PAT-000160,2024-07-01,Oncology,Self Pay,Inpatient,233,110541.18,0.1087,26.3
+PAT-000161,2024-07-01,Pediatrics,Commercial,Outpatient,172,59205.46,0.0655,19.8
+PAT-000162,2024-07-01,Pediatrics,Medicare,Inpatient,231,82542.75,0.0461,28.0
+PAT-000163,2024-07-01,Pediatrics,Medicaid,Outpatient,173,64018.97,0.1166,32.4
+PAT-000164,2024-07-01,Pediatrics,Self Pay,Outpatient,202,91908.23,0.1147,35.2
+PAT-000165,2024-07-01,Radiology,Commercial,Chronic Care,148,73362.21,0.1241,24.1
+PAT-000166,2024-07-01,Radiology,Medicare,Emergency,198,86446.55,0.1007,36.1
+PAT-000167,2024-07-01,Radiology,Medicaid,Chronic Care,190,90454.54,0.0418,34.3
+PAT-000168,2024-07-01,Radiology,Self Pay,Outpatient,210,73417.98,0.1375,29.5
+PAT-000169,2024-08-01,Emergency,Commercial,Outpatient,152,48992.46,0.1436,24.2
+PAT-000170,2024-08-01,Emergency,Medicare,Inpatient,126,42339.14,0.1147,33.8
+PAT-000171,2024-08-01,Emergency,Medicaid,Chronic Care,214,79165.18,0.1472,23.4
+PAT-000172,2024-08-01,Emergency,Self Pay,Inpatient,153,66801.18,0.1351,26.1
+PAT-000173,2024-08-01,Cardiology,Commercial,Inpatient,218,74587.61,0.0847,22.1
+PAT-000174,2024-08-01,Cardiology,Medicare,Outpatient,186,94410.91,0.1103,30.2
+PAT-000175,2024-08-01,Cardiology,Medicaid,Outpatient,230,93456.38,0.0666,23.6
+PAT-000176,2024-08-01,Cardiology,Self Pay,Inpatient,176,89809.0,0.1464,27.8
+PAT-000177,2024-08-01,Orthopedics,Commercial,Inpatient,220,97802.25,0.0751,21.8
+PAT-000178,2024-08-01,Orthopedics,Medicare,Inpatient,153,53304.97,0.0409,18.6
+PAT-000179,2024-08-01,Orthopedics,Medicaid,Inpatient,229,88595.73,0.1296,25.4
+PAT-000180,2024-08-01,Orthopedics,Self Pay,Emergency,158,47519.11,0.1417,29.8
+PAT-000181,2024-08-01,Oncology,Commercial,Outpatient,118,41594.65,0.129,18.8
+PAT-000182,2024-08-01,Oncology,Medicare,Chronic Care,165,68431.39,0.077,23.1
+PAT-000183,2024-08-01,Oncology,Medicaid,Inpatient,169,88292.48,0.0469,23.7
+PAT-000184,2024-08-01,Oncology,Self Pay,Emergency,188,79398.08,0.0641,18.2
+PAT-000185,2024-08-01,Pediatrics,Commercial,Emergency,153,62681.84,0.078,34.7
+PAT-000186,2024-08-01,Pediatrics,Medicare,Inpatient,196,68835.79,0.0882,31.0
+PAT-000187,2024-08-01,Pediatrics,Medicaid,Emergency,122,53838.35,0.1107,28.5
+PAT-000188,2024-08-01,Pediatrics,Self Pay,Outpatient,231,123327.02,0.1482,38.3
+PAT-000189,2024-08-01,Radiology,Commercial,Outpatient,163,75358.94,0.1105,31.1
+PAT-000190,2024-08-01,Radiology,Medicare,Inpatient,218,113281.49,0.1202,21.1
+PAT-000191,2024-08-01,Radiology,Medicaid,Outpatient,177,79570.49,0.0611,38.3
+PAT-000192,2024-08-01,Radiology,Self Pay,Chronic Care,237,96234.14,0.1553,17.7
+PAT-000193,2024-09-01,Emergency,Commercial,Inpatient,147,80195.83,0.0735,24.6
+PAT-000194,2024-09-01,Emergency,Medicare,Emergency,221,115031.66,0.1168,20.8
+PAT-000195,2024-09-01,Emergency,Medicaid,Chronic Care,157,52911.75,0.0424,38.6
+PAT-000196,2024-09-01,Emergency,Self Pay,Chronic Care,222,86568.17,0.0603,28.8
+PAT-000197,2024-09-01,Cardiology,Commercial,Chronic Care,195,81456.35,0.0612,26.3
+PAT-000198,2024-09-01,Cardiology,Medicare,Inpatient,137,45093.98,0.1017,36.8
+PAT-000199,2024-09-01,Cardiology,Medicaid,Chronic Care,156,83040.78,0.0496,34.6
+PAT-000200,2024-09-01,Cardiology,Self Pay,Chronic Care,152,49293.65,0.1103,32.9
+PAT-000201,2024-09-01,Orthopedics,Commercial,Outpatient,229,94492.28,0.1293,35.4
+PAT-000202,2024-09-01,Orthopedics,Medicare,Inpatient,122,59560.39,0.0915,34.0
+PAT-000203,2024-09-01,Orthopedics,Medicaid,Chronic Care,204,99913.16,0.1527,21.0
+PAT-000204,2024-09-01,Orthopedics,Self Pay,Chronic Care,133,43345.99,0.1352,37.6
+PAT-000205,2024-09-01,Oncology,Commercial,Inpatient,164,64564.58,0.1575,28.6
+PAT-000206,2024-09-01,Oncology,Medicare,Inpatient,211,70385.18,0.123,24.9
+PAT-000207,2024-09-01,Oncology,Medicaid,Chronic Care,197,72798.19,0.1164,37.9
+PAT-000208,2024-09-01,Oncology,Self Pay,Inpatient,158,60289.01,0.0484,22.4
+PAT-000209,2024-09-01,Pediatrics,Commercial,Inpatient,237,104394.84,0.0408,29.9
+PAT-000210,2024-09-01,Pediatrics,Medicare,Emergency,224,79472.82,0.1567,19.2
+PAT-000211,2024-09-01,Pediatrics,Medicaid,Outpatient,241,121870.87,0.1429,37.5
+PAT-000212,2024-09-01,Pediatrics,Self Pay,Inpatient,118,47165.34,0.0753,19.5
+PAT-000213,2024-09-01,Radiology,Commercial,Chronic Care,211,81623.62,0.097,33.8
+PAT-000214,2024-09-01,Radiology,Medicare,Emergency,229,94328.86,0.0986,33.2
+PAT-000215,2024-09-01,Radiology,Medicaid,Chronic Care,153,72435.91,0.1021,34.6
+PAT-000216,2024-09-01,Radiology,Self Pay,Inpatient,145,56299.51,0.1012,31.7
+PAT-000217,2024-10-01,Emergency,Commercial,Emergency,239,107677.86,0.0852,25.6
+PAT-000218,2024-10-01,Emergency,Medicare,Outpatient,210,83593.01,0.1129,26.0
+PAT-000219,2024-10-01,Emergency,Medicaid,Outpatient,123,41581.85,0.1155,25.2
+PAT-000220,2024-10-01,Emergency,Self Pay,Inpatient,120,42998.07,0.0897,17.1
+PAT-000221,2024-10-01,Cardiology,Commercial,Outpatient,232,89344.5,0.1402,25.4
+PAT-000222,2024-10-01,Cardiology,Medicare,Outpatient,165,81664.91,0.1312,38.1
+PAT-000223,2024-10-01,Cardiology,Medicaid,Inpatient,181,84159.02,0.158,21.2
+PAT-000224,2024-10-01,Cardiology,Self Pay,Inpatient,123,51327.64,0.0415,35.3
+PAT-000225,2024-10-01,Orthopedics,Commercial,Emergency,185,67359.4,0.1552,24.5
+PAT-000226,2024-10-01,Orthopedics,Medicare,Inpatient,227,89688.74,0.0913,18.9
+PAT-000227,2024-10-01,Orthopedics,Medicaid,Chronic Care,226,83904.65,0.0422,20.0
+PAT-000228,2024-10-01,Orthopedics,Self Pay,Inpatient,129,45048.58,0.0584,32.7
+PAT-000229,2024-10-01,Oncology,Commercial,Chronic Care,221,83364.61,0.1195,33.1
+PAT-000230,2024-10-01,Oncology,Medicare,Emergency,237,114415.1,0.1128,20.7
+PAT-000231,2024-10-01,Oncology,Medicaid,Chronic Care,119,38192.74,0.0569,30.6
+PAT-000232,2024-10-01,Oncology,Self Pay,Inpatient,235,95492.06,0.134,23.0
+PAT-000233,2024-10-01,Pediatrics,Commercial,Chronic Care,216,77902.12,0.1174,26.7
+PAT-000234,2024-10-01,Pediatrics,Medicare,Inpatient,188,69866.23,0.0742,23.7
+PAT-000235,2024-10-01,Pediatrics,Medicaid,Chronic Care,209,110633.0,0.1327,38.6
+PAT-000236,2024-10-01,Pediatrics,Self Pay,Emergency,153,48997.69,0.0957,33.3
+PAT-000237,2024-10-01,Radiology,Commercial,Chronic Care,178,73781.61,0.0589,20.3
+PAT-000238,2024-10-01,Radiology,Medicare,Outpatient,180,74987.16,0.0577,19.0
+PAT-000239,2024-10-01,Radiology,Medicaid,Inpatient,234,103430.28,0.0863,21.5
+PAT-000240,2024-10-01,Radiology,Self Pay,Inpatient,189,56670.97,0.0609,30.0
+PAT-000241,2024-11-01,Emergency,Commercial,Emergency,147,75205.96,0.0707,38.2
+PAT-000242,2024-11-01,Emergency,Medicare,Outpatient,227,92670.86,0.0598,28.0
+PAT-000243,2024-11-01,Emergency,Medicaid,Emergency,140,51681.0,0.152,34.1
+PAT-000244,2024-11-01,Emergency,Self Pay,Emergency,242,106290.47,0.1352,36.0
+PAT-000245,2024-11-01,Cardiology,Commercial,Emergency,207,82931.88,0.1188,17.2
+PAT-000246,2024-11-01,Cardiology,Medicare,Chronic Care,164,76224.39,0.114,33.7
+PAT-000247,2024-11-01,Cardiology,Medicaid,Chronic Care,167,89102.25,0.154,33.4
+PAT-000248,2024-11-01,Cardiology,Self Pay,Chronic Care,174,69016.61,0.088,31.5
+PAT-000249,2024-11-01,Orthopedics,Commercial,Emergency,186,64285.81,0.1016,23.4
+PAT-000250,2024-11-01,Orthopedics,Medicare,Outpatient,175,95452.23,0.1002,29.6
+PAT-000251,2024-11-01,Orthopedics,Medicaid,Chronic Care,237,73770.16,0.0726,29.2
+PAT-000252,2024-11-01,Orthopedics,Self Pay,Emergency,203,85162.79,0.1555,35.0
+PAT-000253,2024-11-01,Oncology,Commercial,Outpatient,178,81050.47,0.1505,24.0
+PAT-000254,2024-11-01,Oncology,Medicare,Inpatient,177,85322.39,0.1134,34.8
+PAT-000255,2024-11-01,Oncology,Medicaid,Inpatient,202,83000.94,0.1258,27.0
+PAT-000256,2024-11-01,Oncology,Self Pay,Inpatient,187,85201.56,0.065,35.2
+PAT-000257,2024-11-01,Pediatrics,Commercial,Outpatient,134,40085.21,0.06,30.5
+PAT-000258,2024-11-01,Pediatrics,Medicare,Outpatient,212,73676.51,0.1214,25.5
+PAT-000259,2024-11-01,Pediatrics,Medicaid,Emergency,225,92133.86,0.097,39.0
+PAT-000260,2024-11-01,Pediatrics,Self Pay,Inpatient,149,58638.17,0.0654,30.3
+PAT-000261,2024-11-01,Radiology,Commercial,Outpatient,159,59338.63,0.0682,34.6
+PAT-000262,2024-11-01,Radiology,Medicare,Chronic Care,177,52544.34,0.1371,30.3
+PAT-000263,2024-11-01,Radiology,Medicaid,Outpatient,202,92821.04,0.1194,30.6
+PAT-000264,2024-11-01,Radiology,Self Pay,Outpatient,127,56381.4,0.1353,35.6
+PAT-000265,2024-12-01,Emergency,Commercial,Chronic Care,201,68396.91,0.1348,18.6
+PAT-000266,2024-12-01,Emergency,Medicare,Emergency,204,81540.59,0.1588,24.5
+PAT-000267,2024-12-01,Emergency,Medicaid,Emergency,211,84194.14,0.139,24.3
+PAT-000268,2024-12-01,Emergency,Self Pay,Inpatient,119,43498.24,0.1105,29.1
+PAT-000269,2024-12-01,Cardiology,Commercial,Emergency,126,68747.91,0.0957,19.1
+PAT-000270,2024-12-01,Cardiology,Medicare,Emergency,236,95934.26,0.064,37.5
+PAT-000271,2024-12-01,Cardiology,Medicaid,Outpatient,197,62542.41,0.1523,18.8
+PAT-000272,2024-12-01,Cardiology,Self Pay,Chronic Care,129,42000.45,0.131,37.7
+PAT-000273,2024-12-01,Orthopedics,Commercial,Inpatient,209,76965.2,0.0581,30.0
+PAT-000274,2024-12-01,Orthopedics,Medicare,Inpatient,213,104302.78,0.0607,16.8
+PAT-000275,2024-12-01,Orthopedics,Medicaid,Chronic Care,220,102900.04,0.0849,18.2
+PAT-000276,2024-12-01,Orthopedics,Self Pay,Chronic Care,154,53267.91,0.0657,21.8
+PAT-000277,2024-12-01,Oncology,Commercial,Outpatient,210,111819.58,0.0442,31.2
+PAT-000278,2024-12-01,Oncology,Medicare,Inpatient,119,62598.19,0.1313,17.4
+PAT-000279,2024-12-01,Oncology,Medicaid,Inpatient,126,39459.0,0.1175,36.0
+PAT-000280,2024-12-01,Oncology,Self Pay,Outpatient,180,78738.15,0.0947,24.9
+PAT-000281,2024-12-01,Pediatrics,Commercial,Outpatient,221,97128.83,0.0685,26.1
+PAT-000282,2024-12-01,Pediatrics,Medicare,Outpatient,117,52334.91,0.1441,38.5
+PAT-000283,2024-12-01,Pediatrics,Medicaid,Emergency,228,97987.43,0.1193,30.1
+PAT-000284,2024-12-01,Pediatrics,Self Pay,Emergency,159,72543.45,0.0552,36.6
+PAT-000285,2024-12-01,Radiology,Commercial,Chronic Care,154,55534.06,0.0682,38.0
+PAT-000286,2024-12-01,Radiology,Medicare,Outpatient,167,73018.96,0.0754,28.2
+PAT-000287,2024-12-01,Radiology,Medicaid,Outpatient,136,56223.07,0.0764,38.2
+PAT-000288,2024-12-01,Radiology,Self Pay,Inpatient,180,66787.41,0.1352,37.6
+PAT-000001,2024-01-01,Emergency,Commercial,Inpatient,162,71903.84,0.0669,19.2
+PAT-000002,2024-01-01,Emergency,Medicare,Chronic Care,124,47154.23,0.1194,17.7
+PAT-000003,2024-01-01,Emergency,Medicaid,Chronic Care,137,74228.34,0.0823,38.5
+PAT-000004,2024-01-01,Emergency,Self Pay,Outpatient,202,104137.63,0.1177,17.5
+PAT-000005,2024-01-01,Cardiology,Commercial,Outpatient,217,105497.28,0.0744,33.3
+PAT-000006,2024-01-01,Cardiology,Medicare,Chronic Care,237,72665.18,0.0453,34.0
+PAT-000007,2024-01-01,Cardiology,Medicaid,Inpatient,146,76415.12,0.0682,36.3
+PAT-000008,2024-01-01,Cardiology,Self Pay,Inpatient,172,51626.35,0.158,19.5
+PAT-000009,2024-01-01,Orthopedics,Commercial,Inpatient,178,59582.58,0.0604,23.3
+PAT-000010,2024-01-01,Orthopedics,Medicare,Chronic Care,117,61706.96,0.1508,25.6
+PAT-000011,2024-01-01,Orthopedics,Medicaid,Outpatient,160,85167.09,0.0601,24.5
+PAT-000012,2024-01-01,Orthopedics,Self Pay,Outpatient,187,92993.39,0.125,18.1
+PAT-000013,2024-01-01,Oncology,Commercial,Chronic Care,162,58131.65,0.1224,28.6
+PAT-000014,2024-01-01,Oncology,Medicare,Outpatient,221,81885.27,0.1348,29.0
+PAT-000015,2024-01-01,Oncology,Medicaid,Chronic Care,123,52689.14,0.1364,24.0
+PAT-000016,2024-01-01,Oncology,Self Pay,Outpatient,186,56513.13,0.0891,19.7
+PAT-000017,2024-01-01,Pediatrics,Commercial,Outpatient,190,55868.28,0.0879,37.6
+PAT-000018,2024-01-01,Pediatrics,Medicare,Inpatient,223,73048.69,0.1218,30.8
+PAT-000019,2024-01-01,Pediatrics,Medicaid,Outpatient,165,50649.01,0.0645,35.9
+PAT-000020,2024-01-01,Pediatrics,Self Pay,Emergency,205,95179.47,0.098,25.7
+PAT-000021,2024-01-01,Radiology,Commercial,Emergency,233,92835.81,0.1018,31.7
+PAT-000022,2024-01-01,Radiology,Medicare,Emergency,235,107846.74,0.1159,35.5
+PAT-000023,2024-01-01,Radiology,Medicaid,Emergency,144,44284.91,0.0627,28.8
+PAT-000024,2024-01-01,Radiology,Self Pay,Emergency,143,49026.46,0.0795,35.7
+PAT-000025,2024-02-01,Emergency,Commercial,Inpatient,217,86861.45,0.1416,21.7
+PAT-000026,2024-02-01,Emergency,Medicare,Emergency,228,90347.79,0.142,27.5
+PAT-000027,2024-02-01,Emergency,Medicaid,Emergency,202,65239.52,0.0897,26.0
+PAT-000028,2024-02-01,Emergency,Self Pay,Chronic Care,206,88816.85,0.1477,32.2
+PAT-000029,2024-02-01,Cardiology,Commercial,Emergency,187,80051.38,0.0409,19.8
+PAT-000030,2024-02-01,Cardiology,Medicare,Inpatient,209,74826.22,0.1315,17.9
+PAT-000031,2024-02-01,Cardiology,Medicaid,Inpatient,240,95142.71,0.0743,21.8
+PAT-000032,2024-02-01,Cardiology,Self Pay,Chronic Care,165,65094.84,0.0963,31.6
+PAT-000033,2024-02-01,Orthopedics,Commercial,Outpatient,119,57162.13,0.1461,34.2
+PAT-000034,2024-02-01,Orthopedics,Medicare,Emergency,212,104208.59,0.1577,24.3
+PAT-000035,2024-02-01,Orthopedics,Medicaid,Outpatient,187,93728.33,0.0719,37.1
+PAT-000036,2024-02-01,Orthopedics,Self Pay,Chronic Care,210,114651.28,0.1284,35.3
+PAT-000037,2024-02-01,Oncology,Commercial,Emergency,179,85969.77,0.1259,33.5
+PAT-000038,2024-02-01,Oncology,Medicare,Emergency,183,65544.99,0.0467,20.4
+PAT-000039,2024-02-01,Oncology,Medicaid,Outpatient,196,91209.45,0.1331,23.3
+PAT-000040,2024-02-01,Oncology,Self Pay,Inpatient,124,42284.78,0.0673,22.5
+PAT-000041,2024-02-01,Pediatrics,Commercial,Inpatient,234,96307.98,0.1398,36.2
+PAT-000042,2024-02-01,Pediatrics,Medicare,Emergency,180,88658.98,0.068,21.3
+PAT-000043,2024-02-01,Pediatrics,Medicaid,Chronic Care,185,54840.18,0.1442,17.0
+PAT-000044,2024-02-01,Pediatrics,Self Pay,Emergency,143,52774.44,0.126,38.3
+PAT-000045,2024-02-01,Radiology,Commercial,Outpatient,210,64954.53,0.1515,22.7
+PAT-000046,2024-02-01,Radiology,Medicare,Chronic Care,234,104389.84,0.1314,36.4
+PAT-000047,2024-02-01,Radiology,Medicaid,Inpatient,201,71680.93,0.0856,36.6
+PAT-000048,2024-02-01,Radiology,Self Pay,Outpatient,208,112254.98,0.1116,33.5
+PAT-000049,2024-03-01,Emergency,Commercial,Outpatient,169,63805.34,0.1012,35.9
+PAT-000050,2024-03-01,Emergency,Medicare,Emergency,129,43301.56,0.0953,23.5
+PAT-000051,2024-03-01,Emergency,Medicaid,Outpatient,202,100830.28,0.047,32.2
+PAT-000052,2024-03-01,Emergency,Self Pay,Emergency,223,97172.55,0.1008,39.0
+PAT-000053,2024-03-01,Cardiology,Commercial,Inpatient,156,53473.4,0.0832,17.2
+PAT-000054,2024-03-01,Cardiology,Medicare,Chronic Care,183,79758.65,0.1434,22.2
+PAT-000055,2024-03-01,Cardiology,Medicaid,Emergency,233,86971.57,0.1323,30.1
+PAT-000056,2024-03-01,Cardiology,Self Pay,Emergency,183,81330.78,0.0572,17.0
+PAT-000057,2024-03-01,Orthopedics,Commercial,Outpatient,159,53491.22,0.1213,27.7
+PAT-000058,2024-03-01,Orthopedics,Medicare,Inpatient,129,70395.36,0.113,38.9
+PAT-000059,2024-03-01,Orthopedics,Medicaid,Emergency,123,49366.52,0.1167,29.4
+PAT-000060,2024-03-01,Orthopedics,Self Pay,Emergency,190,88918.32,0.0481,35.9
+PAT-000061,2024-03-01,Oncology,Commercial,Outpatient,166,52335.36,0.1413,20.7
+PAT-000062,2024-03-01,Oncology,Medicare,Emergency,140,75425.76,0.101,28.5
+PAT-000063,2024-03-01,Oncology,Medicaid,Outpatient,240,89286.96,0.1031,28.1
+PAT-000064,2024-03-01,Oncology,Self Pay,Outpatient,152,70886.26,0.1579,33.6
+PAT-000065,2024-03-01,Pediatrics,Commercial,Outpatient,125,58947.92,0.089,38.3
+PAT-000066,2024-03-01,Pediatrics,Medicare,Inpatient,127,46713.96,0.0697,35.7
+PAT-000067,2024-03-01,Pediatrics,Medicaid,Inpatient,159,66572.38,0.1585,17.0
+PAT-000068,2024-03-01,Pediatrics,Self Pay,Outpatient,217,115440.05,0.1143,36.6
+PAT-000069,2024-03-01,Radiology,Commercial,Outpatient,180,93819.27,0.1424,39.1
+PAT-000070,2024-03-01,Radiology,Medicare,Inpatient,223,89888.4,0.1083,22.8
+PAT-000071,2024-03-01,Radiology,Medicaid,Inpatient,205,90944.86,0.0822,34.3
+PAT-000072,2024-03-01,Radiology,Self Pay,Outpatient,122,39035.48,0.0877,25.7
+PAT-000073,2024-04-01,Emergency,Commercial,Emergency,213,96764.57,0.1585,18.0
+PAT-000074,2024-04-01,Emergency,Medicare,Inpatient,163,71439.11,0.1418,32.2
+PAT-000075,2024-04-01,Emergency,Medicaid,Outpatient,225,114812.42,0.0553,31.4
+PAT-000076,2024-04-01,Emergency,Self Pay,Inpatient,132,44661.64,0.0883,24.3
+PAT-000077,2024-04-01,Cardiology,Commercial,Outpatient,151,60742.12,0.1493,28.5
+PAT-000078,2024-04-01,Cardiology,Medicare,Chronic Care,213,113671.7,0.0817,34.6
+PAT-000079,2024-04-01,Cardiology,Medicaid,Inpatient,220,80224.86,0.0516,21.4
+PAT-000080,2024-04-01,Cardiology,Self Pay,Chronic Care,145,68925.58,0.145,28.0
+PAT-000081,2024-04-01,Orthopedics,Commercial,Chronic Care,199,81308.39,0.1494,20.6
+PAT-000082,2024-04-01,Orthopedics,Medicare,Emergency,170,80586.16,0.1088,17.3
+PAT-000083,2024-04-01,Orthopedics,Medicaid,Outpatient,230,75421.91,0.088,23.8
+PAT-000084,2024-04-01,Orthopedics,Self Pay,Inpatient,166,82183.24,0.0955,17.0
+PAT-000085,2024-04-01,Oncology,Commercial,Emergency,156,68648.33,0.1025,25.7
+PAT-000086,2024-04-01,Oncology,Medicare,Emergency,205,93989.46,0.1127,17.5
+PAT-000087,2024-04-01,Oncology,Medicaid,Inpatient,121,50831.6,0.1389,37.7
+PAT-000088,2024-04-01,Oncology,Self Pay,Inpatient,232,122766.01,0.054,38.6
+PAT-000089,2024-04-01,Pediatrics,Commercial,Chronic Care,142,46239.05,0.1553,20.3
+PAT-000090,2024-04-01,Pediatrics,Medicare,Chronic Care,126,54396.67,0.0766,24.4
+PAT-000091,2024-04-01,Pediatrics,Medicaid,Inpatient,151,58615.22,0.1213,29.7
+PAT-000092,2024-04-01,Pediatrics,Self Pay,Chronic Care,197,68031.36,0.1174,29.8
+PAT-000093,2024-04-01,Radiology,Commercial,Inpatient,121,50836.46,0.0457,22.7
+PAT-000094,2024-04-01,Radiology,Medicare,Chronic Care,154,75112.64,0.0597,27.8
+PAT-000095,2024-04-01,Radiology,Medicaid,Inpatient,162,53591.1,0.1579,20.4
+PAT-000096,2024-04-01,Radiology,Self Pay,Chronic Care,164,81382.26,0.1043,33.1
+PAT-000097,2024-05-01,Emergency,Commercial,Inpatient,148,50349.9,0.1005,36.2
+PAT-000098,2024-05-01,Emergency,Medicare,Inpatient,138,56833.99,0.0896,30.4
+PAT-000099,2024-05-01,Emergency,Medicaid,Inpatient,224,104882.81,0.0622,22.3
+PAT-000100,2024-05-01,Emergency,Self Pay,Chronic Care,198,63593.96,0.0984,17.4
+PAT-000101,2024-05-01,Cardiology,Commercial,Emergency,164,51597.28,0.0461,38.3
+PAT-000102,2024-05-01,Cardiology,Medicare,Emergency,214,93029.37,0.0728,28.2
+PAT-000103,2024-05-01,Cardiology,Medicaid,Emergency,145,72121.11,0.0982,19.7
+PAT-000104,2024-05-01,Cardiology,Self Pay,Outpatient,186,58973.1,0.0747,21.2
+PAT-000105,2024-05-01,Orthopedics,Commercial,Emergency,189,62370.7,0.1176,17.0
+PAT-000106,2024-05-01,Orthopedics,Medicare,Chronic Care,235,72206.33,0.0592,37.3
+PAT-000107,2024-05-01,Orthopedics,Medicaid,Outpatient,168,66431.21,0.0503,25.6
+PAT-000108,2024-05-01,Orthopedics,Self Pay,Outpatient,158,77468.78,0.1076,28.7
+PAT-000109,2024-05-01,Oncology,Commercial,Chronic Care,242,90805.83,0.0603,22.8
+PAT-000110,2024-05-01,Oncology,Medicare,Inpatient,142,41965.89,0.0727,32.3
+PAT-000111,2024-05-01,Oncology,Medicaid,Inpatient,205,86119.29,0.0703,34.2
+PAT-000112,2024-05-01,Oncology,Self Pay,Chronic Care,157,80123.74,0.1002,27.6
+PAT-000113,2024-05-01,Pediatrics,Commercial,Chronic Care,203,103646.05,0.0787,23.1
+PAT-000114,2024-05-01,Pediatrics,Medicare,Emergency,149,77283.47,0.1268,38.0
+PAT-000115,2024-05-01,Pediatrics,Medicaid,Chronic Care,164,73350.98,0.1056,25.6
+PAT-000116,2024-05-01,Pediatrics,Self Pay,Chronic Care,228,84337.28,0.1496,32.5
+PAT-000117,2024-05-01,Radiology,Commercial,Outpatient,125,62542.1,0.108,25.6
+PAT-000118,2024-05-01,Radiology,Medicare,Emergency,169,76338.88,0.1497,23.9
+PAT-000119,2024-05-01,Radiology,Medicaid,Emergency,146,58010.2,0.0646,28.8
+PAT-000120,2024-05-01,Radiology,Self Pay,Outpatient,117,39028.57,0.0536,18.5
+PAT-000121,2024-06-01,Emergency,Commercial,Emergency,231,98848.67,0.0858,22.8
+PAT-000122,2024-06-01,Emergency,Medicare,Emergency,129,39554.6,0.1224,32.7
+PAT-000123,2024-06-01,Emergency,Medicaid,Chronic Care,206,63932.09,0.1537,28.0
+PAT-000124,2024-06-01,Emergency,Self Pay,Inpatient,145,61349.77,0.0752,32.6
+PAT-000125,2024-06-01,Cardiology,Commercial,Outpatient,200,92668.91,0.1411,17.6
+PAT-000126,2024-06-01,Cardiology,Medicare,Emergency,127,46138.67,0.1579,35.1
+PAT-000127,2024-06-01,Cardiology,Medicaid,Chronic Care,211,109650.77,0.0986,34.0
+PAT-000128,2024-06-01,Cardiology,Self Pay,Inpatient,180,58699.81,0.0753,32.1
+PAT-000129,2024-06-01,Orthopedics,Commercial,Emergency,179,56019.92,0.0928,19.3
+PAT-000130,2024-06-01,Orthopedics,Medicare,Inpatient,242,100238.43,0.1565,28.2
+PAT-000131,2024-06-01,Orthopedics,Medicaid,Outpatient,223,95240.26,0.131,22.0
+PAT-000132,2024-06-01,Orthopedics,Self Pay,Inpatient,156,80983.86,0.064,26.0
+PAT-000133,2024-06-01,Oncology,Commercial,Emergency,189,100277.0,0.125,28.7
+PAT-000134,2024-06-01,Oncology,Medicare,Outpatient,194,82816.11,0.1319,33.2
+PAT-000135,2024-06-01,Oncology,Medicaid,Inpatient,145,51491.1,0.1151,22.7
+PAT-000136,2024-06-01,Oncology,Self Pay,Outpatient,137,60616.88,0.0841,18.4
