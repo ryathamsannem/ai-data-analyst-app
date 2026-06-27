@@ -3,13 +3,16 @@ import {
   inferBoundedMetricBounds,
   inferDomainTickStep,
   isLowVarianceOnBoundedScale,
+  OVERVIEW_HBAR_TARGET_MAX_UTILIZATION,
   resolveBarChartRateDisplayCap,
   resolveBarChartRateUpperBound,
   resolveOverviewBarValueDomain,
+  resolveOverviewHBarUtilizationDomainMax,
   shouldUseTightBarDomain,
   snapBarDomainBound,
   zeroBaselineImprovesInterpretation,
 } from "@/lib/overview-bar-value-domain";
+import { estimateHorizontalBarLengthUtilization } from "@/lib/horizontal-bar-visual";
 
 describe("shouldUseTightBarDomain", () => {
   it("detects low-spread percent metrics", () => {
@@ -648,5 +651,132 @@ describe("bar domain parity across surfaces", () => {
     );
     expect(domain![0]).toBeGreaterThan(4.0);
     expect(domain![0]).not.toBe(0);
+  });
+});
+
+describe("Overview H-Bar plot-width utilization cap", () => {
+  const departmentRows = [
+    { name: "Engineering", value: 350 },
+    { name: "Sales", value: 680 },
+    { name: "HR", value: 890 },
+    { name: "Ops", value: 1050 },
+    { name: "Finance", value: 1180 },
+    { name: "Legal", value: 1258 },
+  ];
+
+  const loanRows = [
+    { name: "Mortgage", value: 183_916_971 },
+    { name: "Personal Loan", value: 165_000_000 },
+    { name: "Auto Loan", value: 150_000_000 },
+    { name: "Credit Card", value: 132_661_579 },
+  ];
+
+  it("Overview H-Bar loan/currency targets ~85% utilization, not ×1.10", () => {
+    const maxRaw = 183_916_971;
+    const domain = resolveOverviewBarValueDomain(loanRows, {
+      chartTitle: "Loan Balance by Product Type",
+      metricLabel: "Loan Balance",
+      presentationKind: "bar_horizontal",
+      overviewHorizontalBarHeadroom: true,
+    })!;
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(maxRaw / OVERVIEW_HBAR_TARGET_MAX_UTILIZATION);
+    expect(domain[1]).toBeGreaterThan(maxRaw * 1.15);
+    expect(domain[1] / 1e6).toBeCloseTo(216.37, 0);
+    const util = estimateHorizontalBarLengthUtilization({
+      maxValue: maxRaw,
+      domainMax: domain[1],
+    });
+    expect(util).toBeLessThanOrEqual(0.851);
+    expect(util).toBeGreaterThan(0.84);
+  });
+
+  it("Overview H-Bar count domain starts at 0 near ~85% longest-bar utilization", () => {
+    const maxRaw = 1258;
+    const domain = resolveOverviewBarValueDomain(departmentRows, {
+      chartTitle: "Records by Department",
+      metricLabel: "Records",
+      presentationKind: "bar_horizontal",
+      overviewHorizontalBarHeadroom: true,
+    })!;
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(maxRaw / OVERVIEW_HBAR_TARGET_MAX_UTILIZATION);
+    const util = estimateHorizontalBarLengthUtilization({
+      maxValue: maxRaw,
+      domainMax: domain[1],
+    });
+    expect(util).toBeLessThanOrEqual(0.851);
+    expect(util).toBeGreaterThan(0.84);
+  });
+
+  it("V-Bar profit domain is unchanged by Overview H-Bar utilization cap", () => {
+    const profitRows = [
+      { name: "Engineering", value: 205_126 },
+      { name: "Sales", value: 210_000 },
+      { name: "Marketing", value: 215_087 },
+    ];
+    const vDomain = resolveOverviewBarValueDomain(profitRows, {
+      chartTitle: "Profit by Department",
+      metricLabel: "Profit",
+      presentationKind: "bar",
+    });
+    const hDomainNoCap = resolveOverviewBarValueDomain(profitRows, {
+      chartTitle: "Profit by Department",
+      metricLabel: "Profit",
+      presentationKind: "bar_horizontal",
+    });
+    expect(vDomain).toEqual(hDomainNoCap);
+    expect(vDomain![0]).toBe(0);
+  });
+
+  it("bar-length utilization drops materially vs default ×1.06 padding", () => {
+    const base = resolveOverviewBarValueDomain(departmentRows, {
+      chartTitle: "Records by Department",
+      metricLabel: "Records",
+      presentationKind: "bar_horizontal",
+    })!;
+    const capped = resolveOverviewBarValueDomain(departmentRows, {
+      chartTitle: "Records by Department",
+      metricLabel: "Records",
+      presentationKind: "bar_horizontal",
+      overviewHorizontalBarHeadroom: true,
+    })!;
+    const baseUtil = estimateHorizontalBarLengthUtilization({
+      maxValue: 1258,
+      domainMax: base[1],
+    });
+    const cappedUtil = estimateHorizontalBarLengthUtilization({
+      maxValue: 1258,
+      domainMax: capped[1],
+    });
+    expect(baseUtil).toBeGreaterThan(0.93);
+    expect(cappedUtil).toBeLessThanOrEqual(0.851);
+    expect(cappedUtil).toBeLessThan(baseUtil - 0.05);
+  });
+
+  it("percent H-Bar utilization flag does not override rate cap policy", () => {
+    const rows = [
+      { name: "A", value: 0.034 },
+      { name: "B", value: 0.041 },
+    ];
+    const base = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Delinquency Rate by Customer Segment",
+      metricLabel: "Delinquency Rate",
+      presentationKind: "bar_horizontal",
+    });
+    const withCap = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Delinquency Rate by Customer Segment",
+      metricLabel: "Delinquency Rate",
+      presentationKind: "bar_horizontal",
+      overviewHorizontalBarHeadroom: true,
+    });
+    expect(base).toEqual(withCap);
+    expect(base![0]).toBe(0);
+    expect(base![1]).toBeLessThanOrEqual(0.055);
+  });
+
+  it("resolveOverviewHBarUtilizationDomainMax preserves existing higher domain", () => {
+    expect(resolveOverviewHBarUtilizationDomainMax(100, 200)).toBe(200);
+    expect(resolveOverviewHBarUtilizationDomainMax(100, 110)).toBeCloseTo(117.647, 2);
   });
 });

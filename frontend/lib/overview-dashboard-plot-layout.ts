@@ -254,6 +254,8 @@ export const OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX = 36;
 /** Live H-Bar margins — lower plot band, tighter footer gutter. */
 export const OVERVIEW_HBAR_LIVE_MARGIN_BOTTOM_PX = 20;
 export const OVERVIEW_HBAR_LIVE_MARGIN_TOP_BASE_PX = 10;
+/** Live Overview H-Bar outer right gutter — keeps bars off the card edge. */
+export const OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX = 32;
 
 /** Live V-Bar margins — mirror H-Bar sparse lift and tighter footer gutter. */
 export const OVERVIEW_VBAR_LIVE_MARGIN_TOP_BASE_PX = 8;

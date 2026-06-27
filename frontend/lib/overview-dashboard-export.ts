@@ -104,6 +104,7 @@ export function horizontalBarValueDomain(
     presentationKind: "bar_horizontal",
     executiveRounding: true,
     rightPadRatio,
+    overviewHorizontalBarHeadroom: true,
   });
   if (smart) return smart;
 

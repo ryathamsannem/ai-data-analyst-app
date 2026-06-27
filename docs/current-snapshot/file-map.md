@@ -1,12 +1,12 @@
 # Chart-Related File Map
 
-**Snapshot:** June 27, 2026 (updated after Overview Pass 5A.3)
+**Snapshot:** June 27, 2026 (updated after Overview Pass **5C.5** — H-Bar/V-Bar parity frozen)
 
 Paths relative to repo root.
 
 ---
 
-## Key files by area (5A.3 snapshot)
+## Key files by area (5C.5 snapshot)
 
 ### Overview chart selection (backend)
 | File | Purpose |
@@ -22,14 +22,17 @@ Paths relative to repo root.
 | `frontend/app/components/home/chart-renderer.tsx` | Shared renderer (AI Insights / Charts / capture); H-Bar + V-Bar branches; `barValueTickFormatter` |
 | `frontend/lib/overview-dashboard-chart-renderable.ts` | Frontend Overview chart filtering safety net |
 | `frontend/lib/overview-premium-axis-domain.ts` | `formatOverviewBarValueAxisTick`, line/scatter tick formatters, premium domains |
-| `frontend/lib/cartesian-chart-decisions.ts` | `resolveCartesianBarValueAxisProps` (H-Bar/V-Bar value-axis props) |
+| `frontend/lib/cartesian-chart-decisions.ts` | `resolveCartesianBarValueAxisProps`; Overview H-Bar headroom flag; count-axis tick attach |
+| `frontend/lib/metric-value-format.ts` | Tick formatters, percent/score detection, `coercePercentDisplayNumber` chip fix |
 
-### H-Bar / V-Bar visual constants
+### H-Bar / V-Bar visual constants & domain (frozen 5C.5)
 | File | Purpose |
 |------|---------|
-| `frontend/lib/horizontal-bar-visual.ts` | `HORIZONTAL_BAR_END_RADIUS`, `HORIZONTAL_BAR_MAX_SIZE`, stacked variants |
+| `frontend/lib/horizontal-bar-visual.ts` | H-Bar radius, category-responsive `maxBarSize`, category gap, utilization diagnostic |
+| `frontend/lib/overview-bar-value-domain.ts` | Zero baseline, rate caps (5C.2), **85% H-Bar utilization cap** (5C.5) |
+| `frontend/lib/overview-dashboard-plot-layout.ts` | Live H-Bar margins incl. `OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX` |
+| `frontend/lib/overview-dashboard-export.ts` | PNG export domain + H-Bar maxSize re-exports |
 | `frontend/lib/shared-chart-layout.ts` | `SHARED_CHART_LAYOUT.verticalBar` gaps/category rules |
-| `frontend/lib/overview-dashboard-export.ts` | `OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE`, `OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE` |
 | (V-Bar radius/maxBarSize literals) | inline in `page.tsx` and `chart-renderer.tsx` |
 
 ### AI Summary
@@ -57,17 +60,21 @@ Paths relative to repo root.
 | `frontend/lib/resolved-dataset-type-label.ts` | Frontend dataset-type label resolution |
 | `frontend/app/pdf-report.ts` | `datasetKindLabel` |
 
-### Tests (5A.x)
+### Tests (5A.x → 5C.x)
 | File | Covers |
 |------|--------|
-| `backend/tests/test_cross_domain_mapping_qa.py` | Cross-domain mapping/domain/label QA (retail, banking gold, banking FS, HR) |
+| `backend/tests/test_cross_domain_mapping_qa.py` | Cross-domain mapping/domain/label QA |
 | `backend/tests/test_overview_banking_gold_dashboard.py` | Banking gold default charts (5A / 5A.1) |
 | `backend/tests/test_overview_banking_financial_services.py` | Banking FS label/cadence/scatter (5A.2) |
 | `backend/tests/test_overview_retail_gold_dashboard.py` | Retail default charts |
 | `backend/tests/test_executive_kpi_domains.py` | Executive KPI domain mapping |
-| `frontend/lib/overview-premium-axis-domain.test.ts` | `formatOverviewBarValueAxisTick` + domains |
+| `frontend/lib/overview-bar-value-domain.test.ts` | Zero baseline, rate caps, **85% utilization cap** |
+| `frontend/lib/horizontal-bar-visual.test.ts` | H-Bar radius/maxSize/category gap/band fill |
+| `frontend/lib/cartesian-chart-decisions.test.ts` | Cross-surface axis props parity |
+| `frontend/lib/overview-dashboard-export.test.ts` | PNG export domain + utilization cap |
+| `frontend/lib/overview-premium-axis-domain.test.ts` | `formatOverviewBarValueAxisTick`, count ticks |
 | `frontend/lib/overview-dash-chart-insights.test.ts` | Rate breakdown chips (% + `pp` gap) |
-| `frontend/lib/horizontal-bar-visual.test.ts` | H-Bar radius/thickness constants |
+| `frontend/lib/overview-dashboard-plot-layout.test.ts` | Live H-Bar/V-Bar margins |
 | `frontend/lib/resolved-dataset-type-label.test.ts` | Dataset-type label resolver |
 | `frontend/lib/overview-dashboard-context-chips.test.ts` | Context chips + type label |
 
@@ -106,7 +113,7 @@ Paths relative to repo root.
 | File | Purpose |
 |------|---------|
 | `lib/overview-premium-axis-domain.ts` | Trend/scatter premium domains; `resolveTrendValueAxisProps`; session/overview/session surfaces; `sessionTrendDetailPlotMargins` |
-| `lib/overview-bar-value-domain.ts` | Bar value domains; executive rounding; bounded metrics (scores, percent) |
+| `lib/overview-bar-value-domain.ts` | Bar value domains; zero baseline; rate caps; **85% H-Bar utilization cap**; executive rounding |
 | `lib/chart-platform/axis-presentation-plan.ts` | Export axis plans; `resolveHBarValueAxisProps`, `resolveVerticalBarValueAxisProps` |
 | `lib/metric-value-format.ts` | Tick formatters, percent/score detection |
 

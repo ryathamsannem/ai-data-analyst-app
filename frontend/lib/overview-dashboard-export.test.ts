@@ -55,29 +55,50 @@ describe("detectOverviewExportBarOrientation", () => {
 
 describe("horizontalBarValueDomain", () => {
   it("uses zero baseline for low-spread count breakdowns (bar_horizontal policy)", () => {
-    expect(horizontalBarValueDomain([{ value: 23 }, { value: 17 }])).toEqual([
-      0,
-      25,
-    ]);
-    expect(
-      horizontalBarValueDomain([{ value: 122 }, { value: 108 }], undefined, {
+    const small = horizontalBarValueDomain([{ value: 23 }, { value: 17 }]);
+    expect(small[0]).toBe(0);
+    expect(small[1]).toBeGreaterThanOrEqual(23 / 0.85);
+    const domain = horizontalBarValueDomain(
+      [{ value: 122 }, { value: 108 }],
+      undefined,
+      {
         chartTitle: "Delivery Days by Payment Method",
         metricLabel: "Delivery Days",
-      })
-    ).toEqual([0, 130]);
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(122 / 0.85);
   });
 
   it("keeps zero baseline when values start well below the maximum", () => {
-    expect(
-      horizontalBarValueDomain(
-        [{ value: 120_000 }, { value: 240_000 }, { value: 310_000 }],
-        undefined,
-        {
-          chartTitle: "Revenue by Region",
-          metricLabel: "Revenue",
-        }
-      )
-    ).toEqual([0, 330_000]);
+    const domain = horizontalBarValueDomain(
+      [{ value: 120_000 }, { value: 240_000 }, { value: 310_000 }],
+      undefined,
+      {
+        chartTitle: "Revenue by Region",
+        metricLabel: "Revenue",
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(310_000 / 0.85);
+  });
+
+  it("PNG/export H-Bar loan balance uses the same ~85% utilization cap", () => {
+    const maxRaw = 183_916_971;
+    const domain = horizontalBarValueDomain(
+      [
+        { name: "Mortgage", value: maxRaw },
+        { name: "Credit Card", value: 132_661_579 },
+      ],
+      undefined,
+      {
+        chartTitle: "Loan Balance by Product Type",
+        metricLabel: "Loan Balance",
+      }
+    );
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(maxRaw / 0.85);
+    expect(maxRaw / domain[1]).toBeLessThanOrEqual(0.851);
   });
 
   it("uses tight PNG domain for low-variance satisfaction scores", () => {

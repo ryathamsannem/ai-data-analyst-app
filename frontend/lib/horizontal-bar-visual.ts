@@ -6,11 +6,19 @@
 /** V-Bar overview band cap — reference for H-Bar parity. */
 export const OVERVIEW_VBAR_MAX_BAR_SIZE = 52;
 
-/** Overview H-Bar live — targets ~92% of V-Bar band fill on the same plot height. */
+/** Overview H-Bar live — default for sparse (1–5 category) charts. */
 export const OVERVIEW_HBAR_LIVE_MAX_BAR_SIZE = 48;
 
-/** Overview H-Bar PNG/export — same policy as live (explicit export alias). */
+/** Overview H-Bar PNG/export — same responsive policy as live (explicit export alias). */
 export const OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE = 48;
+
+/** Category-count bands for Overview H-Bar thickness — avoids crowding at 7–8 rows. */
+export const OVERVIEW_HBAR_MAX_SIZE_BY_CATEGORY = {
+  sparse: 48,
+  six: 44,
+  dense: 42,
+  compact: 36,
+} as const;
 
 /**
  * Asymmetric all-corner radius aligned with V-Bar ([8,8,4,4] / [10,10,6,6]).
@@ -48,12 +56,22 @@ export const HBAR_VBAR_PARITY_FIXTURE = [
   { name: "Support", value: 50 },
 ] as const;
 
-export function resolveOverviewHorizontalBarMaxSize(
-  pngCapture?: boolean
+export function resolveOverviewHBarMaxSizeForCategoryCount(
+  categoryCount: number
 ): number {
-  return pngCapture
-    ? OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE
-    : OVERVIEW_HBAR_LIVE_MAX_BAR_SIZE;
+  const n = Math.max(1, Math.floor(categoryCount));
+  if (n <= 5) return OVERVIEW_HBAR_MAX_SIZE_BY_CATEGORY.sparse;
+  if (n === 6) return OVERVIEW_HBAR_MAX_SIZE_BY_CATEGORY.six;
+  if (n <= 8) return OVERVIEW_HBAR_MAX_SIZE_BY_CATEGORY.dense;
+  return OVERVIEW_HBAR_MAX_SIZE_BY_CATEGORY.compact;
+}
+
+export function resolveOverviewHorizontalBarMaxSize(
+  options: { pngCapture?: boolean; categoryCount?: number } = {}
+): number {
+  const count = options.categoryCount ?? 5;
+  void options.pngCapture;
+  return resolveOverviewHBarMaxSizeForCategoryCount(count);
 }
 
 export function resolveHorizontalBarMaxSize(args: {
@@ -61,9 +79,13 @@ export function resolveHorizontalBarMaxSize(args: {
   detailLayout?: boolean;
   /** Overview inline renderer — live vs PNG capture. */
   overviewCapture?: boolean;
+  categoryCount?: number;
 }): number {
   if (args.overviewCapture !== undefined) {
-    return resolveOverviewHorizontalBarMaxSize(args.overviewCapture);
+    return resolveOverviewHorizontalBarMaxSize({
+      pngCapture: args.overviewCapture,
+      categoryCount: args.categoryCount,
+    });
   }
   if (args.compact) return HORIZONTAL_BAR_MAX_SIZE.compact;
   if (args.detailLayout) return HORIZONTAL_BAR_MAX_SIZE.detail;
@@ -80,8 +102,12 @@ export function resolveHorizontalBarCategoryGap(args: {
   detailLayout?: boolean;
 }): HorizontalBarCategoryGap {
   const n = Math.max(1, args.categoryCount);
-  if (n <= 6) return "16%";
-  if (args.detailLayout === true && n <= 10) return "10%";
+  if (args.detailLayout === true) {
+    if (n <= 6) return "16%";
+    if (n <= 10) return "10%";
+    return undefined;
+  }
+  if (n <= 8) return "16%";
   return undefined;
 }
 
@@ -92,6 +118,18 @@ export function resolveHorizontalBarGap(args: {
 }): number | undefined {
   const n = Math.max(1, args.categoryCount);
   return args.detailLayout === true && n <= 6 ? 4 : undefined;
+}
+
+/** Estimated bar-length share of the value axis (0–1) for plot-utilization diagnostics. */
+export function estimateHorizontalBarLengthUtilization(args: {
+  maxValue: number;
+  domainMax: number;
+}): number {
+  const { maxValue, domainMax } = args;
+  if (!Number.isFinite(maxValue) || !Number.isFinite(domainMax) || domainMax <= 0) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, maxValue / domainMax));
 }
 
 /** Estimated band fill ratio for parity diagnostics (not Recharts runtime). */

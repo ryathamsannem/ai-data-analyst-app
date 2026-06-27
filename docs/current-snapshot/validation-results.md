@@ -1,19 +1,21 @@
 # Validation Results
 
-**Snapshot:** June 27, 2026 (after Overview Pass 5A.3) · Branch `DEV` · Latest commit `f648151`.
+**Snapshot:** June 27, 2026 (after Overview Pass **5C.5** — H-Bar/V-Bar parity frozen) · Branch `DEV`.
 
 ---
 
 ## Frontend — vitest
 
 ```bash
-cd frontend && npx vitest run
+cd frontend && npm run test
+# equivalent: cd frontend && npx vitest run
 ```
 
-- **Result:** PASS — **668 tests in 83 files passed (0 failed).**
-- Includes 5A.3 suites: `horizontal-bar-visual.test.ts`, `overview-premium-axis-domain.test.ts`,
-  `overview-dash-chart-insights.test.ts`, `resolved-dataset-type-label.test.ts`,
-  `overview-dashboard-context-chips.test.ts`, `overview-dashboard-chart-renderable.test.ts`.
+- **Result:** PASS — **722 tests in 83 files passed (0 failed).**
+- Key 5B/5C suites: `overview-bar-value-domain.test.ts` (48), `horizontal-bar-visual.test.ts` (11),
+  `cartesian-chart-decisions.test.ts` (15), `overview-dashboard-export.test.ts` (15),
+  `overview-premium-axis-domain.test.ts` (26), `overview-dash-chart-insights.test.ts` (23),
+  `overview-dashboard-plot-layout.test.ts` (11).
 
 ## Frontend — build
 
@@ -37,7 +39,7 @@ cd backend && python -m pytest \
   tests/test_executive_kpi_domains.py
 ```
 
-- **Result:** PASS — **37 passed (0 failed).**
+- **Result:** PASS — **37 passed (0 failed)** (unchanged from 5A.3 snapshot).
 
 ## Backend — full suite
 
@@ -46,56 +48,54 @@ cd backend && python -m pytest tests/
 ```
 
 - **Result:** **6 failed, 421 passed.**
-- **All 6 failures are PRE-EXISTING** (not introduced by Overview Pass 5A.3). Proven by reverting the
-  5A.3 `main.py` scorer edits and re-running: the same 6 tests fail identically on the baseline. They
-  exercise the `sales` showcase discovery / banking suggested-questions / marketing weak-title — none of
-  which the 5A.3 keyword-scorer edits execute against.
+- **All 6 failures are PRE-EXISTING** (not introduced by Overview Pass 5A–5C).
 
 | Pre-existing failing test | Area |
 |---------------------------|------|
 | `tests/intent_engine/test_banking_utilization_routing.py::...::test_suggested_questions_include_utilization_trend` | Suggested questions (banking) |
-| `tests/test_auto_dashboard_chart_quality.py::...::test_no_weak_chart_titles` | marketing.csv "Category Distribution · Channel" weak title |
-| `tests/test_auto_dashboard_opportunities.py::...::test_before_after_chart_count_improvement` | Sales showcase chart count (4 < 6) |
-| `tests/test_auto_dashboard_opportunities.py::...::test_showcase_dimension_diversity_and_donut_cap` | Sales showcase dimension diversity (2 < 3) |
-| `tests/test_auto_dashboard_opportunities.py::...::test_showcase_produces_diverse_charts` | Sales showcase chart count (4 < 6) |
-| `tests/test_auto_dashboard_showcase_regression.py::...::test_scatter_payload_has_numeric_x_axis` | Sales showcase scatter expected |
+| `tests/test_auto_dashboard_chart_quality.py::...::test_no_weak_chart_titles` | marketing.csv weak title |
+| `tests/test_auto_dashboard_opportunities.py::...::test_before_after_chart_count_improvement` | Sales showcase chart count |
+| `tests/test_auto_dashboard_opportunities.py::...::test_showcase_dimension_diversity_and_donut_cap` | Sales showcase dimension diversity |
+| `tests/test_auto_dashboard_opportunities.py::...::test_showcase_produces_diverse_charts` | Sales showcase chart count |
+| `tests/test_auto_dashboard_showcase_regression.py::...::test_scatter_payload_has_numeric_x_axis` | Sales showcase scatter |
 
-> These are tracked as accepted technical debt in [`open-items.md`](./open-items.md), not as 5A.3 regressions.
+---
+
+## H-Bar/V-Bar parity validation (Pass 5B → 5C.5)
+
+| Check | Method | Verdict |
+|-------|--------|---------|
+| Zero baseline (currency/count H/V-Bar) | Unit tests `overview-bar-value-domain.test.ts` | PASS |
+| Low-rate percent cap (delinquency ~5%) | Unit tests 5C.2 | PASS |
+| H-Bar band fill / category sizing | Unit tests `horizontal-bar-visual.test.ts` | PASS |
+| Overview H-Bar 85% utilization cap | Unit tests + Loan Balance fixture ($183.9M → ~$216M domain) | PASS |
+| Percent chip 1.0% not 100% | Unit tests `metric-executive-percent.test.ts` / domain tests | PASS |
+| Export/live domain parity | `cartesian-chart-decisions.test.ts`, `overview-dashboard-export.test.ts`, `axis-presentation-plan.test.ts` | PASS |
+| Count-axis clean integer ticks | `overview-premium-axis-domain.test.ts`, `cartesian-chart-decisions.test.ts` | PASS |
+| Cross-surface renderer wiring | Static trace: `page.tsx` → `resolveCartesianBarValueAxisProps` | PASS |
+| Manual H-Bar/V-Bar premium match | Screenshots after 5C.5; residual stretch mitigated; orientation difference accepted | **FROZEN** |
 
 ---
 
 ## Manual files tested (mapping/domain probe)
 
-Loaded each fixture, ran `compute_semantic_column_mapping` + `build_auto_dashboard`, and inspected the
-resolved domain, type label, role mapping, and chart titles.
+| Fixture | Verdict |
+|---------|---------|
+| `retail_gold_10000.csv` | PASS |
+| `banking_gold_10000.csv` | PASS |
+| `banking_financial_services.csv` | PASS |
+| `hr_gold_5000.csv` | PASS |
 
-| Fixture | Domain | Type label | Primary metric | Secondary | Date | Main dimension | Verdict |
-|---------|--------|-----------|----------------|-----------|------|----------------|---------|
-| `retail_gold_10000.csv` | sales | Sales | `sales_amount` | `profit` | `order_date` | `product_category` | PASS — no banking labels |
-| `banking_gold_10000.csv` | banking | Banking / Financial Services | `spend_amount` | `utilization_pct` | `month` | `product_type` | PASS — no lifecycle age, no scatter |
-| `banking_financial_services.csv` | banking | Banking / Financial Services | `spend_amount` | `credit_utilization` | `report_date` | `product_type` | PASS — monthly trends, no scatter |
-| `hr_gold_5000.csv` | hr | HR / Employee | `salary` | `performance_rating` | `hire_date` | `department` | PASS — salary/department (no training_hours/age_band) |
-
-**Visual checks pending manual UI confirmation:** H-Bar/V-Bar premium parity (currently NOT matching — see
-[`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md)); percent/`pp` formatting on
-rate V-Bars (unit-tested, confirm visually).
+**Visual checks pending manual UI confirmation:** Overview defaults across all four fixtures on live upload (P0 in [`open-items.md`](./open-items.md)).
 
 ---
 
 ## How to continue in a new Cursor chat
 
-**Next recommended task:**
+**Next recommended task (P1):**
 
-> **Investigate H-Bar vs V-Bar visual parity by comparing rendered geometry and shared constants before
-> making more changes.**
+> **Production Readiness Phase 1 — export regression pass** after 5B/5C domain changes.
 
-Concretely:
-1. Render a V-Bar and an H-Bar from the **same dataset** on the same surface.
-2. Measure the SVG: plot band width/height, per-category band size, actual bar thickness, gap between bars,
-   and value-axis domain/ticks.
-3. Identify **which** geometry differs (layout type, band calc, gaps, value-axis compression, card padding,
-   or inline-vs-shared-renderer differences).
-4. Only then adjust constants/gaps/layout. **Do not** make further blind constant edits.
+Re-validate PNG/PDF export for banking Overview cards (Loan Balance H-Bar ~216M top tick, delinquency V-Bar 0–5%, profit V-Bar zero baseline). See [`open-items.md`](./open-items.md) P1.
 
-Start from: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md) (constants + file
-map) and [`overview-pass-status.md`](./overview-pass-status.md) (what 5A.3 already changed).
+**Do not** reopen H-Bar/V-Bar parity unless a regression is reported with measured SVG evidence. Baseline: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).

@@ -119,6 +119,28 @@ function buildTicks(lo: number, hi: number, step: number): number[] {
 }
 
 /**
+ * Clean integer ticks for zero-baseline count bar value axes (Overview live).
+ * Uses the resolved bar domain — does not change domain/baseline policy.
+ */
+export function resolveOverviewBarCountValueAxisTicks(
+  domain: readonly [number, number]
+): number[] | undefined {
+  const [dMin, dMax] = domain;
+  if (!Number.isFinite(dMin) || !Number.isFinite(dMax) || dMax <= dMin) {
+    return undefined;
+  }
+  if (dMin < -1e-9) return undefined;
+
+  const step = chooseOverviewPremiumStep(dMin, dMax);
+  const lo = snapDown(dMin, step);
+  const hi = snapUp(dMax, step);
+  const ticks = buildTicks(lo, hi, step);
+  if (ticks.length < 2 || ticks.length > 7) return undefined;
+  if (ticks.some((t) => Math.abs(t - Math.round(t)) > 1e-6)) return undefined;
+  return ticks;
+}
+
+/**
  * Data-focused axis with rounded bounds and 4–6 even ticks — Overview live charts only.
  */
 export function resolveOverviewPremiumAxisScale(

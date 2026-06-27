@@ -10,9 +10,11 @@ import {
   OVERVIEW_HBAR_LIVE_MAX_BAR_SIZE,
   OVERVIEW_VBAR_MAX_BAR_SIZE,
   estimateHorizontalBarBandFillRatio,
+  estimateHorizontalBarLengthUtilization,
   resolveHorizontalBarCategoryGap,
   resolveHorizontalBarGap,
   resolveHorizontalBarMaxSize,
+  resolveOverviewHBarMaxSizeForCategoryCount,
   resolveOverviewHorizontalBarMaxSize,
 } from "@/lib/horizontal-bar-visual";
 
@@ -41,7 +43,9 @@ describe("horizontal bar visual constants", () => {
   it("matches V-Bar sparse category-band rhythm instead of Recharts defaults", () => {
     expect(resolveHorizontalBarCategoryGap({ categoryCount: 4 })).toBe("16%");
     expect(resolveHorizontalBarCategoryGap({ categoryCount: 6 })).toBe("16%");
-    expect(resolveHorizontalBarCategoryGap({ categoryCount: 8 })).toBeUndefined();
+    expect(resolveHorizontalBarCategoryGap({ categoryCount: 7 })).toBe("16%");
+    expect(resolveHorizontalBarCategoryGap({ categoryCount: 8 })).toBe("16%");
+    expect(resolveHorizontalBarCategoryGap({ categoryCount: 9 })).toBeUndefined();
 
     expect(
       resolveHorizontalBarCategoryGap({ categoryCount: 8, detailLayout: true })
@@ -79,15 +83,14 @@ describe("H-Bar/V-Bar visual parity policy", () => {
   });
 
   it("Overview inline and export share the same H-Bar maxSize resolver", () => {
-    expect(resolveOverviewHorizontalBarMaxSize(false)).toBe(
-      OVERVIEW_HBAR_LIVE_MAX_BAR_SIZE
-    );
-    expect(resolveOverviewHorizontalBarMaxSize(true)).toBe(
-      OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE
-    );
-    expect(resolveOverviewHorizontalBarMaxSize(false)).toBe(
-      resolveOverviewHorizontalBarMaxSize(true)
-    );
+    expect(
+      resolveOverviewHorizontalBarMaxSize({ pngCapture: false, categoryCount: 5 })
+    ).toBe(OVERVIEW_HBAR_LIVE_MAX_BAR_SIZE);
+    expect(
+      resolveOverviewHorizontalBarMaxSize({ pngCapture: true, categoryCount: 5 })
+    ).toBe(OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE);
+    expect(resolveOverviewHBarMaxSizeForCategoryCount(7)).toBe(42);
+    expect(resolveOverviewHBarMaxSizeForCategoryCount(9)).toBe(36);
   });
 
   it("ChartRenderer session path uses centralized maxSize bands", () => {
@@ -116,7 +119,36 @@ describe("H-Bar/V-Bar visual parity policy", () => {
     expect(hFill).toBeGreaterThanOrEqual(vFill * 0.85);
   });
 
-  it("documents export variant — PNG uses same maxSize as live", () => {
-    expect(OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE).toBe(OVERVIEW_HBAR_LIVE_MAX_BAR_SIZE);
+  it("7-category H-Bar thins bands and keeps V-Bar gap rhythm", () => {
+    const plotInnerHeightPx = 366;
+    const sevenGap = resolveHorizontalBarCategoryGap({ categoryCount: 7 });
+    expect(sevenGap).toBe("16%");
+    const hFill = estimateHorizontalBarBandFillRatio({
+      plotInnerHeightPx,
+      categoryCount: 7,
+      maxBarSize: resolveOverviewHBarMaxSizeForCategoryCount(7),
+      categoryGap: sevenGap,
+    });
+    const overcrowded = estimateHorizontalBarBandFillRatio({
+      plotInnerHeightPx,
+      categoryCount: 7,
+      maxBarSize: 48,
+      categoryGap: undefined,
+    });
+    expect(hFill).toBeLessThan(1);
+    expect(hFill).toBeGreaterThan(0.82);
+    expect(hFill).toBeLessThan(overcrowded);
+  });
+
+  it("bar-length utilization helper reflects domain headroom", () => {
+    expect(
+      estimateHorizontalBarLengthUtilization({ maxValue: 1258, domainMax: 1333 })
+    ).toBeGreaterThan(0.94);
+    expect(
+      estimateHorizontalBarLengthUtilization({
+        maxValue: 183_916_971,
+        domainMax: 183_916_971 / 0.85,
+      })
+    ).toBeCloseTo(0.85, 2);
   });
 });

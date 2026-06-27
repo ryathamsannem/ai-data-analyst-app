@@ -7,8 +7,13 @@ import {
   type HBarValueAxisProps,
   type VerticalBarValueAxisProps,
 } from "@/lib/chart-platform/axis-presentation-plan";
+import {
+  resolveMetricValueFormat,
+  type MetricFormatContext,
+} from "@/lib/metric-value-format";
 import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
 import {
+  resolveOverviewBarCountValueAxisTicks,
   resolveScatterValueAxisProps,
   resolveTrendValueAxisProps,
   type ScatterValueAxisProps,
@@ -53,6 +58,19 @@ export function cartesianUsesHorizontalPlot(
  * Shared bar-family value-axis props for Overview inline plots and ChartRenderer.
  * Returns `null` when the kind is not bar, histogram, or horizontal bar.
  */
+function attachOverviewCountBarTicks(
+  props: VerticalBarValueAxisProps | HBarValueAxisProps,
+  ctx: MetricFormatContext,
+  chartKind: ChartKind
+): VerticalBarValueAxisProps | HBarValueAxisProps {
+  if (chartKind === "histogram") return props;
+  if (!props.domain) return props;
+  if (resolveMetricValueFormat(ctx) !== "number") return props;
+  const ticks = resolveOverviewBarCountValueAxisTicks(props.domain);
+  if (!ticks) return props;
+  return { ...props, ticks };
+}
+
 export function resolveCartesianBarValueAxisProps(args: {
   chartKind: ChartKind;
   rows: readonly ChartRow[];
@@ -71,7 +89,16 @@ export function resolveCartesianBarValueAxisProps(args: {
         executiveRounding: false,
       });
       if (!domain) return null;
-      return { domain, allowDataOverflow: false };
+      return attachOverviewCountBarTicks(
+        { domain, allowDataOverflow: false },
+        {
+          chartTitle: chartTitle ?? undefined,
+          metricLabel: metricLabel ?? undefined,
+          presentationKind: chartKind,
+          chartRows: rows as ChartRow[],
+        },
+        chartKind
+      );
     }
     return resolveVerticalBarValueAxisProps({
       plan: context.capture ? (context.exportAxisPlan ?? null) : null,
@@ -90,9 +117,19 @@ export function resolveCartesianBarValueAxisProps(args: {
         metricLabel: metricLabel ?? undefined,
         presentationKind: chartKind,
         executiveRounding: false,
+        overviewHorizontalBarHeadroom: true,
       });
       if (!domain) return null;
-      return { domain, allowDataOverflow: false };
+      return attachOverviewCountBarTicks(
+        { domain, allowDataOverflow: false },
+        {
+          chartTitle: chartTitle ?? undefined,
+          metricLabel: metricLabel ?? undefined,
+          presentationKind: chartKind,
+          chartRows: rows as ChartRow[],
+        },
+        chartKind
+      );
     }
     return resolveHBarValueAxisProps({
       plan: context.capture ? (context.exportAxisPlan ?? null) : null,

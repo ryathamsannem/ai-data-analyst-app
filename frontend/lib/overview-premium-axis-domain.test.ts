@@ -6,6 +6,7 @@ import {
   formatOverviewScatterAxisTick,
   OVERVIEW_LINE_PREMIUM_PAD_RATIO,
   OVERVIEW_SCATTER_TARGET_OCCUPANCY,
+  resolveOverviewBarCountValueAxisTicks,
   resolveOverviewPremiumAxisScale,
   resolveOverviewScatterPremiumAxes,
   resolveOverviewScatterPremiumAxisScale,
@@ -110,6 +111,30 @@ describe("formatOverviewBarValueAxisTick", () => {
     };
     expect(formatOverviewBarValueAxisTick(50, rows, ctx)).toBe("50");
     expect(formatOverviewBarValueAxisTick(100, rows, ctx)).toBe("100");
+  });
+
+  it("formats department count axis ticks as clean integers, not decimals", () => {
+    const rows: ChartRow[] = [
+      { name: "A", value: 350 },
+      { name: "B", value: 1258 },
+    ];
+    const ctx = {
+      metricLabel: "Records by Department",
+      chartTitle: "Records by Department",
+    };
+    expect(formatOverviewBarValueAxisTick(1300, rows, ctx)).toBe("1,300");
+    expect(formatOverviewBarValueAxisTick(1300, rows, ctx)).not.toContain(".");
+  });
+});
+
+describe("resolveOverviewBarCountValueAxisTicks", () => {
+  it("returns clean integer ticks for department count domains without decimals", () => {
+    const ticks = resolveOverviewBarCountValueAxisTicks([0, 1333.48]);
+    expect(ticks).toBeDefined();
+    expect(ticks!.length).toBeGreaterThanOrEqual(4);
+    expect(ticks!.every((t) => Math.abs(t - Math.round(t)) < 1e-9)).toBe(true);
+    expect(ticks!.some((t) => t >= 1200)).toBe(true);
+    expect(ticks!.some((t) => t === 1258.2)).toBe(false);
   });
 });
 

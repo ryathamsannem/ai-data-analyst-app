@@ -10,6 +10,22 @@ import {
 
 const DEFAULT_BAR_RIGHT_PAD_RATIO = 0.06;
 
+/** Target longest-bar share of Overview H-Bar value-axis span (~V-Bar card balance). */
+export const OVERVIEW_HBAR_TARGET_MAX_UTILIZATION = 0.85;
+
+/** @deprecated Use OVERVIEW_HBAR_TARGET_MAX_UTILIZATION — kept for test migration only. */
+export const OVERVIEW_HBAR_VALUE_DOMAIN_PAD_RATIO = 0.10;
+
+/** Overview H-Bar domainMax floor so the longest bar occupies ~85% of plot width. */
+export function resolveOverviewHBarUtilizationDomainMax(
+  maxRaw: number,
+  existingDomainMax: number
+): number {
+  if (!Number.isFinite(maxRaw) || maxRaw <= 0) return existingDomainMax;
+  const utilizationCap = maxRaw / OVERVIEW_HBAR_TARGET_MAX_UTILIZATION;
+  return Math.max(existingDomainMax, utilizationCap);
+}
+
 export type OverviewBarValueDomainOptions = {
   chartTitle?: string;
   metricLabel?: string;
@@ -17,6 +33,8 @@ export type OverviewBarValueDomainOptions = {
   /** Apply executive-friendly rounding (PNG export). */
   executiveRounding?: boolean;
   rightPadRatio?: number;
+  /** Overview H-Bar — extra domainMax padding for plot-width breathing room. */
+  overviewHorizontalBarHeadroom?: boolean;
 };
 
 export type BoundedMetricBounds = {
@@ -498,6 +516,19 @@ export function resolveOverviewBarValueDomain(
   ) {
     const refinedMax = resolveBarChartRateUpperBound({ maxDisplay, maxRaw });
     domainMax = Math.max(maxRaw * 1.01, refinedMax);
+  }
+
+  // Overview H-Bar plot utilization — percent/rate caps own their headroom separately.
+  if (
+    options.overviewHorizontalBarHeadroom &&
+    options.presentationKind === "bar_horizontal" &&
+    domainMin === 0 &&
+    minRaw >= 0 &&
+    !isScoreOrRatingLike &&
+    !hasBoundedRatingScale &&
+    !isPercent
+  ) {
+    domainMax = resolveOverviewHBarUtilizationDomainMax(maxRaw, domainMax);
   }
 
   if (domainMax <= domainMin) {

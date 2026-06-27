@@ -135,6 +135,7 @@ describe("resolveCartesianBarValueAxisProps — horizontal bar", () => {
       metricLabel: "Revenue",
       presentationKind: "bar_horizontal",
       executiveRounding: false,
+      overviewHorizontalBarHeadroom: true,
     });
     const shared = resolveCartesianBarValueAxisProps({
       chartKind: "bar_horizontal",
@@ -163,6 +164,30 @@ describe("resolveCartesianBarValueAxisProps — horizontal bar", () => {
       context: { pipeline: "session", capture: false },
     });
     expect(shared).toEqual(session);
+  });
+
+  it("Overview count H-Bar attaches clean integer value-axis ticks", () => {
+    const rows = [
+      { name: "Engineering", value: 350 },
+      { name: "Sales", value: 680 },
+      { name: "HR", value: 890 },
+      { name: "Ops", value: 1050 },
+      { name: "Finance", value: 1180 },
+      { name: "Legal", value: 1258 },
+    ];
+    const shared = resolveCartesianBarValueAxisProps({
+      chartKind: "bar_horizontal",
+      rows,
+      chartTitle: "Records by Department",
+      metricLabel: "Records",
+      context: { pipeline: "overview", capture: false },
+    });
+    expect(shared?.domain?.[0]).toBe(0);
+    expect(shared?.ticks).toBeDefined();
+    expect(shared!.ticks!.length).toBeGreaterThanOrEqual(4);
+    expect(shared!.ticks!.every((t) => Math.abs(t - Math.round(t)) < 1e-9)).toBe(
+      true
+    );
   });
 });
 

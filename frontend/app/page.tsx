@@ -113,6 +113,7 @@ import {
   computeOverviewContinuousVerticalDashLayout,
   computeOverviewHorizontalDashLayout,
   computeOverviewHBarLiveMargins,
+  OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX,
   computeOverviewMiniCategoryPlan,
   computeOverviewScatterLivePlotMargins,
   computeOverviewScatterDashMargins,
@@ -4744,7 +4745,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const hbBalanced = balanceHorizontalOuterMargins({
         marginLeft: hb.marginLeft,
         chartLayoutMode: pngCapture ? "export" : "compact",
-        minRight: pngCapture ? 12 : 8,
+        minRight: pngCapture ? 12 : OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX,
       });
       const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
         chartKind: "bar_horizontal",
@@ -4818,7 +4819,10 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               dataKey="value"
               fill="#6366f1"
               radius={HORIZONTAL_BAR_END_RADIUS}
-              maxBarSize={resolveOverviewHorizontalBarMaxSize(pngCapture)}
+              maxBarSize={resolveOverviewHorizontalBarMaxSize({
+                pngCapture,
+                categoryCount: chartRows.length,
+              })}
               isAnimationActive={plotAnimOn}
               animationDuration={plotAnimDuration}
               cursor={drillable ? "pointer" : "default"}
@@ -5120,7 +5124,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const barCategoryGap =
         isHist
           ? 2
-          : chartRows.length <= 6
+          : chartRows.length <= 8
             ? "16%"
             : undefined;
       return (

@@ -1,6 +1,6 @@
-# Overview Pass Status (5A → 5A.3)
+# Overview Pass Status (5A → 5C.5)
 
-Snapshot: June 27, 2026 · Branch `DEV` · Latest commit `f648151` (5A.x work uncommitted in working tree).
+Snapshot: June 27, 2026 · Branch `DEV` · Passes 5B/5C in working tree (parity **frozen** after 5C.5).
 
 All passes followed the same constraints: **incremental fixes only**, no AI Insights routing changes,
 no chart-rendering architecture rewrite, no export behavior changes except where shared visual constants
@@ -93,7 +93,114 @@ mapping modal label was sales-biased; H-Bar finish felt heavy.
 - **H-Bar/V-Bar visual parity: NOT PASS** — still visually different in screenshots; needs geometry-level review (see [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md)).
 
 **Known limitations:**
-- H-Bar premium parity unresolved; do not keep tweaking constants blindly.
 - HR `customer` role still resolves to `age` (minor; not a stated requirement).
 - HR auto-dashboard discovery can still surface weaker "Monthly Age Trend" / "Records by Age Band" charts (discovery layer, not mapping; separate follow-up).
 - 6 pre-existing `pytest` failures unrelated to 5A.3 remain.
+
+---
+
+## Pass 5B.1 — H-Bar percent/rate zero baseline + percent chip fix
+
+**Root cause:** H-Bar rate charts truncated X-axis (started ~5.6% instead of 0%); V-Bar chip showed `100.0%` when value was ~1.0% (`coercePercentDisplayNumber` treated 1.0 as fraction).
+
+**Files changed:**
+- `frontend/lib/overview-bar-value-domain.ts` — post-process force `domainMin = 0` for bar/horizontal-bar percent metrics with low floor.
+- `frontend/lib/metric-value-format.ts` — `coercePercentDisplayNumber` gains `maxContextValue`; `formatExecutiveMetricValue` passes dataset max.
+
+**Tests:** `overview-bar-value-domain.test.ts`, `metric-executive-percent.test.ts`.
+
+**Status:** ✅ Frozen.
+
+---
+
+## Pass 5B.2 — Universal zero-baseline for normal positive business bars
+
+**Root cause:** Pass 5B.1 only fixed percent metrics; currency/count bars still used tight domain via `spreadRatio < 0.06`.
+
+**Files changed:**
+- `frontend/lib/overview-bar-value-domain.ts` — broadened post-process: `domainMin = 0` for all normal positive bar metrics except score/rating and bounded rating scales.
+
+**Status:** ✅ Frozen.
+
+---
+
+## Pass 5B.3 — Export/shared/legacy domain parity validation
+
+**Root cause:** Risk that export paths still used old tight-domain behavior without `presentationKind`.
+
+**Files changed / validated:**
+- `frontend/lib/overview-dashboard-export.ts` — `horizontalBarValueDomain()` passes `presentationKind: "bar_horizontal"`.
+- Cross-surface parity tests in `overview-bar-value-domain.test.ts`, `cartesian-chart-decisions.test.ts`, `axis-presentation-plan.test.ts`, `overview-dashboard-export.test.ts`.
+
+**Status:** ✅ Frozen.
+
+---
+
+## Pass 5C.1 — H-Bar visual weight / band-fill parity
+
+**Root cause:** H-Bar looked like thin strips vs premium V-Bar (maxBarSize 28 vs 52, weak radius, no category gap).
+
+**Files changed:**
+- `frontend/lib/horizontal-bar-visual.ts` (new/expanded) — `OVERVIEW_HBAR_LIVE_MAX_BAR_SIZE = 48`, `HORIZONTAL_BAR_END_RADIUS = [4,6,6,4]`, category gap resolver, export/live aliases.
+- `frontend/app/page.tsx`, `chart-renderer.tsx`, `overview-dashboard-export.ts` — wired centralized constants.
+
+**Status:** ✅ Frozen.
+
+---
+
+## Pass 5C.2 — Low-rate V-Bar axis upper-bound polish
+
+**Root cause:** Delinquency 3.4–4.1% got top tick ~9.1% (tight-domain min pad 0.05 on fraction scale after zero-baseline override).
+
+**Files changed:**
+- `frontend/lib/overview-bar-value-domain.ts` — `resolveBarChartRateDisplayCap`, `resolveBarChartRateUpperBound`; tiered percent headroom post-process.
+
+**Status:** ✅ Frozen.
+
+---
+
+## Pass 5C.3 — H-Bar 7-category rhythm + count-axis ticks
+
+**Root cause:** 7+ category H-Bars lost 16% gap; Recharts auto-ticks showed decimals (e.g. `1,258.2`).
+
+**Files changed:**
+- `frontend/lib/horizontal-bar-visual.ts` — category-responsive maxSize (48/44/42/36); gap through 8 categories.
+- `frontend/lib/overview-premium-axis-domain.ts` — `resolveOverviewBarCountValueAxisTicks`.
+- `frontend/lib/cartesian-chart-decisions.ts` — attach clean ticks for Overview count bars.
+- `frontend/lib/overview-dashboard-plot-layout.ts` — `OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX = 32`.
+
+**Status:** ✅ Frozen.
+
+---
+
+## Pass 5C.4 — H-Bar utilization verification (×1.10 headroom)
+
+**Root cause confirmed:** Logic active but visually ineffective (~91% vs ~94% utilization, ~11px delta).
+
+**Files changed:**
+- `frontend/lib/overview-bar-value-domain.ts` — `OVERVIEW_HBAR_VALUE_DOMAIN_PAD_RATIO = 0.10`, `overviewHorizontalBarHeadroom` flag.
+
+**Status:** ✅ Superseded by 5C.5.
+
+---
+
+## Pass 5C.5 — Overview H-Bar 85% utilization cap (FINAL)
+
+**Root cause:** ×1.10 headroom not perceptible; V-Bar rate charts use ~80% occupancy vs H-Bar ~91%.
+
+**Policy:** For Overview H-Bar magnitude charts (currency/count/revenue, not percent/score):
+```ts
+domainMax = max(existingDomainMax, maxRaw / 0.85)
+```
+
+**Expected effect:** Loan Balance max $183.9M → domainMax ~$216M; longest bar ~85% plot width.
+
+**Files changed:**
+- `frontend/lib/overview-bar-value-domain.ts` — `OVERVIEW_HBAR_TARGET_MAX_UTILIZATION = 0.85`, `resolveOverviewHBarUtilizationDomainMax`.
+- `frontend/lib/cartesian-chart-decisions.ts`, `overview-dashboard-export.ts` — `overviewHorizontalBarHeadroom: true`.
+
+**Tests:** 722 vitest pass; build clean.
+
+**Status:** ✅ **Frozen — P0 H-Bar/V-Bar parity closed.**
+
+**Accepted limitation:** Orientation-natural difference (horizontal length vs vertical thickness) remains; not a bug.
