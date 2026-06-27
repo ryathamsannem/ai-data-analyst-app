@@ -10,6 +10,22 @@ import {
 
 const DEFAULT_BAR_RIGHT_PAD_RATIO = 0.06;
 
+/** Target longest-bar share of Overview H-Bar value-axis span (~V-Bar card balance). */
+export const OVERVIEW_HBAR_TARGET_MAX_UTILIZATION = 0.85;
+
+/** @deprecated Use OVERVIEW_HBAR_TARGET_MAX_UTILIZATION — kept for test migration only. */
+export const OVERVIEW_HBAR_VALUE_DOMAIN_PAD_RATIO = 0.10;
+
+/** Overview H-Bar domainMax floor so the longest bar occupies ~85% of plot width. */
+export function resolveOverviewHBarUtilizationDomainMax(
+  maxRaw: number,
+  existingDomainMax: number
+): number {
+  if (!Number.isFinite(maxRaw) || maxRaw <= 0) return existingDomainMax;
+  const utilizationCap = maxRaw / OVERVIEW_HBAR_TARGET_MAX_UTILIZATION;
+  return Math.max(existingDomainMax, utilizationCap);
+}
+
 export type OverviewBarValueDomainOptions = {
   chartTitle?: string;
   metricLabel?: string;
@@ -17,6 +33,8 @@ export type OverviewBarValueDomainOptions = {
   /** Apply executive-friendly rounding (PNG export). */
   executiveRounding?: boolean;
   rightPadRatio?: number;
+  /** Overview H-Bar — extra domainMax padding for plot-width breathing room. */
+  overviewHorizontalBarHeadroom?: boolean;
 };
 
 export type BoundedMetricBounds = {
@@ -289,6 +307,61 @@ function clampDomainToBounds(
   return [lo, hiRaw];
 }
 
+/** Whether stored values are 0–1 fractions displayed as percentage points. */
+export function barRateValuesOnFractionScale(
+  maxRaw: number,
+  maxDisplay: number
+): boolean {
+  return maxRaw <= 1.05 && maxDisplay <= 100 && maxDisplay > maxRaw * 5;
+}
+
+/**
+ * Clean percentage-point axis cap for zero-baseline bar charts.
+ * Keeps domainMin at 0 while avoiding excessive headroom on low single-digit rates.
+ */
+export function resolveBarChartRateDisplayCap(maxDisplay: number): number {
+  if (!Number.isFinite(maxDisplay) || maxDisplay <= 0) return 1;
+
+  if (maxDisplay <= 5) {
+    const padded = maxDisplay * 1.22;
+    if (padded <= 5.25) return 5;
+    if (padded <= 5.75) return 5.5;
+    return snapBarDomainBound(padded, 1, "ceil");
+  }
+
+  if (maxDisplay <= 10) {
+    const padded = maxDisplay * 1.15;
+    const step = maxDisplay <= 8 ? 0.5 : 1;
+    return snapBarDomainBound(padded, step, "ceil");
+  }
+
+  if (maxDisplay <= 50) {
+    const padded = maxDisplay * (1 + DEFAULT_BAR_RIGHT_PAD_RATIO);
+    return snapBarDomainBound(padded, 1, "ceil");
+  }
+
+  return maxDisplay * (1 + DEFAULT_BAR_RIGHT_PAD_RATIO);
+}
+
+/** Raw-axis upper bound for zero-baseline percent/rate bar charts. */
+export function resolveBarChartRateUpperBound(args: {
+  maxDisplay: number;
+  maxRaw: number;
+}): number {
+  const { maxDisplay, maxRaw } = args;
+  if (!Number.isFinite(maxDisplay) || !Number.isFinite(maxRaw)) return maxRaw;
+
+  if (maxDisplay > 50) {
+    return maxRaw * (1 + DEFAULT_BAR_RIGHT_PAD_RATIO);
+  }
+
+  const capDisplay = resolveBarChartRateDisplayCap(maxDisplay);
+  if (barRateValuesOnFractionScale(maxRaw, maxDisplay)) {
+    return capDisplay / 100;
+  }
+  return capDisplay;
+}
+
 /** Smart bar value-axis domain — tight scale for low-spread / percent metrics. */
 export function resolveOverviewBarValueDomain(
   rows: readonly { value: number }[],
@@ -333,6 +406,13 @@ export function resolveOverviewBarValueDomain(
     maxDisplay,
     boundedBounds,
   });
+
+  // Bar charts encode absolute value via bar length — a truncated axis is misleading
+  // for rate/percent metrics where the minimum is low (< 50pp). Scatter and trend
+  // charts benefit from tight domains (position = relative value), but bar charts do not.
+  const isBarChartKind =
+    options.presentationKind === "bar" ||
+    options.presentationKind === "bar_horizontal";
 
   const padRatio =
     options.rightPadRatio ?? DEFAULT_BAR_RIGHT_PAD_RATIO;
@@ -380,6 +460,31 @@ export function resolveOverviewBarValueDomain(
     if (minRaw >= 0) domainMin = Math.max(0, domainMin);
   }
 
+  // Post-process: bar charts encode absolute value via bar length, so a non-zero baseline
+  // is misleading for normal positive metrics. Force zero baseline for bar/horizontal-bar
+  // unless:
+  //   1. Score/rating/NPS-like metrics — zero has no natural origin (satisfaction 4.0–4.5).
+  //   2. 0-5 or 0-10 bounded rating scales — safety net for unlabeled rating metrics.
+  //   3. Values include negatives (delta/change charts) — guarded by minRaw >= 0.
+  // Callers without presentationKind (legacy / non-bar surfaces) skip this override.
+  const isScoreOrRatingLike = metricLabelImpliesScoreLike(
+    options.metricLabel ?? null,
+    options.chartTitle ?? null
+  );
+  const hasBoundedRatingScale =
+    boundedBounds != null &&
+    (boundedBounds.kind === "rating5" || boundedBounds.kind === "rating10");
+
+  if (
+    isBarChartKind &&
+    minRaw >= 0 &&
+    !isScoreOrRatingLike &&
+    !hasBoundedRatingScale &&
+    domainMin > 0
+  ) {
+    domainMin = 0;
+  }
+
   if (options.executiveRounding) {
     domainMax = roundExecutiveDomainMaximum(
       domainMax,
@@ -397,6 +502,33 @@ export function resolveOverviewBarValueDomain(
         boundedBounds
       );
     }
+  }
+
+  // Zero-baseline rate bars: replace tight-domain / executive-rounding inflation
+  // (e.g. 3.4–4.1% → 9.1% top tick) with modest headroom and clean percent ticks.
+  if (
+    isBarChartKind &&
+    isPercent &&
+    !isScoreOrRatingLike &&
+    !hasBoundedRatingScale &&
+    domainMin === 0 &&
+    minRaw >= 0
+  ) {
+    const refinedMax = resolveBarChartRateUpperBound({ maxDisplay, maxRaw });
+    domainMax = Math.max(maxRaw * 1.01, refinedMax);
+  }
+
+  // Overview H-Bar plot utilization — percent/rate caps own their headroom separately.
+  if (
+    options.overviewHorizontalBarHeadroom &&
+    options.presentationKind === "bar_horizontal" &&
+    domainMin === 0 &&
+    minRaw >= 0 &&
+    !isScoreOrRatingLike &&
+    !hasBoundedRatingScale &&
+    !isPercent
+  ) {
+    domainMax = resolveOverviewHBarUtilizationDomainMax(maxRaw, domainMax);
   }
 
   if (domainMax <= domainMin) {

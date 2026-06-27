@@ -106,6 +106,175 @@ export type ParsedAnswerSections = {
   moreDetail?: string;
 };
 
+const PLAIN_SECTION_LABEL_RE =
+  /^(Key findings|What this may indicate|Suggested next steps|Next steps|How this was calculated|Statistical observations)\s*:?\s*$/i;
+
+function parsePlainLabelSections(t: string): ParsedAnswerSections | null {
+  const lines = t.split(/\r?\n/);
+  const labelIndexes: { line: number; key: string }[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+    if (!PLAIN_SECTION_LABEL_RE.test(trimmed)) continue;
+    const norm = normalizeAiSectionTitle(trimmed).toLowerCase();
+    let key = "more";
+    if (/statistical|key finding/.test(norm)) key = "statistical";
+    else if (/hypothes|may indicate|inferred/.test(norm)) key = "hypotheses";
+    else if (/recommend|next step/.test(norm)) key = "recommendations";
+    else if (/method/.test(norm)) key = "methodology";
+    labelIndexes.push({ line: i, key });
+  }
+
+  if (!labelIndexes.length) return null;
+
+  const sections: ParsedAnswerSections = { summary: "" };
+  const preamble = lines.slice(0, labelIndexes[0].line).join("\n").trim();
+  if (preamble) sections.summary = preamble;
+
+  for (let i = 0; i < labelIndexes.length; i++) {
+    const start = labelIndexes[i].line + 1;
+    const end =
+      i + 1 < labelIndexes.length ? labelIndexes[i + 1].line : lines.length;
+    const body = lines.slice(start, end).join("\n").trim();
+    if (!body) continue;
+    const key = labelIndexes[i].key;
+    if (key === "statistical") sections.statistical = body;
+    else if (key === "hypotheses") sections.hypotheses = body;
+    else if (key === "recommendations") sections.recommendations = body;
+    else if (key === "methodology") sections.methodology = body;
+    else {
+      sections.moreDetail = sections.moreDetail
+        ? `${sections.moreDetail}\n\n${body}`
+        : body;
+    }
+  }
+
+  if (!sections.summary && !sections.statistical && !sections.hypotheses) {
+    return null;
+  }
+  return sections;
+}
+
+function parseInlineLabelSections(t: string): ParsedAnswerSections | null {
+  const inlineRe =
+    /\b(Key findings|What this may indicate|Suggested next steps|Next steps)\s*:?\s*/gi;
+  if (!inlineRe.test(t)) return null;
+  inlineRe.lastIndex = 0;
+
+  const matches = [...t.matchAll(inlineRe)];
+  if (!matches.length) return null;
+
+  const sections: ParsedAnswerSections = { summary: "" };
+  const preamble = t.slice(0, matches[0].index ?? 0).trim();
+  if (preamble) sections.summary = preamble;
+
+  for (let i = 0; i < matches.length; i++) {
+    const label = matches[i][1] ?? "";
+    const start = (matches[i].index ?? 0) + matches[i][0].length;
+    const end =
+      i + 1 < matches.length ? (matches[i + 1].index ?? t.length) : t.length;
+    const body = t.slice(start, end).trim();
+    if (!body) continue;
+    const norm = normalizeAiSectionTitle(label).toLowerCase();
+    if (/statistical|key finding/.test(norm)) sections.statistical = body;
+    else if (/hypothes|may indicate|inferred/.test(norm)) sections.hypotheses = body;
+    else if (/recommend|next step/.test(norm)) sections.recommendations = body;
+    else {
+      sections.moreDetail = sections.moreDetail
+        ? `${sections.moreDetail}\n\n${body}`
+        : body;
+    }
+  }
+
+  return sections.summary || sections.statistical || sections.hypotheses
+    ? sections
+    : null;
+}
+
+function firstUsefulSentence(text: string | undefined): string {
+  if (!text?.trim()) return "";
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const cleaned = normalized.replace(/^(\d+[.)]\s+|[-•*–—]\s+)/, "");
+  const match = cleaned.match(/^[^.!?]+[.!?]/);
+  return (match?.[0] ?? cleaned.slice(0, 320)).trim();
+}
+
+export type ResolveParsedAnswerSummaryOpts = {
+  insightSummary?: string;
+  reasoningBlockClaim?: string;
+};
+
+export function parsedAnswerHasDetailSections(
+  sections: ParsedAnswerSections
+): boolean {
+  return Boolean(
+    sections.statistical?.trim() ||
+      sections.hypotheses?.trim() ||
+      sections.recommendations?.trim() ||
+      sections.methodology?.trim() ||
+      sections.moreDetail?.trim()
+  );
+}
+
+/** Derive a main-card summary when the parser left summary empty. */
+export function resolveParsedAnswerSummary(
+  sections: ParsedAnswerSections,
+  opts?: ResolveParsedAnswerSummaryOpts
+): string {
+  if (sections.summary?.trim()) {
+    const lead = firstUsefulSentence(sections.summary);
+    return lead || sections.summary.trim();
+  }
+
+  const sources = [
+    sections.statistical,
+    opts?.insightSummary,
+    sections.hypotheses,
+    sections.recommendations,
+    sections.methodology,
+    sections.moreDetail,
+    opts?.reasoningBlockClaim,
+  ];
+
+  for (const src of sources) {
+    const sentence = firstUsefulSentence(src);
+    if (sentence) return sentence;
+  }
+  return "";
+}
+
+/** Main AI Answer card summary — never "unavailable" when detail sections exist. */
+export function insightAnswerSummaryForDisplay(
+  sections: ParsedAnswerSections,
+  opts?: ResolveParsedAnswerSummaryOpts
+): string {
+  const primary = sections.summary?.trim();
+  if (primary) return primary;
+  if (parsedAnswerHasDetailSections(sections)) {
+    const fallback = resolveParsedAnswerSummary(sections, opts);
+    if (fallback) return fallback;
+  }
+  return "Summary unavailable — see detail sections.";
+}
+
+function withSummaryFallback(
+  sections: ParsedAnswerSections,
+  insightSummary?: string,
+  reasoningBlockClaim?: string
+): ParsedAnswerSections {
+  if (sections.summary?.trim()) return sections;
+  const fallback = resolveParsedAnswerSummary(sections, {
+    insightSummary,
+    reasoningBlockClaim,
+  });
+  return fallback ? { ...sections, summary: fallback } : sections;
+}
+
+export type ParseAnswerIntoSectionsOpts = {
+  reasoningBlockClaim?: string;
+};
+
 export type PdfAlignedAnalysisSlice = {
   focusKpis?: PdfKpiCard[];
   metricColumn?: string | null;
@@ -186,10 +355,17 @@ export type BuildExecutivePdfInputResult =
 
 export function parseAnswerIntoSections(
   raw: string,
-  insightSummary?: string
+  insightSummary?: string,
+  opts?: ParseAnswerIntoSectionsOpts
 ): ParsedAnswerSections {
   const t = raw.trim();
-  if (!t) return { summary: (insightSummary ?? "").trim() };
+  if (!t) {
+    return withSummaryFallback(
+      { summary: (insightSummary ?? "").trim() },
+      insightSummary,
+      opts?.reasoningBlockClaim
+    );
+  }
 
   if (/(^|\n)##\s+\S/m.test(t)) {
     const parts = t.split(/(?=\n##\s+)/);
@@ -216,16 +392,40 @@ export function parseAnswerIntoSections(
           `${titleLine}\n${body}`.trim();
       }
     }
-    return sections;
+    return withSummaryFallback(
+      sections,
+      insightSummary,
+      opts?.reasoningBlockClaim
+    );
+  }
+
+  const plain = parsePlainLabelSections(t);
+  if (plain) {
+    return withSummaryFallback(plain, insightSummary, opts?.reasoningBlockClaim);
+  }
+
+  const inline = parseInlineLabelSections(t);
+  if (inline) {
+    return withSummaryFallback(inline, insightSummary, opts?.reasoningBlockClaim);
   }
 
   const lines = t.split(/\r?\n/);
   const maxLines = 6;
-  if (lines.length <= maxLines) return { summary: t };
-  return {
-    summary: lines.slice(0, maxLines).join("\n"),
-    moreDetail: lines.slice(maxLines).join("\n"),
-  };
+  if (lines.length <= maxLines) {
+    return withSummaryFallback(
+      { summary: t },
+      insightSummary,
+      opts?.reasoningBlockClaim
+    );
+  }
+  return withSummaryFallback(
+    {
+      summary: lines.slice(0, maxLines).join("\n"),
+      moreDetail: lines.slice(maxLines).join("\n"),
+    },
+    insightSummary,
+    opts?.reasoningBlockClaim
+  );
 }
 
 export function mergeParsedSectionsForPdfExport(

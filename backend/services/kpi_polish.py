@@ -222,10 +222,10 @@ def average_kpi_title(
                 return "Average Revenue"
             return "Average Revenue"
         if "sales" in n and domain in ("sales", "retail", "ecommerce"):
-            return "Average Revenue per Record"
+            return "Average Sales per Record"
         if domain == "marketing" and "revenue" in n:
             return "Average Revenue"
-    return "Average Revenue per Record" if domain in ("sales", "retail", "ecommerce") else "Average Revenue"
+    return "Average Sales per Record" if domain in ("sales", "retail", "ecommerce") else "Average Revenue"
 
 
 def contribution_subtitle(

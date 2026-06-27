@@ -5,7 +5,6 @@ import {
   type ChartCaptureFailureReason,
   type ChartCaptureTimelineEntry,
 } from "@/lib/chart-platform/chart-artifact";
-import { waitForStableChartSvg } from "@/lib/chart-png-capture";
 import type { ChartKind } from "@/app/chart-types";
 
 type Box = {
@@ -228,12 +227,34 @@ function hasClassMatch(el: Element, needle: RegExp): boolean {
   return false;
 }
 
+function isBarFamilyMark(el: Element): boolean {
+  if (isInsideHiddenSvgContainer(el)) return false;
+  if (classText(el).includes("recharts-tooltip-cursor")) return false;
+  let node: Element | null = el;
+  while (node) {
+    const cls = classText(node);
+    if (cls.includes("recharts-tooltip-cursor")) return false;
+    if (/recharts-(bar-rectangle|\bbar\b)/.test(cls)) return true;
+    node = node.parentElement;
+  }
+  return false;
+}
+
+function hasBarPlotGeometry(el: Element, kind: ChartKind): boolean {
+  if (!isElementVisible(el) || !hasPaint(el, false)) return false;
+  const box = measureElement(el);
+  if (kind === "bar_horizontal") {
+    return box.width > 4 && box.height > 0.5;
+  }
+  return box.height > 4 && box.width > 0.5;
+}
+
 function candidateMarksForKind(svg: Element, kind: ChartKind): Element[] {
   if (kind === "bar" || kind === "bar_horizontal" || kind === "histogram") {
     return queryAll(
       svg,
-      ".recharts-bar-rectangle, .recharts-bar-rectangle rect, .recharts-bar-rectangle path, .recharts-bar rect, .recharts-bar path, .recharts-rectangle"
-    ).filter((el) => hasClassMatch(el, /recharts-(bar|rectangle)/));
+      ".recharts-bar-rectangle path, .recharts-bar-rectangle rect, .recharts-bar path, .recharts-bar rect, .recharts-bar-rectangle"
+    ).filter((el) => isBarFamilyMark(el));
   }
   if (kind === "line") {
     return queryAll(
@@ -266,6 +287,11 @@ function candidateMarksForKind(svg: Element, kind: ChartKind): Element[] {
 }
 
 function visibleMarkCount(svg: Element, kind: ChartKind): number {
+  if (kind === "bar" || kind === "bar_horizontal" || kind === "histogram") {
+    return candidateMarksForKind(svg, kind).filter((el) =>
+      hasBarPlotGeometry(el, kind)
+    ).length;
+  }
   const oneDimensional = kind === "line" || kind === "area";
   const strokeOnly = kind === "line" || kind === "area";
   return candidateMarksForKind(svg, kind).filter((el) =>
@@ -368,6 +394,131 @@ async function waitForStableKindAwareLayout(args: {
   };
 }
 
+/** Wait until a line/area path stops changing (animation settled) or timeout. */
+export async function waitForStableChartSvg(
+  root: HTMLElement,
+  maxMs = 900
+): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const deadline = Date.now() + maxMs;
+  let stableFrames = 0;
+  let prevPath = "";
+
+  while (Date.now() < deadline) {
+    const curve = root.querySelector(
+      ".recharts-line-curve, .recharts-area-curve"
+    );
+    if (!curve) {
+      stableFrames = 0;
+      await nextLayoutFrame();
+      continue;
+    }
+    const d = curve.getAttribute("d") ?? "";
+    if (d.length > 16 && d === prevPath) {
+      stableFrames += 1;
+      if (stableFrames >= 2) break;
+    } else {
+      stableFrames = 0;
+      prevPath = d;
+    }
+    await nextLayoutFrame();
+  }
+
+  await delay(120);
+}
+
+async function waitForStableBarMarkGeometry(args: {
+  root: HTMLElement;
+  kind: ChartKind;
+  maxMs?: number;
+}): Promise<void> {
+  if (typeof window === "undefined") return;
+  const deadline = Date.now() + (args.maxMs ?? 900);
+  let stableFrames = 0;
+  let prevSignature = "";
+
+  while (Date.now() < deadline) {
+    const svg = findPrimarySvg(args.root);
+    if (!svg) {
+      stableFrames = 0;
+      await nextLayoutFrame();
+      continue;
+    }
+    const marks = candidateMarksForKind(svg, args.kind).filter((el) =>
+      hasBarPlotGeometry(el, args.kind)
+    );
+    const signature = marks
+      .map((el) => {
+        const box = measureElement(el);
+        return `${Math.round(box.width)}x${Math.round(box.height)}`;
+      })
+      .join("|");
+    if (marks.length > 0 && signature.length > 0 && signature === prevSignature) {
+      stableFrames += 1;
+      if (stableFrames >= 2) break;
+    } else {
+      stableFrames = 0;
+      prevSignature = signature;
+    }
+    await nextLayoutFrame();
+  }
+
+  await delay(80);
+}
+
+/** Infer chart kind from capture root DOM when profile kind is unavailable. */
+export function inferCaptureKindFromRoot(root: HTMLElement): ChartKind | null {
+  const svg = findPrimarySvg(root);
+  if (!svg) return null;
+
+  const hasBarLayer =
+    queryAll(svg, ".recharts-bar, .recharts-bar-rectangle").length > 0;
+  if (hasBarLayer) {
+    const hasVerticalGrid = Boolean(
+      root.querySelector(
+        ".recharts-cartesian-grid-vertical line, .recharts-cartesian-grid-vertical path"
+      )
+    );
+    const hasHorizontalGrid = Boolean(
+      root.querySelector(
+        ".recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-horizontal path"
+      )
+    );
+    if (hasVerticalGrid && !hasHorizontalGrid) return "bar_horizontal";
+    return "bar";
+  }
+  if (queryAll(svg, ".recharts-line").length > 0) return "line";
+  if (queryAll(svg, ".recharts-area").length > 0) return "area";
+  if (queryAll(svg, ".recharts-scatter").length > 0) return "scatter";
+  if (queryAll(svg, ".recharts-pie").length > 0) return "donut";
+  return null;
+}
+
+/** Kind-aware post-layout settle — bars, lines, or brief pause for other kinds. */
+export async function waitForCaptureGeometrySettled(
+  root: HTMLElement,
+  kind?: ChartKind,
+  maxMs = 900
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  const resolvedKind = kind ?? inferCaptureKindFromRoot(root);
+  if (
+    resolvedKind === "bar" ||
+    resolvedKind === "bar_horizontal" ||
+    resolvedKind === "histogram"
+  ) {
+    await waitForStableBarMarkGeometry({ root, kind: resolvedKind, maxMs });
+    return;
+  }
+  if (resolvedKind === "line" || resolvedKind === "area") {
+    await waitForStableChartSvg(root, maxMs);
+    return;
+  }
+  await nextLayoutFrame();
+  await delay(80);
+}
+
 export async function waitForBasicChartCaptureReady(args: {
   getRoot: () => HTMLElement | null;
   kind: ChartKind;
@@ -445,7 +596,7 @@ export async function waitForBasicChartCaptureReady(args: {
     }
 
     pushChartCaptureStatus(timeline, "settling");
-    await waitForStableChartSvg(root);
+    await waitForCaptureGeometrySettled(root, args.kind);
     pushChartCaptureStatus(timeline, "ready");
     return {
       root,

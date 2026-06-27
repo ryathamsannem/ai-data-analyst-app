@@ -145,6 +145,105 @@ class NarrativePolishTests(unittest.TestCase):
         self.assertNotRegex(out.lower(), r"\bquarter\b")
         self.assertNotIn("quarterly", out.lower())
 
+    def test_fraction_three_quarters_preserved_when_quarter_sanitized(self):
+        df = pd.DataFrame({"report_date": ["2024-01-01"], "loan_balance": [100.0]})
+        raw = "Corporate holds nearly three-quarters of total loan balance."
+        out = sanitize_unsupported_quarter_wording(raw, df, {}, {})
+        self.assertIn("three-quarters", out.lower())
+        self.assertNotIn("three-time period", out.lower())
+
+    def test_fix_malformed_hedging_could_may(self):
+        from intent_engine.narrative_polish import fix_malformed_hedging
+
+        raw = "This could may be consistent with regional concentration."
+        out = fix_malformed_hedging(raw)
+        self.assertNotIn("could may", out.lower())
+        self.assertIn("may be consistent with", out.lower())
+
+    def test_fix_fraction_quarter_corruption(self):
+        from intent_engine.narrative_polish import fix_fraction_quarter_corruption
+
+        raw = "Corporate holds nearly three-time period of total loan balance."
+        out = fix_fraction_quarter_corruption(raw)
+        self.assertIn("three-quarters", out.lower())
+        self.assertNotIn("three-time period", out.lower())
+
+    def test_why_followup_trim_stays_concise(self):
+        from intent_engine.narrative_polish import trim_why_followup_prose
+
+        long = " ".join(["word"] * 200)
+        out = trim_why_followup_prose(long, max_words=130)
+        self.assertLessEqual(len(out.split()), 130)
+
+    def test_why_followup_trim_preserves_paragraph_breaks(self):
+        from intent_engine.narrative_polish import trim_why_followup_prose
+
+        raw = "Opener line.\n\n" + " ".join(["detail"] * 120) + "\n\nLimitation line."
+        out = trim_why_followup_prose(raw, max_words=130)
+        self.assertIn("\n\n", out)
+
+    def test_format_why_followup_removes_inline_section_labels(self):
+        from intent_engine.narrative_polish import format_why_followup_narrative
+
+        raw = (
+            "Based on the previous sales-by-region result, Key findings North leads with 35%. "
+            "Top 3 regions account for 86%. What this may indicate This may show concentration. "
+            "Suggested next steps Compare North by product category."
+        )
+        out = format_why_followup_narrative(raw)
+        low = out.lower()
+        self.assertNotRegex(
+            low,
+            r"key findings\s+what this may indicate\s+suggested next steps",
+        )
+        self.assertNotIn("key findings", low)
+        self.assertIn("based on the previous", low)
+        self.assertLessEqual(len(out.split()), 130)
+
+    def test_must_be_may_creates_could_may_then_final_polish_fixes(self):
+        from intent_engine.narrative_polish import apply_final_narrative_polish
+
+        raw = "The strong performance of North could be may be consistent with regional concentration."
+        out = apply_final_narrative_polish(raw)
+        self.assertNotIn("could may", out.lower())
+        self.assertNotIn("could be may", out.lower())
+        self.assertIn("may be consistent with", out.lower())
+
+    def test_final_polish_runs_after_full_answer(self):
+        from intent_engine.narrative_polish import polish_narrative_answer
+
+        sidecar = {"wasFollowUp": True, "whyFollowUp": True, "originalFollowUp": "Why?"}
+        raw = (
+            "Based on the previous sales-by-region result, Key findings North leads. "
+            "What this may indicate North could may be consistent with concentration. "
+            "Suggested next steps Compare by category."
+        )
+        out = polish_narrative_answer(
+            raw,
+            question="Why?",
+            analysis_ctx={"metricColumn": "sales_amount", "categoryColumn": "region"},
+            sidecar=sidecar,
+        )
+        self.assertNotIn("could may", out.lower())
+        self.assertNotRegex(
+            out.lower(),
+            r"key findings\s+what this may indicate",
+        )
+
+    def test_is_may_reflect_cleaned_in_final_polish(self):
+        from intent_engine.narrative_guardrails import sanitize_narrative_answer
+        from intent_engine.narrative_polish import apply_final_narrative_polish
+
+        raw = "Concentration is driven by segment mix in this cohort."
+        df = __import__("pandas").DataFrame({"loan_balance": [1.0]})
+        out = sanitize_narrative_answer(raw, df, {}, "Why?", analysis_ctx={})
+        self.assertNotIn("is may reflect", out.lower())
+        self.assertIn("may reflect", out.lower())
+
+        direct = apply_final_narrative_polish("Concentration is may reflect segment mix.")
+        self.assertNotIn("is may reflect", direct.lower())
+        self.assertIn("may reflect", direct.lower())
+
     def test_quarter_kept_when_derived_quarter_bucket(self):
         df = pd.DataFrame({"report_date": ["2024-01-01"], "revenue": [100.0]})
         ctx = {"timeSeriesMeta": {"timeBucket": "Q"}}

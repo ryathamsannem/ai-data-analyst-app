@@ -1,4 +1,5 @@
 import type { ChartKind, ChartRow } from "@/app/chart-types";
+import { cartesianUsesHorizontalPlot } from "@/lib/cartesian-chart-decisions";
 import { OVERVIEW_PNG_EXPORT_HBAR_CATEGORY_PAD_PX } from "@/lib/overview-dashboard-export";
 import {
   balanceVerticalOuterMargins,
@@ -235,10 +236,7 @@ export function overviewDashboardUsesHorizontalBars(
   displayKind: ChartKind,
   miniCategoryPlan: ReturnType<typeof computeOverviewMiniCategoryPlan>
 ): boolean {
-  return (
-    displayKind === "bar_horizontal" ||
-    (displayKind === "bar" && Boolean(miniCategoryPlan?.renderAsHorizontalBar))
-  );
+  return cartesianUsesHorizontalPlot(displayKind, miniCategoryPlan);
 }
 
 /** Extra live-view plot height for Overview line / area mini cards. */
@@ -256,6 +254,8 @@ export const OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX = 36;
 /** Live H-Bar margins — lower plot band, tighter footer gutter. */
 export const OVERVIEW_HBAR_LIVE_MARGIN_BOTTOM_PX = 20;
 export const OVERVIEW_HBAR_LIVE_MARGIN_TOP_BASE_PX = 10;
+/** Live Overview H-Bar outer right gutter — keeps bars off the card edge. */
+export const OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX = 32;
 
 /** Live V-Bar margins — mirror H-Bar sparse lift and tighter footer gutter. */
 export const OVERVIEW_VBAR_LIVE_MARGIN_TOP_BASE_PX = 8;

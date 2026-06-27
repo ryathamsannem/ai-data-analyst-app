@@ -1,6 +1,6 @@
 # Chart Rendering Summary
 
-**Snapshot date:** June 18, 2026  
+**Snapshot date:** June 21, 2026  
 **Scope:** End-to-end chart rendering from backend aggregation through live UI and export artifacts.
 
 ---
@@ -10,7 +10,7 @@
 ```
 Backend pandas aggregation
         ↓
-API chart_type string (bar, horizontalBar, line, …)
+API chart_type string (bar, horizontalBar, histogram, line, …)
         ↓
 Frontend kind resolution (final-chart-presentation + normalize-visualization-contract)
         ↓
@@ -21,14 +21,14 @@ Surface-specific renderer + layout helpers
 Optional: ChartArtifact capture (PNG / PDF)
 ```
 
-| Surface | Renderer | Layout source | Shell |
-|---------|----------|---------------|-------|
-| Overview mini | Inline Recharts in `page.tsx` | `overview-dashboard-plot-layout.ts` | Auto-dashboard card grid |
-| Charts tab | `ChartRenderer` (`detailViewLayout`) | `shared-chart-layout.ts` | 960px frame, kind viewport |
-| AI Insights | `ChartRenderer` (`insightMode`) | Same as Charts | `AiInsightChartShell` |
-| Overview PNG | Inline in `page.tsx` (`pngCapture`) | `overview-dashboard-export.ts` | Offscreen capture host |
-| Charts PNG | `ChartRenderer` (`pngCaptureMode`) | `chart-png-export-layout.ts` | `ChartCaptureHost` |
-| PDF chart | Same as Insights capture tree | `pdfChart` profile | Hidden root + artifact embed |
+| Surface | Renderer | Layout source | Export profile |
+|---------|----------|---------------|----------------|
+| Overview mini (live) | Inline Recharts in `page.tsx` | `overview-dashboard-plot-layout.ts` | — |
+| Overview PNG | Inline + `ChartRenderer` for pie/donut | `overview-dashboard-export.ts` | `overviewPng` |
+| Charts tab (live) | `ChartRenderer` (`detailViewLayout`) | `shared-chart-layout.ts` | — |
+| Charts PNG | `ChartRenderer` (`pngCaptureMode`) | `chart-png-export-layout.ts` | `chartsPng` |
+| AI Insights (live) | `ChartRenderer` (`insightMode`) | Same as Charts | — |
+| PDF chart | Same capture tree as Insights | `pdfChart` profile | `pdfChart` |
 
 ---
 
@@ -36,279 +36,193 @@ Optional: ChartArtifact capture (PNG / PDF)
 
 **Primary file:** `backend/main.py`
 
-### Data flow
+Chart rows are **deterministic** (pandas). Key routing:
 
-1. User uploads dataset → `POST /upload` → profile, KPIs, `auto_dashboard` charts.
-2. Filtered refresh → `POST /filtered-dashboard`.
-3. AI question → `POST /ask` → intent routing, pandas groupby/aggregation, chart rows + narrative.
+- Histogram: `_question_asks_numeric_distribution_histogram()`
+- Share/composition pie/donut: `question_asks_categorical_share_composition()` + dimension inference in `main.py`
+- Executive ambiguous intent: `executive_ambiguous_intent.py` (guards for share questions)
 
-Chart rows are **deterministic** (pandas). The LLM produces narrative text, not series values.
-
-### Key backend functions
-
-| Function | Role |
-|----------|------|
-| `build_smart_chart()` | Rule-based fallback when primary viz routing misses |
-| Auto-dashboard builders | Category/time/radial opportunities from schema |
-| `_chart_type_for_api()` | Maps internal kind → API string (`bar`, `horizontalBar`, `line`, …) |
-| Histogram / scatter pair resolvers | Distribution and correlation relationship charts |
-
-### API chart type strings
-
-Frontend maps these via `apiChartStringToKind()` in `frontend/lib/smart-chart-intelligence.ts`. API types are **hints** — frontend re-evaluates kind from rows, labels, and question text (especially bar family).
+**Tests:** `test_histogram_intent_routing.py`, `test_donut_pie_share_routing.py`
 
 ---
 
-## 2. Visualization Contract Normalization
+## 2. Kind Resolution (frontend)
 
-**Files:** `frontend/lib/normalize-visualization-contract.ts`, `frontend/lib/selected-visualization.ts`
+**Files:** `final-chart-presentation.ts`, `normalize-visualization-contract.ts`, `selected-visualization.ts`
 
-### `normalizeVisualizationContract()`
+- **`resolveBarFamilyKind()`** — canonical H-Bar vs V-Bar across all surfaces.
+- **`computeAutoDashboardChartPresentation()`** — Overview display kind.
+- **`shareCompositionAllowed()`** — radial eligibility from title/question phrasing.
 
-Single normalization path producing:
-
-- `kind` / `effectivePresentationKind`
-- `layout` (vertical / horizontal / radial / cartesian2d)
-- Axis labels, title, rows
-
-### Kind resolution order (`resolveKindFromPayload`)
-
-1. **`pinnedChartKind`** — explicit override (rare).
-2. **Frozen contract** — `contract.chartType` from session snapshot wins when present.
-3. **Source-specific:**
-   - `auto_dashboard` → `computeAutoDashboardChartPresentation()`
-   - otherwise → `computeFinalChartPresentation()`
-
-### `freezeVisualizationContract()`
-
-Called when a chart enters session history. Produces immutable `VisualizationContract` with:
-
-- Pinned `chartType` / `rendererType`
-- Labels, series, aggregation, dimension, time bucket
-- Semantic mode: `trend` | `category` | `distribution` | `comparison` | `relationship`
-
-Once frozen, downstream surfaces read the contract rather than re-inferring kind from API strings alone.
+Session snapshots store **`displayKind`** (canonical presentation kind).
 
 ---
 
-## 3. Presentation Profile System
+## 3. Radial Sizing Architecture
 
-**File:** `frontend/lib/chart-platform/chart-presentation-profile.ts`
+**Primary files:** `radial-export-layout.ts`, `overview-mini-radial-polish.ts`, `chart-renderer.tsx`, `chart-png-capture.ts`
 
-Read-only metadata layer — **does not drive live rendering directly** but describes how each surface should capture and embed charts.
+### 3.1 Live session detail (Charts / AI Insights)
 
-### Profile IDs
+Function: `resolveProportionalSessionRadialRadii()` when `compact=false`, `pngCaptureMode=false`.
 
-| ID | Surface | Aspect policy |
-|----|---------|---------------|
-| `overviewLive` | Overview card | `compact-card` |
-| `overviewPng` | Overview PNG | `presentation-canvas` |
-| `chartsLive` | Charts tab | `detail-viewport` |
-| `chartsPng` | Charts PNG | `presentation-canvas` |
-| `aiInsightsLive` | AI Insights | `detail-viewport` |
-| `pdfChart` | PDF embed | `pdf-embed` |
+| Constant | Value |
+|----------|-------|
+| `SESSION_RADIAL_PLOT_BAND_DIAMETER_RATIO` | 0.70 (~65–75% occupancy) |
+| `SESSION_RADIAL_OUTER_RADIUS_USABLE_RATIO` | 0.40 |
+| `SESSION_DETAIL_RADIAL_CY` | `"48%"` |
+| `SESSION_RADIAL_LEGEND_FONT_PX` | 12 |
+| `SESSION_RADIAL_LEGEND_ICON_PX` | 9 |
 
-Each profile includes:
+Legend renders **inside** Recharts `<Legend>`.
 
-- Capture width/height, canvas dimensions (export profiles)
-- `axisPolicyId` — links to `AxisPresentationPlan` diagnostics
-- `metadataMode` — contract chips vs PDF-native context
-- `pdfEmbed` — max height, min width ratio, aspect bounds (PDF only)
+### 3.2 Overview live compact (pie/donut only)
 
-Built via `buildChartPresentationProfile()` using `buildPresentationExportSpec()` from `chart-png-export-layout.ts`.
+Path: `ChartRenderer` with `overviewMiniRadial=true`, `compact=true`, `pngCaptureMode=false`.
 
-### Presentation contract (Phase 1 platform)
+| Constant | Value |
+|----------|-------|
+| `RADIAL_COMPACT_OUTER_PX` | 84 |
+| `RADIAL_COMPACT_INNER_DONUT_PX` | 52 |
+| `OVERVIEW_MINI_RADIAL_SIZE_SCALE` | 1.24 |
+| `OVERVIEW_MINI_RADIAL_LEGEND_PADDING_TOP_PX` | 2 |
 
-**Files:** `chart-presentation-contract.ts`, `build-chart-contract.ts`
+After base radii: `scaleOverviewMiniRadialRadii()` + `tightenOverviewMiniRadialMargins()` + `cy → 48%`.
 
-Parallel to legacy `VisualizationContract`:
+Plot band height: 300px mobile / 340px desktop (`useOverviewDashPlotHeight()`).
 
-- Identity, resolved kind, story type, semantic header
-- Metadata chips for UI and PDF-native rendering
-- Attached to `ChartSnapshot.presentationContract` in session context
+### 3.3 Export (Overview PNG, Charts PNG, PDF artifact)
 
----
+Function: `resolveProportionalExportRadialRadii()` when `pngCaptureMode=true` (both compact and session detail).
 
-## 4. Overview Rendering
+| Constant | Value |
+|----------|-------|
+| `RADIAL_EXPORT_PLOT_BAND_DIAMETER_RATIO` | **0.63** (~62–65% occupancy) |
+| `RADIAL_EXPORT_OUTER_RADIUS_USABLE_RATIO` | **0.36** |
+| `RADIAL_EXPORT_PLOT_WIDTH_UTIL` | **0.86** (composite plot scale; non-radial 0.97) |
+| `RADIAL_EXPORT_MIN_SVG_PAD_PX` | 20 |
+| `resolveRadialExportPlotHeight()` base | 400px (+12–24px for >4 / >6 categories) |
 
-**Files:** `frontend/app/page.tsx`, `overview-dashboard-plot-layout.ts`, `overview-dashboard-export.ts`
+**Composite legend** (external to SVG):
 
-### Auto-dashboard cards
+| Constant | Value |
+|----------|-------|
+| `RADIAL_EXPORT_LEGEND_FONT_PX` | 24 |
+| `RADIAL_EXPORT_LEGEND_ICON_PX` | 17 |
+| `RADIAL_EXPORT_LEGEND_ITEM_GAP_PX` | 10 |
+| `RADIAL_EXPORT_LEGEND_SWATCH_GAP_PX` | 10 |
+| `RADIAL_EXPORT_LEGEND_ROW_EXTRA_PX` | 14 |
+| `RADIAL_EXPORT_LEGEND_PLOT_GAP_PX` | 10 |
 
-1. Backend returns mini chart specs (title, `chart_type`, labels, values).
-2. `computeAutoDashboardChartPresentation()` resolves display kind.
-3. Inline Recharts in `OverviewAutoDashboardChartCard` — **not** `ChartRenderer`.
-4. `computeOverviewMiniCategoryPlan()` handles category axis angles, margins; `allowHorizontalBarFallback: false` (no narrow-card H-Bar flip).
-5. `resolveOverviewDashLivePlotHeight()` applies kind-specific plot boosts (trend +36, scatter +32, H-Bar +36, **V-Bar +28**).
+**Composite footer** (radial exports only):
 
-### Overview kind storage
+| Constant | Value |
+|----------|-------|
+| `RADIAL_EXPORT_FOOTER_FONT_PX` | 22 |
+| `RADIAL_EXPORT_FOOTER_RESERVE_PX` | 46 |
 
-Session sync stores **`displayKind`** (canonical presentation kind), not layout-only `renderAsHorizontalBar` flips. PNG export uses the same display kind constants (`OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE = 52`, 16% category gap for ≤6 categories).
+Non-radial footer remains `EXPORT_FOOTER_FONT_PX = 15` in `chart-png-capture.ts`.
 
-### Overview PNG
-
-Separate export tuning in `overview-dashboard-export.ts` — larger axis ticks, export margins, plot height ~728px band. Captured via artifact platform with `overviewPng` profile.
-
----
-
-## 5. Charts Tab Rendering
-
-**Files:** `ChartRenderer`, `chart-layout-config.ts`, `shared-chart-layout.ts`
-
-### Flow
-
-1. User selects timeline entry from `ChartSessionProvider`.
-2. Snapshot provides `chartKind`, `chartData`, `contract`, `presentationContract`.
-3. `resolveChartsTabPreviewPlotHeight()` → `resolveSharedDetailPlotHeight()`.
-4. `ChartRenderer` with `detailViewLayout=true`, `insightMode=false`.
-5. Wrapped in kind-specific viewport (`max-w-[760px]` bar, `[850px]` line/area, `[900px]` H-Bar).
-
-### Session detail plot heights (desktop ~900px viewport)
-
-| Kind | Plot height behavior |
-|------|---------------------|
-| Line / Area / Scatter | Floor 560px + boost, cap 580px |
-| H-Bar | `420 + n×24`, cap 580px |
-| V-Bar / Histogram (n ≤ 6) | Floor 520px, cap 580px |
-| Donut / Pie | Band − 20px |
-
----
-
-## 6. AI Insights Rendering
-
-**Files:** same `ChartRenderer` + `ai-insight-chart-shell.tsx`, alignment gates in `page.tsx`
-
-### Differences from Charts tab
-
-- `insightMode=true` — symmetric `insightCartesianOuterMargins`, metadata chips use insight tokens.
-- **Alignment gates** before showing viz, AI Read, or export:
-  - `insightChartMatchesCurrentQuestion`
-  - `chartSnapshotMatchesQuestionIntent`
-- Export button gated by `showInsightExportButton`.
-
-### Question match
-
-Outlier / distribution questions must not show unrelated grouped bar charts unless the question explicitly groups by dimension.
-
----
-
-## 7. PNG Export Rendering
-
-**Files:** `chart-capture-controller.ts`, `ChartCaptureHost.tsx`, `chart-png-capture.ts`, `chart-png-export-session.ts`
-
-### Request flow
+### 3.4 Radial export flow
 
 ```
-User clicks Export PNG
-  → buildChartPngCaptureRequest() with profile (overviewPng | chartsPng)
-  → ChartCaptureHost mounts offscreen render tree
-  → waitForBasicChartCaptureReady() (kind-aware marks, stable layout)
-  → captureElementToPng() composites header + plot + footer
-  → ChartArtifact returned
+ChartRenderer (pngCaptureMode, legend in SVG during capture)
+  → renderPlotSvgToPng() strips .recharts-legend-wrapper from SVG clone
+  → extractRechartsLegendEntries() reads DOM legend text/colors
+  → renderLegendChromeToPng() draws legend at RADIAL_EXPORT_* token sizes
+  → compositeExportPng(radialExport=true)
+       plot scaled with RADIAL_EXPORT_PLOT_WIDTH_UTIL
+       legend + footer at fixed px sizes
 ```
+
+Canvas height budget: `resolveRadialExportCanvasHeight()` includes legend estimate + footer reserve.
+
+### 3.5 Share display and warnings
+
+- **Tooltip/share formatting:** `radial-chart-format.ts` (`radialShareDisplayAllowed`, `formatRadialTooltipValue`)
+- **Rate warning suppression:** `resolveRateExceeds100Warning()` suppresses misleading rate>100% note on valid composition donuts
+
+---
+
+## 4. Cartesian Chart Parity (summary)
+
+### H-Bar
+
+- Kind: `resolveBarFamilyKind()` — no Overview layout flip to H-Bar via fallback.
+- Overview live: `OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX = 36`, horizontal plot band helpers in `overview-dashboard-plot-layout.ts`.
+
+### V-Bar / Histogram
+
+- Shared value axis: `resolveVerticalBarValueAxisProps()` + `overview-bar-value-domain.ts`
+- Overview live: `OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX = 36`, `maxBarSize` 52 (export constants in `overview-dashboard-export.ts`)
+
+### Line / Area
+
+- Domain parity: `overview-premium-axis-domain.ts`
+- Overview live boost: `OVERVIEW_TREND_PLOT_HEIGHT_BOOST_PX = 36`
+
+### Scatter
+
+- Presentation guards: `relationship-scatter-presentation.ts`
+- Overview: `OVERVIEW_SCATTER_PLOT_HEIGHT_BOOST_PX = 36`, point radius 3.5px
+- PDF: content-tight composite via `pdfChartUsesContentTightComposite()`
+
+---
+
+## 5. PNG Export
+
+**Files:** `chart-capture-controller.ts`, `chart-png-capture.ts`, `chart-png-export-layout.ts`
 
 ### Canvas sizing (`chart-png-export-layout.ts`)
 
-| Kind | Canvas width | Plot height (typical) |
-|------|--------------|------------------------|
-| Default bar / histogram | 1400px | ~728px |
-| Line / area / scatter | 1200px | ~668px |
-| H-Bar | 1100–1300px | category-scaled |
-| Donut / pie | radial layout | radial layout |
+| Kind | Canvas width (typical) |
+|------|------------------------|
+| Bar / histogram / default | 1400px |
+| Line / area / scatter | 1200px |
+| H-Bar | 1100–1300px |
+| Donut / pie | `resolveRadialExportCanvasHeight(categoryCount)` |
 
-### Content-tight composite
-
-**PDF only** (not Overview/Charts PNG): `pdfChartUsesContentTightComposite()` skips fixed canvas padding for `scatter` and `bar` so the artifact fills the frame without excess dark whitespace.
-
-### Charts PNG kind
-
-`resolveChartsPngExportKind()` prefers session `chartKind` for bar family — avoids Overview layout kind leaking into Charts PNG.
+Charts PNG kind: `resolveChartsPngExportKind()` uses session `chartKind` for bar family.
 
 ---
 
-## 8. PDF Rendering
+## 6. PDF Rendering
 
-**Files:** `pdf-report.ts`, `build-executive-pdf-input.ts`, `pdf-enterprise-style.ts`
+**Files:** `pdf-report.ts`, `build-executive-pdf-input.ts`, `chart-presentation-profile.ts`
 
-### Chart image source priority
+### Chart image priority
 
-1. Valid `ChartArtifact.dataUrl` from `pdfChart` capture.
-2. Legacy DOM `captureEl` fallback (intentional safety net).
+1. Valid `ChartArtifact` from `pdfChart` capture (same radial pipeline as PNG).
+2. Legacy DOM fallback (`captureChartPlotToPng`).
 
-### PDF chart section
-
-- Native header with contract metadata chips (max 6).
-- Image placed via `computePdfChartEmbedDimensions()` using `presentationProfile.pdfEmbed`.
-- Rounded frame pad from `PDF_SPACING.chartFramePad`.
-
-### PDF embed policies (current)
+### PDF embed policies (`resolvePdfChartEmbedPolicy`)
 
 | Kind | maxHeightMm | minWidthRatio |
 |------|-------------|---------------|
 | H-Bar | 158 | 0.74 |
-| V-Bar | 150 | 0.88 |
+| V-Bar / histogram | 158 | 0.88 |
 | Line / Area | 158 | 0.90 |
 | Scatter | 150 | 0.92 |
 | Donut / Pie | 108 | 0.58 |
 
 ---
 
-## 9. How Chart Kinds Are Resolved
+## 7. AI Insights Gates
 
-See [`chart-kind-policy.md`](./chart-kind-policy.md) for complete rules.
+Before viz, AI Read, or export:
 
-**Entry points:**
-
-| Function | Used when |
-|----------|-----------|
-| `resolveBarFamilyKind()` | Bar vs H-Bar decision |
-| `computeFinalChartPresentation()` | AI / general frontend resolution |
-| `computeAutoDashboardChartPresentation()` | Overview auto-dashboard (+ radial/time guards) |
-| `normalizeVisualizationContract()` | Unified normalization |
-| `resolveSnapshotPresentationKind()` | Session snapshot kind for renderers |
-| `resolvePresentationKindFromContract()` | Read frozen contract kind |
-
-**Pinning:** Once `freezeVisualizationContract()` runs, `contract.chartType` is authoritative unless an explicit `pinnedChartKind` is passed at normalize time.
+- `insightChartMatchesCurrentQuestion`
+- `chartSnapshotMatchesQuestionIntent`
+- Export button: `showInsightExportButton`
 
 ---
 
-## 10. Shared Renderer: ChartRenderer
+## Completed vs Remaining (chart rendering)
 
-**File:** `frontend/app/components/home/chart-renderer.tsx`
-
-Single Recharts implementation for Charts, Insights, and PNG/PDF artifact capture (not Overview mini cards).
-
-### Branching by kind
-
-- `bar_horizontal` — horizontal layout, wrapped Y ticks
-- `bar` / `histogram` — vertical BarChart; V-Bar uses `SHARED_CHART_LAYOUT.verticalBar.compactCategoryGap` (16% for n ≤ 6)
-- `line` / `area` — premium trend axes via session helpers
-- `scatter` — relationship axes, point styling
-- `pie` / `donut` — radial margins and radii
-
-### Axis presentation plan integration
-
-`resolveVerticalBarValueAxisProps()` and H-Bar equivalents apply shared value-axis domains from `axis-presentation-plan.ts` when an export axis plan is present.
-
----
-
-## Alignment Gates (AI Insights only)
-
-| Gate | Purpose |
-|------|---------|
-| `insightChartMatchesCurrentQuestion` | Chart belongs to current Q&A turn |
-| `chartSnapshotMatchesQuestionIntent` | Viz matches question semantics |
-| `showInsightExportButton` | Export only when answer + aligned viz |
-
-Charts tab: SmartChartInsightPanel always available when intel is active (no question gate).
-
----
-
-## What Not to Change Without Explicit Approval
-
-- H-Bar / Donut / Pie renderer branches
-- Shell max-width classes (960 / 850 / 900 / 760)
-- Chart kind semantics and `resolveBarFamilyKind()` policy
-- Overview inline renderer → broad migration to ChartRenderer
-- AI Insights alignment gate behavior
-- PDF page structure / executive narrative layout
+| Completed | Remaining |
+|-----------|-----------|
+| H-Bar / V-Bar / histogram / line / area / scatter parity passes | Overview inline vs ChartRenderer dual pipeline |
+| Histogram + donut routing | H-Bar tick fine-tuning if drift reported |
+| Radial export proportional balance + legend readability | Browser E2E export tests |
+| Rate-warning suppression for share donuts | Vector PDF charts |
+| ChartArtifact platform across PNG/PDF | Full AxisPresentationPlan enforcement on all surfaces |

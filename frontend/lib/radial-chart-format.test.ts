@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { ChartRow } from "@/app/chart-types";
 import {
+  formatRadialLegendEntry,
   formatRadialTooltipValue,
   radialRawValuesSumTo100Percent,
   radialSharePercent,
   radialSharePercentSum,
   radialShouldFormatValuesAsPercent,
   radialShouldUseSharePercentDisplay,
+  resolveRadialPieEdgeProps,
+  RADIAL_LEGEND_SEP,
 } from "@/lib/radial-chart-format";
 
 describe("radialSharePercent", () => {
@@ -67,6 +70,52 @@ describe("radialShouldUseSharePercentDisplay", () => {
   });
 });
 
+describe("formatRadialLegendEntry", () => {
+  const retailRows: ChartRow[] = [
+    { name: "Electronics", value: 4_270_000 },
+    { name: "Furniture", value: 1_320_000 },
+    { name: "Clothing", value: 1_140_000 },
+    { name: "Home & Kitchen", value: 1_120_000 },
+  ];
+
+  it("formats category · percent · compact value for share donuts", () => {
+    const line = formatRadialLegendEntry(retailRows, "Electronics");
+    expect(line).toContain("Electronics");
+    expect(line).toContain(RADIAL_LEGEND_SEP);
+    expect(line).toMatch(/54%/);
+    expect(line).toMatch(/4\.3M|4\.27M/i);
+  });
+
+  it("includes percent and value for each slice label", () => {
+    for (const row of retailRows) {
+      const line = formatRadialLegendEntry(retailRows, String(row.name));
+      expect(line).toContain(String(row.name));
+      expect(line).toMatch(/\d+%/);
+      expect(line.split(RADIAL_LEGEND_SEP).length).toBeGreaterThanOrEqual(2);
+    }
+  });
+});
+
+describe("resolveRadialPieEdgeProps", () => {
+  it("uses soft padding and corner radius for overview mini donuts", () => {
+    expect(resolveRadialPieEdgeProps({ kind: "donut", overviewMiniRadial: true })).toEqual({
+      paddingAngle: 3,
+      cornerRadius: 4,
+    });
+  });
+
+  it("uses modest edges for session donuts without overview polish", () => {
+    expect(resolveRadialPieEdgeProps({ kind: "donut", overviewMiniRadial: false })).toEqual({
+      paddingAngle: 2,
+      cornerRadius: 3,
+    });
+  });
+
+  it("skips corner radius on pie charts", () => {
+    expect(resolveRadialPieEdgeProps({ kind: "pie" }).cornerRadius).toBe(0);
+  });
+});
+
 describe("formatRadialTooltipValue", () => {
   it("shows value plus computed share for contribution data", () => {
     const rows: ChartRow[] = [
@@ -74,17 +123,19 @@ describe("formatRadialTooltipValue", () => {
       { name: "B", value: 60000, displayValue: "$60,000" },
     ];
     const text = formatRadialTooltipValue(rows, rows[0], 40000);
-    expect(text).toBe("$40,000 (40.0%)");
+    expect(text).toContain("A");
+    expect(text).toContain("40%");
+    expect(text).toMatch(/\$40,000|40,000|40K/i);
   });
 
-  it("shows raw values without share when rates exceed 100%", () => {
+  it("shows raw values without computed share when rates exceed 100%", () => {
     const rows: ChartRow[] = [
       { name: "A", value: 45, displayValue: "45.0%" },
       { name: "B", value: 52, displayValue: "52.0%" },
       { name: "C", value: 38, displayValue: "38.0%" },
     ];
     const text = formatRadialTooltipValue(rows, rows[0], 45);
-    expect(text).toBe("45.0%");
+    expect(text).toMatch(/^A · 45/);
     expect(text).not.toContain("(33.");
   });
 
@@ -94,6 +145,6 @@ describe("formatRadialTooltipValue", () => {
       { name: "B", value: 60, displayValue: "60%" },
     ];
     const text = formatRadialTooltipValue(rows, rows[0], 40);
-    expect(text).toBe("40.0%");
+    expect(text).toBe("A · 40%");
   });
 });

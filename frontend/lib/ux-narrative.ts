@@ -17,6 +17,58 @@ export const AI_INSIGHT_SECTION_LABELS = {
   methodology: "How this was calculated",
 } as const;
 
+export type AiAnswerLeadInOptions = {
+  routingIntent?: string | null;
+  categoryColumn?: string | null;
+  metricColumn?: string | null;
+  isTimeSeries?: boolean;
+};
+
+function isDateLikeColumn(col: string | null | undefined): boolean {
+  if (!col?.trim()) return false;
+  const c = col.toLowerCase();
+  return /date|time|month|week|year|day|period|quarter|timestamp/.test(c);
+}
+
+function isRankingOrComparisonIntent(intent: string | null | undefined): boolean {
+  const i = (intent || "").trim().toLowerCase();
+  return (
+    i === "ranking" ||
+    i === "comparison" ||
+    i === "rank" ||
+    i === "outlier"
+  );
+}
+
+function isBankingRiskMetric(metricCol: string | null | undefined): boolean {
+  const m = (metricCol || "").toLowerCase();
+  return /loan|balance|delinquen|utilization|npl|credit|risk|default/.test(m);
+}
+
+function isWorkforceContext(
+  domain: string,
+  metricCol?: string | null
+): boolean {
+  const d = domain.trim().toLowerCase();
+  if (d === "hr") return true;
+  const m = (metricCol || "").toLowerCase();
+  return /attrition|employee|department|salary|engagement|tenure|hire|headcount/.test(
+    m
+  );
+}
+
+function isActualTimeSeriesTrend(
+  chartType: ChartKind,
+  opts?: AiAnswerLeadInOptions
+): boolean {
+  if (chartType !== "line" && chartType !== "area") return false;
+  if (opts?.isTimeSeries) return true;
+  const intent = (opts?.routingIntent || "").trim().toLowerCase();
+  if (intent === "trend" || intent === "time_series") return true;
+  if (isRankingOrComparisonIntent(intent)) return false;
+  return isDateLikeColumn(opts?.categoryColumn);
+}
+
 /** Map legacy / model section headers to display labels. */
 export function normalizeAiSectionTitle(raw: string): string {
   const t = raw.trim().toLowerCase();
@@ -29,18 +81,42 @@ export function normalizeAiSectionTitle(raw: string): string {
 
 export function aiAnswerLeadIn(
   domain: string,
-  chartType: ChartKind
+  chartType: ChartKind,
+  opts?: AiAnswerLeadInOptions
 ): string | null {
   const d = domain.trim().toLowerCase();
-  if (chartType === "line" || chartType === "area") {
+
+  if (chartType === "histogram") return "Distribution insight";
+  if (chartType === "scatter") return "Relationship insight";
+
+  if (isActualTimeSeriesTrend(chartType, opts)) {
     if (d === "operations" || d === "manufacturing") return "Performance trend";
     return "Trend over time";
   }
+
+  if (d === "banking" || isBankingRiskMetric(opts?.metricColumn)) {
+    return "Risk insight";
+  }
+  if (isWorkforceContext(d, opts?.metricColumn)) {
+    return "Workforce insight";
+  }
+  if (d === "sales" || d === "ecommerce" || d === "retail") {
+    return "Commercial insight";
+  }
   if (d === "operations" || d === "manufacturing") return "Operational insight";
-  if (d === "sales" || d === "ecommerce") return "Commercial insight";
-  if (d === "hr") return "Workforce insight";
-  if (d === "finance") return "Financial insight";
+  if (d === "finance" || d === "finance_fpa") return "Financial insight";
   if (d === "marketing") return "Marketing insight";
+
+  if (
+    isRankingOrComparisonIntent(opts?.routingIntent) ||
+    chartType === "bar_horizontal" ||
+    chartType === "bar" ||
+    chartType === "pie" ||
+    chartType === "donut"
+  ) {
+    return "Business comparison";
+  }
+
   return "Key insight";
 }
 

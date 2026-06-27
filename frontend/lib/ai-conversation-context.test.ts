@@ -36,6 +36,30 @@ describe("buildParentAnalysisContext", () => {
     ]);
     expect(parent?.routingIntent).toBe("ranking");
   });
+
+  it("includes reasoningBlocks from aligned analysis when present", () => {
+    const parent = buildParentAnalysisContext({
+      conversationSnapshot: {
+        lastQuestion: "Which region has the highest total sales?",
+        followUpChain: ["Which region has the highest total sales?"],
+      },
+      alignedAnalysis: {
+        metricColumn: "sales_amount",
+        categoryColumn: "region",
+        reasoningBlocks: [
+          {
+            type: "contribution",
+            claim: "North contributes 35% of total sales amount.",
+            evidence: { share_pct: 35 },
+          },
+        ],
+      },
+      lastAskedQuestion: "Which region has the highest total sales?",
+      answer: "North leads.",
+    });
+    expect(parent?.reasoningBlocks).toHaveLength(1);
+    expect(parent?.reasoningBlocks?.[0]?.claim).toContain("North");
+  });
 });
 
 describe("shouldSendFollowUpContinuation", () => {

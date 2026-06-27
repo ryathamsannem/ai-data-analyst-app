@@ -3,6 +3,7 @@
  */
 
 import type { RoutingPlanPayload } from "@/lib/routing-plan";
+import type { ReasoningBlock } from "@/lib/reasoning-blocks";
 
 export type ParentAnalysisContext = {
   rootQuestion: string | null;
@@ -20,6 +21,7 @@ export type ParentAnalysisContext = {
   lastAiAnswer: string | null;
   turnId: string | null;
   routingPlan: RoutingPlanPayload | null;
+  reasoningBlocks?: ReasoningBlock[];
 };
 
 export type ConversationSnapshotLike = {
@@ -46,6 +48,7 @@ export type AlignedAnalysisLike = {
   chartTitle?: string | null;
   insightSummary?: string | null;
   routingPlan?: RoutingPlanPayload | null;
+  reasoningBlocks?: ReasoningBlock[];
 };
 
 export type BuildParentAnalysisContextArgs = {
@@ -138,6 +141,9 @@ export function buildParentAnalysisContext(
       null,
     turnId: snap?.turnId ?? args.aiConversationState?.turnId ?? null,
     routingPlan: analysis?.routingPlan ?? null,
+    reasoningBlocks: analysis?.reasoningBlocks?.length
+      ? [...analysis.reasoningBlocks]
+      : undefined,
   };
 }
 

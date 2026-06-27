@@ -90,7 +90,6 @@ import {
 import {
   OVERVIEW_PNG_EXPORT_AXIS_TICK_PX,
   OVERVIEW_PNG_EXPORT_AXIS_TITLE_PX,
-  OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE,
   OVERVIEW_PNG_EXPORT_LINE_STROKE_PX,
   OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR,
   OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_VBAR,
@@ -99,10 +98,14 @@ import {
   OVERVIEW_PNG_EXPORT_MARKER_R_PX,
   OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE,
   OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE,
-  OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE,
   shouldShowOverviewBarValueLabels,
 } from "@/lib/overview-dashboard-export";
-import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
+import {
+  cartesianUsesHorizontalPlot,
+  resolveCartesianBarValueAxisProps,
+  resolveScatterValueAxisProps,
+  resolveTrendValueAxisProps,
+} from "@/lib/cartesian-chart-decisions";
 import {
   computeCartesianCategoryPlanForRender,
   computeOverviewBarCategoryBottom,
@@ -110,6 +113,7 @@ import {
   computeOverviewContinuousVerticalDashLayout,
   computeOverviewHorizontalDashLayout,
   computeOverviewHBarLiveMargins,
+  OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX,
   computeOverviewMiniCategoryPlan,
   computeOverviewScatterLivePlotMargins,
   computeOverviewScatterDashMargins,
@@ -119,7 +123,6 @@ import {
   computeOverviewVBarLiveVerticalDashLayout,
   computeOverviewVerticalDashLayout,
   overviewDashUsesExpandedPlotBand,
-  overviewDashboardUsesHorizontalBars,
   OVERVIEW_SCATTER_POINT_FILL_OPACITY,
   OVERVIEW_SCATTER_POINT_RADIUS_PX,
   OVERVIEW_SCATTER_POINT_STROKE_COLOR,
@@ -128,14 +131,19 @@ import {
   resolveOverviewDashLivePlotHeight,
 } from "@/lib/overview-dashboard-plot-layout";
 import {
+  formatOverviewBarValueAxisTick,
   formatOverviewLineYAxisTick,
   formatOverviewScatterAxisTick,
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
-  resolveTrendValueAxisProps,
-  resolveScatterValueAxisProps,
 } from "@/lib/overview-premium-axis-domain";
+import {
+  HORIZONTAL_BAR_END_RADIUS,
+  resolveHorizontalBarCategoryGap,
+  resolveOverviewHorizontalBarMaxSize,
+  OVERVIEW_VBAR_MAX_BAR_SIZE,
+} from "@/lib/horizontal-bar-visual";
 import { ChartCaptureHost } from "@/app/components/chart-platform/ChartCaptureHost";
 import {
   captureChartPngArtifact,
@@ -156,9 +164,8 @@ import {
 import { buildChartCartesianTooltipHandlers } from "@/lib/chart-tooltip-format";
 import { radialShareDisplayAllowed } from "@/lib/radial-chart-format";
 import {
-  chartHasRateAbove100,
   percentGapChipAriaLabel,
-  RATE_EXCEEDS_100_WARNING,
+  resolveRateExceeds100Warning,
 } from "@/lib/chart-quality-warnings";
 import { useMeasuredElementWidth } from "@/lib/use-measured-element-width";
 import { CartesianXAxisTitleLabelContent, createVerticalValueAxisLabel } from "@/app/components/chart-value-axis-title";
@@ -260,6 +267,10 @@ import {
   type NarrativeTone,
 } from "@/lib/insight-narrative-tone";
 import {
+  chartSnapshotMatchesAnalysis,
+  shouldPreservePinnedInsightChart,
+} from "@/lib/insight-chart-alignment";
+import {
   buildFollowupQuestion,
   fromAlignedAnalysis,
   fromAutoDashboardChart,
@@ -285,6 +296,15 @@ import {
   AiInsightAnswerBody,
   formatInsightSummary,
 } from "./components/ai-insight-answer-body";
+import {
+  parseRecommendedActions,
+  visibleRecommendedActions,
+  type RecommendedAction,
+} from "@/lib/recommended-actions";
+import {
+  parseReasoningBlocks,
+  type ReasoningBlock,
+} from "@/lib/reasoning-blocks";
 import {
   polishInsightNarrativeText,
   type DualMetricRoasLead,
@@ -317,6 +337,15 @@ import {
   aiInsightsAnswerDetailSummaryRecommendations,
   aiInsightsAnswerDetailsGroup,
   aiInsightsAnswerDetailsLabel,
+  aiInsightsReasoningBasis,
+  aiInsightsReasoningClaim,
+  aiInsightsReasoningItem,
+  aiInsightsReasoningList,
+  aiInsightsRecommendedChip,
+  aiInsightsRecommendedDesc,
+  aiInsightsRecommendedItem,
+  aiInsightsRecommendedList,
+  aiInsightsRecommendedTitle,
   aiInsightsAnswerHeader,
   aiInsightsAnswerKicker,
   aiInsightsAnswerLead,
@@ -356,6 +385,9 @@ import {
   aiInsightsSuggestedRecentList,
   aiInsightsSuggestedRecentSection,
   aiInsightsSuggestedRecentTitle,
+  aiInsightsRecentInsightBadgeFollowUp,
+  aiInsightsRecentInsightBadgeMain,
+  aiInsightsRecentInsightItemActive,
   aiInsightsMutedLabel,
   aiInsightsAskPanel,
   aiInsightsGrid,
@@ -484,6 +516,8 @@ import {
   saasRequestHeaders,
   setPlanTier,
 } from "@/lib/saas-session";
+import { buildOverviewDashboardContextChips } from "@/lib/overview-dashboard-context-chips";
+import { resolveOverviewDatasetTypeLabel } from "@/lib/resolved-dataset-type-label";
 import { OverviewInlineKpiChip } from "./components/home/overview-inline-kpi-chip";
 import { OverviewLandingHero } from "./components/home/overview-landing-hero";
 import { OverviewLandingTrustRow } from "./components/home/overview-landing-trust-row";
@@ -501,6 +535,7 @@ import {
   overviewChartGridSoloRowStyle,
 } from "@/lib/overview-chart-grid-layout";
 import {
+  filterOverviewAutoDashboardCharts,
   filterOverviewRenderableCharts,
   overviewChartHasRenderableData,
 } from "@/lib/overview-dashboard-chart-renderable";
@@ -697,6 +732,14 @@ import {
   type ChartInsightAnswerBundle,
   type ChartInsightAnswerStore,
 } from "@/lib/chart-insight-answers";
+import {
+  appendInsightSavedResult,
+  buildInsightRestorePayload,
+  chartExistsInHistory,
+  clearInsightResultHistory,
+  createInsightSavedResult,
+  type InsightSavedResult,
+} from "@/lib/insight-result-history";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   datasetKindLabel,
@@ -707,7 +750,9 @@ import {
 import {
   buildExecutivePdfExportInput,
   computePdfRankedSignalsFromChartRows,
+  insightAnswerSummaryForDisplay,
   parseAnswerIntoSections,
+  resolveParsedAnswerSummary,
   sortRowsForPresentation,
   type PdfChartPrepContext,
 } from "@/lib/build-executive-pdf-input";
@@ -715,7 +760,18 @@ import {
   buildExportTabVisualizationPreview,
   exportTabAiAnswerAvailable,
 } from "@/lib/export-tab-preview";
+import {
+  aggregateMappingConfidenceFromMetadata,
+  mappingConfidenceDisplayLabel,
+  shouldShowMappingLowConfidenceWarning,
+  validateColumnMappingSelections,
+} from "@/lib/column-mapping-validation";
 import { resolvePdfExportContext } from "@/lib/resolve-pdf-export-context";
+import {
+  exportTabBlockedReason,
+  FILTERED_DASHBOARD_ERROR,
+  friendlyChartCaptureErrorMessage,
+} from "@/lib/user-facing-export-errors";
 import {
   BarChart,
   Bar,
@@ -1180,75 +1236,6 @@ function inferAggAndMetricFromChartTitle(title: string): {
 
 function normalizeQuestionForMatch(q: string): string {
   return q.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function snapshotMetricCategoryTokens(snap: ChartSnapshot): {
-  metric: string;
-  category: string;
-} {
-  const prov = snap.visualization as { provenance?: InsightProvenance } | null;
-  const fp = snap.finalPresentation;
-  return {
-    metric: normalizeIntentToken(
-      prov?.provenance?.numericColumn ?? fp?.metric ?? ""
-    ),
-    category: normalizeIntentToken(
-      prov?.provenance?.categoryColumn ?? fp?.dimension ?? ""
-    ),
-  };
-}
-
-function analysisMetricCategoryTokens(
-  parsed: AlignedAnalysisContext | null
-): { metric: string; category: string } {
-  return {
-    metric: normalizeIntentToken(parsed?.metricColumn ?? ""),
-    category: normalizeIntentToken(parsed?.categoryColumn ?? ""),
-  };
-}
-
-function metricCategoryTokensAlign(
-  a: { metric: string; category: string },
-  b: { metric: string; category: string }
-): boolean {
-  if (a.metric && b.metric && a.metric !== b.metric) return false;
-  if (a.category && b.category && a.category !== b.category) return false;
-  return true;
-}
-
-function chartSnapshotMatchesAnalysis(
-  snap: ChartSnapshot,
-  parsed: AlignedAnalysisContext | null
-): boolean {
-  if (!parsed) return false;
-  return metricCategoryTokensAlign(
-    snapshotMetricCategoryTokens(snap),
-    analysisMetricCategoryTokens(parsed)
-  );
-}
-
-/** Keep a pinned insight chart only for same-question re-asks or aligned follow-ups. */
-function shouldPreservePinnedInsightChart(args: {
-  pinned: ChartSnapshot;
-  question: string;
-  parsed: AlignedAnalysisContext | null;
-  followUpDetected: boolean;
-}): boolean {
-  const pinnedQ = normalizeQuestionForMatch(args.pinned.question ?? "");
-  const newQ = normalizeQuestionForMatch(args.question);
-  if (pinnedQ && newQ && pinnedQ === newQ) return true;
-
-  if (extractDashboardChartTitleFromPrefillQuestion(args.question)) {
-    return true;
-  }
-
-  if (isTrendMode(args.pinned.contract)) {
-    return args.followUpDetected;
-  }
-
-  if (!args.followUpDetected) return false;
-
-  return chartSnapshotMatchesAnalysis(args.pinned, args.parsed);
 }
 
 function resolveOriginChartRefSnapshot(args: {
@@ -1977,6 +1964,7 @@ function parseConversationMeta(raw: unknown): ConversationMeta | null {
 
 type ConversationFollowUpMeta = {
   wasFollowUp: boolean;
+  whyFollowUp?: boolean;
   previousAnalysisSummary: string;
   followUpApplied: string;
   contextUsedLine: string;
@@ -1989,6 +1977,7 @@ function parseConversationFollowUp(raw: unknown): ConversationFollowUpMeta | nul
   if (!o.wasFollowUp) return null;
   return {
     wasFollowUp: true,
+    whyFollowUp: Boolean(o.whyFollowUp),
     previousAnalysisSummary: String(o.previousAnalysisSummary ?? "").trim(),
     followUpApplied: String(o.followUpApplied ?? "").trim(),
     contextUsedLine: String(o.contextUsedLine ?? "").trim(),
@@ -3215,6 +3204,8 @@ type AlignedAnalysisContext = {
     disclaimer?: string | null;
     lacksTimeSeries?: boolean;
   } | null;
+  reasoningBlocks?: ReasoningBlock[];
+  recommendedActions?: RecommendedAction[];
 };
 
 type InsightConfidenceBreakdownComponent = {
@@ -3498,6 +3489,8 @@ function parseAlignedAnalysis(raw: unknown): AlignedAnalysisContext | null {
     dimensionRedirectHandled: Boolean(o.dimensionRedirectHandled),
     requestedDimensionMissing: Boolean(o.requestedDimensionMissing),
     forecastGuardrails: parseForecastGuardrails(o.forecastGuardrails),
+    reasoningBlocks: parseReasoningBlocks(o.reasoningBlocks),
+    recommendedActions: parseRecommendedActions(o.recommendedActions),
   };
 }
 
@@ -4311,7 +4304,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [displayKind, chartRows, miniAxes, viewportWidthPx, plotHeightPx]
   );
 
-  const renderBarAsHorizontal = overviewDashboardUsesHorizontalBars(
+  const renderBarAsHorizontal = cartesianUsesHorizontalPlot(
     displayKind,
     miniCategoryPlan
   );
@@ -4404,14 +4397,25 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chartRows]
   );
 
-  const overviewBarValueDomain = useMemo(
+  // Metric-aware bar value ticks: currency/large numbers compact to K/M and
+  // percent/rate metrics read as points (35%, 3.4%) instead of raw decimals.
+  const barValueTickFormatter = useCallback(
+    (tick: number) =>
+      formatOverviewBarValueAxisTick(tick, chartRows, overviewMetricCtx),
+    [chartRows, overviewMetricCtx]
+  );
+
+  const overviewVerticalBarAxisProps = useMemo(
     () =>
-      resolveOverviewBarValueDomain(chartRows, {
-        chartTitle: chart.title,
-        metricLabel: overviewMetricLabel,
-        presentationKind: displayKind,
-        executiveRounding: false,
-      }),
+      displayKind === "bar" || displayKind === "histogram"
+        ? resolveCartesianBarValueAxisProps({
+            chartKind: displayKind,
+            rows: chartRows,
+            chartTitle: chart.title,
+            metricLabel: overviewMetricLabel,
+            context: { pipeline: "overview", capture: false },
+          })
+        : null,
     [chartRows, chart.title, overviewMetricLabel, displayKind]
   );
 
@@ -4438,10 +4442,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
 
   const overviewRateWarning = useMemo(
     () =>
-      chartHasRateAbove100(chartRows, chart.title)
-        ? RATE_EXCEEDS_100_WARNING
-        : null,
-    [chartRows, chart.title]
+      resolveRateExceeds100Warning({
+        rows: chartRows,
+        metricLabel: chart.title,
+        presentationKind: displayKind,
+        chartTitle: canonicalTitle || chart.title,
+      }),
+    [chartRows, chart.title, displayKind, canonicalTitle]
   );
 
   const overviewTooltipHandlers = useMemo(
@@ -4511,7 +4518,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       : dashGrid.opacity;
     const showBarEndLabels = shouldShowOverviewBarValueLabels(
       chartRows,
-      valueTickFormatter
+      barValueTickFormatter
     );
     const localCategoryPlan = computeOverviewMiniCategoryPlan(
       displayKind,
@@ -4522,7 +4529,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     );
     const plotHorizontal = pngCapture
       ? renderBarAsHorizontal
-      : overviewDashboardUsesHorizontalBars(displayKind, localCategoryPlan);
+      : cartesianUsesHorizontalPlot(displayKind, localCategoryPlan);
     const effectivePlotH =
       pngCapture
         ? plotH
@@ -4749,13 +4756,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const hbBalanced = balanceHorizontalOuterMargins({
         marginLeft: hb.marginLeft,
         chartLayoutMode: pngCapture ? "export" : "compact",
-        minRight: pngCapture ? 12 : 8,
+        minRight: pngCapture ? 12 : OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX,
       });
-      const hBarValueDomain = resolveOverviewBarValueDomain(chartRows, {
+      const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
+        chartKind: "bar_horizontal",
+        rows: chartRows,
         chartTitle: chart.title,
         metricLabel: overviewMetricLabel,
-        presentationKind: displayKind,
-        executiveRounding: false,
+        context: { pipeline: "overview", capture: pngCapture },
       });
       const hBarRightMargin = showBarEndLabels
         ? Math.max(hbBalanced.marginRight, 52)
@@ -4774,6 +4782,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           <BarChart
             layout="vertical"
             data={chartRows}
+            barCategoryGap={resolveHorizontalBarCategoryGap({
+              categoryCount: chartRows.length,
+            })}
             margin={{
               left: hbBalanced.marginLeft,
               right: hBarRightMargin,
@@ -4790,11 +4801,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             />
             <XAxis
               type="number"
-              {...(hBarValueDomain
-                ? { domain: hBarValueDomain, allowDataOverflow: false }
-                : {})}
+              {...(hBarValueAxisProps ?? {})}
               tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK }}
-              tickFormatter={valueTickFormatter}
+              tickFormatter={barValueTickFormatter}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             />
@@ -4820,8 +4829,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             <Bar
               dataKey="value"
               fill="#6366f1"
-              radius={[0, 6, 6, 0]}
-              maxBarSize={pngCapture ? OVERVIEW_PNG_EXPORT_HBAR_MAX_SIZE : 32}
+              radius={HORIZONTAL_BAR_END_RADIUS}
+              maxBarSize={resolveOverviewHorizontalBarMaxSize({
+                pngCapture,
+                categoryCount: chartRows.length,
+              })}
               isAnimationActive={plotAnimOn}
               animationDuration={plotAnimDuration}
               cursor={drillable ? "pointer" : "default"}
@@ -4842,7 +4854,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 <LabelList
                   dataKey="value"
                   position="insideRight"
-                  formatter={(v) => valueTickFormatter(Number(v ?? 0))}
+                  formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
                   style={{
                     fill: "#e2e8f0",
                     fontSize: 13,
@@ -5123,7 +5135,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       const barCategoryGap =
         isHist
           ? 2
-          : chartRows.length <= 6
+          : chartRows.length <= 8
             ? "16%"
             : undefined;
       return (
@@ -5172,11 +5184,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
             </XAxis>
             <YAxis
               tick={{ fontSize: axisTickFs, fill: OV_AXIS_TICK, dx: 2 }}
-              tickFormatter={valueTickFormatter}
+              tickFormatter={barValueTickFormatter}
               width={vLay.yAxisWidth}
-              {...(overviewBarValueDomain
-                ? { domain: overviewBarValueDomain, allowDataOverflow: false }
-                : {})}
+              {...(overviewVerticalBarAxisProps ?? {})}
               axisLine={{ stroke: OV_AXIS_LINE }}
               tickLine={{ stroke: OV_AXIS_LINE }}
             />
@@ -5194,7 +5204,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                   ? pngCapture
                     ? OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE
                     : OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE
-                  : OVERVIEW_PNG_EXPORT_VBAR_MAX_SIZE
+                  : OVERVIEW_VBAR_MAX_BAR_SIZE
               }
               isAnimationActive={plotAnimOn}
               animationDuration={plotAnimDuration}
@@ -5216,7 +5226,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 <LabelList
                   dataKey="value"
                   position="top"
-                  formatter={(v) => valueTickFormatter(Number(v ?? 0))}
+                  formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
                   style={{
                     fill: "#e2e8f0",
                     fontSize: 13,
@@ -5326,11 +5336,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 });
                 downloadChartArtifact(artifact, request.filename);
               } catch (err) {
-                onChartExportError?.(
-                  err instanceof Error
-                    ? err.message
-                    : "Unable to export chart image."
-                );
+                onChartExportError?.(friendlyChartCaptureErrorMessage(err));
               } finally {
                 setOverviewPngCaptureRequest(null);
                 setExportingPng(false);
@@ -5552,6 +5558,7 @@ type DatasetKindSlug =
   | "ecommerce"
   | "manufacturing"
   | "finance"
+  | "banking"
   | "operations"
   | "marketing"
   | "generic"
@@ -5568,6 +5575,7 @@ function coerceDatasetKind(raw: unknown): DatasetKindSlug {
     case "finance":
     case "operations":
     case "marketing":
+    case "banking":
     case "generic":
       return k;
     default:
@@ -6478,6 +6486,9 @@ function HomeInner() {
   const [howCalculatedOpen, setHowCalculatedOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [mappingSaving, setMappingSaving] = useState(false);
+  const [pdfExportBusy, setPdfExportBusy] = useState(false);
+  const [mappingModalError, setMappingModalError] = useState("");
   const [insightAskLoadingChart, setInsightAskLoadingChart] = useState(false);
   const [insightAskLoadingNarrative, setInsightAskLoadingNarrative] =
     useState(false);
@@ -6674,6 +6685,9 @@ function HomeInner() {
   ]);
 
   const [mappingConfirmedByUser, setMappingConfirmedByUser] = useState(false);
+  const [apiMappingConfidence, setApiMappingConfidence] = useState<string | null>(
+    null
+  );
   const [mappingMetadata, setMappingMetadata] = useState<MappingMetadata | null>(
     null
   );
@@ -6697,7 +6711,16 @@ function HomeInner() {
     useState<ConversationMeta | null>(null);
   const [aiConversationState, setAiConversationState] =
     useState<AiConversationState>(() => emptyAiConversationState());
-  const [questionHistory, setQuestionHistory] = useState<string[]>([]);
+  const [insightResultHistory, setInsightResultHistory] = useState<
+    InsightSavedResult[]
+  >([]);
+  const [activeInsightResultId, setActiveInsightResultId] = useState<
+    string | null
+  >(null);
+  const insightResultHistoryRef = useRef<InsightSavedResult[]>([]);
+  const activeInsightResultIdRef = useRef<string | null>(null);
+  const lastSavedInsightResultIdRef = useRef<string | null>(null);
+  const insightParentResultIdAtAskStartRef = useRef<string | null>(null);
   /** True when the last /ask returned a chart payload (hydrated visualization). */
   const [lastAskVisualizationHydrated, setLastAskVisualizationHydrated] =
     useState(false);
@@ -6802,7 +6825,10 @@ function HomeInner() {
               date_range: datePayload,
             }),
           });
-          if (!res.ok) return;
+          if (!res.ok) {
+            setError(FILTERED_DASHBOARD_ERROR);
+            return;
+          }
           const data = (await res.json()) as Record<string, unknown>;
           setDashboardEmpty(Boolean(data.empty));
           setFilterBreadcrumb(
@@ -6853,6 +6879,7 @@ function HomeInner() {
           }
         } catch (e) {
           if ((e as Error).name === "AbortError") return;
+          setError(FILTERED_DASHBOARD_ERROR);
         }
       })();
     }, 280);
@@ -6940,6 +6967,81 @@ function HomeInner() {
       }));
     },
     []
+  );
+
+  useEffect(() => {
+    insightResultHistoryRef.current = insightResultHistory;
+  }, [insightResultHistory]);
+
+  useEffect(() => {
+    activeInsightResultIdRef.current = activeInsightResultId;
+  }, [activeInsightResultId]);
+
+  const persistInsightSavedResult = useCallback(
+    (input: {
+      turnId?: string | null;
+      question: string;
+      answer: string;
+      hasValidAIAnswer: boolean;
+      alignedAnalysis: AlignedAnalysisContext | null;
+      chartId: string | null;
+      isFollowUp: boolean;
+      parentResultId: string | null;
+      lastAskVisualizationHydrated: boolean;
+    }) => {
+      const entry = createInsightSavedResult({
+        turnId: input.turnId ?? null,
+        question: input.question,
+        answer: input.answer,
+        hasValidAIAnswer: input.hasValidAIAnswer,
+        alignedAnalysis: input.alignedAnalysis,
+        chartId: input.chartId,
+        isFollowUp: input.isFollowUp,
+        parentResultId: input.parentResultId,
+        lastAskVisualizationHydrated: input.lastAskVisualizationHydrated,
+      });
+      lastSavedInsightResultIdRef.current = entry.id;
+      setInsightResultHistory((prev) => appendInsightSavedResult(prev, entry));
+      setActiveInsightResultId(entry.id);
+    },
+    []
+  );
+
+  const restoreInsightSavedResult = useCallback(
+    (resultId: string) => {
+      const hit = insightResultHistoryRef.current.find((r) => r.id === resultId);
+      if (!hit) {
+        setError("Unable to restore that insight — it is no longer in this session.");
+        return;
+      }
+
+      const payload = buildInsightRestorePayload(hit);
+      setActiveInsightResultId(payload.resultId);
+      setQuestion(payload.question);
+      setAnswer(payload.answer);
+      setHasValidAIAnswer(payload.hasValidAIAnswer);
+      setLastAskedQuestion(payload.question);
+      setAlignedAnalysis(
+        (payload.alignedAnalysis as AlignedAnalysisContext | null) ?? null
+      );
+      setLastAskVisualizationHydrated(payload.lastAskVisualizationHydrated);
+      setHowCalculatedOpen(false);
+
+      if (
+        payload.chartId &&
+        chartExistsInHistory(chartHistory, payload.chartId)
+      ) {
+        pinInsightChart(payload.chartId);
+        pinnedInsightChartIdRef.current = payload.chartId;
+        saveInsightBundleForChart(payload.chartId, {
+          answer: payload.answer,
+          lastAskedQuestion: payload.question,
+          hasValidAIAnswer: payload.hasValidAIAnswer,
+          alignedAnalysis: payload.alignedAnalysis,
+        });
+      }
+    },
+    [chartHistory, pinInsightChart, saveInsightBundleForChart]
   );
 
   const selectChartWithInsightState = useCallback(
@@ -7107,7 +7209,7 @@ function HomeInner() {
       downloadChartArtifact(artifact, request.filename);
     } catch (err) {
       console.error("Chart PNG download failed:", err);
-      setError("Unable to download chart image.");
+      setError(friendlyChartCaptureErrorMessage(err));
     } finally {
       setChartsTabPngCaptureRequest(null);
       setExportingChartsTabPng(false);
@@ -7138,6 +7240,7 @@ function HomeInner() {
       const nextQ = value.trim();
       const snapQ = (insightSnapshot?.question ?? lastAskedQuestion).trim();
       if (nextQ !== lastAskedQuestion.trim() || (snapQ && nextQ !== snapQ)) {
+        setActiveInsightResultId(null);
         setHasValidAIAnswer(false);
         setAlignedAnalysis(null);
         setLastAskVisualizationHydrated(false);
@@ -7258,7 +7361,10 @@ function HomeInner() {
     setLastConversationMeta(null);
     setAiConversationState(emptyAiConversationState());
     clearInsightThread();
-    setQuestionHistory([]);
+    setInsightResultHistory(clearInsightResultHistory());
+    setActiveInsightResultId(null);
+    lastSavedInsightResultIdRef.current = null;
+    insightParentResultIdAtAskStartRef.current = null;
     setKpis(null);
     setKpiCards([]);
     setAlignedAnalysis(null);
@@ -7275,6 +7381,7 @@ function HomeInner() {
     setMappingConfirmedByUser(false);
     setMappingModalOpen(false);
     setMappingMetadata(null);
+    setApiMappingConfidence(null);
     setLoading(true);
 
     try {
@@ -7361,6 +7468,12 @@ function HomeInner() {
       } else {
         setMappingMetadata(null);
       }
+      setApiMappingConfidence(
+        typeof data.mapping_confidence === "string" &&
+          data.mapping_confidence.trim()
+          ? data.mapping_confidence.trim().toLowerCase()
+          : null
+      );
 
       setUploadMessage(
         `File uploaded successfully • ${data.rows} rows • ${data.columns.length} columns`
@@ -7388,7 +7501,10 @@ function HomeInner() {
     setLastConversationMeta(null);
     setAiConversationState(emptyAiConversationState());
     clearInsightThread();
-    setQuestionHistory([]);
+    setInsightResultHistory(clearInsightResultHistory());
+    setActiveInsightResultId(null);
+    lastSavedInsightResultIdRef.current = null;
+    insightParentResultIdAtAskStartRef.current = null;
     setDashboardFilters([]);
     setDashDateStart("");
     setDashDateEnd("");
@@ -7396,6 +7512,7 @@ function HomeInner() {
     setFilterBreadcrumb("");
     setDashboardEmpty(false);
     setMappingMetadata(null);
+    setApiMappingConfidence(null);
     setLoading(true);
 
     try {
@@ -7471,6 +7588,12 @@ function HomeInner() {
       } else {
         setMappingMetadata(null);
       }
+      setApiMappingConfidence(
+        typeof data.mapping_confidence === "string" &&
+          data.mapping_confidence.trim()
+          ? data.mapping_confidence.trim().toLowerCase()
+          : null
+      );
 
       setUploadMessage(
         `Sheet changed successfully • ${data.rows} rows • ${data.columns.length} columns`
@@ -7530,7 +7653,10 @@ function HomeInner() {
     setAnswer("");
     setHasValidAIAnswer(false);
     setLastAskedQuestion("");
-    setQuestionHistory([]);
+    setInsightResultHistory(clearInsightResultHistory());
+    setActiveInsightResultId(null);
+    lastSavedInsightResultIdRef.current = null;
+    insightParentResultIdAtAskStartRef.current = null;
     setAlignedAnalysis(null);
     setLastAskVisualizationHydrated(false);
     setHowCalculatedOpen(false);
@@ -7555,7 +7681,7 @@ function HomeInner() {
     ) {
       return true;
     }
-    if (questionHistory.length > 0) return true;
+    if (insightResultHistory.length > 0) return true;
     if (conversationSnapshot?.lastQuestion?.trim()) return true;
     if (aiConversationState.followUpChain.length > 0) return true;
     if (aiConversationState.lastQuestion.trim()) return true;
@@ -7567,7 +7693,7 @@ function HomeInner() {
     answer,
     lastAskedQuestion,
     question,
-    questionHistory,
+    insightResultHistory,
     conversationSnapshot,
     aiConversationState.followUpChain,
     aiConversationState.lastQuestion,
@@ -7650,6 +7776,9 @@ function HomeInner() {
 
     const requestNonce = ++insightAskRequestNonceRef.current;
     insightAskInFlightTurnIdRef.current = null;
+
+    insightParentResultIdAtAskStartRef.current =
+      activeInsightResultIdRef.current ?? lastSavedInsightResultIdRef.current;
 
     setError("");
     setAnswer("");
@@ -7786,6 +7915,7 @@ function HomeInner() {
               followUpChain: parentAnalysisContext.followUpChain,
               lastAiAnswer: parentAnalysisContext.lastAiAnswer,
               turnId: parentAnalysisContext.turnId,
+              reasoningBlocks: parentAnalysisContext.reasoningBlocks ?? undefined,
             }
           : null,
         continuation_intent: continuationIntent,
@@ -7828,14 +7958,6 @@ function HomeInner() {
       const meta = parseConversationMeta(chartData.conversation_meta);
       setLastConversationMeta(meta);
 
-      const qTrim = qRaw;
-      if (qTrim) {
-        setQuestionHistory((prev) => {
-          const merged = [qTrim, ...prev.filter((x) => x !== qTrim)];
-          return merged.slice(0, 3);
-        });
-      }
-
       const hydrated = hydrateVisualizationFromApi(chartData.visualization);
       const parsedAnalysis = parseAlignedAnalysis(chartData.analysis);
       logAnalysisIntentToConsole(qRaw, parsedAnalysis?.analysisIntent);
@@ -7851,6 +7973,7 @@ function HomeInner() {
             question: qRaw,
             parsed: parsedAnalysis,
             followUpDetected,
+            normalizeQuestion: normalizeQuestionForMatch,
           }) ||
             (askMode === "fresh_root_chart_entry" &&
               askPinnedSnapshot.source === "auto_dashboard" &&
@@ -8065,6 +8188,21 @@ function HomeInner() {
             alignedAnalysis: parsedAnalysis,
           });
         }
+        persistInsightSavedResult({
+          turnId: turnId || null,
+          question: qRaw,
+          answer: terminalAnswer,
+          hasValidAIAnswer: Boolean(terminalAnswer),
+          alignedAnalysis: parsedAnalysis,
+          chartId: bundleChartId,
+          isFollowUp: followUpDetected,
+          parentResultId: followUpDetected
+            ? insightParentResultIdAtAskStartRef.current
+            : null,
+          lastAskVisualizationHydrated: preservePinnedChart
+            ? true
+            : Boolean(hydrated),
+        });
         return;
       }
 
@@ -8227,6 +8365,23 @@ function HomeInner() {
           alignedAnalysis: analysisForBundle,
         });
       }
+
+      persistInsightSavedResult({
+        turnId: turnId || null,
+        question: qRaw,
+        answer: answerForBundle,
+        hasValidAIAnswer: validForBundle,
+        alignedAnalysis: analysisForBundle,
+        chartId: bundleChartId,
+        isFollowUp: Boolean(narrMeta?.followUpDetected ?? followUpDetected),
+        parentResultId:
+          narrMeta?.followUpDetected ?? followUpDetected
+            ? insightParentResultIdAtAskStartRef.current
+            : null,
+        lastAskVisualizationHydrated: preservePinnedChart
+          ? true
+          : Boolean(hydrated),
+      });
     } catch {
       if (!isStaleAsk()) {
         setAlignedAnalysis(null);
@@ -8276,8 +8431,23 @@ function HomeInner() {
       return;
     }
 
+    const mappingValidation = validateColumnMappingSelections(columns, {
+      product: productColumn,
+      sales: salesColumn,
+      region: regionColumn,
+      customer: customerColumn,
+      profit: profitColumn,
+      date: dateColumn,
+    });
+    if (!mappingValidation.ok) {
+      setMappingModalError(mappingValidation.message);
+      return;
+    }
+
     setError("");
+    setMappingModalError("");
     dismissMappingMessage();
+    setMappingSaving(true);
 
     try {
       const response = await fetch(apiUrl("/update-column-mapping"), {
@@ -8296,7 +8466,16 @@ function HomeInner() {
       });
 
       if (!response.ok) {
-        throw new Error("Column mapping save failed");
+        let detail: unknown = null;
+        try {
+          const body = await response.json();
+          detail = body?.detail ?? body?.message ?? null;
+        } catch {
+          /* ignore parse errors */
+        }
+        throw new Error(
+          extractApiErrorMessage(detail) || "Column mapping save failed"
+        );
       }
 
       const data = await response.json();
@@ -8328,6 +8507,13 @@ function HomeInner() {
       if (data.mapping_metadata && typeof data.mapping_metadata === "object") {
         setMappingMetadata(data.mapping_metadata as MappingMetadata);
       }
+      setApiMappingConfidence(
+        typeof data.mapping_confidence === "string" &&
+          data.mapping_confidence.trim()
+          ? data.mapping_confidence.trim().toLowerCase()
+          : "high"
+      );
+
       setSuggestedQuestions(
         dedupeSuggestedQuestionsNear(
           dedupeSuggestedQuestions(
@@ -8349,8 +8535,14 @@ function HomeInner() {
       setMappingMessage("Column mapping saved successfully.");
       setMappingConfirmedByUser(true);
       setMappingModalOpen(false);
-    } catch {
-      setError("Unable to save column mapping.");
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message.trim()
+          ? err.message.trim()
+          : "Unable to save column mapping.";
+      setMappingModalError(message);
+    } finally {
+      setMappingSaving(false);
     }
   };
 
@@ -8382,16 +8574,25 @@ function HomeInner() {
   let mappingConfidence: "High" | "Medium" | "Low" = "Low";
   if (mappingConfirmedByUser) {
     mappingConfidence = "High";
-  } else if (mappingMetadata?.roles) {
-    const fromRoles = mappingConfidenceFromRoleMetadata(mappingMetadata.roles);
-    mappingConfidence =
-      fromRoles === "high" ? "High" : fromRoles === "medium" ? "Medium" : "Low";
+  } else if (mappingMetadata?.roles || apiMappingConfidence) {
+    mappingConfidence = mappingConfidenceDisplayLabel(
+      aggregateMappingConfidenceFromMetadata(
+        mappingMetadata,
+        apiMappingConfidence
+      )
+    );
   } else {
     const resolvedCount = [effectiveSales, effectiveDate, effectiveProduct].filter(
       Boolean
     ).length;
     mappingConfidence = resolvedCount >= 2 ? "Medium" : "Low";
   }
+
+  const showMappingLowConfidenceWarning = shouldShowMappingLowConfidenceWarning(
+    mappingMetadata,
+    mappingConfirmedByUser,
+    apiMappingConfidence
+  );
 
   const insightRelationshipBundle = useMemo((): {
     correlation: RelationshipCorrelationSnapshot;
@@ -8550,6 +8751,16 @@ function HomeInner() {
     mappingConfirmedByUser,
   ]);
 
+  const insightReasoningBlocks = useMemo(
+    () => alignedAnalysis?.reasoningBlocks ?? [],
+    [alignedAnalysis?.reasoningBlocks]
+  );
+
+  const insightRecommendedActions = useMemo(
+    () => visibleRecommendedActions(alignedAnalysis?.recommendedActions ?? []),
+    [alignedAnalysis?.recommendedActions]
+  );
+
   const insightNarrativeTone = useMemo((): NarrativeTone => {
     if (!alignedAnalysis) return "balanced";
     const backendMap =
@@ -8570,6 +8781,11 @@ function HomeInner() {
       mappingConfidence: mapForTone,
       mappingConfirmedByUser,
       unifiedConfidenceLevel: insightUnifiedConfidence?.level,
+      hasStrongReasoningEvidence: (alignedAnalysis.reasoningBlocks?.length ?? 0) >= 2,
+      isTrendChart:
+        Boolean(insightSnapshot) &&
+        isTrendMode(insightSnapshot?.contract) &&
+        chartSnapshotMatchesAnalysis(insightSnapshot!, alignedAnalysis),
     });
   }, [
     alignedAnalysis,
@@ -8577,6 +8793,7 @@ function HomeInner() {
     mappingConfirmedByUser,
     mappingMetadata?.roles,
     mappingConfidence,
+    insightSnapshot,
   ]);
 
   const insightNarrativeDisclaimer = useMemo(() => {
@@ -8631,7 +8848,7 @@ function HomeInner() {
   );
 
   const overviewRenderableCharts = useMemo(
-    () => filterOverviewRenderableCharts(autoDashboard?.charts ?? []),
+    () => filterOverviewAutoDashboardCharts(autoDashboard?.charts ?? []),
     [autoDashboard?.charts]
   );
 
@@ -8644,6 +8861,26 @@ function HomeInner() {
       contextLine: null,
     }));
   }, [autoDashboard]);
+
+  const overviewDashboardContextChips = useMemo(
+    () =>
+      buildOverviewDashboardContextChips({
+        datasetKind: datasetKind || "",
+        typeLabel: autoDashboard?.type_label ?? null,
+        mappingDomain: mappingMetadata?.domain ?? null,
+        dashboardFilters,
+        filterBreadcrumb,
+        chartCount: overviewRenderableCharts.length,
+      }),
+    [
+      datasetKind,
+      autoDashboard?.type_label,
+      mappingMetadata?.domain,
+      dashboardFilters,
+      filterBreadcrumb,
+      overviewRenderableCharts.length,
+    ]
+  );
 
   const dataPreviewDerivationsActive =
     activeTab === "preview" || activeTab === "export";
@@ -9022,7 +9259,8 @@ function HomeInner() {
       insightSnapshot.questionTurnId &&
       insightSnapshot.questionTurnId === turnId
     ) {
-      return true;
+      if (!alignedAnalysis) return true;
+      return chartSnapshotMatchesAnalysis(insightSnapshot, alignedAnalysis);
     }
 
     if (lastConversationMeta?.followUpDetected && alignedAnalysis) {
@@ -9232,10 +9470,10 @@ function HomeInner() {
   const visibleSuggestedQuestions = useMemo(
     () =>
       applySuggestionListHygiene(suggestedQuestions, [
-        ...questionHistory,
+        ...insightResultHistory.map((r) => r.question),
         question.trim(),
       ].filter(Boolean)).slice(0, 5),
-    [suggestedQuestions, questionHistory, question]
+    [suggestedQuestions, insightResultHistory, question]
   );
 
   const tickTruncate = useCallback((v: string | number) => {
@@ -9508,10 +9746,19 @@ function HomeInner() {
 
   const sessionChartRateWarning = useMemo(() => {
     const metricLabel = visualization?.title ?? chartAxisLabels.valueAxis;
-    return chartHasRateAbove100(sortedChartData, metricLabel)
-      ? RATE_EXCEEDS_100_WARNING
-      : null;
-  }, [sortedChartData, visualization?.title, chartAxisLabels.valueAxis]);
+    return resolveRateExceeds100Warning({
+      rows: sortedChartData,
+      metricLabel,
+      presentationKind: sessionRenderedChartKind,
+      chartTitle: visualization?.title ?? chartTitle,
+    });
+  }, [
+    sortedChartData,
+    visualization?.title,
+    chartAxisLabels.valueAxis,
+    sessionRenderedChartKind,
+    chartTitle,
+  ]);
 
   const executiveVizInsights = useMemo((): ExecutiveVizInsightCard[] => {
     if (isTrendMode(activeSnapshot?.contract) && sortedChartData.length) {
@@ -10162,14 +10409,21 @@ function HomeInner() {
       insightVisualization?.title ??
       insightChartMeasureLabel ??
       insightChartAxisLabels.valueAxis;
-    return chartHasRateAbove100(sortedInsightChartData, metricLabel)
-      ? RATE_EXCEEDS_100_WARNING
-      : null;
+    return resolveRateExceeds100Warning({
+      rows: sortedInsightChartData,
+      metricLabel,
+      presentationKind: insightRenderedChartKind,
+      chartTitle: insightDisplayChartTitle,
+      question: lastAskedQuestion,
+    });
   }, [
     sortedInsightChartData,
     insightVisualization?.title,
     insightChartMeasureLabel,
     insightChartAxisLabels.valueAxis,
+    insightRenderedChartKind,
+    insightDisplayChartTitle,
+    lastAskedQuestion,
   ]);
 
   const insightExecutiveVizInsights = useMemo((): ExecutiveVizInsightCard[] => {
@@ -10558,10 +10812,16 @@ function HomeInner() {
     }
     const parsed = parseAnswerIntoSections(
       answer,
-      alignedAnalysis?.insightSummary ?? undefined
+      alignedAnalysis?.insightSummary ?? undefined,
+      { reasoningBlockClaim: insightReasoningBlocks[0]?.claim }
     );
     const c = insightSnapshot?.contract;
     const tone = insightNarrativeTone;
+    const softenProseOpts = {
+      analysisRowCount: alignedAnalysis?.analysisRowCount,
+      hasStrongReasoningEvidence: insightReasoningBlocks.length >= 2,
+      isDescriptiveFact: true,
+    };
     const isRelScatter =
       insightPresentationChartKind === "scatter" &&
       Boolean(insightVisualization?.relationshipInsights);
@@ -10577,7 +10837,9 @@ function HomeInner() {
           insightRelationshipEnriched?.pearson ?? null
         );
       }
-      return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone));
+      return polishInsightNarrativeText(
+        softenAssertiveProse(sanitized, tone, softenProseOpts)
+      );
     };
     const softenSummary = (t?: string) => {
       const raw = t?.trim() ? t.trim() : "";
@@ -10591,14 +10853,23 @@ function HomeInner() {
           insightRelationshipEnriched?.pearson ?? null
         );
       }
-      return polishInsightNarrativeText(softenAssertiveProse(sanitized, tone), {
+      return polishInsightNarrativeText(
+        softenAssertiveProse(sanitized, tone, softenProseOpts),
+        {
         dualMetricRoasLead,
-      });
+      }
+      );
     };
     const summaryTextRaw =
       insightNumberedExecutiveBrief ??
-      softenSummary(parsed.summary) ??
-      "";
+      (softenSummary(parsed.summary) ||
+        softenSummary(
+          resolveParsedAnswerSummary(parsed, {
+            insightSummary: alignedAnalysis?.insightSummary ?? undefined,
+            reasoningBlockClaim: insightReasoningBlocks[0]?.claim,
+          })
+        ) ||
+        "");
     let summaryText = summaryTextRaw;
     if (insightUnsupportedGrowth) {
       summaryText = prependUnsupportedGrowthLead(
@@ -10655,6 +10926,7 @@ function HomeInner() {
     insightVisualization?.relationshipInsights,
     insightRelationshipEnriched,
     insightCorrelationCaution,
+    insightReasoningBlocks,
   ]);
 
   const insightExecutiveBrief = useMemo(() => {
@@ -10780,6 +11052,24 @@ function HomeInner() {
     [exportPdfPreviewContext, exportOptions.includeAIInsight, answer]
   );
 
+  const exportTabDownloadBlocked = useMemo(
+    () =>
+      exportTabBlockedReason({
+        hasDataset: columns.length > 0,
+        includeChart: exportOptions.includeChart,
+        chartAvailable: exportVizPreview.available,
+        includeAIInsight: exportOptions.includeAIInsight,
+        aiAnswerAvailable: exportAiAnswerAvailable,
+      }),
+    [
+      columns.length,
+      exportOptions.includeChart,
+      exportOptions.includeAIInsight,
+      exportVizPreview.available,
+      exportAiAnswerAvailable,
+    ]
+  );
+
   const exportExecutiveInsightsPreview = useMemo(() => {
     if (!exportOptions.includeChart || !exportOptions.includeAIInsight) return null;
     const ctx = exportPdfPreviewContext;
@@ -10874,6 +11164,7 @@ function HomeInner() {
       let insightPinRestored: string | null = null;
       try {
         setError("");
+        setPdfExportBusy(true);
         const pdfRemaining = planUsage?.usage.pdf_exports_remaining;
         if (!canExportPdf(planTier, pdfRemaining)) {
           const msg =
@@ -11534,6 +11825,7 @@ function HomeInner() {
       console.error("PDF generation failed:", err);
       setError("Unable to generate PDF report.");
     } finally {
+      setPdfExportBusy(false);
       if (pdfCaptureActive) setPdfCaptureMounted(false);
       if (insightPinRestored !== null) {
         flushSync(() => {
@@ -12067,22 +12359,21 @@ function HomeInner() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setMappingModalOpen(true)}
+                      onClick={() => {
+                        setMappingModalError("");
+                        setMappingModalOpen(true);
+                      }}
                       className={`shrink-0 ${ovOverviewSecondaryBtn}`}
                     >
                       Review mapping
                     </button>
                   </div>
                   {(() => {
-                    const domainKind = (datasetKind || "").trim().toLowerCase();
-                    const datasetTypeLabel =
-                      domainKind && domainKind !== "generic"
-                        ? datasetKindLabel(datasetKind)
-                        : mappingMetadata?.domain
-                          ? mappingMetadata.domain
-                              .replace(/_/g, " ")
-                              .replace(/\b\w/g, (ch) => ch.toUpperCase())
-                          : datasetKindLabel("generic");
+                    const datasetTypeLabel = resolveOverviewDatasetTypeLabel({
+                      datasetKind: datasetKind || "",
+                      typeLabel: autoDashboard?.type_label ?? null,
+                      mappingDomain: mappingMetadata?.domain ?? null,
+                    });
                     const engineRegion = mappingMetadata?.roles?.region?.selected?.trim();
                     const regionDisplay =
                       regionColumn.trim() || (engineRegion && engineRegion) || "";
@@ -12093,21 +12384,20 @@ function HomeInner() {
                           ? "bg-amber-500/10 text-amber-900 ring-amber-500/25 dark:text-amber-100"
                           : "bg-[color:var(--surface-subtle)] text-foreground ring-[color:var(--border-default)]";
                     const colHint = (explicit: string, inferred: string | null) => {
-                      if (explicit.trim()) {
+                      const hasValue = Boolean(explicit.trim() || inferred);
+                      if (!hasValue) return null;
+                      if (mappingConfirmedByUser && explicit.trim()) {
                         return (
                           <span className={`ml-1 ${ovDataHint}`}>
                             (manual)
                           </span>
                         );
                       }
-                      if (inferred) {
-                        return (
-                          <span className={`ml-1 ${ovDataHint}`}>
-                            (auto-detect)
-                          </span>
-                        );
-                      }
-                      return null;
+                      return (
+                        <span className={`ml-1 ${ovDataHint}`}>
+                          (auto-detect)
+                        </span>
+                      );
                     };
                     const colValue = (explicit: string, inferred: string | null) => {
                       const v = explicit.trim() || inferred;
@@ -12151,11 +12441,11 @@ function HomeInner() {
                                 <span className={ovDataValueMono}>
                                   {regionDisplay}
                                 </span>
-                                {regionColumn.trim() ? (
+                                {regionColumn.trim() && mappingConfirmedByUser ? (
                                   <span className={`ml-1 ${ovDataHint}`}>
                                     (manual)
                                   </span>
-                                ) : engineRegion ? (
+                                ) : regionDisplay ? (
                                   <span className={`ml-1 ${ovDataHint}`}>
                                     (auto-detect)
                                   </span>
@@ -12288,11 +12578,11 @@ function HomeInner() {
                   {(autoDashboard?.cards?.length ?? 0) > 0 &&
                   (autoDashboard?.charts?.length ?? 0) > 0 ? (
                     <div className="flex flex-wrap gap-2 mb-2">
-                      {autoDashboardKpiRows.map(({ card }, idx) => (
+                      {overviewDashboardContextChips.map((chip) => (
                         <OverviewInlineKpiChip
-                          key={`dash-kpi-${idx}-${card.title}`}
-                          title={card.title}
-                          value={card.value}
+                          key={`dash-ctx-${chip.title}`}
+                          title={chip.title}
+                          value={chip.value}
                         />
                       ))}
                     </div>
@@ -12378,6 +12668,18 @@ function HomeInner() {
             ) : null}
             </div>
           )}
+
+        {activeTab === "preview" && columns.length === 0 && (
+          <section className="mb-6 min-w-0 w-full">
+            <div className="rounded-xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-6 py-10 text-center">
+              <h2 className={dpSectionTitle}>Data Preview</h2>
+              <p className={`mx-auto mt-2 max-w-md text-sm leading-relaxed ${ovMuted}`}>
+                Upload a CSV or Excel file on the Overview tab to inspect rows, column
+                types, and mapping quality here.
+              </p>
+            </div>
+          </section>
+        )}
 
         {activeTab === "preview" && columns.length > 0 && (
           <section className="mb-6 min-w-0 w-full">
@@ -12821,7 +13123,19 @@ function HomeInner() {
           </section>
         )}
 
-        {activeTab === "charts" && (
+        {activeTab === "charts" && columns.length === 0 && (
+          <section className={chartsTabPage}>
+            <div className={chartsTabEmptyState}>
+              <p className={chartsTabEmptyTitle}>Upload a dataset first</p>
+              <p className="mx-auto max-w-lg text-sm leading-relaxed text-[color:var(--text-muted)]">
+                Charts from Overview and AI Insights appear here after you upload a file
+                on the <span className={chartsTabDescEmphasis}>Overview</span> tab.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "charts" && columns.length > 0 && (
           <section className={chartsTabPage}>
             <div className={chartsTabHeaderRow}>
               <div className="min-w-0 max-w-2xl">
@@ -13060,7 +13374,19 @@ function HomeInner() {
           </section>
         )}
 
-        {activeTab === "insights" && (
+        {activeTab === "insights" && columns.length === 0 && (
+          <section className={`${aiInsightsPage} ${aiInsightsOuterShell}`}>
+            <div className="rounded-xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-inset)] px-6 py-10 text-center">
+              <h2 className={aiInsightsSuggestedHeading}>AI Insights</h2>
+              <p className={`mx-auto mt-2 max-w-md text-sm leading-relaxed ${ovMuted}`}>
+                Upload a dataset on the Overview tab to ask analytical questions and
+                generate charts with narrative insights.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "insights" && columns.length > 0 && (
           <section className={`${aiInsightsPage} ${aiInsightsOuterShell}`}>
             <div className={aiInsightsGrid}>
               <div className={aiInsightsPanelShell}>
@@ -13079,23 +13405,46 @@ function HomeInner() {
                       </button>
                     ))}
                   </div>
-                  {questionHistory.length > 0 ? (
+                  {insightResultHistory.length > 0 ? (
                     <div className={aiInsightsSuggestedRecentSection}>
-                      <h3 className={aiInsightsSuggestedRecentTitle}>Recent questions</h3>
+                      <h3 className={aiInsightsSuggestedRecentTitle}>
+                        Recent Insights
+                      </h3>
                       <p className={aiInsightsSuggestedRecentDesc}>
-                        Tap to refill the input (last 3).
+                        Tap to restore a saved answer instantly — no new AI call.
                       </p>
                       <div className={aiInsightsSuggestedRecentList}>
-                        {questionHistory.map((hq) => (
-                          <button
-                            key={hq}
-                            type="button"
-                            onClick={() => setQuestion(hq)}
-                            className={aiInsightsSuggestedRecentItem}
-                          >
-                            {hq.length > 72 ? `${hq.slice(0, 70)}…` : hq}
-                          </button>
-                        ))}
+                        {insightResultHistory.map((item) => {
+                          const isActive = activeInsightResultId === item.id;
+                          const label =
+                            item.question.length > 72
+                              ? `${item.question.slice(0, 70)}…`
+                              : item.question;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => restoreInsightSavedResult(item.id)}
+                              className={`${aiInsightsSuggestedRecentItem} ${
+                                isActive ? aiInsightsRecentInsightItemActive : ""
+                              }`}
+                              aria-current={isActive ? "true" : undefined}
+                            >
+                              <span className="flex items-start justify-between gap-2">
+                                <span className="min-w-0 flex-1">{label}</span>
+                                <span
+                                  className={
+                                    item.isFollowUp
+                                      ? aiInsightsRecentInsightBadgeFollowUp
+                                      : aiInsightsRecentInsightBadgeMain
+                                  }
+                                >
+                                  {item.isFollowUp ? "Follow-up" : "Main"}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : null}
@@ -13254,15 +13603,40 @@ function HomeInner() {
                   answer.trim()) ? (
                 <div className={aiInsightsAnswerCard}>
                   <div className={aiInsightsAnswerHeader}>
-                    <p className={aiInsightsAnswerKicker}>Executive analysis</p>
+                    <p className={aiInsightsAnswerKicker}>
+                      {alignedAnalysis?.conversationFollowUp?.whyFollowUp
+                        ? "Evidence-backed follow-up"
+                        : "Executive analysis"}
+                    </p>
                     <h3 className={aiInsightsAnswerTitle}>AI Answer</h3>
                   </div>
                   {answer.trim() || insightAskLoadingNarrative ? (
                     <div className={aiInsightsAnswerStack}>
                       {(() => {
+                        const leadChartKind = (
+                          insightChartMatchesCurrentQuestion
+                            ? insightPresentationChartKind
+                            : ((alignedAnalysis?.chartTypeInternal as ChartKind) ||
+                                insightPresentationChartKind)
+                        ) as ChartKind;
                         const lead = aiAnswerLeadIn(
                           datasetKind || "",
-                          insightPresentationChartKind
+                          leadChartKind,
+                          {
+                            routingIntent:
+                              alignedAnalysis?.routingPlan?.intent ?? null,
+                            categoryColumn:
+                              alignedAnalysis?.categoryColumn ??
+                              insightVisualization?.provenance?.categoryColumn ??
+                              null,
+                            metricColumn:
+                              alignedAnalysis?.metricColumn ??
+                              insightVisualization?.provenance?.numericColumn ??
+                              null,
+                            isTimeSeries:
+                              insightChartMatchesCurrentQuestion &&
+                              isTrendMode(insightSnapshot?.contract ?? null),
+                          }
                         );
                         return lead ? (
                           <p className={aiInsightsAnswerLead}>{lead}</p>
@@ -13271,11 +13645,74 @@ function HomeInner() {
                       <div className={aiInsightsAnswerSummaryPanel}>
                         <p className={aiInsightsAnswerSummary}>
                           {formatInsightSummary(
-                            parsedInsightAnswer.summary ||
-                              "Summary unavailable — see detail sections."
+                            insightAnswerSummaryForDisplay(parsedInsightAnswer, {
+                              insightSummary:
+                                alignedAnalysis?.insightSummary ?? undefined,
+                              reasoningBlockClaim:
+                                insightReasoningBlocks[0]?.claim,
+                            })
                           )}
                         </p>
                       </div>
+                      {insightReasoningBlocks.length > 0 ? (
+                        <div className={aiInsightsAnswerDetailsGroup}>
+                          <p className={aiInsightsAnswerDetailsLabel}>
+                            Why this matters
+                          </p>
+                          <ul className={aiInsightsReasoningList}>
+                            {insightReasoningBlocks.map((block, idx) => (
+                              <li
+                                key={`${block.type}-${idx}-${block.claim.slice(0, 32)}`}
+                                className={aiInsightsReasoningItem}
+                              >
+                                <p className={aiInsightsReasoningClaim}>
+                                  {block.claim}
+                                </p>
+                                {block.reason ? (
+                                  <p className={aiInsightsReasoningBasis}>
+                                    {block.reason}
+                                  </p>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {insightRecommendedActions.length > 0 ? (
+                        <div className={aiInsightsAnswerDetailsGroup}>
+                          <p className={aiInsightsAnswerDetailsLabel}>
+                            Recommended next actions
+                          </p>
+                          <ul className={aiInsightsRecommendedList}>
+                            {insightRecommendedActions.map((action, idx) => (
+                              <li
+                                key={`${action.type}-${idx}-${action.title.slice(0, 32)}`}
+                                className={aiInsightsRecommendedItem}
+                              >
+                                <p className={aiInsightsRecommendedTitle}>
+                                  {idx + 1}. {action.title}
+                                </p>
+                                <p className={aiInsightsRecommendedDesc}>
+                                  {action.description}
+                                </p>
+                                {action.question ? (
+                                  <button
+                                    type="button"
+                                    className={aiInsightsRecommendedChip}
+                                    onClick={() =>
+                                      setQuestionAndResetInsightState(
+                                        action.question!
+                                      )
+                                    }
+                                  >
+                                    Ask: {action.question}
+                                  </button>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                       <div className={aiInsightsAnswerDetailsGroup}>
                         <p className={aiInsightsAnswerDetailsLabel}>
                           Supporting detail
@@ -14093,6 +14530,7 @@ function HomeInner() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
+                      disabled={pdfExportBusy}
                       onClick={() =>
                         downloadReport({
                           includeKPIs: true,
@@ -14104,9 +14542,9 @@ function HomeInner() {
                           chartScope: "insight",
                         })
                       }
-                      className={aiInsightsBtnExport}
+                      className={`${aiInsightsBtnExport} disabled:cursor-not-allowed disabled:opacity-50`}
                     >
-                      Export this insight (PDF)
+                      {pdfExportBusy ? "Exporting PDF…" : "Export this insight (PDF)"}
                     </button>
                   </div>
                 ) : null}
@@ -14424,14 +14862,19 @@ function HomeInner() {
 
               <div className={exportTabFooter}>
                 <p className={exportTabFooterHint}>
-                  Generates a business-ready PDF with your selected sections and branding.
+                  {exportTabDownloadBlocked
+                    ? exportTabDownloadBlocked
+                    : pdfExportBusy
+                      ? "Generating your PDF report…"
+                      : "Generates a business-ready PDF with your selected sections and branding."}
                 </p>
                 <button
                   type="button"
+                  disabled={Boolean(exportTabDownloadBlocked) || pdfExportBusy}
                   onClick={() => downloadReport()}
-                  className={exportTabDownloadBtn}
+                  className={`${exportTabDownloadBtn} disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  Download Report PDF
+                  {pdfExportBusy ? "Generating PDF…" : "Download Report PDF"}
                 </button>
               </div>
             </div>
@@ -14475,6 +14918,24 @@ function HomeInner() {
               </div>
 
               <div className="p-6">
+                {showMappingLowConfidenceWarning ? (
+                  <p
+                    className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2.5 text-sm leading-relaxed text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-100"
+                    role="status"
+                  >
+                    Mapping confidence is low. Review the roles below or leave Auto
+                    Detect — dashboards and insights work best with a confirmed primary
+                    metric and date column.
+                  </p>
+                ) : null}
+                {mappingModalError ? (
+                  <p
+                    className="mb-4 rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2.5 text-sm leading-relaxed text-red-800 dark:border-rose-500/30 dark:bg-rose-950/35 dark:text-rose-100"
+                    role="alert"
+                  >
+                    {mappingModalError}
+                  </p>
+                ) : null}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
@@ -14546,7 +15007,7 @@ function HomeInner() {
                   </div>
                   <div>
                     <label className={`mb-1 block text-sm font-medium ${ovMuted}`}>
-                      Secondary metric (e.g. profit)
+                      Secondary metric / comparison metric
                     </label>
                     <select
                       value={profitColumn}
@@ -14584,10 +15045,10 @@ function HomeInner() {
                   <button
                     type="button"
                     onClick={saveColumnMapping}
-                    disabled={loading}
+                    disabled={loading || mappingSaving}
                     className={`${ovBtnSecondarySm} disabled:opacity-50`}
                   >
-                    {loading ? "Saving…" : "Save mapping"}
+                    {mappingSaving ? "Saving…" : "Save mapping"}
                   </button>
                   <button
                     type="button"

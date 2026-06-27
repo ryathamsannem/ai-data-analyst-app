@@ -63,6 +63,7 @@ export type HBarValueAxisProps = {
 
 export type VerticalBarValueAxisProps = {
   domain?: readonly [number, number];
+  ticks?: readonly number[];
   allowDataOverflow?: boolean;
 };
 

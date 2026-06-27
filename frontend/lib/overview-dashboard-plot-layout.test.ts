@@ -16,6 +16,7 @@ import {
   OVERVIEW_TREND_PLOT_HEIGHT_BOOST_PX,
   OVERVIEW_SCATTER_PLOT_HEIGHT_BOOST_PX,
   OVERVIEW_HBAR_PLOT_HEIGHT_BOOST_PX,
+  OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX,
   OVERVIEW_VBAR_LIVE_PLOT_HEIGHT_BOOST_PX,
   OVERVIEW_VBAR_LIVE_MARGIN_BOTTOM_CAP_FLAT_PX,
   computeOverviewVBarLivePlotMargins,
@@ -180,6 +181,10 @@ describe("overview continuous plot height", () => {
     expect(longTicks.marginRight).toBeLessThanOrEqual(
       OVERVIEW_VBAR_LIVE_MARGIN_RIGHT_MAX_PX
     );
+  });
+
+  it("reserves a wider live H-Bar right gutter than the compact default cap", () => {
+    expect(OVERVIEW_HBAR_LIVE_MARGIN_RIGHT_MIN_PX).toBeGreaterThanOrEqual(32);
   });
 
   it("lowers sparse H-Bar groups and tightens live trend and V-Bar margins", () => {

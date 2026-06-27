@@ -236,6 +236,48 @@ describe("chart capture readiness", () => {
     await expectReadinessFailure(buildRoot("bar"), "bar", "missing_marks");
   });
 
+  it("rejects tooltip cursor rectangles as bar marks", async () => {
+    const root = buildRoot("bar");
+    const svg = (root as unknown as FakeElement).children[0]?.children[0];
+    svg?.append(
+      new FakeElement(
+        "rect",
+        { class: "recharts-rectangle recharts-tooltip-cursor", fill: "#ccc" },
+        { width: 100, height: 20 }
+      )
+    );
+    await expectReadinessFailure(root, "bar", "missing_marks");
+  });
+
+  it("rejects zero-size bar rectangles", async () => {
+    await expectReadinessFailure(
+      buildRoot(
+        "bar",
+        new FakeElement(
+          "rect",
+          { fill: "#6366f1", class: "recharts-bar-rectangle" },
+          { width: 0, height: 0 }
+        )
+      ),
+      "bar",
+      "missing_marks"
+    );
+  });
+
+  it("accepts vertical bar marks once geometry is non-zero", async () => {
+    await expectReady(
+      "bar",
+      new FakeElement("rect", { fill: "#6366f1" }, { width: 24, height: 96 })
+    );
+  });
+
+  it("accepts histogram marks with vertical bar geometry", async () => {
+    await expectReady(
+      "histogram",
+      new FakeElement("rect", { fill: "#6366f1" }, { width: 22, height: 80 })
+    );
+  });
+
   it("ignores hidden marks", async () => {
     await expectReadinessFailure(
       buildRoot(

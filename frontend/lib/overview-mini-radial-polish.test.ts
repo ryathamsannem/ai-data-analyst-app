@@ -6,7 +6,7 @@ import {
 } from "@/lib/overview-mini-radial-polish";
 
 describe("overview mini radial polish", () => {
-  it("scales radii ~12% without changing cy", () => {
+  it("scales radii ~24% without changing cy before polish applies session cy", () => {
     const scaled = scaleOverviewMiniRadialRadii({
       innerRadius: 52,
       outerRadius: 84,
@@ -17,14 +17,14 @@ describe("overview mini radial polish", () => {
     expect(scaled.outerRadius).toBe(Math.round(84 * OVERVIEW_MINI_RADIAL_SIZE_SCALE));
   });
 
-  it("tightens bottom margin for legend proximity", () => {
+  it("tightens top and bottom margins for legend proximity", () => {
     const tightened = tightenOverviewMiniRadialMargins({
       top: 7,
       left: 10,
       right: 12,
       bottom: 24,
     });
-    expect(tightened.bottom).toBe(19);
-    expect(tightened.top).toBe(7);
+    expect(tightened.bottom).toBe(14);
+    expect(tightened.top).toBe(5);
   });
 });

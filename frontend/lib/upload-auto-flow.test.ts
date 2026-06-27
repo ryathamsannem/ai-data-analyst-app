@@ -35,6 +35,12 @@ describe("upload auto flow", () => {
     if (!result.ok) expect(result.reason).toBe("file_too_large");
   });
 
+  it("rejects zero-byte files", () => {
+    const result = validateOverviewUploadPick(mockFile("empty.csv", 0), "free");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("empty_file");
+  });
+
   it("triggers auto-upload after valid pick when idle", () => {
     const validation = validateOverviewUploadPick(mockFile("sales.csv", 512), "free");
     expect(shouldAutoUploadAfterPick(validation, false)).toBe(true);

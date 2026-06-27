@@ -1,11 +1,11 @@
 import type { RadialChartRadii } from "@/lib/radial-export-layout";
 
-/** ~12% larger ring — keeps cx/cy and card shell unchanged. */
-export const OVERVIEW_MINI_RADIAL_SIZE_SCALE = 1.12;
+/** Modest live boost — ~70% plot-band diameter on 300px cards (Charts/AI parity). */
+export const OVERVIEW_MINI_RADIAL_SIZE_SCALE = 1.24;
 
 export const OVERVIEW_MINI_RADIAL_SLICE_STROKE = "rgba(255, 255, 255, 0.48)";
 export const OVERVIEW_MINI_RADIAL_SLICE_STROKE_WIDTH = 1;
-export const OVERVIEW_MINI_RADIAL_LEGEND_PADDING_TOP_PX = 4;
+export const OVERVIEW_MINI_RADIAL_LEGEND_PADDING_TOP_PX = 2;
 
 export function scaleOverviewMiniRadialRadii(
   radii: RadialChartRadii
@@ -28,6 +28,7 @@ export function tightenOverviewMiniRadialMargins(margins: {
 }): { top: number; left: number; right: number; bottom: number } {
   return {
     ...margins,
-    bottom: Math.max(8, margins.bottom - 5),
+    top: Math.max(4, margins.top - 2),
+    bottom: Math.max(6, margins.bottom - 10),
   };
 }

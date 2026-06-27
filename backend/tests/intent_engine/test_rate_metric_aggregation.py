@@ -28,6 +28,10 @@ class TestRateMetricAggregation(unittest.TestCase):
         self.assertFalse(column_prefers_mean_aggregation("revenue"))
         self.assertFalse(column_prefers_mean_aggregation("units_sold"))
 
+    def test_delivery_days_prefers_mean(self) -> None:
+        self.assertTrue(column_prefers_mean_aggregation("delivery_days"))
+        self.assertTrue(column_prefers_mean_aggregation("discount_pct"))
+
     def test_ranking_question_uses_average_for_rate_column(self) -> None:
         label, key = main._resolve_agg_label_and_key(
             "conversion rate by campaign name",

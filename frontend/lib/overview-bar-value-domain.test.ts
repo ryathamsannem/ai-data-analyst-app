@@ -3,11 +3,16 @@ import {
   inferBoundedMetricBounds,
   inferDomainTickStep,
   isLowVarianceOnBoundedScale,
+  OVERVIEW_HBAR_TARGET_MAX_UTILIZATION,
+  resolveBarChartRateDisplayCap,
+  resolveBarChartRateUpperBound,
   resolveOverviewBarValueDomain,
+  resolveOverviewHBarUtilizationDomainMax,
   shouldUseTightBarDomain,
   snapBarDomainBound,
   zeroBaselineImprovesInterpretation,
 } from "@/lib/overview-bar-value-domain";
+import { estimateHorizontalBarLengthUtilization } from "@/lib/horizontal-bar-visual";
 
 describe("shouldUseTightBarDomain", () => {
   it("detects low-spread percent metrics", () => {
@@ -136,6 +141,35 @@ describe("zeroBaselineImprovesInterpretation", () => {
   });
 });
 
+describe("resolveBarChartRateDisplayCap", () => {
+  it("caps low single-digit rates near 5%", () => {
+    expect(resolveBarChartRateDisplayCap(4.1)).toBe(5);
+    expect(resolveBarChartRateDisplayCap(3.4)).toBe(5);
+  });
+
+  it("avoids doubling mid single-digit rates", () => {
+    expect(resolveBarChartRateDisplayCap(7.9)).toBe(9.5);
+  });
+
+  it("keeps mid-range utilization headroom modest", () => {
+    expect(resolveBarChartRateDisplayCap(44)).toBe(47);
+  });
+});
+
+describe("resolveBarChartRateUpperBound", () => {
+  it("maps fraction-scale caps back to raw axis values", () => {
+    expect(
+      resolveBarChartRateUpperBound({ maxDisplay: 4.1, maxRaw: 0.041 })
+    ).toBe(0.05);
+  });
+
+  it("preserves 0-100 scale values without fraction conversion", () => {
+    expect(
+      resolveBarChartRateUpperBound({ maxDisplay: 44, maxRaw: 44 })
+    ).toBe(47);
+  });
+});
+
 describe("resolveOverviewBarValueDomain", () => {
   const satisfactionRows = [
     { value: 4.05 },
@@ -250,13 +284,499 @@ describe("resolveOverviewBarValueDomain", () => {
     expect(String(domain![1])).not.toMatch(/9999/);
   });
 
-  it("handles fraction-stored percent values", () => {
+  it("handles fraction-stored percent values (no presentationKind — legacy tight domain)", () => {
     const domain = resolveOverviewBarValueDomain(
       [{ value: 0.052 }, { value: 0.051 }, { value: 0.049 }],
       { chartTitle: "CTR by Channel", metricLabel: "CTR" }
     );
     expect(domain).toBeDefined();
+    // Without presentationKind the bar-chart zero-baseline override does not fire.
     expect(domain![0]).toBeGreaterThan(0.045);
     expect(domain![1]).toBeLessThan(0.056);
+  });
+
+  it("H-Bar percent/rate charts use zero baseline (not truncated domain)", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [
+        { value: 0.056 },
+        { value: 0.062 },
+        { value: 0.071 },
+        { value: 0.079 },
+      ],
+      {
+        chartTitle: "Conversion Rate Pct by Product Category",
+        metricLabel: "Conversion Rate Pct",
+        presentationKind: "bar_horizontal",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(0.079);
+    expect(domain![1]).toBeLessThanOrEqual(0.105);
+  });
+
+  it("V-Bar percent/rate charts use the same zero baseline as H-Bar", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [
+        { value: 0.056 },
+        { value: 0.062 },
+        { value: 0.071 },
+        { value: 0.079 },
+      ],
+      {
+        chartTitle: "Conversion Rate Pct by Channel",
+        metricLabel: "Conversion Rate Pct",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(0.079);
+    expect(domain![1]).toBeLessThanOrEqual(0.105);
+  });
+
+  it("high-floor rate bar chart still uses zero baseline (per uniform bar policy)", () => {
+    // Customer retention 85–95%: not score-like, bar length encodes the absolute rate.
+    // Zero baseline is correct — a tight domain starting at 85% misrepresents bar length.
+    const domain = resolveOverviewBarValueDomain(
+      [{ value: 85 }, { value: 88 }, { value: 91 }, { value: 95 }],
+      {
+        chartTitle: "Retention Rate by Segment",
+        metricLabel: "Retention Rate",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(95);
+  });
+
+  it("bounded satisfaction scores keep tight domain — score/rating-like exemption", () => {
+    // Satisfaction Score 4.05–4.08: score-like → exempt from zero-baseline override.
+    const domain = resolveOverviewBarValueDomain(
+      [{ value: 4.05 }, { value: 4.06 }, { value: 4.07 }, { value: 4.08 }],
+      {
+        chartTitle: "Satisfaction Score by Campaign",
+        metricLabel: "Satisfaction Score",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBeGreaterThan(4.0);
+    expect(domain![1]).toBeLessThan(4.15);
+    expect(domain![0]).not.toBe(0);
+  });
+
+  it("profit/currency V-Bar uses zero baseline regardless of spread width", () => {
+    // Profit by Department: narrow spread 205K–215K would previously trigger tight domain.
+    // With bar-chart policy: domainMin forced to 0 (Revenue is currency, not score-like).
+    const domain = resolveOverviewBarValueDomain(
+      [
+        { value: 205_126 },
+        { value: 210_000 },
+        { value: 212_500 },
+        { value: 215_087 },
+      ],
+      {
+        chartTitle: "Profit by Department",
+        metricLabel: "Profit",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(215_087);
+  });
+
+  it("profit/currency H-Bar also uses zero baseline", () => {
+    // Same data rendered as horizontal bar.
+    const domain = resolveOverviewBarValueDomain(
+      [
+        { value: 205_126 },
+        { value: 210_000 },
+        { value: 215_087 },
+      ],
+      {
+        chartTitle: "Profit by Department",
+        metricLabel: "Profit",
+        presentationKind: "bar_horizontal",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(215_087);
+  });
+
+  it("revenue/sales bars with wide spread also start at zero", () => {
+    // Wide-spread revenue already returned zero via ZBI; confirm it still does.
+    const domain = resolveOverviewBarValueDomain(
+      [{ value: 120_000 }, { value: 240_000 }, { value: 312_087 }],
+      {
+        chartTitle: "Revenue by Region",
+        metricLabel: "Revenue",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(312_087);
+  });
+
+  it("percent/utilization H-Bar 35.7–44.0 starts at zero with reasonable upper bound", () => {
+    // Fraction-stored: 0.357–0.440.
+    const domain = resolveOverviewBarValueDomain(
+      [{ value: 0.357 }, { value: 0.390 }, { value: 0.415 }, { value: 0.440 }],
+      {
+        chartTitle: "Credit Utilization by Product Type",
+        metricLabel: "Utilization Rate",
+        presentationKind: "bar_horizontal",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(0.44);
+    expect(domain![1]).toBeLessThanOrEqual(0.48);
+  });
+
+  it("V-Bar delinquency 3.4%–4.1% starts at 0 with upper bound ~5%, not ~9%", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [
+        { value: 0.034 },
+        { value: 0.038 },
+        { value: 0.041 },
+      ],
+      {
+        chartTitle: "Delinquency Rate by Customer Segment",
+        metricLabel: "Delinquency Rate",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeLessThanOrEqual(0.055);
+    expect(domain![1]).toBeGreaterThanOrEqual(0.05);
+    expect(domain![1]).toBeLessThan(0.07);
+  });
+
+  it("H-Bar delinquency 3.4%–4.1% matches V-Bar upper-bound policy", () => {
+    const rows = [
+      { value: 0.034 },
+      { value: 0.038 },
+      { value: 0.041 },
+    ];
+    const vBar = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Delinquency Rate by Customer Segment",
+      metricLabel: "Delinquency Rate",
+      presentationKind: "bar",
+    });
+    const hBar = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Delinquency Rate by Customer Segment",
+      metricLabel: "Delinquency Rate",
+      presentationKind: "bar_horizontal",
+    });
+    expect(vBar).toEqual(hBar);
+    expect(vBar![0]).toBe(0);
+    expect(vBar![1]).toBeLessThanOrEqual(0.055);
+  });
+
+  it("conversion rate 5.6%–7.9% starts at 0 with reasonable upper bound", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [
+        { value: 0.056 },
+        { value: 0.062 },
+        { value: 0.071 },
+        { value: 0.079 },
+      ],
+      {
+        chartTitle: "Conversion Rate Pct by Product Category",
+        metricLabel: "Conversion Rate Pct",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(0.079);
+    expect(domain![1]).toBeLessThanOrEqual(0.105);
+  });
+
+  it("percent/rate V-Bar 1.0–10.0 (0-100 scale) starts at zero", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [{ value: 1.0 }, { value: 3.5 }, { value: 7.9 }, { value: 10.0 }],
+      {
+        chartTitle: "Defect Rate by Region",
+        metricLabel: "Defect Rate",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(10.0);
+  });
+
+  it("PNG/export delinquency domain keeps zero baseline and ~5% cap after executive rounding", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [
+        { value: 0.034 },
+        { value: 0.038 },
+        { value: 0.041 },
+      ],
+      {
+        chartTitle: "Delinquency Rate by Customer Segment",
+        metricLabel: "Delinquency Rate",
+        presentationKind: "bar",
+        executiveRounding: true,
+      }
+    );
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeLessThanOrEqual(0.055);
+    expect(domain![1]).toBeGreaterThanOrEqual(0.05);
+  });
+
+  it("negative/positive profit delta still includes zero (minRaw < 0 guard)", () => {
+    // Delta/variance bars: values span negative to positive — the fix does not fire
+    // because minRaw < 0; domain must already include zero by other paths.
+    const domain = resolveOverviewBarValueDomain(
+      [{ value: -12_000 }, { value: 5_000 }, { value: 18_000 }],
+      {
+        chartTitle: "Profit Delta by Region",
+        metricLabel: "Profit Delta",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBeLessThan(0);
+    expect(domain![1]).toBeGreaterThan(18_000);
+  });
+});
+
+/** Controlled 5-category fixture — V-Bar and H-Bar must share zero baseline. */
+const controlledBarFixture = [
+  { name: "A", value: 100 },
+  { name: "B", value: 80 },
+  { name: "C", value: 60 },
+  { name: "D", value: 40 },
+  { name: "E", value: 20 },
+];
+
+describe("bar domain parity across surfaces", () => {
+  const profitRows = [
+    { name: "Engineering", value: 205_126 },
+    { name: "Sales", value: 210_000 },
+    { name: "Marketing", value: 215_087 },
+  ];
+  const utilizationRows = [
+    { name: "Credit Card", value: 0.357 },
+    { name: "Auto", value: 0.390 },
+    { name: "Mortgage", value: 0.415 },
+    { name: "Personal", value: 0.440 },
+  ];
+
+  it("Overview live V-Bar profit domain starts at 0", () => {
+    const domain = resolveOverviewBarValueDomain(profitRows, {
+      chartTitle: "Profit by Department",
+      metricLabel: "Profit",
+      presentationKind: "bar",
+      executiveRounding: false,
+    });
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(215_087);
+  });
+
+  it("Overview live H-Bar utilization domain starts at 0", () => {
+    const domain = resolveOverviewBarValueDomain(utilizationRows, {
+      chartTitle: "Credit Utilization by Product Type",
+      metricLabel: "Utilization Rate",
+      presentationKind: "bar_horizontal",
+      executiveRounding: false,
+    });
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(0.44);
+  });
+
+  it("controlled fixture: V-Bar and H-Bar both start at 0 with comparable span", () => {
+    const vDomain = resolveOverviewBarValueDomain(controlledBarFixture, {
+      chartTitle: "Quantity by Segment",
+      metricLabel: "Quantity",
+      presentationKind: "bar",
+    });
+    const hDomain = resolveOverviewBarValueDomain(controlledBarFixture, {
+      chartTitle: "Quantity by Segment",
+      metricLabel: "Quantity",
+      presentationKind: "bar_horizontal",
+    });
+    expect(vDomain![0]).toBe(0);
+    expect(hDomain![0]).toBe(0);
+    expect(vDomain![1]).toBeGreaterThan(100);
+    expect(hDomain![1]).toBeGreaterThan(100);
+    // Same data → same domain bounds on both orientations.
+    expect(vDomain).toEqual(hDomain);
+  });
+
+  it("percent/rate V-Bar 1.0–10.0 and H-Bar 35.7–44.0 both start at 0", () => {
+    const defectDomain = resolveOverviewBarValueDomain(
+      [
+        { name: "East", value: 1.0 },
+        { name: "West", value: 3.5 },
+        { name: "North", value: 7.9 },
+        { name: "South", value: 10.0 },
+      ],
+      {
+        chartTitle: "Defect Rate by Region",
+        metricLabel: "Defect Rate",
+        presentationKind: "bar",
+      }
+    );
+    const utilDomain = resolveOverviewBarValueDomain(utilizationRows, {
+      chartTitle: "Credit Utilization by Product Type",
+      metricLabel: "Utilization Rate",
+      presentationKind: "bar_horizontal",
+    });
+    expect(defectDomain![0]).toBe(0);
+    expect(utilDomain![0]).toBe(0);
+  });
+
+  it("score/rating metric remains tight on bar charts", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [
+        { name: "Q1", value: 4.05 },
+        { name: "Q2", value: 4.06 },
+        { name: "Q3", value: 4.07 },
+        { name: "Q4", value: 4.08 },
+      ],
+      {
+        chartTitle: "Satisfaction Score by Campaign",
+        metricLabel: "Satisfaction Score",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain![0]).toBeGreaterThan(4.0);
+    expect(domain![0]).not.toBe(0);
+  });
+});
+
+describe("Overview H-Bar plot-width utilization cap", () => {
+  const departmentRows = [
+    { name: "Engineering", value: 350 },
+    { name: "Sales", value: 680 },
+    { name: "HR", value: 890 },
+    { name: "Ops", value: 1050 },
+    { name: "Finance", value: 1180 },
+    { name: "Legal", value: 1258 },
+  ];
+
+  const loanRows = [
+    { name: "Mortgage", value: 183_916_971 },
+    { name: "Personal Loan", value: 165_000_000 },
+    { name: "Auto Loan", value: 150_000_000 },
+    { name: "Credit Card", value: 132_661_579 },
+  ];
+
+  it("Overview H-Bar loan/currency targets ~85% utilization, not ×1.10", () => {
+    const maxRaw = 183_916_971;
+    const domain = resolveOverviewBarValueDomain(loanRows, {
+      chartTitle: "Loan Balance by Product Type",
+      metricLabel: "Loan Balance",
+      presentationKind: "bar_horizontal",
+      overviewHorizontalBarHeadroom: true,
+    })!;
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(maxRaw / OVERVIEW_HBAR_TARGET_MAX_UTILIZATION);
+    expect(domain[1]).toBeGreaterThan(maxRaw * 1.15);
+    expect(domain[1] / 1e6).toBeCloseTo(216.37, 0);
+    const util = estimateHorizontalBarLengthUtilization({
+      maxValue: maxRaw,
+      domainMax: domain[1],
+    });
+    expect(util).toBeLessThanOrEqual(0.851);
+    expect(util).toBeGreaterThan(0.84);
+  });
+
+  it("Overview H-Bar count domain starts at 0 near ~85% longest-bar utilization", () => {
+    const maxRaw = 1258;
+    const domain = resolveOverviewBarValueDomain(departmentRows, {
+      chartTitle: "Records by Department",
+      metricLabel: "Records",
+      presentationKind: "bar_horizontal",
+      overviewHorizontalBarHeadroom: true,
+    })!;
+    expect(domain[0]).toBe(0);
+    expect(domain[1]).toBeGreaterThanOrEqual(maxRaw / OVERVIEW_HBAR_TARGET_MAX_UTILIZATION);
+    const util = estimateHorizontalBarLengthUtilization({
+      maxValue: maxRaw,
+      domainMax: domain[1],
+    });
+    expect(util).toBeLessThanOrEqual(0.851);
+    expect(util).toBeGreaterThan(0.84);
+  });
+
+  it("V-Bar profit domain is unchanged by Overview H-Bar utilization cap", () => {
+    const profitRows = [
+      { name: "Engineering", value: 205_126 },
+      { name: "Sales", value: 210_000 },
+      { name: "Marketing", value: 215_087 },
+    ];
+    const vDomain = resolveOverviewBarValueDomain(profitRows, {
+      chartTitle: "Profit by Department",
+      metricLabel: "Profit",
+      presentationKind: "bar",
+    });
+    const hDomainNoCap = resolveOverviewBarValueDomain(profitRows, {
+      chartTitle: "Profit by Department",
+      metricLabel: "Profit",
+      presentationKind: "bar_horizontal",
+    });
+    expect(vDomain).toEqual(hDomainNoCap);
+    expect(vDomain![0]).toBe(0);
+  });
+
+  it("bar-length utilization drops materially vs default ×1.06 padding", () => {
+    const base = resolveOverviewBarValueDomain(departmentRows, {
+      chartTitle: "Records by Department",
+      metricLabel: "Records",
+      presentationKind: "bar_horizontal",
+    })!;
+    const capped = resolveOverviewBarValueDomain(departmentRows, {
+      chartTitle: "Records by Department",
+      metricLabel: "Records",
+      presentationKind: "bar_horizontal",
+      overviewHorizontalBarHeadroom: true,
+    })!;
+    const baseUtil = estimateHorizontalBarLengthUtilization({
+      maxValue: 1258,
+      domainMax: base[1],
+    });
+    const cappedUtil = estimateHorizontalBarLengthUtilization({
+      maxValue: 1258,
+      domainMax: capped[1],
+    });
+    expect(baseUtil).toBeGreaterThan(0.93);
+    expect(cappedUtil).toBeLessThanOrEqual(0.851);
+    expect(cappedUtil).toBeLessThan(baseUtil - 0.05);
+  });
+
+  it("percent H-Bar utilization flag does not override rate cap policy", () => {
+    const rows = [
+      { name: "A", value: 0.034 },
+      { name: "B", value: 0.041 },
+    ];
+    const base = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Delinquency Rate by Customer Segment",
+      metricLabel: "Delinquency Rate",
+      presentationKind: "bar_horizontal",
+    });
+    const withCap = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Delinquency Rate by Customer Segment",
+      metricLabel: "Delinquency Rate",
+      presentationKind: "bar_horizontal",
+      overviewHorizontalBarHeadroom: true,
+    });
+    expect(base).toEqual(withCap);
+    expect(base![0]).toBe(0);
+    expect(base![1]).toBeLessThanOrEqual(0.055);
+  });
+
+  it("resolveOverviewHBarUtilizationDomainMax preserves existing higher domain", () => {
+    expect(resolveOverviewHBarUtilizationDomainMax(100, 200)).toBe(200);
+    expect(resolveOverviewHBarUtilizationDomainMax(100, 110)).toBeCloseTo(117.647, 2);
   });
 });

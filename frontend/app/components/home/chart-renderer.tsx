@@ -43,6 +43,7 @@ import {
   RADIAL_SESSION_LEGEND_ICON_PX,
   RADIAL_SESSION_LEGEND_PAD_TOP_PX,
   RADIAL_SESSION_SLICE_STROKE_WIDTH,
+  SESSION_DETAIL_RADIAL_CY,
   resolveRadialChartRadii,
 } from "@/lib/radial-export-layout";
 import {
@@ -58,13 +59,18 @@ import {
   formatChartAxisCategoryTick,
 } from "@/lib/chart-axis-formatters";
 import {
+  cartesianUsesHorizontalPlot,
+  resolveCartesianBarValueAxisProps,
+  resolveScatterValueAxisProps,
+  resolveTrendValueAxisProps,
+} from "@/lib/cartesian-chart-decisions";
+import {
+  formatOverviewBarValueAxisTick,
   formatOverviewLineYAxisTick,
   formatOverviewScatterAxisTick,
   OVERVIEW_LINE_LIVE_MARKER_R_PX,
   OVERVIEW_LINE_LIVE_MARKER_STROKE_PX,
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
-  resolveScatterValueAxisProps,
-  resolveTrendValueAxisProps,
   sessionLineAreaDetailBottomMargin,
   sessionLineAreaDetailXAxisHeightPx,
   sessionTrendDetailPlotMargins,
@@ -78,7 +84,15 @@ import {
   OVERVIEW_SCATTER_POINT_STROKE_PX,
 } from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
-import { formatRadialTooltipValue } from "@/lib/radial-chart-format";
+import { formatRadialLegendEntry, resolveRadialPieEdgeProps } from "@/lib/radial-chart-format";
+import {
+  HORIZONTAL_BAR_END_RADIUS,
+  HORIZONTAL_BAR_STACKED_MAX_SIZE,
+  HORIZONTAL_BAR_STACKED_RADIUS,
+  resolveHorizontalBarCategoryGap,
+  resolveHorizontalBarGap,
+  resolveHorizontalBarMaxSize,
+} from "@/lib/horizontal-bar-visual";
 import { buildChartCartesianTooltipHandlers, chartTooltipMetricLabel, formatChartTooltipCategoryLine } from "@/lib/chart-tooltip-format";
 import { type MetricFormatContext } from "@/lib/metric-value-format";
 import {
@@ -86,8 +100,6 @@ import {
   chartLayoutWidthKey,
 } from "@/lib/chart-axis-theme";
 import {
-  resolveHBarValueAxisProps,
-  resolveVerticalBarValueAxisProps,
   type AxisPresentationPlan,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
@@ -246,6 +258,14 @@ function ChartRendererInner({
       presentationKind: rKind,
     }),
     [rAxes.valueAxis, rKind]
+  );
+
+  // Metric-aware bar value ticks: currency/large numbers compact to K/M and
+  // percent/rate metrics read as points (35%, 3.4%) instead of raw decimals.
+  const barValueTickFormatter = useMemo(
+    () => (tick: number) =>
+      formatOverviewBarValueAxisTick(tick, rData, metricTooltipCtx),
+    [rData, metricTooltipCtx]
   );
 
   const cartesianTooltip = useMemo(
@@ -492,6 +512,14 @@ function ChartRendererInner({
         <BarChart
           layout="vertical"
           data={rData}
+          barCategoryGap={resolveHorizontalBarCategoryGap({
+            categoryCount: rData.length,
+            detailLayout,
+          })}
+          barGap={resolveHorizontalBarGap({
+            categoryCount: rData.length,
+            detailLayout,
+          })}
           margin={{
             left: hmBalanced.marginLeft,
             right: hmBalanced.marginRight,
@@ -564,8 +592,14 @@ function ChartRendererInner({
               dataKey={k}
               name={stackedSpec.seriesLabels[k] ?? k}
               fill={PIE_COLORS[i % PIE_COLORS.length]}
-              radius={[0, 6, 6, 0]}
-              maxBarSize={compact ? 22 : detailLayout ? 32 : 26}
+              radius={HORIZONTAL_BAR_STACKED_RADIUS}
+              maxBarSize={
+                compact
+                  ? HORIZONTAL_BAR_STACKED_MAX_SIZE.compact
+                  : detailLayout
+                    ? HORIZONTAL_BAR_STACKED_MAX_SIZE.detail
+                    : HORIZONTAL_BAR_STACKED_MAX_SIZE.default
+              }
               isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
               cursor={canInsightDrill ? "pointer" : "default"}
@@ -863,19 +897,22 @@ function ChartRendererInner({
       ? radialChartExportOuterMargins(rKind, piePad)
       : radialChartOuterMargins(rKind, compact, piePad);
     if (polishOverviewMini) {
-      radii = scaleOverviewMiniRadialRadii(radii);
+      radii = {
+        ...scaleOverviewMiniRadialRadii(radii),
+        cy: SESSION_DETAIL_RADIAL_CY,
+      };
       margins = tightenOverviewMiniRadialMargins(margins);
     }
     const sliceStroke = polishOverviewMini
       ? OVERVIEW_MINI_RADIAL_SLICE_STROKE
       : "#fff";
     const legendFontSize = polishOverviewMini
-      ? 11
+      ? RADIAL_SESSION_LEGEND_FONT_PX
       : pngCaptureMode
         ? RADIAL_EXPORT_LEGEND_FONT_PX
         : RADIAL_SESSION_LEGEND_FONT_PX;
     const legendIconSize = polishOverviewMini
-      ? 8
+      ? RADIAL_SESSION_LEGEND_ICON_PX
       : pngCaptureMode
         ? RADIAL_EXPORT_LEGEND_ICON_PX
         : RADIAL_SESSION_LEGEND_ICON_PX;
@@ -889,6 +926,14 @@ function ChartRendererInner({
       : pngCaptureMode
         ? RADIAL_EXPORT_LEGEND_PAD_TOP_PX
         : RADIAL_SESSION_LEGEND_PAD_TOP_PX;
+    const radialEdge = resolveRadialPieEdgeProps({
+      kind: rKind,
+      overviewMiniRadial: polishOverviewMini,
+    });
+    const radialMetricCtx = {
+      ...metricTooltipCtx,
+      chartRows: rData,
+    };
     return (
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
@@ -904,7 +949,8 @@ function ChartRendererInner({
             cy={radii.cy}
             innerRadius={radii.innerRadius}
             outerRadius={radii.outerRadius}
-            paddingAngle={2}
+            paddingAngle={radialEdge.paddingAngle}
+            cornerRadius={radialEdge.cornerRadius}
             stroke={sliceStroke}
             strokeWidth={sliceStrokeWidth}
             isAnimationActive={rechartsAnimActive}
@@ -934,32 +980,25 @@ function ChartRendererInner({
             {...CHART_TOOLTIP_FRAME}
             formatter={(v, _n, item) => {
               const p = item?.payload as ChartRow;
-              return [
-                formatRadialTooltipValue(rData, p, v),
-                `${chartTooltipMetricLabel(rAxes.valueAxis)}:`,
-              ];
+              const name = String(p?.name ?? "");
+              return [formatRadialLegendEntry(rData, name, radialMetricCtx), ""];
             }}
-            labelFormatter={(_, items) => {
-              const arr = items as unknown as readonly { payload?: ChartRow }[];
-              const p = arr?.[0]?.payload;
-              return formatChartTooltipCategoryLine(
-                rAxes.categoryAxis,
-                String(p?.name ?? "")
-              );
-            }}
+            labelFormatter={() => ""}
           />
           <Legend
             wrapperStyle={{ fontSize: legendFontSize, paddingTop: legendPaddingTop }}
             iconSize={legendIconSize}
             iconType="circle"
-            formatter={(v) => tickTruncate(v)}
+            formatter={(v) =>
+              tickTruncate(formatRadialLegendEntry(rData, String(v ?? ""), radialMetricCtx))
+            }
           />
         </PieChart>
       </ResponsiveContainer>
     );
   }
 
-  const shouldRenderHorizontal = rKind === "bar_horizontal";
+  const shouldRenderHorizontal = cartesianUsesHorizontalPlot(rKind, categoryPlan);
 
   if (shouldRenderHorizontal) {
     const hb =
@@ -975,13 +1014,16 @@ function ChartRendererInner({
       marginLeft: hb.marginLeft,
       chartLayoutMode,
     });
-    const hBarValueAxisProps = resolveHBarValueAxisProps({
-      plan: exportAxisPresentationPlan,
-      chartKind: rKind,
+    const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
+      chartKind: "bar_horizontal",
       rows: rData,
       chartTitle: rAxes.valueAxis,
       metricLabel: rAxes.valueAxis,
-      executiveRounding: pngCaptureMode,
+      context: {
+        pipeline: "session",
+        capture: pngCaptureMode,
+        exportAxisPlan: exportAxisPresentationPlan,
+      },
     });
     return (
       <ResponsiveContainer
@@ -992,6 +1034,10 @@ function ChartRendererInner({
         <BarChart
           layout="vertical"
           data={rData}
+          barCategoryGap={resolveHorizontalBarCategoryGap({
+            categoryCount: rData.length,
+            detailLayout,
+          })}
           margin={{
             left: hmBalanced.marginLeft,
             right: hmBalanced.marginRight,
@@ -1012,7 +1058,7 @@ function ChartRendererInner({
             tick={{ fontSize: 11, fill: AXIS_TICK }}
             axisLine={{ stroke: CHART_AXIS_LINE }}
             tickLine={{ stroke: CHART_AXIS_LINE }}
-            tickFormatter={valueTickFormatter}
+            tickFormatter={barValueTickFormatter}
           >
             {hb.showValueAxisTitle ? (
               <Label
@@ -1045,8 +1091,11 @@ function ChartRendererInner({
           <Bar
             dataKey="value"
             fill="#6366f1"
-            radius={[0, 8, 8, 0]}
-            maxBarSize={compact ? 28 : detailLayout ? 48 : 36}
+            radius={HORIZONTAL_BAR_END_RADIUS}
+            maxBarSize={resolveHorizontalBarMaxSize({
+              compact,
+              detailLayout,
+            })}
             activeBar={{ opacity: 0.88 }}
             isAnimationActive={rechartsAnimActive}
             animationDuration={rechartsAnimDuration}
@@ -1317,16 +1366,20 @@ function ChartRendererInner({
         </XAxis>
         <YAxis
           tick={AXIS_Y_TICK_VAL}
-          tickFormatter={valueTickFormatter}
+          tickFormatter={barValueTickFormatter}
           axisLine={{ stroke: CHART_AXIS_LINE }}
           tickLine={{ stroke: CHART_AXIS_LINE }}
           width={verticalValueLayout.yAxisWidth}
-          {...(resolveVerticalBarValueAxisProps({
-            plan: exportAxisPresentationPlan,
+          {...(resolveCartesianBarValueAxisProps({
             chartKind: rKind,
             rows: rData,
             chartTitle: metricTooltipCtx.chartTitle,
             metricLabel: rAxes.valueAxis,
+            context: {
+              pipeline: "session",
+              capture: pngCaptureMode,
+              exportAxisPlan: exportAxisPresentationPlan,
+            },
           }) ?? {})}
           label={
             verticalValueLayout.showValueAxisTitle
