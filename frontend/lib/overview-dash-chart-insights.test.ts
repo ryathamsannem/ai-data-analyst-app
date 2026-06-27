@@ -221,7 +221,7 @@ describe("formatOverviewMiniInsightChips trend wording", () => {
     expect(chips[1]?.text).toMatch(/^Lowest: /);
   });
 
-  it("uses share-aware chips for overview donut charts", () => {
+  it("uses share-aware chips with percent and compact value for overview donut charts", () => {
     const chips = formatOverviewMiniInsightChips(
       [
         { name: "Electronics", value: 360000 },
@@ -233,10 +233,11 @@ describe("formatOverviewMiniInsightChips trend wording", () => {
         presentationKind: "donut",
       }
     );
-    expect(chips[0]?.text).toMatch(/^Largest: Electronics /);
-    expect(chips[0]?.text).toMatch(/%$/);
-    expect(chips[1]?.text).toMatch(/^Smallest: Furniture /);
-    expect(chips[2]?.text).toBe("Total: 100%");
+    expect(chips[0]?.text).toMatch(/^Largest: Electronics · /);
+    expect(chips[0]?.text).toMatch(/\d+%/);
+    expect(chips[0]?.text).toMatch(/360K|360,000/i);
+    expect(chips[1]?.text).toMatch(/^Smallest: Furniture · /);
+    expect(chips[2]?.text).toMatch(/^Total: /);
   });
 
   it("preserves small score gaps in breakdown chips", () => {

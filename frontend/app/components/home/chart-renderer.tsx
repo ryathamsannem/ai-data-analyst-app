@@ -83,7 +83,7 @@ import {
   OVERVIEW_SCATTER_POINT_STROKE_PX,
 } from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
-import { formatRadialTooltipValue } from "@/lib/radial-chart-format";
+import { formatRadialLegendEntry, resolveRadialPieEdgeProps } from "@/lib/radial-chart-format";
 import { buildChartCartesianTooltipHandlers, chartTooltipMetricLabel, formatChartTooltipCategoryLine } from "@/lib/chart-tooltip-format";
 import { type MetricFormatContext } from "@/lib/metric-value-format";
 import {
@@ -895,6 +895,14 @@ function ChartRendererInner({
       : pngCaptureMode
         ? RADIAL_EXPORT_LEGEND_PAD_TOP_PX
         : RADIAL_SESSION_LEGEND_PAD_TOP_PX;
+    const radialEdge = resolveRadialPieEdgeProps({
+      kind: rKind,
+      overviewMiniRadial: polishOverviewMini,
+    });
+    const radialMetricCtx = {
+      ...metricTooltipCtx,
+      chartRows: rData,
+    };
     return (
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
@@ -910,7 +918,8 @@ function ChartRendererInner({
             cy={radii.cy}
             innerRadius={radii.innerRadius}
             outerRadius={radii.outerRadius}
-            paddingAngle={2}
+            paddingAngle={radialEdge.paddingAngle}
+            cornerRadius={radialEdge.cornerRadius}
             stroke={sliceStroke}
             strokeWidth={sliceStrokeWidth}
             isAnimationActive={rechartsAnimActive}
@@ -940,25 +949,18 @@ function ChartRendererInner({
             {...CHART_TOOLTIP_FRAME}
             formatter={(v, _n, item) => {
               const p = item?.payload as ChartRow;
-              return [
-                formatRadialTooltipValue(rData, p, v),
-                `${chartTooltipMetricLabel(rAxes.valueAxis)}:`,
-              ];
+              const name = String(p?.name ?? "");
+              return [formatRadialLegendEntry(rData, name, radialMetricCtx), ""];
             }}
-            labelFormatter={(_, items) => {
-              const arr = items as unknown as readonly { payload?: ChartRow }[];
-              const p = arr?.[0]?.payload;
-              return formatChartTooltipCategoryLine(
-                rAxes.categoryAxis,
-                String(p?.name ?? "")
-              );
-            }}
+            labelFormatter={() => ""}
           />
           <Legend
             wrapperStyle={{ fontSize: legendFontSize, paddingTop: legendPaddingTop }}
             iconSize={legendIconSize}
             iconType="circle"
-            formatter={(v) => tickTruncate(v)}
+            formatter={(v) =>
+              tickTruncate(formatRadialLegendEntry(rData, String(v ?? ""), radialMetricCtx))
+            }
           />
         </PieChart>
       </ResponsiveContainer>
