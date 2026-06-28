@@ -582,6 +582,30 @@ def _infer_business_domain(columns: List[str]) -> str:
         "student_id", "term_date", "grade_level", "enrollment_count", "attendance_rate",
         "test_score", "pass_rate", "school_region",
     )
+    insurance_kw = (
+        "claim_id", "claim_date", "claim_type", "policy_type", "loss_ratio",
+        "settlement_days", "fraud_flag",
+    )
+    real_estate_kw = (
+        "property_id", "list_date", "property_type", "listing_status", "sale_price",
+        "days_on_market", "cap_rate", "sqft",
+    )
+    telecom_kw = (
+        "subscriber_id", "billing_month", "plan_tier", "data_usage_gb", "monthly_revenue",
+        "churn_rate", "support_calls",
+    )
+    hospitality_kw = (
+        "booking_id", "check_in_date", "hotel_brand", "room_type", "room_revenue",
+        "occupancy_rate", "avg_daily_rate", "guest_rating",
+    )
+    energy_kw = (
+        "meter_id", "reading_date", "facility_type", "grid_region", "energy_kwh",
+        "peak_demand_kw", "utility_cost", "efficiency_score",
+    )
+    support_kw = (
+        "ticket_id", "opened_date", "ticket_category", "resolution_hours", "escalations",
+        "csat_score", "sla_breach_rate", "tickets_opened", "tickets_resolved",
+    )
     mfg_kw = (
         "bom", "work_order", "routing", "batch", "lot", "plant", "assembly",
         "sku", "material", "warehouse", "inventory", "production", "defect_rate",
@@ -603,6 +627,12 @@ def _infer_business_domain(columns: List[str]) -> str:
     saas = sum(1 for k in saas_kw if k in joined)
     supply = sum(1 for k in supply_kw if k in joined)
     edu = sum(1 for k in edu_kw if k in joined)
+    insurance = sum(1 for k in insurance_kw if k in joined)
+    real_estate = sum(1 for k in real_estate_kw if k in joined)
+    telecom = sum(1 for k in telecom_kw if k in joined)
+    hospitality = sum(1 for k in hospitality_kw if k in joined)
+    energy = sum(1 for k in energy_kw if k in joined)
+    support = sum(1 for k in support_kw if k in joined)
     mfg = sum(1 for k in mfg_kw if k in joined)
     eco = sum(1 for k in ecom_kw if k in joined)
     ops = sum(1 for k in ops_kw if k in joined)
@@ -618,6 +648,12 @@ def _infer_business_domain(columns: List[str]) -> str:
         "marketing": mkt,
         "manufacturing": mfg,
         "ecommerce": eco,
+        "insurance": insurance,
+        "real_estate": real_estate,
+        "telecom": telecom,
+        "hospitality": hospitality,
+        "energy": energy,
+        "customer_support": support,
     }
     best = max(domain_scores.items(), key=lambda x: x[1])
     if best[1] >= 3:
@@ -634,6 +670,18 @@ def _infer_business_domain(columns: List[str]) -> str:
         return "supply_chain"
     if edu >= 2:
         return "education"
+    if insurance >= 2 and insurance >= healthcare:
+        return "insurance"
+    if real_estate >= 2:
+        return "real_estate"
+    if telecom >= 2:
+        return "telecom"
+    if hospitality >= 2:
+        return "hospitality"
+    if energy >= 2:
+        return "energy"
+    if support >= 2:
+        return "customer_support"
     if ops >= 2 and ops >= eco and ops >= mfg:
         return "operations"
     if mkt >= 2 and mkt >= eco:
@@ -746,6 +794,14 @@ def _product_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("carrier", 28),
         ("payer_type", 30),
         ("subject", 28),
+        ("claim_type", 32),
+        ("policy_type", 38),
+        ("property_type", 40),
+        ("hotel_brand", 34),
+        ("room_type", 30),
+        ("plan_tier", 36),
+        ("ticket_category", 36),
+        ("facility_type", 28),
     )
     for kw, w in pairs:
         if kw in n:
@@ -785,6 +841,14 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         ("net_revenue", 44),
         ("sales_amount", 44),
         ("claim_amount", 44),
+        ("sale_price", 44),
+        ("room_revenue", 44),
+        ("monthly_revenue", 44),
+        ("energy_kwh", 44),
+        ("utility_cost", 44),
+        ("tickets_opened", 40),
+        ("tickets_resolved", 38),
+        ("escalations", 34),
         ("freight_cost", 44),
         ("enrollment_count", 40),
         ("units_produced", 42),
@@ -848,6 +912,10 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         ("handling_time", 32),
         ("fulfillment_days", 48),
         ("warehouse_days", 40),
+        ("resolution_hours", 52),
+        ("avg_resolution_hours", 50),
+        ("sla_breach_rate", 58),
+        ("breach_rate", 52),
         ("star_rating", 44),
         ("review_rating", 42),
         ("customer_rating", 42),
@@ -857,6 +925,8 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         ("review_score", 40),
         ("rating", 38),
         ("score", 26),
+        ("peak_demand", 36),
+        ("peak_demand_kw", 36),
     )
     for kw, pen in operational_penalties:
         if kw in n:
@@ -880,7 +950,7 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         ("avg_resolution_hours", 50),
         ("credit_utilization", 44),
     )
-    if domain not in ("manufacturing", "operations"):
+    if domain not in ("manufacturing", "operations", "customer_support"):
         for kw, pen in hr_penalties:
             if kw in n:
                 score -= pen
@@ -1011,7 +1081,6 @@ def _profit_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("engagement_score", 26),
         ("attrition_rate", 24),
         ("mrr", 36),
-        ("claim_amount", 34),
         ("freight_cost", 30),
         ("conversion_rate", 28),
         ("pass_rate", 28),
@@ -1032,6 +1101,15 @@ def _profit_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("clicks", 22),
         ("impressions", 18),
         ("ctr", 24),
+        ("loss_ratio", 34),
+        ("settlement_days", 28),
+        ("cap_rate", 32),
+        ("occupancy_rate", 30),
+        ("avg_daily_rate", 32),
+        ("guest_rating", 24),
+        ("efficiency_score", 28),
+        ("csat_score", 32),
+        ("sla_breach_rate", 30),
     ):
         if kw in n:
             score += w
@@ -1074,6 +1152,12 @@ def _date_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("month", 8),
         ("period", 8),
         ("incident_date", 36),
+        ("claim_date", 34),
+        ("list_date", 32),
+        ("billing_month", 30),
+        ("check_in_date", 34),
+        ("reading_date", 32),
+        ("opened_date", 32),
         ("campaign_date", 34),
         ("event_date", 30),
         ("reported_date", 28),
@@ -1713,6 +1797,98 @@ def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[
     if domain == "ecommerce" and role == "product" and "product_category" in n:
         pts += 8.0
         reasons.append("domain:eco_product_category(+8)")
+    if domain == "insurance":
+        if role == "sales" and "claim_amount" in n:
+            pts += 10.0
+            reasons.append("domain:insurance_sales(+10)")
+        if role == "product" and any(k in n for k in ("policy_type", "claim_type")):
+            pts += 10.0 if "policy_type" in n else 6.0
+            reasons.append("domain:insurance_product(+10)")
+        if role == "profit":
+            if "loss_ratio" in n:
+                pts += 18.0
+                reasons.append("domain:insurance_profit_loss_ratio(+18)")
+            elif "settlement_days" in n:
+                pts += 14.0
+                reasons.append("domain:insurance_profit_settlement(+14)")
+            if "claim_amount" in n:
+                pts -= 24.0
+                reasons.append("domain:insurance_profit_avoid_primary_dup(-24)")
+    if domain == "real_estate":
+        if role == "sales" and "sale_price" in n:
+            pts += 10.0
+            reasons.append("domain:real_estate_sales(+10)")
+        if role == "product" and "property_type" in n:
+            pts += 12.0
+            reasons.append("domain:real_estate_product(+12)")
+        if role == "profit":
+            if "cap_rate" in n:
+                pts += 16.0
+                reasons.append("domain:real_estate_profit_cap_rate(+16)")
+            elif "days_on_market" in n:
+                pts += 12.0
+                reasons.append("domain:real_estate_profit_dom(+12)")
+    if domain == "telecom":
+        if role == "sales" and "monthly_revenue" in n:
+            pts += 10.0
+            reasons.append("domain:telecom_sales(+10)")
+        if role == "product" and "plan_tier" in n:
+            pts += 12.0
+            reasons.append("domain:telecom_product(+12)")
+        if role == "profit" and ("churn_rate" in n or "churn" in n):
+            pts += 14.0
+            reasons.append("domain:telecom_profit_churn(+14)")
+    if domain == "hospitality":
+        if role == "sales" and "room_revenue" in n:
+            pts += 10.0
+            reasons.append("domain:hospitality_sales(+10)")
+        if role == "product" and any(k in n for k in ("hotel_brand", "room_type")):
+            pts += 10.0
+            reasons.append("domain:hospitality_product(+10)")
+        if role == "profit":
+            if "occupancy_rate" in n:
+                pts += 20.0
+                reasons.append("domain:hospitality_profit_occupancy(+20)")
+            elif "avg_daily_rate" in n:
+                pts += 14.0
+                reasons.append("domain:hospitality_profit_adr(+14)")
+            elif "guest_rating" in n:
+                pts += 10.0
+                reasons.append("domain:hospitality_profit_rating(+10)")
+    if domain == "energy":
+        if role == "sales":
+            if "energy_kwh" in n:
+                pts += 18.0
+                reasons.append("domain:energy_sales_kwh(+18)")
+            elif "utility_cost" in n:
+                pts += 8.0
+                reasons.append("domain:energy_sales_cost(+8)")
+        if role == "product" and "facility_type" in n:
+            pts += 10.0
+            reasons.append("domain:energy_product(+10)")
+        if role == "profit" and "efficiency_score" in n:
+            pts += 14.0
+            reasons.append("domain:energy_profit_efficiency(+14)")
+    if domain == "customer_support":
+        if role == "sales" and "tickets_opened" in n:
+            pts += 16.0
+            reasons.append("domain:support_sales_opened(+16)")
+        if role == "sales" and "tickets_resolved" in n:
+            pts -= 8.0
+            reasons.append("domain:support_sales_resolved_penalty(-8)")
+        if role == "product" and "ticket_category" in n:
+            pts += 8.0
+            reasons.append("domain:support_product(+8)")
+        if role == "profit":
+            if "csat_score" in n:
+                pts += 16.0
+                reasons.append("domain:support_profit_csat(+16)")
+            elif "sla_breach_rate" in n:
+                pts += 14.0
+                reasons.append("domain:support_profit_sla(+14)")
+            elif "resolution_hours" in n:
+                pts += 8.0
+                reasons.append("domain:support_profit_resolution(+8)")
     return pts, reasons
 
 
@@ -1909,13 +2085,24 @@ def _calibrate_mapping_role_confidence(
     Promote medium role confidence when the selected mapping is semantically strong
     but gap rules are conservative (e.g. close valid secondary metrics).
     """
-    if confidence != "medium" or not conf_source:
+    if not conf_source:
         return confidence
     top1 = conf_source[0]
     top2 = conf_source[1] if len(conf_source) > 1 else {}
     s1 = float(top1.get("score") or 0)
     s2 = float(top2.get("score") or 0)
     gap = s1 - s2
+
+    if role_key == "sales" and confidence in ("low", "medium"):
+        bonus1 = _candidate_domain_role_bonus(top1)
+        if bonus1 >= 14.0 and s1 >= 70.0 and gap >= 2.0:
+            return "high"
+        if bonus1 >= 10.0 and s1 >= 60.0 and gap >= 4.0 and confidence == "low":
+            return "medium"
+
+    if confidence != "medium":
+        return confidence
+
     if role_key != "profit" or s1 < 60.0 or gap < 4.0:
         return confidence
     bonus1 = _candidate_domain_role_bonus(top1)

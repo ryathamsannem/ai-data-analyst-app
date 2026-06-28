@@ -177,7 +177,7 @@ class TestDomainUpload1kFixturesExist(unittest.TestCase):
         import json
 
         data = json.loads(manifest.read_text(encoding="utf-8"))
-        self.assertEqual(len(data.get("datasets") or []), 9)
+        self.assertEqual(len(data.get("datasets") or []), 15)
 
     def test_each_fixture_has_about_1000_rows(self) -> None:
         for path in FIXTURE_DIR.glob("*_1k.csv"):

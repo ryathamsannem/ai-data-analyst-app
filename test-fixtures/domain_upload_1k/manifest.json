@@ -155,6 +155,108 @@
         "test_score",
         "pass_rate"
       ]
+    },
+    {
+      "domain_key": "insurance_1k",
+      "file": "insurance_claims_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "claim_id",
+        "claim_date",
+        "claim_type",
+        "policy_type",
+        "region",
+        "claim_amount",
+        "loss_ratio",
+        "settlement_days",
+        "fraud_flag"
+      ]
+    },
+    {
+      "domain_key": "real_estate_1k",
+      "file": "real_estate_property_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "property_id",
+        "list_date",
+        "property_type",
+        "market_region",
+        "listing_status",
+        "sale_price",
+        "days_on_market",
+        "sqft",
+        "cap_rate"
+      ]
+    },
+    {
+      "domain_key": "telecom_1k",
+      "file": "telecom_usage_1k.csv",
+      "rows": 1000,
+      "columns": 8,
+      "column_names": [
+        "subscriber_id",
+        "billing_month",
+        "plan_tier",
+        "market_region",
+        "data_usage_gb",
+        "monthly_revenue",
+        "churn_rate",
+        "support_calls"
+      ]
+    },
+    {
+      "domain_key": "hospitality_1k",
+      "file": "hospitality_bookings_1k.csv",
+      "rows": 1000,
+      "columns": 9,
+      "column_names": [
+        "booking_id",
+        "check_in_date",
+        "hotel_brand",
+        "room_type",
+        "market",
+        "room_revenue",
+        "occupancy_rate",
+        "avg_daily_rate",
+        "guest_rating"
+      ]
+    },
+    {
+      "domain_key": "energy_1k",
+      "file": "energy_utilization_1k.csv",
+      "rows": 1000,
+      "columns": 8,
+      "column_names": [
+        "meter_id",
+        "reading_date",
+        "facility_type",
+        "grid_region",
+        "energy_kwh",
+        "peak_demand_kw",
+        "utility_cost",
+        "efficiency_score"
+      ]
+    },
+    {
+      "domain_key": "support_1k",
+      "file": "support_tickets_1k.csv",
+      "rows": 1000,
+      "columns": 11,
+      "column_names": [
+        "ticket_id",
+        "opened_date",
+        "ticket_category",
+        "priority",
+        "region",
+        "tickets_opened",
+        "tickets_resolved",
+        "resolution_hours",
+        "escalations",
+        "csat_score",
+        "sla_breach_rate"
+      ]
     }
   ]
 }
