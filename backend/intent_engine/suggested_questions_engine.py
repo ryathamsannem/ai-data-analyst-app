@@ -696,6 +696,18 @@ def compose_suggested_questions(
         dims = [c for c, _ in ranked_dims[:6]]
 
     date_for_trend = date_col or (date_cols[0] if date_cols else None)
+    if not date_for_trend:
+        temporal = _find_column_by_tokens(
+            columns, ("month", "report_month", "billing_month", "period", "term_date")
+        )
+        if temporal:
+            try:
+                from intent_engine.trend_date_resolve import group_column_is_time_series_eligible
+
+                if group_column_is_time_series_eligible(df, temporal):
+                    date_for_trend = temporal
+            except Exception:
+                pass
 
     candidates: List[QuestionCandidate] = []
     candidates.extend(_generate_executive_candidates(vertical, metrics, dims))
@@ -712,16 +724,19 @@ def compose_suggested_questions(
     )
     candidates.extend(_generate_relationship_candidates(metrics, dims))
 
-    if vertical == "banking" and date_for_trend:
+    if vertical == "banking":
+        trend_date = date_for_trend or _find_column_by_tokens(
+            columns, ("month", "report_month", "period")
+        )
         util = _find_column_by_tokens(columns, ("utilization_pct", "utilization"))
-        if util and _metric_can_trend(df, profile, util, date_for_trend):
+        if util and trend_date and _metric_can_trend(df, profile, util, trend_date):
             _add_candidate(
                 candidates,
-                text=f"Show {_q_label(util)} trend by {_q_label(date_for_trend)}",
+                text=f"Show {_q_label(util)} trend by {_q_label(trend_date)}",
                 category="basic",
                 intent="trend",
                 metric=util,
-                dimension=date_for_trend,
+                dimension=trend_date,
                 score=9.8,
             )
 

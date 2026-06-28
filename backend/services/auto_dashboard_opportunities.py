@@ -174,6 +174,30 @@ def _norm_col(col: str) -> str:
     return str(col).strip().lower().replace(" ", "_")
 
 
+def _is_temporal_breakdown_dimension(dim: Optional[str]) -> bool:
+    """Block month/date-like columns as categorical breakdown axes (use trend charts instead)."""
+    if not dim:
+        return False
+    norm = _norm_col(str(dim))
+    if norm in (
+        "month",
+        "report_month",
+        "reporting_month",
+        "period_month",
+        "week",
+        "quarter",
+        "year",
+        "day",
+        "date",
+        "timestamp",
+    ):
+        return True
+    return any(
+        tok in norm
+        for tok in ("_month", "_date", "_week", "_quarter", "_year", "_day")
+    )
+
+
 def _is_geographic_name(col: str) -> bool:
     n = _norm_col(col)
     if n in _LAT_LON:
@@ -424,7 +448,9 @@ def _norm_chart_type(chart_type: Optional[str]) -> str:
 
 
 def _coverage_bucket(chart: Dict[str, Any]) -> str:
-    opp = str(chart.get("_opportunityType") or "compare").lower()
+    opp = str(
+        chart.get("_opportunityType") or chart.get("opportunityType") or "compare"
+    ).lower()
     if opp == "correlation":
         return "relationship"
     return opp
@@ -1190,6 +1216,8 @@ def _prune_scatter_when_business_rich(
     *,
     min_non_scatter: int = 4,
     candidate_pool: Optional[List[Dict[str, Any]]] = None,
+    kind: str = "generic",
+    discovered_count: int = 0,
 ) -> List[Dict[str, Any]]:
     non_scatter = [
         c for c in charts if _norm_chart_type(c.get("chartType")) != "scatter"
@@ -1199,6 +1227,17 @@ def _prune_scatter_when_business_rich(
         1 for c in pool if _norm_chart_type(c.get("chartType")) != "scatter"
     )
     if pool_non_scatter >= min_non_scatter:
+        if str(kind).lower() in ("marketing", "finance"):
+            return non_scatter
+        showcase_rich = discovered_count >= 18
+        relationship_scatter = [
+            c
+            for c in charts
+            if _norm_chart_type(c.get("chartType")) == "scatter"
+            and _coverage_bucket(c) == "relationship"
+        ]
+        if showcase_rich and relationship_scatter:
+            return non_scatter + relationship_scatter[:1]
         return non_scatter
     if len(non_scatter) >= min_non_scatter:
         return non_scatter
@@ -1711,24 +1750,32 @@ def _metric_dim_duplicate(
     selected: List[Dict[str, Any]],
     candidate: Dict[str, Any],
     record_key: str,
+    *,
+    discovered_count: int = 0,
 ) -> bool:
     cm = _metric_key(candidate, record_key)
     cd = _dimension_key(candidate)
     if not cd:
         return False
+    if _is_temporal_breakdown_dimension(cd):
+        return True
     cct = _norm_chart_type(candidate.get("chartType"))
     if cct not in _BREAKDOWN_TYPES or cct in _TEMPORAL_TYPES:
         return False
+    alt_dims = 0
     for existing in selected:
         if _metric_key(existing, record_key) != cm:
             continue
         ed = _dimension_key(existing)
         if not ed or ed == cd:
             continue
+        if _is_temporal_breakdown_dimension(ed):
+            continue
         ect = _norm_chart_type(existing.get("chartType"))
         if ect in _BREAKDOWN_TYPES and ect not in _TEMPORAL_TYPES:
-            return True
-    return False
+            alt_dims += 1
+    max_alt = 2 if discovered_count >= 18 else 1
+    return alt_dims >= max_alt
 
 
 def _metrics_comparable_for_story_dedup(
@@ -1794,14 +1841,23 @@ def _pick_best_candidate(
     record_key: str,
     metric_usage: Dict[str, int],
     prefer_bucket: Optional[str] = None,
+    discovered_count: int = 0,
 ) -> Tuple[int, int]:
     best_idx = -1
     best_score = -1
     for i, chart in enumerate(remaining):
         mk = _metric_key(chart, record_key)
-        if metric_usage.get(mk, 0) >= 2:
+        usage = metric_usage.get(mk, 0)
+        dk = _dimension_key(chart)
+        if usage >= 2:
             continue
-        if _metric_dim_duplicate(selected, chart, record_key):
+        if _is_temporal_breakdown_dimension(dk) and _norm_chart_type(
+            chart.get("chartType")
+        ) in _BREAKDOWN_TYPES:
+            continue
+        if _metric_dim_duplicate(
+            selected, chart, record_key, discovered_count=discovered_count
+        ):
             continue
         if _chart_story_blocked_by_selected(selected, chart, record_key):
             continue
@@ -1813,7 +1869,13 @@ def _pick_best_candidate(
         if prefer_bucket and bucket != prefer_bucket:
             continue
         if _norm_chart_type(chart.get("chartType")) == "scatter":
-            if _non_scatter_business_chart_count(remaining, selected) >= 4:
+            pool_size = len(remaining) + len(selected)
+            if (
+                prefer_bucket != "relationship"
+                and _non_scatter_business_chart_count(remaining, selected) >= 4
+            ):
+                continue
+            if prefer_bucket == "relationship" and discovered_count < 18:
                 continue
         sc = _score_candidate(
             chart,
@@ -1848,13 +1910,17 @@ def _commit_pick(
     mk = _metric_key(pick, record_key)
     dk = _dimension_key(pick)
     ct = _norm_chart_type(pick.get("chartType"))
-    metric_usage[mk] = metric_usage.get(mk, 0) + 1
+    if ct != "scatter":
+        metric_usage[mk] = metric_usage.get(mk, 0) + 1
     types_used.add(ct)
     metric_dims_used.add((mk, dk))
     if dk:
         dimension_usage[dk] = dimension_usage.get(dk, 0) + 1
     coverage_filled.add(_coverage_bucket(pick))
     clean = {k: v for k, v in pick.items() if not str(k).startswith("_")}
+    opp = pick.get("_opportunityType") or pick.get("opportunityType")
+    if opp:
+        clean["opportunityType"] = opp
     tit = normalize_canonical_chart_title(str(clean.get("title") or ""))
     if tit:
         clean["title"] = tit
@@ -1868,6 +1934,7 @@ def select_diverse_charts(
     max_charts: int,
     deps: DashboardDeps,
     kpi_context: Optional[List[KpiChartContext]] = None,
+    discovered_count: int = 0,
 ) -> List[Dict[str, Any]]:
     if not candidates:
         return []
@@ -1911,6 +1978,7 @@ def select_diverse_charts(
             record_key=deps.record_metric_key,
             metric_usage=metric_usage,
             prefer_bucket=bucket,
+            discovered_count=discovered_count,
         )
         if idx < 0 or score < 0:
             continue
@@ -1942,6 +2010,7 @@ def select_diverse_charts(
             kpi_context=kpi_ctx,
             record_key=deps.record_metric_key,
             metric_usage=metric_usage,
+            discovered_count=discovered_count,
         )
         if idx < 0 or score < 0:
             break
@@ -1974,7 +2043,11 @@ def select_diverse_charts(
         pruned, deps.record_metric_key, kind=kind
     )
     pruned = _prune_scatter_when_business_rich(
-        pruned, min_non_scatter=4, candidate_pool=all_candidates
+        pruned,
+        min_non_scatter=4,
+        candidate_pool=all_candidates,
+        kind=kind,
+        discovered_count=discovered_count,
     )
     pruned = _ensure_hr_workforce_core_charts(
         pruned,
@@ -2472,6 +2545,7 @@ def build_dashboard_charts_bundle(
         max_charts=max_charts,
         deps=bound,
         kpi_context=kpi_context,
+        discovered_count=len(discovered),
     )
 
     telemetry = compute_dashboard_coverage_telemetry(
