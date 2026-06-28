@@ -1186,14 +1186,42 @@ def _prune_lifecycle_overview_charts(
 
 
 def _prune_scatter_when_business_rich(
-    charts: List[Dict[str, Any]], *, min_non_scatter: int = 4
+    charts: List[Dict[str, Any]],
+    *,
+    min_non_scatter: int = 4,
+    candidate_pool: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     non_scatter = [
         c for c in charts if _norm_chart_type(c.get("chartType")) != "scatter"
     ]
-    if len(non_scatter) < min_non_scatter:
-        return charts
-    return [c for c in charts if _norm_chart_type(c.get("chartType")) != "scatter"]
+    pool = candidate_pool if candidate_pool is not None else charts
+    pool_non_scatter = sum(
+        1 for c in pool if _norm_chart_type(c.get("chartType")) != "scatter"
+    )
+    if pool_non_scatter >= min_non_scatter:
+        return non_scatter
+    if len(non_scatter) >= min_non_scatter:
+        return non_scatter
+    return charts
+
+
+def _non_scatter_business_chart_count(
+    *pools: Optional[List[Dict[str, Any]]],
+) -> int:
+    seen_titles: Set[str] = set()
+    count = 0
+    for pool in pools:
+        if not pool:
+            continue
+        for chart in pool:
+            if _norm_chart_type(chart.get("chartType")) == "scatter":
+                continue
+            title = str(chart.get("title") or "").strip().lower()
+            if not title or title in seen_titles:
+                continue
+            seen_titles.add(title)
+            count += 1
+    return count
 
 
 def _executive_trend_title(metric_col: str, time_bucket: str, pretty_label: Callable[..., str]) -> str:
@@ -1643,7 +1671,7 @@ def _score_candidate(
     strength = _metric_semantic_strength(mk, str(chart.get("title") or ""))
     if ct == "scatter" and strength < 90:
         base -= 18
-    if ct == "scatter" and str(kind or "").lower() == "finance":
+    if ct == "scatter" and str(kind or "").lower() in ("finance", "marketing", "sales"):
         base -= 28
     if (
         str(kind or "").lower() == "finance"
@@ -1784,17 +1812,8 @@ def _pick_best_candidate(
         bucket = _coverage_bucket(chart)
         if prefer_bucket and bucket != prefer_bucket:
             continue
-        if (
-            prefer_bucket == "relationship"
-            and str(kind or "").lower() == "finance"
-            and _norm_chart_type(chart.get("chartType")) == "scatter"
-        ):
-            non_scatter_pool = sum(
-                1
-                for c in remaining
-                if _norm_chart_type(c.get("chartType")) != "scatter"
-            )
-            if non_scatter_pool >= 4:
+        if _norm_chart_type(chart.get("chartType")) == "scatter":
+            if _non_scatter_business_chart_count(remaining, selected) >= 4:
                 continue
         sc = _score_candidate(
             chart,
@@ -1954,7 +1973,9 @@ def select_diverse_charts(
     pruned = _prune_geographic_risk_overview_charts(
         pruned, deps.record_metric_key, kind=kind
     )
-    pruned = _prune_scatter_when_business_rich(pruned, min_non_scatter=4)
+    pruned = _prune_scatter_when_business_rich(
+        pruned, min_non_scatter=4, candidate_pool=all_candidates
+    )
     pruned = _ensure_hr_workforce_core_charts(
         pruned,
         all_candidates,

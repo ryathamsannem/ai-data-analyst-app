@@ -47,7 +47,6 @@ export type MappingMetadataConfidenceInput = {
 } | null;
 
 const CORE_MAPPING_ROLES = ["sales", "product", "date", "profit"] as const;
-const OPTIONAL_MAPPING_ROLES = ["region", "customer"] as const;
 
 function normalizeMappingConfidenceLevel(
   raw: string | null | undefined
@@ -74,14 +73,6 @@ export function aggregateMappingConfidenceFromMetadata(
   for (const key of CORE_MAPPING_ROLES) {
     const conf =
       normalizeMappingConfidenceLevel(roles[key]?.confidence) ?? "low";
-    if (conf === "low") return "low";
-    if (conf === "medium") worst = "medium";
-  }
-  for (const key of OPTIONAL_MAPPING_ROLES) {
-    const role = roles[key];
-    if (!role?.selected?.trim()) continue;
-    const conf =
-      normalizeMappingConfidenceLevel(role.confidence) ?? "low";
     if (conf === "low") return "low";
     if (conf === "medium") worst = "medium";
   }

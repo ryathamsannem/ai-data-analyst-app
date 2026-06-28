@@ -798,6 +798,9 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         ("sale_amount", 40),
         ("subtotal", 36),
         ("spend", 34),
+        ("impressions", 32),
+        ("clicks", 30),
+        ("conversions", 32),
         ("sales", 36),
         ("salary", 44),
         ("wages", 40),
@@ -1022,6 +1025,13 @@ def _profit_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("delivery_days", 26),
         ("defect_rate", 26),
         ("churn_rate", 24),
+        # Marketing / campaign secondary metrics.
+        ("roi", 36),
+        ("spend", 30),
+        ("conversions", 28),
+        ("clicks", 22),
+        ("impressions", 18),
+        ("ctr", 24),
     ):
         if kw in n:
             score += w
@@ -1485,6 +1495,26 @@ def _cardinality_profile_score(
         if 0.001 <= ratio <= 0.95:
             pts += 10.0
             reasons.append("cardinality:usable(+10)")
+        elif role == "profit" and ratio > 0.95:
+            nm = _norm_header_token(col)
+            metric_like = any(
+                k in nm
+                for k in (
+                    "revenue",
+                    "sales",
+                    "roi",
+                    "spend",
+                    "conversion",
+                    "click",
+                    "impression",
+                    "rate",
+                    "cost",
+                    "amount",
+                )
+            )
+            if metric_like:
+                pts += 8.0
+                reasons.append("cardinality:profit_high_unique_metric(+8)")
     return pts, reasons
 
 
@@ -1508,6 +1538,10 @@ def _type_profile_bonus(col: str, profile: Dict[str, Any], role: str) -> Tuple[f
         if t == "date":
             pts += 25.0
             reasons.append("dtype:date(+25)")
+        elif t in ("text", "category") and _column_name_implies_temporal(col):
+            # Monthly snapshot columns (e.g. SaaS `month`) often profile as category.
+            pts += 20.0
+            reasons.append("dtype:temporal_category(+20)")
         elif t in ("text", "category"):
             pts += 3.0
             reasons.append("dtype:text_or_category(+3)")
@@ -1602,6 +1636,27 @@ def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[
     if domain == "marketing" and role == "sales" and any(k in n for k in ("revenue", "spend", "conversion")):
         pts += 8.0
         reasons.append("domain:marketing_sales(+8)")
+    if domain == "marketing" and role == "product" and any(
+        k in n for k in ("channel", "campaign_name", "campaign")
+    ):
+        pts += 10.0
+        reasons.append("domain:marketing_product(+10)")
+    if domain == "marketing" and role == "profit":
+        if "roi" in n:
+            pts += 16.0
+            reasons.append("domain:marketing_profit_roi(+16)")
+        elif "spend" in n:
+            pts += 12.0
+            reasons.append("domain:marketing_profit_spend(+12)")
+        elif "conversion" in n:
+            pts += 10.0
+            reasons.append("domain:marketing_profit_conversions(+10)")
+        elif "click" in n:
+            pts += 6.0
+            reasons.append("domain:marketing_profit_clicks(+6)")
+        if "revenue" in n:
+            pts -= 22.0
+            reasons.append("domain:marketing_profit_avoid_primary_dup(-22)")
     if domain == "saas" and role == "sales" and "mrr" in n:
         pts += 10.0
         reasons.append("domain:saas_sales(+10)")
@@ -1839,6 +1894,55 @@ def _confidence_from_top1_top2(cands: List[Dict[str, Any]]) -> str:
     return "low"
 
 
+def _candidate_domain_role_bonus(row: Dict[str, Any]) -> float:
+    breakdown = row.get("breakdown") if isinstance(row.get("breakdown"), dict) else {}
+    return float(breakdown.get("domain_role_bonus") or 0.0)
+
+
+def _calibrate_mapping_role_confidence(
+    role_key: str,
+    confidence: str,
+    cands: List[Dict[str, Any]],
+    conf_source: List[Dict[str, Any]],
+) -> str:
+    """
+    Promote medium role confidence when the selected mapping is semantically strong
+    but gap rules are conservative (e.g. close valid secondary metrics).
+    """
+    if confidence != "medium" or not conf_source:
+        return confidence
+    top1 = conf_source[0]
+    top2 = conf_source[1] if len(conf_source) > 1 else {}
+    s1 = float(top1.get("score") or 0)
+    s2 = float(top2.get("score") or 0)
+    gap = s1 - s2
+    if role_key != "profit" or s1 < 60.0 or gap < 4.0:
+        return confidence
+    bonus1 = _candidate_domain_role_bonus(top1)
+    bonus2 = _candidate_domain_role_bonus(top2)
+    n1 = str(top1.get("column") or "").lower()
+    n2 = str(top2.get("column") or "").lower()
+    banking_profit_tokens = ("utilization", "delinquency", "credit")
+    banking_tie = (
+        bonus1 >= 8.0
+        and bonus2 >= 8.0
+        and s2 >= 0.92 * s1
+        and any(tok in n1 for tok in banking_profit_tokens)
+        and any(tok in n2 for tok in banking_profit_tokens)
+    )
+    if banking_tie:
+        return "medium"
+    if bonus1 >= 20.0:
+        return "high"
+    if s1 >= 60.0 and gap >= 4.0 and bonus1 >= 10.0:
+        return "high"
+    if bonus1 >= 12.0 and (bonus1 - bonus2) >= 4.0 and gap >= 4.0:
+        return "high"
+    if bonus1 >= 10.0 and (bonus1 - bonus2) >= 14.0:
+        return "high"
+    return confidence
+
+
 def _resolve_distinct_primary_secondary_metric(
     proposed: Dict[str, Optional[str]],
     sales_cands: List[Dict[str, Any]],
@@ -1991,6 +2095,7 @@ def compute_semantic_column_mapping(
                 if str(c.get("column") or "").strip().lower() != primary
             ] or list(cands)
         conf = _confidence_from_top1_top2(conf_source)
+        conf = _calibrate_mapping_role_confidence(key, conf, cands, conf_source)
         sel = proposed.get(key)
         roles_meta[key] = {
             "selected": sel,
@@ -12911,7 +13016,7 @@ def _build_focus_kpis_from_intent(
 
 
 def _aggregate_mapping_confidence_from_meta() -> Optional[str]:
-    """Worst-case role confidence from persisted column-mapping metadata."""
+    """Worst-case confidence across required mapping roles (optional roles excluded)."""
     global column_mapping_metadata
     meta = column_mapping_metadata or {}
     roles = meta.get("roles") if isinstance(meta.get("roles"), dict) else {}
@@ -12919,11 +13024,8 @@ def _aggregate_mapping_confidence_from_meta() -> Optional[str]:
         return None
     worst = "high"
     core_roles = ("sales", "product", "date", "profit")
-    optional_roles = ("region", "customer")
-    for key in core_roles + optional_roles:
+    for key in core_roles:
         role = roles.get(key) if isinstance(roles.get(key), dict) else {}
-        if key in optional_roles and not (role or {}).get("selected"):
-            continue
         conf = str((role or {}).get("confidence") or "").strip().lower()
         if conf == "low":
             return "low"

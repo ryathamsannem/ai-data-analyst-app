@@ -65,7 +65,7 @@ FIXTURE_EXPECTATIONS: dict[str, dict] = {
         "exec_domain": "healthcare",
         "map_domain": "healthcare",
         "type_label": "Healthcare",
-        "min_aggregate": "medium",
+        "min_aggregate": "high",
         "sales": "claim_amount",
         "product": "department",
         "date": "visit_date",
@@ -91,13 +91,18 @@ FIXTURE_EXPECTATIONS: dict[str, dict] = {
         "sales": "revenue",
         "product": "campaign_name",
         "date": "campaign_date",
-        "profit": "conversion_rate",
+        "profit_alternatives": (
+            "spend",
+            "conversion_rate",
+            "clicks",
+            "impressions",
+        ),
     },
     "saas_subscription_1k.csv": {
         "exec_domain": "saas",
         "map_domain": "saas",
         "type_label": "SaaS / Subscription",
-        "min_aggregate": "medium",
+        "min_aggregate": "high",
         "sales": "mrr",
         "product": "plan_type",
         "date": "month",
@@ -111,7 +116,7 @@ FIXTURE_EXPECTATIONS: dict[str, dict] = {
     "supply_chain_logistics_1k.csv": {
         "exec_domain": "generic",
         "map_domain": "supply_chain",
-        "min_aggregate": "medium",
+        "min_aggregate": "high",
         "sales": "freight_cost",
         "product": "carrier",
         "date": "ship_date",
@@ -134,18 +139,12 @@ FIXTURE_EXPECTATIONS: dict[str, dict] = {
 
 
 def _aggregate_mapping_confidence(meta: dict) -> str:
+    """Mirror backend `_aggregate_mapping_confidence_from_meta` (core roles only)."""
     roles = meta.get("roles") or {}
     rank = {"low": 0, "medium": 1, "high": 2}
     worst = "high"
     for key in ("sales", "product", "date", "profit"):
         conf = str((roles.get(key) or {}).get("confidence") or "low").lower()
-        if rank[conf] < rank[worst]:
-            worst = conf
-    for key in ("region", "customer"):
-        role = roles.get(key) or {}
-        if not role.get("selected"):
-            continue
-        conf = str(role.get("confidence") or "low").lower()
         if rank[conf] < rank[worst]:
             worst = conf
     return worst
@@ -273,7 +272,77 @@ class TestDomainUpload1kMapping(unittest.TestCase):
             ("churn_rate", "active_users", "new_signups", "expansion_revenue"),
         )
         self.assertEqual(dash.get("type_label"), "SaaS / Subscription")
-        self.assertIn(_aggregate_mapping_confidence(meta), ("high", "medium"))
+        self.assertEqual(_aggregate_mapping_confidence(meta), "high")
+
+    def test_healthcare_high_confidence_with_distinct_roles(self) -> None:
+        path = FIXTURE_DIR / "healthcare_patient_1k.csv"
+        proposed, meta, _profile, dash = _parse_fixture(path)
+        self.assertEqual(proposed.get("sales"), "claim_amount")
+        self.assertIn(
+            proposed.get("profit"),
+            ("readmission_rate", "wait_time_minutes", "visit_count"),
+        )
+        self.assertEqual(proposed.get("date"), "visit_date")
+        self.assertEqual(proposed.get("product"), "department")
+        self.assertEqual(dash.get("type_label"), "Healthcare")
+        self.assertEqual(_aggregate_mapping_confidence(meta), "high")
+
+    def test_saas_high_confidence_with_distinct_roles(self) -> None:
+        path = FIXTURE_DIR / "saas_subscription_1k.csv"
+        proposed, meta, _profile, dash = _parse_fixture(path)
+        self.assertEqual(proposed.get("sales"), "mrr")
+        self.assertIn(
+            proposed.get("profit"),
+            ("churn_rate", "active_users", "new_signups", "expansion_revenue"),
+        )
+        self.assertEqual(proposed.get("date"), "month")
+        self.assertIn(proposed.get("product"), ("plan_type", "customer_segment"))
+        self.assertEqual(dash.get("type_label"), "SaaS / Subscription")
+        self.assertEqual(_aggregate_mapping_confidence(meta), "high")
+
+    def test_banking_at_least_medium_not_dragged_by_optional_region(self) -> None:
+        path = FIXTURE_DIR / "banking_financial_1k.csv"
+        proposed, meta, _profile, _dash = _parse_fixture(path)
+        roles = meta.get("roles") or {}
+        self.assertIsNone(proposed.get("region"))
+        self.assertEqual(_aggregate_mapping_confidence(meta), "medium")
+        for core in ("sales", "product", "date"):
+            self.assertEqual(
+                (roles.get(core) or {}).get("confidence"),
+                "high",
+                msg=f"banking {core}",
+            )
+
+    def test_supply_chain_high_confidence_not_dragged_by_optional_customer(self) -> None:
+        path = FIXTURE_DIR / "supply_chain_logistics_1k.csv"
+        proposed, meta, _profile, _dash = _parse_fixture(path)
+        roles = meta.get("roles") or {}
+        self.assertIsNone(proposed.get("customer"))
+        self.assertEqual(_aggregate_mapping_confidence(meta), "high")
+        for core in ("sales", "date", "product"):
+            self.assertEqual(
+                (roles.get(core) or {}).get("confidence"),
+                "high",
+                msg=f"supply_chain {core}",
+            )
+
+    def test_optional_customer_medium_does_not_reduce_aggregate(self) -> None:
+        path = FIXTURE_DIR / "healthcare_patient_1k.csv"
+        _proposed, meta, _profile, _dash = _parse_fixture(path)
+        roles = meta.get("roles") or {}
+        self.assertEqual((roles.get("customer") or {}).get("confidence"), "medium")
+        self.assertEqual(_aggregate_mapping_confidence(meta), "high")
+
+    def test_backend_aggregate_matches_test_helper(self) -> None:
+        for filename in FIXTURE_EXPECTATIONS:
+            path = FIXTURE_DIR / filename
+            _proposed, meta, _profile, _dash = _parse_fixture(path)
+            main.column_mapping_metadata = meta
+            self.assertEqual(
+                main._aggregate_mapping_confidence_from_meta(),
+                _aggregate_mapping_confidence(meta),
+                msg=filename,
+            )
 
     def test_hr_workforce_not_low_confidence(self) -> None:
         """HR with salary/department/hire_date must not show Low aggregate confidence."""
