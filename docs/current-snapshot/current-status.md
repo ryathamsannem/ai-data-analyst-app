@@ -1,10 +1,8 @@
 # Current Status
 
-**Snapshot date:** June 27, 2026
-**Phase:** After Overview Pass 5C.5 (H-Bar/V-Bar visual parity **frozen**)
-**Branch:** `DEV`
-
-> Overview Passes 5B.x and 5C.x (H-Bar/V-Bar parity) are in the **working tree**, not yet committed as a single snapshot commit.
+**Snapshot date:** June 28, 2026
+**Phase:** After healthcare/SaaS mapping follow-up; before **Mapping Confidence Calibration**
+**Branch:** `DEV` · commit `e353dee` · working tree **clean**
 
 ---
 
@@ -21,14 +19,20 @@
 - **Export regression (P1)** — PNG/PDF export validated after 5B/5C domain changes: 87 targeted export tests + Phase 7 PDF 18/18; no regressions found (June 27, 2026).
 - **Export/shared domain parity** — Overview live + PNG use inline pipeline with 85% H-Bar cap; session/PDF charts share `resolveOverviewBarValueDomain` zero-baseline policy without Overview stretch (Pass 5B.3).
 - **AI Insights** — structured reasoning blocks, "Why this matters" cards, narrative QA, follow-up reasoning, recommended next actions, insight result restore (see [`ai-insights-status.md`](./ai-insights-status.md)).
-- **Tests/build** — frontend **722/722** vitest pass; `npm run build` clean; backend targeted domain suites 37/37 pass.
+- **P1 error/loading/empty UX audit** — eight gaps fixed; see [`p1-error-loading-ux-audit.md`](./p1-error-loading-ux-audit.md).
+- **Upload / mapping edge cases** — empty, ambiguous, high-cardinality schemas validated; see [`p1-upload-mapping-edge-cases.md`](./p1-upload-mapping-edge-cases.md).
+- **P2 HR discovery cleanup** — age-band / monthly-age charts demoted when workforce charts exist (commit `5e198ae`).
+- **9-domain 1k upload fixtures** — generated, validated; see [`cross-domain-upload-mapping-validation.md`](./cross-domain-upload-mapping-validation.md).
+- **Healthcare / SaaS duplicate-metric follow-up** — distinct secondary metrics + SaaS exec domain / type label (commit `e353dee`).
+- **Tests/build** — frontend **741/741** vitest pass; `npm run build` clean; cross-domain targeted backend **35/35** pass.
 
 ---
 
 ## What is still unresolved
 
-- **Pre-existing backend failures** — 6 `pytest` failures (sales showcase diversity/scatter, banking suggested-questions utilization trend, marketing weak-title). Proven pre-existing; out of scope for chart parity work.
-- **Manual UI confirmation** — ~~cross-domain Overview defaults on all four gold fixtures~~ **closed** (June 27, 2026); optional live-browser spot-check remains non-blocking.
+- **Mapping confidence calibration (P1)** — four 1k fixtures still **Medium**: `banking_financial_1k.csv`, `healthcare_patient_1k.csv`, `saas_subscription_1k.csv`, `supply_chain_logistics_1k.csv`. Next recommended task.
+- **Pre-existing backend failures** — 6 `pytest` failures (sales showcase diversity/scatter, banking suggested-questions utilization trend, marketing weak-title). Unchanged; out of scope.
+- **Manual UI confirmation** — optional live-browser spot-check remains non-blocking.
 
 ---
 
@@ -60,5 +64,7 @@ Detail: [`overview-pass-status.md`](./overview-pass-status.md).
 | [`file-map.md`](./file-map.md) | Key files by area |
 | [`open-items.md`](./open-items.md) | Prioritized open items (P0/P1/P2) |
 | [`validation-results.md`](./validation-results.md) | Latest test/build/manual results |
+| [`cross-domain-upload-mapping-validation.md`](./cross-domain-upload-mapping-validation.md) | 9-domain 1k upload + mapping confidence |
+| [`latest-working-snapshot.md`](./latest-working-snapshot.md) | **This snapshot** — git state, tests, next task |
 
 Prior parity-phase docs remain in this folder: `chart-rendering-summary.md`, `chart-premium-parity-status.md`, `architecture-map.md`, `changelog-premium-chart-phase.md`.

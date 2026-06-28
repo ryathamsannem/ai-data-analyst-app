@@ -1,6 +1,6 @@
 # Overview Pass Status (5A → 5C.5)
 
-Snapshot: June 27, 2026 · Branch `DEV` · Passes 5B/5C in working tree (parity **frozen** after 5C.5).
+Snapshot: June 28, 2026 · Branch `DEV` · commit `e353dee` · Passes 5B/5C committed; parity **frozen** after 5C.5.
 
 All passes followed the same constraints: **incremental fixes only**, no AI Insights routing changes,
 no chart-rendering architecture rewrite, no export behavior changes except where shared visual constants

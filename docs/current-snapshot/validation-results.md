@@ -1,6 +1,30 @@
 # Validation Results
 
-**Snapshot:** June 27, 2026 (after Overview Pass **5C.5** + **P1 export regression pass**) · Branch `DEV`.
+**Snapshot:** June 28, 2026 (pre–mapping-confidence calibration) · Branch `DEV` · commit `e353dee`.
+
+---
+
+## Snapshot validation run (June 28, 2026)
+
+### Targeted cross-domain + edge-case + HR suites
+
+```bash
+cd backend && python -m pytest \
+  tests/test_cross_domain_upload_1k.py \
+  tests/test_cross_domain_mapping_qa.py \
+  tests/test_upload_mapping_edge_cases.py \
+  tests/test_overview_hr_gold_dashboard.py
+```
+
+- **Result:** PASS — **35/35 passed.**
+
+### Full backend
+
+```bash
+cd backend && python -m pytest tests/
+```
+
+- **Result:** **452 passed, 6 failed** — same pre-existing failure set (unchanged).
 
 ---
 
@@ -11,7 +35,7 @@ cd frontend && npm run test
 # equivalent: cd frontend && npx vitest run
 ```
 
-- **Result:** PASS — **722 tests in 83 files passed (0 failed).**
+- **Result:** PASS — **741 tests in 85 files passed (0 failed).**
 - Key 5B/5C suites: `overview-bar-value-domain.test.ts` (48), `horizontal-bar-visual.test.ts` (11),
   `cartesian-chart-decisions.test.ts` (15), `overview-dashboard-export.test.ts` (15),
   `overview-premium-axis-domain.test.ts` (26), `overview-dash-chart-insights.test.ts` (23),
@@ -47,7 +71,7 @@ cd backend && python -m pytest \
 cd backend && python -m pytest tests/
 ```
 
-- **Result:** **6 failed, 421 passed.**
+- **Result:** **6 failed, 452 passed.**
 - **All 6 failures are PRE-EXISTING** (not introduced by Overview Pass 5A–5C).
 
 | Pre-existing failing test | Area |
@@ -111,7 +135,7 @@ cd frontend && npm run test -- \
 
 ### Full suite + build (re-run same day)
 
-- **Vitest:** PASS — **722/722** (83 files).
+- **Vitest:** PASS — **741/741** (85 files).
 - **Build:** PASS — Next.js 16.2.4 (Turbopack); TypeScript clean.
 
 ### Validation matrix
@@ -166,14 +190,14 @@ Automated coverage is sufficient to close P1 export regression. Optional browser
 | Banking FS — monthly cadence (not weekly) | PASS (`timeBucket: M`, monthly trend titles) |
 | Banking FS — rate axes (delinquency ~3–4%, cap ~5%) | PASS (domain policy frozen in 5C.2; chart present) |
 | HR — salary/department/workforce prioritized | PASS (mapping: salary + department + hire_date) |
-| HR — weak age charts | **P2** — `Records by Age Band`, `Monthly Age Trend` still in grid; discovery/scoring layer; not a blocker |
+| HR — weak age charts | **Fixed** — age-band / monthly-age demoted when workforce charts exist (`5e198ae`) |
 | H-Bar/V-Bar visual / PNG export | PASS by reference (P0 frozen + P1 export pass); no new regression |
 
 ### Issues found
 
 | Issue | Severity | Layer | Action |
 |-------|----------|-------|--------|
-| HR surfaces age-band count + monthly age trend in default grid | **P2** | Backend auto-dashboard discovery/scoring | Future narrow HR discovery pass; demote age/lifecycle when salary/dept/performance charts exist |
+| HR surfaces age-band count + monthly age trend in default grid | **Fixed** | Backend auto-dashboard discovery | Demoted in `5e198ae` |
 | Banking gold uses `Delinquency Flag` (binary) vs rate on gold 10k | **Info** | Discovery metric selection | Acceptable — still risk-on-product-type; rate chart appears on `banking_financial_services.csv` |
 | `customer` mapping → `customer_id` on banking gold | **Info** | Backend semantic mapping | Non-blocking; segment charts discovered independently |
 
@@ -200,6 +224,8 @@ cd backend && python -m pytest \
 
 **Next recommended task (P1):**
 
-> Error/loading UX audit · upload/mapping edge cases · optional live-browser Overview spot-check (non-blocking).
+> **Mapping Confidence Calibration — Medium domains review** — `banking_financial_1k.csv`, `healthcare_patient_1k.csv`, `saas_subscription_1k.csv`, `supply_chain_logistics_1k.csv`.
+
+Baseline: [`latest-working-snapshot.md`](./latest-working-snapshot.md) · [`cross-domain-upload-mapping-validation.md`](./cross-domain-upload-mapping-validation.md).
 
 **Do not** reopen H-Bar/V-Bar parity unless a regression is reported with measured SVG evidence. Baseline: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).
