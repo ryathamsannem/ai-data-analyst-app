@@ -85,26 +85,28 @@ Mapping calibration for six new domains in `backend/main.py`:
 
 ## Deferred (unchanged)
 
-- Pre-existing showcase/suggested-question backend failures (5 tests)
 - Minor title preferences
 - Generic exec/type labels where no dedicated executive domain exists (insurance, real estate, telecom, hospitality, energy, education, supply chain)
 
 ## Tests
 
-| Suite | Result |
-|-------|--------|
+| Suite | Result (final snapshot) |
+|-------|-------------------------|
 | `tests/test_cross_domain_15_overview_validation.py` | **7 passed** |
-| `tests/test_marketing_campaigns_mapping_dashboard.py` | **6 passed** |
+| `tests/test_marketing_campaigns_mapping_dashboard.py` | **7 passed** |
 | `tests/test_cross_domain_upload_1k.py` | **20 passed** |
-| Full `pytest tests/` | **473 passed, 5 failed** (pre-existing) |
+| `tests/intent_engine/test_banking_utilization_routing.py` | **2 passed** |
+| `tests/test_auto_dashboard_opportunities.py` | **12 passed** |
+| `tests/test_auto_dashboard_showcase_regression.py` | **7 passed** |
+| Full `pytest tests/` | **478 passed, 0 failed** |
 
-### Known pre-existing failures (do not fix in this pass)
+### Former pre-existing failures — resolved (`61d0145`)
 
-1. `tests/intent_engine/test_banking_utilization_routing.py::test_suggested_questions_include_utilization_trend`
-2. `tests/test_auto_dashboard_opportunities.py::test_before_after_chart_count_improvement`
-3. `tests/test_auto_dashboard_opportunities.py::test_showcase_dimension_diversity_and_donut_cap`
-4. `tests/test_auto_dashboard_opportunities.py::test_showcase_produces_diverse_charts`
-5. `tests/test_auto_dashboard_showcase_regression.py::test_scatter_payload_has_numeric_x_axis`
+1. ~~`test_banking_utilization_routing.py::test_suggested_questions_include_utilization_trend`~~ — **fixed**
+2. ~~`test_auto_dashboard_opportunities.py` showcase count/diversity (3 tests)~~ — **fixed**
+3. ~~`test_auto_dashboard_showcase_regression.py::test_scatter_payload_has_numeric_x_axis`~~ — **fixed**
+
+Explicit relationship/showcase scatter remains supported; default Overview scatter stays blocked for business-rich dashboards.
 
 ## Files changed
 

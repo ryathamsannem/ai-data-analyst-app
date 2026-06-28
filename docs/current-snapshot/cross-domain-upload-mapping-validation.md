@@ -1,17 +1,17 @@
 # Cross-Domain 1k Upload & Mapping Confidence Validation
 
-**Date:** 2026-06-28 (updated after healthcare/SaaS follow-up commit `e353dee`)  
-**Fixtures:** `test-fixtures/domain_upload_1k/`  
+**Date:** 2026-06-28 (final snapshot — 15 domains validated; mapping confidence calibrated)  
+**Fixtures:** `test-fixtures/domain_upload_1k/` (15 CSVs)  
 **Generator:** `test-fixtures/domain_upload_1k/generate_domain_1k_fixtures.py`  
-**Tests:** `backend/tests/test_cross_domain_upload_1k.py`
+**Tests:** `backend/tests/test_cross_domain_upload_1k.py`, `backend/tests/test_cross_domain_15_overview_validation.py`
 
 ## Summary
 
-Nine ~1,000-row domain CSV fixtures were generated and validated for upload parsing, semantic mapping, mapping confidence, executive domain labels, KPI cards, and default Overview charts. All fixtures pass backend validation. HR mapping confidence was **Low** before fixes; it is now **High** for both `hr_workforce_1k.csv` and `hr_gold_5000.csv`.
+Fifteen ~1,000-row domain CSV fixtures are generated and validated for upload parsing, semantic mapping, mapping confidence, executive domain labels, KPI cards, and default Overview charts. All fixtures pass backend validation.
 
-**Follow-up (June 28, `e353dee`):** Healthcare and SaaS now map **distinct** primary/secondary metrics (no duplicate `claim_amount` / `mrr` on profit role). SaaS receives executive domain `saas` and type label **SaaS / Subscription**. Healthcare type label **Healthcare** with executive domain `healthcare`.
+**15-domain result (final snapshot):** **14 High**, **1 justified Medium** (banking only), **0 Low**. See [`final-overview-15-domain-validation.md`](./final-overview-15-domain-validation.md) for the full matrix.
 
-**Remaining open item:** Four fixtures still aggregate **Medium** confidence — calibration pass next (see [`open-items.md`](./open-items.md)).
+**Follow-ups complete:** Healthcare and SaaS distinct secondary metrics + exec labels (`e353dee`); marketing revenue confidence; default scatter demotion; showcase/banking backend fixes (`61d0145`).
 
 ## HR Low-confidence root cause (fixed)
 
@@ -40,21 +40,20 @@ Nine ~1,000-row domain CSV fixtures were generated and validated for upload pars
 | `retail_ecommerce_1k.csv` | 1000/9 | sales | ecommerce | Sales | **High** | sales_amount | profit | order_date | product_category | Monthly Sales Amount Trend; Sales Amount by Customer Segment; Region Profit Share | PASS |
 | `banking_financial_1k.csv` | 1000/9 | banking | banking | Banking / Financial Services | **Medium** | spend_amount | credit_utilization | report_month | product_type | Monthly Spend Amount Trend; Spend Amount by Product Type | PASS |
 | `hr_workforce_1k.csv` | 1000/9 | hr | hr | HR / Employee | **High** | salary | performance_rating | hire_date | department | Monthly Salary Trend; Salary by Department | PASS |
-| `healthcare_patient_1k.csv` | 1000/9 | healthcare | healthcare | Healthcare | **Medium** | claim_amount | readmission_rate (or wait_time / visit_count) | visit_date | department | Monthly Claim Amount Trend; Claim Amount by Department | PASS |
+| `healthcare_patient_1k.csv` | 1000/9 | healthcare | healthcare | Healthcare | **High** | claim_amount | wait_time_minutes | visit_date | department | Monthly Claim Amount Trend; Claim Amount by Department | PASS |
 | `manufacturing_quality_1k.csv` | 1000/9 | operations | manufacturing | Operations | **High** | units_produced | defect_rate | production_date | product_line | Monthly Units Produced Trend; Units Produced by Product Line | PASS |
 | `marketing_campaign_1k.csv` | 1000/10 | marketing | marketing | Marketing | **High** | revenue | conversion_rate | campaign_date | campaign_name | Monthly Revenue Trend; Revenue by Region | PASS |
-| `saas_subscription_1k.csv` | 1000/9 | saas | saas | SaaS / Subscription | **Medium** | mrr | churn_rate (or active_users / new_signups / expansion_revenue) | month | plan_type | Monthly Mrr Trend; Mrr by Plan Type | PASS |
-| `supply_chain_logistics_1k.csv` | 1000/9 | generic | supply_chain | Generic | **Medium** | freight_cost | on_time_rate (or delivery_days / shipment_count) | ship_date | carrier | Monthly Freight Cost Trend; Freight Cost by Carrier | PASS |
+| `saas_subscription_1k.csv` | 1000/9 | saas | saas | SaaS / Subscription | **High** | mrr | churn_rate | month | plan_type | Monthly Mrr Trend; Mrr by Plan Type | PASS |
+| `supply_chain_logistics_1k.csv` | 1000/9 | generic | supply_chain | Generic | **High** | freight_cost | on_time_rate | ship_date | carrier | Monthly Freight Cost Trend; Freight Cost by Carrier | PASS |
 | `education_student_1k.csv` | 1000/9 | generic | education | Generic | **High** | enrollment_count | pass_rate | term_date | grade_level | Monthly Enrollment Count Trend; Enrollment Count by School Region | PASS |
 
-### Medium confidence cases (calibration target)
+### Medium confidence (justified)
 
-| Fixture | Why Medium (current) | Follow-up status |
-|---------|----------------------|------------------|
-| Banking | No geographic region column; profit-role gap between utilization vs loan balance is narrow | Open — calibration |
-| Healthcare | Aggregate still Medium despite distinct secondary metric | Open — calibration |
-| SaaS | Aggregate still Medium despite distinct secondary + exec label | Open — calibration |
-| Supply chain | Aggregate Medium; profit role from alternatives | Open — calibration |
+| Fixture | Why Medium | Status |
+|---------|------------|--------|
+| Banking | No geographic region column; narrow profit-role gap (utilization vs delinquency tie) | **Justified** — accepted for snapshot |
+
+~~Healthcare / SaaS / supply chain Medium~~ — **Resolved** — now **High** in 15-domain validation.
 
 ~~Healthcare / SaaS duplicate primary-secondary~~ — **Fixed** (`e353dee`).
 
