@@ -1120,3 +1120,27 @@ See also: [`pdf-export-phase-changelog.md`](./pdf-export-phase-changelog.md) · 
 Artifacts: `docs/pdf-validation-screenshots/pdf-mandatory-fix-{banking,hospitality}-*`, report `docs/pdf-validation-screenshots/pdf-mandatory-fix-generic-alignment-report.json`.
 
 **Note:** Strategic recommendation bullets may still suggest cross-dimensional follow-ups (e.g. “market segment”) — separate from chart-aligned interpretation; not in scope for this mandatory fix.
+
+---
+
+## 25. Mandatory alignment fix — PDF bypass + structured insight model (June 29, 2026, post-`042db37`, uncommitted)
+
+**Problem:** After commit `042db37`, hospitality **Room Revenue by Room Type** PDFs still showed **Market** narrative (“Downtown and Beach markets dominate…”) on AI insight page 2 while the visualization correctly showed Room Type categories.
+
+**Root cause (confirmed):**
+
+1. **`buildInsightSectionsForPdf` re-parsed raw `pdfInsightAnswer`** for insight-scope exports, bypassing the aligned `parsedInsightAnswer` from `alignPdfNarrativeToChart` — stale Market copy in `statistical` / `hypotheses` flowed into PDF **Business interpretation** via `buildPdfExecutiveContentPlan`.
+2. **Live UI summary** could still pull stale `alignedAnalysis.insightSummary` / unfiltered reasoning-block claims through `insightAnswerSummaryForDisplay` opts even when parsed sections were aligned.
+3. **PDF had no structured insight presentation** — it rebuilt hierarchy from mixed aligned + raw sources instead of the live UI’s normalized model.
+4. **Per-section sanitization** was only applied on full fallback, not when individual supporting-detail / why-this-matters blocks conflicted.
+
+**Fix:**
+
+| File | Change |
+|------|--------|
+| `frontend/lib/insight-chart-narrative-alignment.ts` | Per-section sanitization; reasoning-block filter; `insightPresentation` PDF slice; market-dimension guard |
+| `frontend/lib/build-executive-pdf-input.ts` | Use aligned `parsedInsightAnswer` only; pass `insightReasoningBlocks`; emit `insightPresentation` |
+| `frontend/app/pdf-report.ts` | Structured PDF sections (Executive takeaway, Evidence, Why this matters, Supporting detail); compact Chart view (single rationale line) |
+| `frontend/app/page.tsx` | Align reasoning blocks + insightSummary; stop stale summary fallback in UI; pass aligned model to export |
+
+**Validation:** 70 targeted tests **PASS**; `npm run build` **PASS**; live script `docs/pdf-mandatory-fix-generic-alignment-validation.py`.

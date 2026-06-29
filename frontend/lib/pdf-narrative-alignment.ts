@@ -4,6 +4,7 @@ import type {
   PdfChartPrepContext,
 } from "@/lib/build-executive-pdf-input";
 import type { ExecutiveVizInsightCard } from "@/lib/executive-insight-ranking";
+import type { ReasoningBlock } from "@/lib/reasoning-blocks";
 import {
   alignInsightPresentationToChart,
   buildChartAlignedInsightSummary,
@@ -11,6 +12,7 @@ import {
   filterExecutiveVizCardsForChart,
   insightNarrativeConflictsWithChart,
   type InsightChartNarrativeContext,
+  type InsightPresentationPdfSlice,
 } from "@/lib/insight-chart-narrative-alignment";
 
 export type PdfChartNarrativeContext = InsightChartNarrativeContext;
@@ -33,10 +35,13 @@ export type PdfNarrativeAlignInput = {
   insightExecutiveVizInsights: ExecutiveVizInsightCard[];
   parsedInsightAnswer: ParsedAnswerSections;
   alignedInsightSummary?: string;
+  insightSummary?: string | null;
+  reasoningBlocks?: ReasoningBlock[];
   rankedSignals?: PdfRankedSignal[] | null;
 };
 
 export type PdfNarrativeAlignResult = PdfNarrativeAlignInput & {
+  insightPresentation: InsightPresentationPdfSlice;
   usedChartAlignedFallback: boolean;
 };
 
@@ -51,6 +56,8 @@ export function alignPdfNarrativeToChart(
     insightExecutiveVizInsights: input.insightExecutiveVizInsights,
     pdfInsightAnswer: input.pdfInsightAnswer,
     alignedInsightSummary: input.alignedInsightSummary,
+    insightSummary: input.insightSummary,
+    reasoningBlocks: input.reasoningBlocks,
     rankedSignals: input.rankedSignals,
   });
 
@@ -61,6 +68,7 @@ export function alignPdfNarrativeToChart(
     insightExecutiveVizInsights: aligned.insightExecutiveVizInsights,
     parsedInsightAnswer: aligned.parsedInsightAnswer,
     alignedInsightSummary: aligned.alignedInsightSummary,
+    insightPresentation: aligned.insightPresentation,
     usedChartAlignedFallback: aligned.usedChartAlignedFallback,
   };
 }

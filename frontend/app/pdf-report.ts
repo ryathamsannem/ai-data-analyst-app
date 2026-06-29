@@ -902,6 +902,15 @@ export type PdfInsightSections = {
   moreDetail?: string;
 };
 
+/** Normalized aligned insight sections shared with live AI Insights UI. */
+export type PdfInsightPresentation = {
+  executiveTakeaway: string;
+  evidence: string | null;
+  whyThisMatters: Array<{ claim: string; reason?: string | null }>;
+  supportingDetail: string | null;
+  strategicRecommendations: string | null;
+};
+
 /** Top chart categories for PDF executive summary + highlighted signals (numeric order matches key figures). */
 export type PdfRankedSignal = {
   rank: string;
@@ -955,6 +964,8 @@ export type ExecutivePdfExportInput = {
   answer: string;
   /** When set, insight narrative uses these blocks instead of raw `answer`. */
   insightSections?: PdfInsightSections | null;
+  /** Structured aligned insight model (live UI parity) for executive PDF sections. */
+  insightPresentation?: PdfInsightPresentation | null;
   /** Category (X) and value (Y) axis labels for the exported chart context */
   chartAxisLabels?: { category: string; value: string } | null;
   /** Structured one-liner from aligned analysis when present */
@@ -3909,15 +3920,78 @@ export async function runExecutivePdfExport(
 
     if (contentPlan.chartIntelBlocks) {
       const intel = contentPlan.chartIntelBlocks;
-      ensurePageSpace(20);
+      ensurePageSpace(14);
       insightSubheading("Chart view", 12);
-      bodyText(`Why this chart: ${intel.whySelected}`, PDF_TYPE.bodySmall);
-      bodyText(`Recommended read: ${intel.interpretation}`, PDF_TYPE.bodySmall);
-      bodyText(`Chart fit: ${intel.suitability}`, PDF_TYPE.bodySmall);
+      bodyText(intel.whySelected, PDF_TYPE.bodySmall);
     }
 
     y += PDF_SPACING.subsectionBefore;
+    const presentation = input.insightPresentation;
     const hierarchy = contentPlan.hierarchy;
+    const hasStructuredPresentation = Boolean(
+      presentation?.executiveTakeaway?.trim() ||
+        presentation?.evidence?.trim() ||
+        presentation?.whyThisMatters.length ||
+        presentation?.supportingDetail?.trim() ||
+        presentation?.strategicRecommendations?.trim()
+    );
+
+    if (hasStructuredPresentation && presentation) {
+      if (presentation.executiveTakeaway?.trim()) {
+        ensureAiBlockFits(
+          "Executive takeaway",
+          9.5,
+          presentation.executiveTakeaway.trim(),
+          9.5
+        );
+        insightSubheading("Executive takeaway", 18);
+        bodyBullets([presentation.executiveTakeaway.trim()], PDF_TYPE.bodySmall);
+      }
+      if (presentation.evidence?.trim()) {
+        ensureAiBlockFits("Evidence", 9.5, presentation.evidence.trim(), 9.5);
+        y += PDF_SPACING.bulletGap;
+        insightSubheading("Evidence");
+        bodyBullets([presentation.evidence.trim()], 9.5);
+      }
+      if (presentation.whyThisMatters.length > 0) {
+        const bullets = presentation.whyThisMatters.map((block) =>
+          block.reason?.trim()
+            ? `${block.claim.trim()} — ${block.reason.trim()}`
+            : block.claim.trim()
+        );
+        ensureAiBlockFits(
+          "Why this matters",
+          9.5,
+          bullets.join(" "),
+          9.5
+        );
+        y += PDF_SPACING.bulletGap;
+        insightSubheading("Why this matters");
+        bodyBullets(bullets, 9.5);
+      }
+      if (presentation.supportingDetail?.trim()) {
+        ensureAiBlockFits(
+          "Supporting detail",
+          9.5,
+          presentation.supportingDetail.trim(),
+          9.5
+        );
+        y += PDF_SPACING.bulletGap;
+        insightSubheading("Supporting detail");
+        bodyBullets([presentation.supportingDetail.trim()], 9.5);
+      }
+      if (presentation.strategicRecommendations?.trim()) {
+        ensureAiBlockFits(
+          hierarchyLabels.recommendation,
+          9.5,
+          presentation.strategicRecommendations.trim(),
+          9.5
+        );
+        y += PDF_SPACING.bulletGap;
+        insightSubheading(hierarchyLabels.recommendation);
+        bodyBullets([presentation.strategicRecommendations.trim()], 9.5);
+      }
+    } else {
     const hasHierarchy = Boolean(
       hierarchy.executiveSummary?.trim() ||
         hierarchy.businessInterpretation?.trim() ||
@@ -3968,6 +4042,7 @@ export async function runExecutivePdfExport(
         PDF_EMPTY_STATES.aiInsight.title,
         PDF_EMPTY_STATES.aiInsight.body
       );
+    }
     }
     y += PDF_SPACING.subsectionAfter;
   }

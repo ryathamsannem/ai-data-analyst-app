@@ -7,6 +7,7 @@ import type {
 } from "@/lib/build-executive-pdf-input";
 import { humanizeColumnName } from "@/lib/analytics-metadata";
 import type { ExecutiveVizInsightCard } from "@/lib/executive-insight-ranking";
+import type { ReasoningBlock } from "@/lib/reasoning-blocks";
 
 /** Chart contract slice used to validate insight narrative text. */
 export type InsightChartNarrativeContext = {
@@ -255,6 +256,25 @@ function dimensionIsProductType(ctx: InsightChartNarrativeContext): boolean {
   return /\bproduct\s*type\b|\bproduct_type\b/.test(blob);
 }
 
+function dimensionIsMarket(ctx: InsightChartNarrativeContext): boolean {
+  const blob =
+    `${ctx.dimensionLabel} ${ctx.dimensionColumn ?? ""} ${ctx.chartTitle}`.toLowerCase();
+  return /\bmarkets?\b|\bmarket_key\b|\bmarket_segment\b/.test(blob);
+}
+
+function mentionsWrongBreakdownDimension(
+  text: string,
+  ctx: InsightChartNarrativeContext
+): boolean {
+  const t = text.toLowerCase();
+  const dimBlob =
+    `${ctx.dimensionLabel} ${ctx.dimensionColumn ?? ""}`.toLowerCase();
+  if (!/\bmarkets?\b/.test(t) || dimensionIsMarket(ctx)) return false;
+  const chartHits = countChartCategoryMentions(text, ctx);
+  const foreignHits = countForeignCategoryMentions(text, ctx);
+  return chartHits === 0 || foreignHits >= 1;
+}
+
 /** True when narrative text references a breakdown that conflicts with the active chart. */
 export function insightNarrativeConflictsWithChart(
   text: string,
@@ -268,6 +288,7 @@ export function insightNarrativeConflictsWithChart(
 
   if (chartHits === 0 && foreignHits >= 2) return true;
   if (chartHits <= 1 && foreignHits >= 3) return true;
+  if (mentionsWrongBreakdownDimension(t, ctx)) return true;
 
   if (dimensionIsProductType(ctx)) {
     if (mentionsSegmentDimension(t)) return true;
@@ -327,6 +348,60 @@ export function filterExecutiveVizCardsForChart(
   });
 }
 
+export function filterReasoningBlocksForChart(
+  blocks: ReasoningBlock[],
+  ctx: InsightChartNarrativeContext
+): ReasoningBlock[] {
+  return blocks.filter(
+    (block) =>
+      !insightNarrativeConflictsWithChart(
+        `${block.claim} ${block.reason}`,
+        ctx
+      )
+  );
+}
+
+export type InsightPresentationPdfSlice = {
+  executiveTakeaway: string;
+  evidence: string | null;
+  whyThisMatters: Array<{ claim: string; reason?: string | null }>;
+  supportingDetail: string | null;
+  strategicRecommendations: string | null;
+};
+
+export type InsightPresentationSource = {
+  parsedInsightAnswer: ParsedAnswerSections;
+  insightExecutiveBrief: string;
+  insightExecutiveVizInsights: ExecutiveVizInsightCard[];
+  pdfInsightAnswer: string;
+  alignedInsightSummary?: string;
+  insightSummary: string | null;
+  reasoningBlocks: ReasoningBlock[];
+};
+
+export function buildInsightPresentationPdfSlice(
+  aligned: InsightPresentationSource
+): InsightPresentationPdfSlice {
+  const sections = aligned.parsedInsightAnswer;
+  const evidenceFromCards = aligned.insightExecutiveVizInsights
+    .map((c) => `${c.title}: ${c.value}${c.hint ? ` (${c.hint})` : ""}`)
+    .join(" · ");
+  return {
+    executiveTakeaway:
+      aligned.insightExecutiveBrief.trim() ||
+      sections.summary?.trim() ||
+      "",
+    evidence: sections.statistical?.trim() || evidenceFromCards || null,
+    whyThisMatters: aligned.reasoningBlocks.map((block) => ({
+      claim: block.claim,
+      reason: block.reason?.trim() || null,
+    })),
+    supportingDetail:
+      sections.moreDetail?.trim() || sections.hypotheses?.trim() || null,
+    strategicRecommendations: sections.recommendations?.trim() || null,
+  };
+}
+
 export type AlignedInsightPresentationInput = {
   chartPrep: PdfChartPrepContext | null;
   parsedInsightAnswer: ParsedAnswerSections;
@@ -334,6 +409,8 @@ export type AlignedInsightPresentationInput = {
   insightExecutiveVizInsights?: ExecutiveVizInsightCard[];
   pdfInsightAnswer?: string;
   alignedInsightSummary?: string;
+  insightSummary?: string | null;
+  reasoningBlocks?: ReasoningBlock[];
   rankedSignals?: PdfRankedSignal[] | null;
 };
 
@@ -343,6 +420,9 @@ export type AlignedInsightPresentation = {
   insightExecutiveVizInsights: ExecutiveVizInsightCard[];
   pdfInsightAnswer: string;
   alignedInsightSummary?: string;
+  insightSummary: string | null;
+  reasoningBlocks: ReasoningBlock[];
+  insightPresentation: InsightPresentationPdfSlice;
   usedChartAlignedFallback: boolean;
 };
 
@@ -354,24 +434,41 @@ export function alignInsightPresentationToChart(
   const parsed = input.parsedInsightAnswer;
   const brief = input.insightExecutiveBrief?.trim() ?? "";
   const cards = input.insightExecutiveVizInsights ?? [];
+  const reasoningBlocks = input.reasoningBlocks ?? [];
   const pdfInsightAnswer = input.pdfInsightAnswer?.trim() || parsed.summary || "";
+  const insightSummary = input.insightSummary?.trim() || null;
+
+  const finish = (
+    next: InsightPresentationSource,
+    usedChartAlignedFallback: boolean
+  ): AlignedInsightPresentation => ({
+    ...next,
+    insightPresentation: buildInsightPresentationPdfSlice(next),
+    usedChartAlignedFallback,
+  });
 
   if (!ctx) {
-    return {
-      parsedInsightAnswer: parsed,
-      insightExecutiveBrief: brief,
-      insightExecutiveVizInsights: cards,
-      pdfInsightAnswer,
-      alignedInsightSummary: input.alignedInsightSummary,
-      usedChartAlignedFallback: false,
-    };
+    return finish(
+      {
+        parsedInsightAnswer: parsed,
+        insightExecutiveBrief: brief,
+        insightExecutiveVizInsights: cards,
+        pdfInsightAnswer,
+        alignedInsightSummary: input.alignedInsightSummary,
+        insightSummary,
+        reasoningBlocks,
+      },
+      false
+    );
   }
 
   const combined = [
     pdfInsightAnswer,
     brief,
     input.alignedInsightSummary ?? "",
+    insightSummary ?? "",
     ...cards.map((c) => `${c.title} ${c.value} ${c.hint ?? ""}`),
+    ...reasoningBlocks.map((b) => `${b.claim} ${b.reason}`),
     parsed.summary,
     parsed.statistical,
     parsed.hypotheses,
@@ -383,37 +480,59 @@ export function alignInsightPresentationToChart(
     .join("\n");
 
   if (!insightNarrativeConflictsWithChart(combined, ctx)) {
-    return {
-      parsedInsightAnswer: parsed,
-      insightExecutiveBrief: brief,
-      insightExecutiveVizInsights: cards,
-      pdfInsightAnswer,
-      alignedInsightSummary: input.alignedInsightSummary,
-      usedChartAlignedFallback: false,
-    };
+    return finish(
+      {
+        parsedInsightAnswer: {
+          summary: parsed.summary,
+          statistical: sanitizeSectionText(parsed.statistical, ctx),
+          hypotheses: sanitizeSectionText(parsed.hypotheses, ctx),
+          recommendations: sanitizeSectionText(parsed.recommendations, ctx),
+          methodology: sanitizeSectionText(parsed.methodology, ctx),
+          moreDetail: sanitizeSectionText(parsed.moreDetail, ctx),
+        },
+        insightExecutiveBrief: brief,
+        insightExecutiveVizInsights: filterExecutiveVizCardsForChart(cards, ctx),
+        pdfInsightAnswer,
+        alignedInsightSummary: input.alignedInsightSummary,
+        insightSummary: sanitizeSectionText(insightSummary ?? undefined, ctx) ?? insightSummary,
+        reasoningBlocks: filterReasoningBlocksForChart(reasoningBlocks, ctx),
+      },
+      false
+    );
   }
 
   const fallback = buildChartAlignedInsightSummary(ctx, input.rankedSignals);
   const filteredCards = filterExecutiveVizCardsForChart(cards, ctx);
+  const filteredReasoning = filterReasoningBlocksForChart(reasoningBlocks, ctx);
   const safeBrief = insightNarrativeConflictsWithChart(brief, ctx)
     ? fallback
     : brief;
+  const safeInsightSummary = insightNarrativeConflictsWithChart(
+    insightSummary ?? "",
+    ctx
+  )
+    ? fallback
+    : insightSummary;
 
-  return {
-    parsedInsightAnswer: {
-      summary: fallback,
-      statistical: sanitizeSectionText(parsed.statistical, ctx),
-      hypotheses: sanitizeSectionText(parsed.hypotheses, ctx),
-      recommendations: sanitizeSectionText(parsed.recommendations, ctx),
-      methodology: sanitizeSectionText(parsed.methodology, ctx),
-      moreDetail: sanitizeSectionText(parsed.moreDetail, ctx),
+  return finish(
+    {
+      parsedInsightAnswer: {
+        summary: fallback,
+        statistical: sanitizeSectionText(parsed.statistical, ctx),
+        hypotheses: sanitizeSectionText(parsed.hypotheses, ctx),
+        recommendations: sanitizeSectionText(parsed.recommendations, ctx),
+        methodology: sanitizeSectionText(parsed.methodology, ctx),
+        moreDetail: sanitizeSectionText(parsed.moreDetail, ctx),
+      },
+      insightExecutiveBrief: safeBrief,
+      insightExecutiveVizInsights: filteredCards,
+      pdfInsightAnswer: fallback,
+      alignedInsightSummary: fallback,
+      insightSummary: safeInsightSummary,
+      reasoningBlocks: filteredReasoning,
     },
-    insightExecutiveBrief: safeBrief,
-    insightExecutiveVizInsights: filteredCards,
-    pdfInsightAnswer: fallback,
-    alignedInsightSummary: fallback,
-    usedChartAlignedFallback: true,
-  };
+    true
+  );
 }
 
 export function chartRowsToRankedSignals(

@@ -5,6 +5,7 @@ import type {
 } from "@/lib/build-executive-pdf-input";
 import type { ExecutiveVizInsightCard } from "@/lib/executive-insight-ranking";
 import type { PdfRankedSignal } from "@/app/pdf-report";
+import type { ReasoningBlock } from "@/lib/reasoning-blocks";
 import {
   alignInsightPresentationToChart,
   buildInsightChartPrepFromSnapshot,
@@ -17,6 +18,8 @@ export type LiveInsightAlignInput = {
   parsedInsightAnswer: ParsedAnswerSections;
   insightExecutiveBrief?: string;
   insightExecutiveVizInsights?: ExecutiveVizInsightCard[];
+  insightSummary?: string | null;
+  reasoningBlocks?: ReasoningBlock[];
   rankedSignals?: PdfRankedSignal[] | null;
 };
 
@@ -24,16 +27,23 @@ export type LiveInsightAlignInput = {
 export function alignLiveInsightPresentation(
   input: LiveInsightAlignInput,
   chartPrep: PdfChartPrepContext | null,
-  snapshot?: ChartSnapshot | null
+  _snapshot?: ChartSnapshot | null
 ): AlignedInsightPresentation {
   if (!chartPrep) {
-    return {
-      parsedInsightAnswer: input.parsedInsightAnswer,
+    const parsed = input.parsedInsightAnswer;
+    const base = {
+      parsedInsightAnswer: parsed,
       insightExecutiveBrief: input.insightExecutiveBrief?.trim() ?? "",
       insightExecutiveVizInsights: input.insightExecutiveVizInsights ?? [],
       pdfInsightAnswer: input.parsedInsightAnswer.summary ?? "",
-      usedChartAlignedFallback: false,
+      insightSummary: input.insightSummary?.trim() || null,
+      reasoningBlocks: input.reasoningBlocks ?? [],
     };
+    return alignInsightPresentationToChart({
+      chartPrep: null,
+      ...base,
+      rankedSignals: input.rankedSignals,
+    });
   }
 
   return alignInsightPresentationToChart({
@@ -42,10 +52,10 @@ export function alignLiveInsightPresentation(
     insightExecutiveBrief: input.insightExecutiveBrief,
     insightExecutiveVizInsights: input.insightExecutiveVizInsights,
     pdfInsightAnswer: input.parsedInsightAnswer.summary,
+    insightSummary: input.insightSummary,
+    reasoningBlocks: input.reasoningBlocks,
     rankedSignals:
-      input.rankedSignals ??
-      chartPrep.rankedSignals ??
-      undefined,
+      input.rankedSignals ?? chartPrep.rankedSignals ?? undefined,
   });
 }
 

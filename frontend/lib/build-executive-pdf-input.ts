@@ -30,6 +30,7 @@ import {
 import type { RoutingPlanPayload } from "@/lib/routing-plan";
 import type { SmartChartIntel } from "@/lib/smart-chart-intelligence";
 import { alignPdfNarrativeToChart } from "@/lib/pdf-narrative-alignment";
+import type { ReasoningBlock } from "@/lib/reasoning-blocks";
 import { resolveOverviewDatasetTypeLabel } from "@/lib/resolved-dataset-type-label";
 import {
   datasetKindLabel,
@@ -316,6 +317,7 @@ export type PdfAlignedAnalysisSlice = {
   insightConfidenceLevel?: string;
   insightConfidenceRationale?: string;
   routingPlan?: RoutingPlanPayload | null;
+  reasoningBlocks?: ReasoningBlock[];
 };
 
 /** Chart + provenance resolved by page before export (capture refs stay in React). */
@@ -367,6 +369,7 @@ export type BuildExecutivePdfInputParams = {
   parsedInsightAnswer: ParsedAnswerSections;
   insightExecutiveBrief: string;
   insightExecutiveVizInsights: ExecutiveVizInsightCard[];
+  insightReasoningBlocks?: ReasoningBlock[];
   executiveVizInsights: ExecutiveVizInsightCard[];
   insightSmartChartIntel: SmartChartIntel | null;
   sessionSmartChartIntel: SmartChartIntel | null;
@@ -871,16 +874,18 @@ function buildExecutiveSummaryLines(
       if (sem) return wrap(buildChartNarrative(sem));
       return "";
     }
+    const fromParsed = params.parsedInsightAnswer.summary?.trim();
+    if (fromParsed) return wrap(fromParsed);
     const fromAligned = pdfAlignedAnalysis?.insightSummary?.trim();
     if (fromAligned) return wrap(fromAligned);
-    const fromParsed =
+    const fromRaw =
       chartScope === "insight"
         ? parseAnswerIntoSections(
             pdfInsightAnswer,
             pdfAlignedAnalysis?.insightSummary ?? undefined
           ).summary?.trim()
         : parsedInsightAnswer.summary?.trim();
-    if (fromParsed) return wrap(fromParsed);
+    if (fromRaw) return wrap(fromRaw);
     return "";
   })();
 
@@ -905,44 +910,26 @@ function buildExecutiveSummaryLines(
 function buildInsightSectionsForPdf(
   params: BuildExecutivePdfInputParams
 ): PdfInsightSections | null {
-  const {
-    options,
-    chartScope,
-    pdfInsightAnswer,
-    parsedInsightAnswer,
-    pdfAlignedAnalysis,
-    chartPrep,
-  } = params;
-  if (!options.includeAIInsight) return null;
+  if (!params.options.includeAIInsight) return null;
 
-  const pdfContract = chartPrep?.contract;
-  const _pdfTrendMode = chartPrep?.trendMode ?? false;
+  const parsed = params.parsedInsightAnswer;
+  const pdfContract = params.chartPrep?.contract;
 
-  const parsed =
-    chartScope === "insight"
-      ? (() => {
-          const p = parseAnswerIntoSections(
-            pdfInsightAnswer,
-            pdfAlignedAnalysis?.insightSummary ?? undefined
-          );
-          if (!isTrendMode(pdfContract)) return p;
-          const sanitize = (t?: string) =>
-            t?.trim()
-              ? sanitizeNarrativeForTrendContract(t, pdfContract)
-              : t;
-          return {
-            ...p,
-            summary: sanitize(p.summary) ?? "",
-            statistical: sanitize(p.statistical),
-            hypotheses: sanitize(p.hypotheses),
-            recommendations: sanitize(p.recommendations),
-            methodology: sanitize(p.methodology),
-            moreDetail: sanitize(p.moreDetail),
-          };
-        })()
-      : parsedInsightAnswer;
+  if (!isTrendMode(pdfContract)) {
+    return mergeParsedSectionsForPdfExport(parsed);
+  }
 
-  return mergeParsedSectionsForPdfExport(parsed);
+  const sanitize = (t?: string) =>
+    t?.trim() ? sanitizeNarrativeForTrendContract(t, pdfContract) : t;
+  return mergeParsedSectionsForPdfExport({
+    ...parsed,
+    summary: sanitize(parsed.summary) ?? "",
+    statistical: sanitize(parsed.statistical),
+    hypotheses: sanitize(parsed.hypotheses),
+    recommendations: sanitize(parsed.recommendations),
+    methodology: sanitize(parsed.methodology),
+    moreDetail: sanitize(parsed.moreDetail),
+  });
 }
 
 function buildChartThumbnails(chartHistory: ChartSnapshot[]) {
@@ -1025,6 +1012,7 @@ export function buildExecutivePdfExportInput(
     pdfInsightAnswer,
     insightExecutiveBrief,
     insightExecutiveVizInsights,
+    insightReasoningBlocks,
     executiveVizInsights,
     insightSmartChartIntel,
     sessionSmartChartIntel,
@@ -1047,6 +1035,8 @@ export function buildExecutivePdfExportInput(
           insightExecutiveVizInsights,
           parsedInsightAnswer: params.parsedInsightAnswer,
           alignedInsightSummary: pdfAlignedAnalysis?.insightSummary,
+          insightSummary: pdfAlignedAnalysis?.insightSummary ?? null,
+          reasoningBlocks: insightReasoningBlocks ?? [],
           rankedSignals: pdfRankedSignals,
         })
       : null;
@@ -1060,6 +1050,8 @@ export function buildExecutivePdfExportInput(
     insightExecutiveVizInsights;
   const effectiveParsedInsightAnswer =
     alignedNarrative?.parsedInsightAnswer ?? params.parsedInsightAnswer;
+  const effectiveInsightPresentation =
+    alignedNarrative?.insightPresentation ?? null;
   const effectivePdfAlignedAnalysis =
     alignedNarrative?.alignedInsightSummary != null && pdfAlignedAnalysis
       ? {
@@ -1137,6 +1129,7 @@ export function buildExecutivePdfExportInput(
           )
         : effectivePdfInsightAnswer,
     insightSections: buildInsightSectionsForPdf(narrativeParams),
+    insightPresentation: effectiveInsightPresentation,
     insightSummary:
       pdfTrendMode && pdfContract
         ? sanitizeNarrativeForTrendContract(

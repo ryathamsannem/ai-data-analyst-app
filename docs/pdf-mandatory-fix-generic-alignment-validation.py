@@ -44,7 +44,7 @@ SCENARIOS = [
             "Business District",
             "Airport",
         ],
-        "overviewWait": "room revenue",
+        "overviewWait": "Grand Plaza",
     },
 ]
 

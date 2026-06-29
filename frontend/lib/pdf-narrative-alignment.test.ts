@@ -219,4 +219,31 @@ describe("buildExecutivePdfExportInput insight preset", () => {
     expect(answer).not.toContain("customer segment");
     expect(built.input.routingPlan).toBeUndefined();
   });
+
+  it("uses aligned parsed sections instead of re-parsing raw insight answer", () => {
+    const stale =
+      "Premium and SME customer segments dominate spend versus Corporate and Retail.";
+    const alignedParsed = {
+      summary: "Spend Amount by Product Type — #1: Credit Card ($420K).",
+      statistical: "Credit Card leads Product Type spend.",
+    };
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      pdfInsightAnswer: stale,
+      parsedInsightAnswer: alignedParsed,
+      insightReasoningBlocks: [],
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.input.insightSections?.summary).toContain("Product Type");
+    expect(built.input.insightSections?.statistical?.toLowerCase()).toContain(
+      "credit card"
+    );
+    expect(built.input.insightSections?.statistical?.toLowerCase()).not.toContain(
+      "premium"
+    );
+    expect(built.input.insightPresentation?.executiveTakeaway.toLowerCase()).toContain(
+      "product type"
+    );
+  });
 });

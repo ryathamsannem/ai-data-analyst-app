@@ -9,15 +9,16 @@
       "insightPdf": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-banking-insight-preset.pdf",
       "pdfAnalysis": {
         "file": "pdf-mandatory-fix-banking-insight-preset.pdf",
-        "pages": 4,
+        "pages": 5,
         "imagesPerPage": [
+          1,
           1,
           1,
           1,
           1
         ],
-        "vizPage": 3,
-        "vizScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-banking-viz-page-3.png"
+        "vizPage": 4,
+        "vizScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-banking-viz-page-4.png"
       },
       "uiGoodTerms": [
         "Credit Card",
@@ -30,6 +31,7 @@
         "Credit Card",
         "Term Deposit",
         "Personal Loan",
+        "Auto Loan",
         "Product Type"
       ],
       "pdfBadTerms": [],
@@ -40,7 +42,7 @@
       "id": "hospitality",
       "question": "Room Revenue by Room Type",
       "chartTitle": "Room Revenue by Room Type",
-      "uiAnswerSample": "BUSINESS COMPARISON\n\nTotal room revenue across all 1,000 bookings is approximately 54.",
+      "uiAnswerSample": "BUSINESS COMPARISON\n\nTotal room revenue across 1,000 bookings is 54.",
       "uiScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-hospitality-ui-answer.png",
       "insightPdf": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-hospitality-insight-preset.pdf",
       "pdfAnalysis": {
@@ -62,6 +64,7 @@
         "Suite",
         "Executive",
         "Deluxe",
+        "Family",
         "Standard",
         "Room Type"
       ],

@@ -221,6 +221,63 @@ describe("insight-chart-narrative-alignment", () => {
     expect(live.pdfInsightAnswer).toBe(pdf.pdfInsightAnswer);
   });
 
+  it("filters conflicting why-this-matters reasoning blocks", () => {
+    const aligned = alignInsightPresentationToChart({
+      chartPrep: roomTypePrep(),
+      parsedInsightAnswer: {
+        summary: "Suite leads room revenue by room type.",
+        moreDetail:
+          "Downtown and Beach markets still dominate total hospitality revenue.",
+      },
+      reasoningBlocks: [
+        {
+          type: "contribution",
+          claim: "Downtown market contributes the largest room revenue share.",
+          metric: "room_revenue",
+          dimension: "market",
+          entity: "Downtown",
+          value: 1,
+          comparisonValue: null,
+          sharePct: 24,
+          gapRatio: null,
+          cohortN: 200,
+          confidence: "high",
+          reason: "Based on market grouping.",
+        },
+        {
+          type: "contribution",
+          claim: "Suite leads the room type breakdown.",
+          metric: "room_revenue",
+          dimension: "room_type",
+          entity: "Suite",
+          value: 1,
+          comparisonValue: null,
+          sharePct: 21,
+          gapRatio: null,
+          cohortN: 200,
+          confidence: "high",
+          reason: "Based on room type grouping.",
+        },
+      ],
+    });
+
+    expect(aligned.reasoningBlocks).toHaveLength(1);
+    expect(aligned.reasoningBlocks[0]?.claim.toLowerCase()).toContain("suite");
+    expect(aligned.parsedInsightAnswer.moreDetail).toBeUndefined();
+    expect(aligned.insightPresentation.whyThisMatters).toHaveLength(1);
+  });
+
+  it("detects markets wording on a non-market chart dimension", () => {
+    const ctx = buildInsightChartNarrativeContext(roomTypePrep());
+    expect(ctx).not.toBeNull();
+    expect(
+      insightNarrativeConflictsWithChart(
+        "Downtown and Beach markets dominate room revenue across the portfolio.",
+        ctx!
+      )
+    ).toBe(true);
+  });
+
   it("buildLiveInsightChartPrep matches shared chart prep builder", () => {
     const snapshot = roomTypePrep();
     const fromLive = buildLiveInsightChartPrep(

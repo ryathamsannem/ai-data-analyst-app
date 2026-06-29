@@ -750,9 +750,7 @@ import {
   buildLiveInsightChartPrep,
 } from "@/lib/live-insight-narrative-alignment";
 import {
-  buildInsightChartNarrativeContext,
   chartRowsToRankedSignals,
-  insightNarrativeConflictsWithChart,
 } from "@/lib/insight-chart-narrative-alignment";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
@@ -11084,6 +11082,8 @@ function HomeInner() {
           parsedInsightAnswer: rawParsedInsightAnswer,
           insightExecutiveBrief: insightExecutiveBriefBeforeAlign,
           insightExecutiveVizInsights: insightExecutiveVizInsightsBuilt,
+          insightSummary: alignedAnalysis?.insightSummary ?? null,
+          reasoningBlocks: insightReasoningBlocks,
           rankedSignals: chartRowsToRankedSignals(sortedInsightChartData),
         },
         buildLiveInsightChartPrep(insightSnapshot, {
@@ -11099,6 +11099,8 @@ function HomeInner() {
       insightSnapshot,
       insightChartAxisLabels.categoryAxis,
       insightChartAxisLabels.valueAxis,
+      alignedAnalysis?.insightSummary,
+      insightReasoningBlocks,
     ]
   );
 
@@ -11106,32 +11108,15 @@ function HomeInner() {
   const insightExecutiveBrief = alignedInsightPresentation.insightExecutiveBrief;
   const insightExecutiveVizInsights =
     alignedInsightPresentation.insightExecutiveVizInsights;
-
-  const insightReasoningBlocksForDisplay = useMemo(() => {
-    const ctx = buildInsightChartNarrativeContext(
-      buildLiveInsightChartPrep(insightSnapshot, {
-        category: insightChartAxisLabels.categoryAxis,
-        value: insightChartAxisLabels.valueAxis,
-      })
-    );
-    if (!ctx?.categoryNames.length) return insightReasoningBlocks;
-    return insightReasoningBlocks.filter(
-      (block) =>
-        !insightNarrativeConflictsWithChart(
-          `${block.claim} ${block.reason}`,
-          ctx
-        )
-    );
-  }, [
-    insightReasoningBlocks,
-    insightSnapshot,
-    insightChartAxisLabels.categoryAxis,
-    insightChartAxisLabels.valueAxis,
-  ]);
+  const insightReasoningBlocksForDisplay =
+    alignedInsightPresentation.reasoningBlocks;
 
   const pdfInsightExportSidecarRef = useRef({
     insightExecutiveVizInsights: [] as ExecutiveVizInsightCard[],
     insightExecutiveBrief: "",
+    insightPresentation: null as ReturnType<
+      typeof alignLiveInsightPresentation
+    >["insightPresentation"] | null,
     insightSmartChartIntel: null as SmartChartIntel | null,
     insightChartInsightBadge: null as string | null,
     insightRenderedChartKind: "" as ChartKind,
@@ -11141,6 +11126,7 @@ function HomeInner() {
     pdfInsightExportSidecarRef.current = {
       insightExecutiveVizInsights,
       insightExecutiveBrief,
+      insightPresentation: alignedInsightPresentation.insightPresentation,
       insightSmartChartIntel,
       insightChartInsightBadge,
       insightRenderedChartKind,
@@ -11148,6 +11134,7 @@ function HomeInner() {
   }, [
     insightExecutiveVizInsights,
     insightExecutiveBrief,
+    alignedInsightPresentation.insightPresentation,
     insightSmartChartIntel,
     insightChartInsightBadge,
     insightRenderedChartKind,
@@ -11361,15 +11348,16 @@ function HomeInner() {
         });
       }
       const pdfInsightSidecar = pdfInsightExportSidecarRef.current;
-      const pdfParsedInsightAnswer =
-        chartScope === "insight" && pdfSnap?.id === insightChartId
-          ? parsedInsightAnswer
-          : chartScope === "insight"
-            ? parseAnswerIntoSections(
-                pdfInsightAnswer,
-                pdfAlignedAnalysis?.insightSummary ?? undefined
-              )
-            : parsedInsightAnswer;
+      const insightExportMatchesLive =
+        chartScope === "insight" && pdfSnap?.id === insightChartId;
+      const pdfParsedInsightAnswer = insightExportMatchesLive
+        ? parsedInsightAnswer
+        : chartScope === "insight"
+          ? parseAnswerIntoSections(
+              pdfInsightAnswer,
+              pdfAlignedAnalysis?.insightSummary ?? undefined
+            )
+          : parsedInsightAnswer;
       const pdfChartDataRaw = pdfSnap?.chartData ?? [];
       const pdfChartTitle = pdfSnap?.title ?? "";
       const pdfChartSubtitle = pdfSnap?.subtitle ?? "";
@@ -11921,7 +11909,9 @@ function HomeInner() {
         pdfAlignedAnalysis,
         question,
         lastAskedQuestion: pdfExportLastAskedQuestion,
-        pdfInsightAnswer,
+        pdfInsightAnswer: insightExportMatchesLive
+          ? alignedInsightPresentation.pdfInsightAnswer
+          : pdfInsightAnswer,
         parsedInsightAnswer: pdfParsedInsightAnswer,
         insightExecutiveBrief:
           chartScope === "insight"
@@ -11931,6 +11921,9 @@ function HomeInner() {
           chartScope === "insight"
             ? pdfInsightSidecar.insightExecutiveVizInsights
             : insightExecutiveVizInsights,
+        insightReasoningBlocks: insightExportMatchesLive
+          ? alignedInsightPresentation.reasoningBlocks
+          : (pdfAlignedAnalysis?.reasoningBlocks ?? []),
         executiveVizInsights,
         insightSmartChartIntel:
           chartScope === "insight"
@@ -13818,12 +13811,7 @@ function HomeInner() {
                       <div className={aiInsightsAnswerSummaryPanel}>
                         <p className={aiInsightsAnswerSummary}>
                           {formatInsightSummary(
-                            insightAnswerSummaryForDisplay(parsedInsightAnswer, {
-                              insightSummary:
-                                alignedAnalysis?.insightSummary ?? undefined,
-                              reasoningBlockClaim:
-                                insightReasoningBlocks[0]?.claim,
-                            })
+                            insightAnswerSummaryForDisplay(parsedInsightAnswer)
                           )}
                         </p>
                       </div>
