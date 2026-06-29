@@ -555,3 +555,216 @@ Existing `backend/tests/intent_engine/test_suggested_questions_engine.py` — **
 - **Grammar:** “top 5 {dim} ranked by {metric}” template remains slightly awkward across several domains — cosmetic, not a P1 blocker.
 
 **Verdict:** Phase 1 backend goals met; safe to commit. Phase 2 = frontend follow-up chips only.
+
+---
+
+## 11. Phase 2 follow-up chips — audit only (June 28, 2026)
+
+**Scope:** Frontend follow-up chips after `/ask` responses. **No production code changed.**  
+**Commit baseline:** `3ee3e48` (Phase 1 backend suggested questions).
+
+### 11.1 Flow trace
+
+```mermaid
+flowchart TD
+  Ask[POST /ask response] --> Valid{hasValidAIAnswer + answer + lastAskedQuestion}
+  Valid --> Gates{Unsupported / profit-margin branches}
+  Gates -->|default| Build[buildAiFollowUpQuestionChips]
+  Gates -->|profit margin| PM[buildProfitMarginFollowUpChips]
+  Build --> Merge[page.tsx merge: schemaAwareFollowUpSeeds + base]
+  Merge --> Filter[isInvalidMetricCompareChip + isLowQualityFollowUpChip]
+  Filter --> Meta[appendThreadMetaFollowUpChips]
+  Meta --> Render[AI Insights: Suggested follow-ups]
+  UploadSQ[upload suggested_questions] --> LeftPanel[Left panel chips]
+  LeftPanel -.->|NOT wired| Merge
+```
+
+| Layer | File | Function | Role |
+|-------|------|----------|------|
+| Orchestrator | `frontend/app/page.tsx` | `insightFollowUpChips` useMemo (~L10160) | Builds context from chart/analysis; merges seeds; caps at 5 |
+| Chip generator | `frontend/lib/ai-follow-up-suggestions.ts` | `buildAiFollowUpQuestionChips()` | Primary 3–5 chips from chart + schema |
+| Natural business | `frontend/lib/ai-follow-up-suggestions.ts` | `buildNaturalBusinessFollowUpChips()` | Why/compare/growth/profit branches |
+| Executive lens | `frontend/lib/ai-follow-up-suggestions.ts` | `buildExecutiveLensFollowUpChips()` | When `executiveLens` / routing intent set |
+| Scatter | `frontend/lib/ai-follow-up-suggestions.ts` | `buildRelationshipScatterFollowUpChips()` | Correlation follow-ups |
+| Dual metric | `frontend/lib/ai-follow-up-suggestions.ts` | `buildDualMetricCompareFollowUpChips()` | ROAS / spend compare |
+| Schema seeds | `frontend/lib/ux-narrative.ts` | `schemaAwareFollowUpSeeds()` | Prepended in page merge (ops/finance/trend) |
+| Thread meta | `frontend/lib/ai-conversation-context.ts` | `appendThreadMetaFollowUpChips()` | Methodology chips if room |
+| Chip routing | `frontend/lib/suggested-follow-up-continuation.ts` | `resolveSuggestedChipAskOpts()` | Scoped vs fresh-root on click |
+| Upload suggestions | `frontend/app/page.tsx` | `visibleSuggestedQuestions` | **Separate** left panel; dedupes vs history only |
+| Data Preview SQ | `frontend/lib/data-preview-suggested-questions.ts` | `resolveDataPreviewSuggestedQuestions()` | **Not** used for post-answer follow-ups |
+
+### 11.2 Inputs available to `buildAiFollowUpQuestionChips()`
+
+| Input | Source in `page.tsx` | Used for |
+|-------|----------------------|----------|
+| `lastQuestion` | `lastAskedQuestion` | Skip chips already asked; partial overlap check |
+| `chartKind` | `insightPresentationChartKind` | Line/bar/scatter branches |
+| `valueAxisLabel` / `categoryAxisLabel` | semantic context + axis labels | Metric/dimension phrasing |
+| `seriesRows` | `sortedInsightChartData` | Top/bottom why chips |
+| `columns` | dataset columns | **`columnHints()`** — currently treats all non-date/non-id columns as measures |
+| `profile?.column_types` | Passed to `alternateNumericMetricLabels` only | **Not** passed into `columnHints()` |
+| `metricColumn` / `categoryColumn` | `alignedAnalysis` | Label resolution |
+| `alternateMetricLabels` | `alternateNumericMetricLabels(...)` | Cross-metric compare |
+| `executiveLens` / `routingIntent` | routing plan | Executive lens path |
+| `dualMetricCompare` | grouped bar / analysis flag | ROAS path |
+| **Missing** | `visibleSuggestedQuestions` | **Not passed** — root cause of FU-P1-02 |
+
+### 11.3 Example chips (deterministic probe, June 28, 2026)
+
+**Line trend — marketing conversion rate**
+
+- `Why is 2024-03 highest?`
+- `Compare conversion rate across campaign dates`
+- `Which campaign date is growing fastest?`
+- `Which campaign date contributes most conversion rate?`
+- `Compare conversion rate and channel across campaign dates`
+
+**Weak:** treats **date axis as a category** (“campaign date growing fastest”); no generic insight (crowded out at 5-chip cap).
+
+**Bar ranking — retail profit by category**
+
+- `Why is Electronics highest?`
+- `Compare profit across product categories`
+- `Which product category is growing fastest?` *(bar, not trend)*
+- `Which product category contributes most profit?`
+- `Compare profit and product category across product categories` *(dimension mistaken as metric)*
+
+**Support CSAT — no profit column**
+
+- `Why is Account highest?`
+- `Compare csat score across ticket categories`
+- `Which ticket category is growing fastest?`
+- `Compare csat score and ticket category across ticket categories`
+
+**Weak:** CSAT ranking framed as “highest = good”; “growing fastest” on horizontal bar; category name in compare pair.
+
+**SaaS churn line**
+
+- `Compare churn rate across months` ⚠️ temporal breakdown
+- `Which month is growing fastest?`
+- `Compare churn rate and plan type across months`
+
+**Scatter — sales vs profit (retail)**
+
+- `Which points look like outliers?`
+- `Compare profit margin by category` ⚠️ profit-margin chip on scatter path
+- `How strong is the linear link between sales amount and profit?`
+
+**Sparse bar — healthcare compare (1 series row)**
+
+- `What is the most important business insight?` ⚠️ **FU-P1-01** surfaces when pool is thin
+
+**Executive lens risk — healthcare, no profit**
+
+- `Which department has the highest concentration risk?`
+- `Compare readmission rate across departments`
+
+**No profit leakage** on executive lens path (`hasProfit` guard works).
+
+### 11.4 Findings vs FU-P1 issues
+
+| ID | Finding | Root cause |
+|----|---------|------------|
+| **FU-P1-01** | Generic insight appears when natural pool is thin (~≤4 chips before dedupe); also hardcoded in `buildDualMetricCompareFollowUpChips` fallback (line 251) | Unconditional push at end of `buildAiFollowUpQuestionChips` (L822–824); often masked by 5-chip cap on rich charts |
+| **FU-P1-02** | Upload suggestions and follow-ups can repeat same intent (“Which X has highest Y?”, “Compare X across Z”) | `visibleSuggestedQuestions` not passed to follow-up builder; merge dedupes exact string only, not semantic overlap vs left panel |
+| **FU-P1-03** | Profit chips on retail OK; scatter path always offers “Compare profit margin by category”; `columnHints()` treats **category columns as numeric measures** → bogus “Compare metric and channel across …” on non-retail domains | `columnHints()` ignores `column_types`; profit branch in `buildNaturalBusinessFollowUpChips` keys off polluted `uniqueMeasures` |
+| **Extra** | Temporal compare on line charts (`across months`, `across visit dates`) | No temporal-dimension guard in follow-up layer (mirrors pre-Phase-1 backend SQ-P1-04) |
+| **Extra** | “Why is {date bucket} highest?” on trend lines | `buildNaturalBusinessFollowUpChips` + bar-like why branch treat time buckets as categories |
+| **Extra** | Scatter/correlation chips only on scatter answers | Acceptable; not overused on bar/line |
+
+**Not in scope / acceptable:** `appendThreadMetaFollowUpChips` methodology strings; `schemaAwareFollowUpSeeds` domain seeds; recommended-actions cards (separate surface).
+
+### 11.5 Minimal safe implementation plan (Phase 2 — pending approval)
+
+**Single-file core + thin page wiring. No backend / chart / export changes.**
+
+1. **FU-P1-01 — Gate generic insight chip** (`ai-follow-up-suggestions.ts` only)
+   - Remove from default pool; append only when `dedupeFollowUpChips` result has **&lt; 3** chips after quality filter.
+   - Remove from `buildDualMetricCompareFollowUpChips` fallback list (line 251).
+
+2. **FU-P1-03 — Schema-aware measures** (`ai-follow-up-suggestions.ts`)
+   - Extend `columnHints(columns, columnTypes?)` to include only `column_types[col] === "number"`.
+   - Profit branch: require explicit profit-like column name in numeric columns.
+   - `buildRelationshipScatterFollowUpChips`: gate “Compare profit margin by …” on `hasProfit`.
+
+3. **Temporal + trend guards** (`ai-follow-up-suggestions.ts`)
+   - Skip `Compare {metric} across {temporal plural}` when dimension phrase matches `month|date|week|period|term|billing`.
+   - On line/area with date-like category axis: skip “Why is {bucket} highest?” and “{dim} growing fastest” when dim is temporal.
+
+4. **FU-P1-02 — Dedupe vs upload suggestions** (`page.tsx` + small helper in `ai-follow-up-suggestions.ts`)
+   - Pass `visibleSuggestedQuestions` into merge loop (or new optional ctx field).
+   - Add `followUpOverlapsPriorQuestion(chip, priorQuestions[])` reusing token-overlap logic from `data-preview-suggested-questions.ts` (~72% threshold).
+   - Filter before `appendThreadMetaFollowUpChips`.
+
+**Estimated touch:** 2 files primary (`ai-follow-up-suggestions.ts`, `page.tsx` ~10 lines), optional extract of shared near-dup helper.
+
+### 11.6 Proposed unit tests
+
+| File | Test |
+|------|------|
+| `frontend/lib/ai-follow-up-suggestions.test.ts` | No generic insight when ≥3 quality chips; show when pool &lt;3 |
+| `frontend/lib/ai-follow-up-suggestions.test.ts` | Support/healthcare columns without `profit` → no profit/profit-margin chips (bar + scatter) |
+| `frontend/lib/ai-follow-up-suggestions.test.ts` | SaaS churn line → no “compare across months” |
+| `frontend/lib/ai-follow-up-suggestions.test.ts` | Line trend with date axis → no “why is Jan highest” / no “month growing fastest” |
+| `frontend/lib/ai-follow-up-suggestions.test.ts` | `followUpOverlapsSuggestedQuestions` removes chips near-duplicating upload list |
+| `frontend/lib/ai-follow-up-suggestions.test.ts` | `columnHints` respects `column_types` (categories excluded from measure pairs) |
+
+Existing tests (12 passed): `ai-follow-up-suggestions.test.ts`, `ai-follow-up-semantic-dedupe.test.ts`, `suggested-follow-up-continuation.test.ts`.
+
+**Next step:** Review §11.5 and approve Phase 2 implementation scope.
+
+---
+
+## 12. Phase 2 frontend implementation (June 28, 2026)
+
+**Baseline:** `3ee3e48` (Phase 1 backend suggested questions)  
+**Scope:** AI Insights post-answer follow-up chips only. **Not committed** — pending review.
+
+### 12.1 Files changed
+
+| File | Change |
+|------|--------|
+| `frontend/lib/ai-follow-up-suggestions.ts` | Generic insight gating, schema-aware `columnHints`, profit/temporal/support guards, near-dup helpers |
+| `frontend/app/page.tsx` | Pass `columnTypes`; dedupe follow-ups vs `visibleSuggestedQuestions` + last ask |
+| `frontend/lib/ai-follow-up-suggestions.test.ts` | Extended from 4 → 14 tests |
+| `docs/current-snapshot/suggested-questions-15-domain-quality.md` | §12 (this section) |
+
+**Not modified:** backend, Overview, charts, export/PDF, recommended actions, data-preview chips.
+
+### 12.2 Issues fixed
+
+| ID | Fix |
+|----|-----|
+| **FU-P1-01** | `finalizeFollowUpChipList()` appends generic insight only when &lt;3 quality chips; removed from dual-metric fallback |
+| **FU-P1-02** | `followUpOverlapsPriorQuestion()` + `filterFollowUpsAgainstPriorQuestions()`; wired in `page.tsx` merge against `visibleSuggestedQuestions` |
+| **FU-P1-03** | `schemaHasProfitColumn()` gates profit branches and scatter profit-margin chip |
+| **Audit extras** | `columnHints(columns, columnTypes)` numeric-only; `isTemporalDimensionPhrase()` blocks temporal compare/why/growth; support CSAT phrasing path |
+
+### 12.3 Before → after (example weak chips)
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| Line trend (marketing) | “Why is 2024-03 highest?” · “Which campaign date is growing fastest?” | “Which period changed most…” · “What is driving the change in conversion rate?” |
+| SaaS churn line | “Compare churn rate across months” | Temporal compare blocked; trend-focused chips |
+| Support CSAT bar | “Why is Account highest?” | “Which ticket category is creating the biggest CSAT risk?” · “Where should we focus to improve CSAT?” |
+| Scatter (healthcare) | “Compare profit margin by category” | Omitted when no profit column |
+| Sparse answer pool | Always eligible generic insight | Generic insight only when &lt;3 quality chips |
+| Left panel overlap | “Which channel has the highest revenue?” in both panels | Suppressed in follow-ups when in upload suggestions |
+
+### 12.4 Tests
+
+| Suite | Result |
+|-------|--------|
+| `lib/ai-follow-up-suggestions.test.ts` | **14 passed** |
+| Related follow-up/routing tests (5 files) | **37 passed** |
+
+New coverage: generic insight gating, profit/scatter gating, temporal guards, upload dedupe, column_types hints, support CSAT wording.
+
+### 12.5 Remaining deferred
+
+| Item | Notes |
+|------|-------|
+| Thread meta chips | “What evidence supports…” still appended when merge pool has room — acceptable |
+| `schemaAwareFollowUpSeeds` | Ops/finance seeds may still add domain-specific compares — not changed |
+| Full frontend suite | Only targeted follow-up tests run (37 passed) |
+| Commit | Pending user review |

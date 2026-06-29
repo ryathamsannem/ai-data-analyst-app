@@ -30,7 +30,9 @@ import {
 import {
   alternateNumericMetricLabels,
   buildAiFollowUpQuestionChips,
+  filterFollowUpsAgainstPriorQuestions,
   filterMeaningfulFollowUpChips,
+  followUpOverlapsPriorQuestion,
   isInvalidMetricCompareChip,
   isLowQualityFollowUpChip,
   buildProfitMarginFollowUpChips,
@@ -10259,7 +10261,13 @@ function HomeInner() {
         alignedAnalysis?.executiveLens ?? null
       ),
       routingIntent: alignedAnalysis?.routingPlan?.intent ?? null,
+      columnTypes: profile?.column_types,
     });
+
+    const priorFollowUpQuestions = [
+      ...visibleSuggestedQuestions,
+      lastAskedQuestion.trim(),
+    ].filter(Boolean);
 
     const seeds = dualMetricCompare
       ? []
@@ -10293,6 +10301,7 @@ function HomeInner() {
       const t = c.replace(/\s+/g, " ").trim();
       const k = t.toLowerCase();
       if (t.length < 6 || seen.has(k)) continue;
+      if (followUpOverlapsPriorQuestion(t, priorFollowUpQuestions)) continue;
       if (isInvalidMetricCompareChip(t, axisMet)) continue;
       if (isLowQualityFollowUpChip(t, followUpQuality)) continue;
       seen.add(k);
@@ -10300,7 +10309,10 @@ function HomeInner() {
       if (merged.length >= 5) break;
     }
     return filterMeaningfulFollowUpChips(
-      appendThreadMetaFollowUpChips(merged, 5),
+      filterFollowUpsAgainstPriorQuestions(
+        appendThreadMetaFollowUpChips(merged, 5),
+        priorFollowUpQuestions
+      ),
       axisMet,
       followUpQuality
     ).slice(0, 5);
@@ -10308,6 +10320,7 @@ function HomeInner() {
     hasValidAIAnswer,
     answer,
     lastAskedQuestion,
+    visibleSuggestedQuestions,
     insightUnsupportedGrowth,
     insightUnsupportedTrend,
     insightUnsupportedDecline,
