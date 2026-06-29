@@ -406,7 +406,7 @@ export function pdfDrawEnterpriseRunningChrome(
     reportTitle: string;
     sourceLabel: string;
     generatedByLine: string;
-    supportLine: string;
+    supportLine: string | null;
     accent: Rgb;
     ink: Rgb;
     muted: Rgb;
@@ -473,10 +473,12 @@ export function pdfDrawEnterpriseRunningChrome(
     align: "center",
     maxWidth: contentWidth * 0.55,
   });
-  doc.text(supportLine, pageWidth / 2, footerBaseline + 1.8, {
-    align: "center",
-    maxWidth: contentWidth * 0.55,
-  });
+  if (supportLine?.trim()) {
+    doc.text(supportLine, pageWidth / 2, footerBaseline + 1.8, {
+      align: "center",
+      maxWidth: contentWidth * 0.55,
+    });
+  }
 
   doc.setFont("helvetica", "normal");
   doc.text(

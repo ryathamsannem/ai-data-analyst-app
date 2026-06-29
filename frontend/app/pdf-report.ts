@@ -44,9 +44,8 @@ import {
 } from "@/lib/pdf-enterprise-style";
 import {
   buildExportPdfFilename,
-  buildPdfFooterCenterLine,
-  buildPdfSupportLine,
   BRANDING,
+  resolvePdfExportFooter,
 } from "@/lib/branding-config";
 import {
   buildPdfExecutiveContentPlan,
@@ -912,6 +911,8 @@ export type ExecutivePdfExportInput = {
     sheet?: string;
     fileName: string;
     datasetKind: string;
+    /** Resolved domain/type label (Overview parity); falls back to datasetKind. */
+    profileLabel?: string;
   };
   generatedAt: Date;
   mappingConfidence: Confidence;
@@ -1949,6 +1950,16 @@ export function datasetKindLabel(kind: string): string {
   if (map[k]) return map[k];
   if (!k) return "General business";
   return k.charAt(0).toUpperCase() + k.slice(1);
+}
+
+/** Domain/type line for PDF cover, snapshot, and exec summary. */
+export function resolvePdfDatasetProfileLabel(dataset: {
+  datasetKind: string;
+  profileLabel?: string;
+}): string {
+  const explicit = (dataset.profileLabel ?? "").trim();
+  if (explicit) return explicit;
+  return datasetKindLabel(dataset.datasetKind);
 }
 
 function humanizePdfDumpLabel(s: string): string {
@@ -3350,7 +3361,7 @@ export async function runExecutivePdfExport(
     doc.setTextColor(0, 0, 0);
   };
 
-  const kindLabel = datasetKindLabel(input.dataset.datasetKind);
+  const kindLabel = resolvePdfDatasetProfileLabel(input.dataset);
   const genStr = formatPdfGeneratedTimestamp(input.generatedAt);
   const sourceRaw = (input.dataset.fileName || "").trim() || "—";
   const sourceShort =
@@ -4786,6 +4797,10 @@ export async function runExecutivePdfExport(
   }
 
   /* -------- Running header / footer every page -------- */
+  const pdfFooter = resolvePdfExportFooter({
+    reportCompanyName: input.branding.companyName,
+    globalBranding: BRANDING,
+  });
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -4801,8 +4816,8 @@ export async function runExecutivePdfExport(
       company,
       reportTitle: PDF_REPORT_TITLE,
       sourceLabel: sourceShort,
-      generatedByLine: buildPdfFooterCenterLine(BRANDING),
-      supportLine: buildPdfSupportLine(BRANDING.supportEmail),
+      generatedByLine: pdfFooter.generatedByLine,
+      supportLine: pdfFooter.supportLine,
       accent: theme.accent,
       ink: theme.ink,
       muted: theme.muted,

@@ -11826,6 +11826,8 @@ function HomeInner() {
         selectedSheet: selectedSheet || undefined,
         uploadFileName: uploadMeta?.name,
         datasetKind: datasetKind || "generic",
+        typeLabel: autoDashboard?.type_label ?? null,
+        mappingDomain: mappingMetadata?.domain ?? null,
         profile,
         preview: dataPreviewSortedRows.slice(
           0,

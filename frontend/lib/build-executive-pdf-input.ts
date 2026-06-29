@@ -30,6 +30,7 @@ import {
 import type { RoutingPlanPayload } from "@/lib/routing-plan";
 import type { SmartChartIntel } from "@/lib/smart-chart-intelligence";
 import { alignPdfNarrativeToChart } from "@/lib/pdf-narrative-alignment";
+import { resolveOverviewDatasetTypeLabel } from "@/lib/resolved-dataset-type-label";
 import {
   datasetKindLabel,
   type ExecutivePdfExportInput,
@@ -353,6 +354,8 @@ export type BuildExecutivePdfInputParams = {
   selectedSheet?: string;
   uploadFileName?: string;
   datasetKind: string;
+  typeLabel?: string | null;
+  mappingDomain?: string | null;
   profile: PdfDatasetProfile;
   preview: Record<string, unknown>[];
   kpis: PdfKpisSnapshot | null;
@@ -820,6 +823,8 @@ function buildExecutiveSummaryLines(
     rows,
     columns,
     datasetKind,
+    typeLabel,
+    mappingDomain,
     kpis,
     question,
     lastAskedQuestion,
@@ -835,7 +840,11 @@ function buildExecutiveSummaryLines(
   const lines: string[] = [];
   const rowCount = kpis?.total_rows ?? rows;
   const colCount = kpis?.total_columns ?? columns.length;
-  const domainLabel = datasetKindLabel(datasetKind || "generic");
+  const domainLabel = resolveOverviewDatasetTypeLabel({
+    datasetKind: datasetKind || "generic",
+    typeLabel,
+    mappingDomain,
+  });
 
   lines.push(
     `The dataset contains ${Number(rowCount).toLocaleString()} rows and ${colCount} columns (${domainLabel} profile).`
@@ -994,6 +1003,8 @@ export function buildExecutivePdfExportInput(
     selectedSheet,
     uploadFileName,
     datasetKind,
+    typeLabel,
+    mappingDomain,
     profile,
     preview,
     pdfAlignedAnalysis,
@@ -1067,6 +1078,12 @@ export function buildExecutivePdfExportInput(
   const smartIntel =
     chartScope === "insight" ? insightSmartChartIntel : sessionSmartChartIntel;
 
+  const profileLabel = resolveOverviewDatasetTypeLabel({
+    datasetKind: datasetKind || "generic",
+    typeLabel,
+    mappingDomain,
+  });
+
   const input: ExecutivePdfExportInput = {
     includes: {
       includeKPIs: resolved.includeKPIs,
@@ -1086,6 +1103,7 @@ export function buildExecutivePdfExportInput(
       sheet: selectedSheet || undefined,
       fileName: uploadFileName?.trim() || "No file name supplied.",
       datasetKind: datasetKind || "generic",
+      profileLabel,
     },
     generatedAt: new Date(),
     mappingConfidence,

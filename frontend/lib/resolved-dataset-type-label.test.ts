@@ -19,6 +19,23 @@ describe("resolveOverviewDatasetTypeLabel", () => {
       })
     ).toBe("Banking / Financial Services");
   });
+
+  it("prefers mapping domain over generic type_label for real estate", () => {
+    expect(
+      resolveOverviewDatasetTypeLabel({
+        datasetKind: "generic",
+        typeLabel: "Generic",
+        mappingDomain: "real_estate",
+      })
+    ).toBe("Real Estate / Property");
+    expect(
+      resolveOverviewDatasetTypeLabel({
+        datasetKind: "generic",
+        typeLabel: "Generic",
+        mappingDomain: "real_estate",
+      })
+    ).not.toBe("General business");
+  });
 });
 
 describe("buildOverviewDashboardContextChips dataset label", () => {

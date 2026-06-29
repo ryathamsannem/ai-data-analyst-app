@@ -136,6 +136,33 @@ describe("buildExecutivePdfExportInput", () => {
     expect(input.includes.pdfMode).toBe("executive");
   });
 
+  it("carries resolved profileLabel from mapping domain into dataset and exec summary", () => {
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      datasetKind: "generic",
+      typeLabel: "Generic",
+      mappingDomain: "real_estate",
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.input.dataset.profileLabel).toBe("Real Estate / Property");
+    expect(built.input.execSummaryLines[0]).toContain("Real Estate / Property");
+    expect(built.input.execSummaryLines[0]).not.toContain("General business");
+  });
+
+  it("keeps banking dataset_kind label without regression", () => {
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      datasetKind: "banking",
+      typeLabel: "Banking / Financial Services",
+      mappingDomain: null,
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.input.dataset.profileLabel).toBe("Banking / Financial Services");
+    expect(built.input.execSummaryLines[0]).toContain("Banking / Financial Services");
+  });
+
   it("defaults analyst mode to technical appendix", () => {
     const built = buildExecutivePdfExportInput({
       ...baseParams(),
