@@ -966,12 +966,21 @@ function buildChartThumbnails(chartHistory: ChartSnapshot[]) {
     .filter((t) => t.values.length > 1);
 }
 
-function previewDuplicates(
+export const PDF_PREVIEW_DUPLICATE_METRIC_LABEL =
+  "Sample duplicate-like rows (preview check)";
+
+export function previewDuplicatesForPdf(
   preview: Record<string, unknown>[],
-  columns: string[]
-): { duplicates: number; note: string } {
+  columns: string[],
+  totalRows: number
+): { duplicates: number; note: string; label: string } {
+  const label = PDF_PREVIEW_DUPLICATE_METRIC_LABEL;
   if (!preview.length || !columns.length) {
-    return { duplicates: 0, note: "Preview sample not available." };
+    return {
+      duplicates: 0,
+      label,
+      note: "Preview duplicate check not available — no preview rows loaded.",
+    };
   }
   const sigs = preview.map((row) =>
     columns.map((c) => String(row[c] ?? "")).join("\u001f")
@@ -982,9 +991,12 @@ function previewDuplicates(
   tally.forEach((n) => {
     if (n > 1) dupExtra += n - 1;
   });
+  const totalLabel =
+    totalRows > 0 ? `${totalRows.toLocaleString()} file rows` : "the full dataset";
   return {
     duplicates: dupExtra,
-    note: `Estimated from the first ${preview.length} preview rows (not necessarily the entire file).`,
+    label,
+    note: `Preview duplicate check only — scans ${preview.length.toLocaleString()} loaded preview row${preview.length === 1 ? "" : "s"}, not all ${totalLabel}. This is not a full-file duplicate audit.`,
   };
 }
 
@@ -1186,7 +1198,7 @@ export function buildExecutivePdfExportInput(
     chartThumbnails: buildChartThumbnails(chartHistory),
     preview: { rows: preview, columns },
     profile: profile ? { null_counts: profile.null_counts || {} } : null,
-    previewDuplicates: () => previewDuplicates(preview, columns),
+    previewDuplicates: () => previewDuplicatesForPdf(preview, columns, rows),
     conversationAppendix,
   };
 

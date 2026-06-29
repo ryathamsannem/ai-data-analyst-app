@@ -716,3 +716,61 @@ Script: `python docs/pdf1-real-estate-full-export.py` (headless Chrome, Export t
 | PDF-P2-03 | Data quality duplicate wording / sample-size clarity | PDF-2B |
 | PDF-P2-01 | KPI snapshot vs dashboard dedupe | PDF-2C |
 | PDF-P2-02 | Technical appendix tone / page-break threshold | PDF-2C |
+
+---
+
+## 19. PDF-2B implementation (June 29, 2026)
+
+**Baseline:** `DEV` @ `6e30b8f` + uncommitted PDF-2B changes (not committed per user request).  
+**Scope:** PDF-P2-06 (ID/date preview formatting) + PDF-P2-03 (data quality wording) only — PDF-2C deferred.
+
+### 19.1 Root cause
+
+| ID | Root cause | Fix |
+|----|------------|-----|
+| **PDF-P2-06** | `formatPdfTableCellValue` applied `parsePdfIsoDateLabel` / `normalizePdfIsoDatesInText` to every cell. `parsePdfIsoDateLabel` used loose `Date.parse()` on strings with hyphens — `Date.parse("ACC-000001")` resolves to a valid timestamp, rendering IDs as dates like `2001-01-01`. | Column-name guards (`pdfColumnNameLooksLikeIdentifier`, `pdfColumnNameLooksLikeDate`) and value guards (`pdfValueLooksLikeIdentifier`) in `pdf-date-format.ts`; `shouldFormatPdfCellAsDate()` gates date normalization; preview cells pass column name; removed loose `Date.parse` fallback from `parsePdfIsoDateLabel`. |
+| **PDF-P2-03** | Duplicate metric labeled **“Duplicate-like rows (sample)”** with note **“Estimated from the first N preview rows…”** — easy to misread as full-file quality despite honest wording. | `previewDuplicatesForPdf()` returns explicit label **“Sample duplicate-like rows (preview check)”** and note citing preview row count vs total file rows; Data quality section adds file-wide vs preview intro; row labels **“Total rows (file-wide)”** / **“Total columns (file-wide)”**. |
+
+### 19.2 Files changed
+
+| File | Change |
+|------|--------|
+| `frontend/lib/pdf-date-format.ts` | Column/value date vs identifier guards; safer `parsePdfIsoDateLabel` |
+| `frontend/lib/pdf-date-format.test.ts` | **New** — ID/date formatting tests |
+| `frontend/app/pdf-report.ts` | Column-aware `formatPdfTableCellDisplayValue`; data quality labels/intro |
+| `frontend/lib/build-executive-pdf-input.ts` | `previewDuplicatesForPdf()`, `PDF_PREVIEW_DUPLICATE_METRIC_LABEL` |
+| `frontend/lib/pdf-preview-quality.test.ts` | **New** — duplicate wording tests |
+| `frontend/lib/build-executive-pdf-input.test.ts` | Preview duplicate metadata assembly test |
+| `frontend/lib/phase7-pdf-generate.test.ts` | Mock `previewDuplicates` label field |
+| `docs/pdf2b-banking-full-export.py` | **New** — one-off PDF-2B validation script |
+| `docs/pdf-validation-screenshots/pdf1-banking-export-full.pdf` | Regenerated validation artifact |
+| `docs/pdf-validation-screenshots/pdf2b-banking-validation-report.json` | Validation report |
+
+### 19.3 Behavior changes
+
+- **Appendix sample data:** `account_id` / `property_id` cells render as text (`ACC-000001`, `PROP-000001`); `report_month` / `list_date` still normalize to `YYYY-MM-DD`.
+- **Data quality:** Intro clarifies file-wide metrics vs preview-only duplicate check; duplicate row uses preview-specific label and note with explicit file row count; no full-file duplicate scan claimed.
+
+### 19.4 Tests and build
+
+```text
+npx vitest run lib/pdf-date-format.test.ts lib/pdf-preview-quality.test.ts lib/pdf-export-sections.test.ts lib/build-executive-pdf-input.test.ts
+→ 4 files, 36 tests passed
+
+npm run build → success (Next.js 16.2.4)
+```
+
+### 19.5 Live validation (one PDF)
+
+| Artifact | Result |
+|----------|--------|
+| `docs/pdf-validation-screenshots/pdf1-banking-export-full.pdf` | `ACC-000001` present; no spurious `2001-01-01` without ACC ids; `2024-01-01` on date columns; **Sample duplicate-like rows (preview check)** label; **not a full-file duplicate audit** note; **Total rows (file-wide)** label |
+
+Script: `python docs/pdf2b-banking-full-export.py`
+
+### 19.6 Deferred (PDF-2C)
+
+| ID | Item |
+|----|------|
+| PDF-P2-01 | KPI snapshot vs dashboard dedupe |
+| PDF-P2-02 | Technical appendix tone / page-break threshold |

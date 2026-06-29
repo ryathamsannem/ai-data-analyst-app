@@ -222,6 +222,26 @@ describe("buildExecutivePdfExportInput", () => {
     expect(built.input.includes.includeTechnicalAppendix).toBe(true);
   });
 
+  it("assembles preview-only duplicate quality metadata with file row context", () => {
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      options: {
+        ...baseParams().options,
+        includeDataQuality: true,
+      },
+      preview: [
+        { city: "A", revenue: 1 },
+        { city: "A", revenue: 1 },
+      ],
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const dup = built.input.previewDuplicates();
+    expect(dup.label).toMatch(/preview check/i);
+    expect(dup.note).toMatch(/not a full-file duplicate audit/i);
+    expect(dup.note).toMatch(/100 file rows/i);
+  });
+
   it("respects Export tab flags when reportPreset is not insight", () => {
     const built = buildExecutivePdfExportInput({
       ...baseParams(),

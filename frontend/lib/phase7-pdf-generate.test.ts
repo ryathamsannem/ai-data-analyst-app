@@ -280,7 +280,8 @@ function buildInput(dataset: DatasetKey, combo: ComboId): ExecutivePdfExportInpu
     },
     previewDuplicates: () => ({
       duplicates: 0,
-      note: "Estimated from preview excerpt.",
+      label: "Sample duplicate-like rows (preview check)",
+      note: "Preview duplicate check only.",
     }),
     chartAxisLabels: { category: "City", value: "Revenue" },
     conversationAppendix: thread,

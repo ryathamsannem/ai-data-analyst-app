@@ -19,6 +19,7 @@ import {
   formatPdfGeneratedTimestamp,
   normalizePdfIsoDatesInText,
   parsePdfIsoDateLabel,
+  shouldFormatPdfCellAsDate,
 } from "@/lib/pdf-date-format";
 import {
   PDF_CHART_CAPTURE_SCALE,
@@ -427,13 +428,27 @@ function formatPdfBusinessNumber(n: number): string {
 }
 
 /** Consistent dates and numbers for PDF table cells. */
-function formatPdfTableCellValue(value: unknown, maxChars = 140): string {
+export function formatPdfTableCellDisplayValue(
+  value: unknown,
+  columnName?: string,
+  maxChars = 140
+): string {
+  return formatPdfTableCellValue(value, maxChars, columnName);
+}
+
+function formatPdfTableCellValue(
+  value: unknown,
+  maxChars = 140,
+  columnName?: string
+): string {
   if (value === null || value === undefined) return "—";
   let s = String(value).replace(/\s+/g, " ").trim();
   if (!s) return "—";
-  const isoOnly = parsePdfIsoDateLabel(s);
-  if (isoOnly) s = isoOnly;
-  else s = normalizePdfIsoDatesInText(s);
+  if (shouldFormatPdfCellAsDate(columnName, s)) {
+    const isoOnly = parsePdfIsoDateLabel(s);
+    if (isoOnly) s = isoOnly;
+    else s = normalizePdfIsoDatesInText(s);
+  }
   const plainNum = s.replace(/,/g, "");
   if (/^-?[\d]+(\.\d+)?$/.test(plainNum)) {
     const n = Number(plainNum);
@@ -448,8 +463,12 @@ function truncatePdfPreviewColumnLabel(label: string, maxLen = 28): string {
   return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
 }
 
-function formatPdfPreviewCellValue(value: unknown, maxChars = 56): string {
-  return formatPdfTableCellValue(value, maxChars);
+function formatPdfPreviewCellValue(
+  value: unknown,
+  columnName?: string,
+  maxChars = 56
+): string {
+  return formatPdfTableCellValue(value, maxChars, columnName);
 }
 
 function ellipsizePdfCellToWidth(
@@ -493,7 +512,7 @@ function computePdfPreviewColumnWidths(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(fontSize);
     for (const row of body) {
-      const cell = formatPdfPreviewCellValue(row[col]);
+      const cell = formatPdfPreviewCellValue(row[col], headers[col]);
       w = Math.max(
         w,
         Math.min(doc.getTextWidth(cell) + pad * 2, contentWidth * 0.3)
@@ -541,7 +560,9 @@ function drawPdfDataPreviewTable(args: {
   const rows = body
     .slice(0, PDF_DATA_PREVIEW_MAX_ROWS)
     .map((r) =>
-      Array.from({ length: n }, (_, i) => formatPdfPreviewCellValue(r[i]))
+      Array.from({ length: n }, (_, i) =>
+        formatPdfPreviewCellValue(r[i], headers[i])
+      )
     );
   if (rows.length === 0) return y;
 
@@ -959,7 +980,11 @@ export type ExecutivePdfExportInput = {
   chartThumbnails: PdfChartThumb[];
   preview: { rows: Record<string, unknown>[]; columns: string[] };
   profile: { null_counts: Record<string, number> } | null;
-  previewDuplicates: () => { duplicates: number; note: string };
+  previewDuplicates: () => {
+    duplicates: number;
+    note: string;
+    label: string;
+  };
   conversationAppendix?: PdfConversationAppendix | null;
 };
 
@@ -2809,7 +2834,7 @@ export async function runExecutivePdfExport(
       const previewColKeys = cols.slice(0, maxCols);
       previewHeads = previewColKeys;
       previewBody = preview.slice(0, excerptRowCount).map((row) =>
-        previewColKeys.map((c) => formatPdfPreviewCellValue(row[c]))
+        previewColKeys.map((c) => formatPdfPreviewCellValue(row[c], c))
       );
     }
     const previewTableH =
@@ -4522,16 +4547,20 @@ export async function runExecutivePdfExport(
         "Data quality: No quality profile available."
       );
     } else {
-      const { duplicates, note } = input.previewDuplicates();
+      const { duplicates, note, label } = input.previewDuplicates();
+      bodyText(
+        "File-wide metrics below reflect the loaded dataset. Duplicate detection applies to the preview excerpt only.",
+        PDF_TYPE.bodySmall
+      );
       const summaryRows: string[][] = [
-        ["Total rows", input.dataset.rows.toLocaleString()],
-        ["Total columns", String(input.dataset.colCount)],
+        ["Total rows (file-wide)", input.dataset.rows.toLocaleString()],
+        ["Total columns (file-wide)", String(input.dataset.colCount)],
         ["Missing cells (all columns)", totalMissing.toLocaleString()],
       ];
       if (pctMissing !== null) {
         summaryRows.push(["Estimated missing rate", `${pctMissing}% of cells`]);
       }
-      summaryRows.push(["Duplicate-like rows (sample)", String(duplicates)]);
+      summaryRows.push([label, String(duplicates)]);
       drawDataTable(["Metric", "Value"], summaryRows, {
         fontSize: 8.5,
         maxCols: 2,
