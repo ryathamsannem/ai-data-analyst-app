@@ -5280,6 +5280,12 @@ def build_suggested_questions() -> List[str]:
 
     try:
         from intent_engine.suggested_questions_engine import compose_suggested_questions
+        from services.executive_kpi_cards import infer_executive_domain
+
+        mapped_primary = get_mapped_or_detected_column(
+            "sales", ["sales", "revenue", "amount", "total", "value", "mrr", "salary"]
+        )
+        exec_domain = infer_executive_domain(columns)
 
         engine_qs = compose_suggested_questions(
             df=df,
@@ -5290,6 +5296,8 @@ def build_suggested_questions() -> List[str]:
             columns=columns,
             dashboard_kind=domain,
             date_col=date_for_trend,
+            mapped_primary=mapped_primary,
+            executive_domain=exec_domain,
         )
         deduped = _dedup_question_list(engine_qs, max_n=6)
         if len(deduped) >= 5:

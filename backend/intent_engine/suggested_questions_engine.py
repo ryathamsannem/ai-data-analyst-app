@@ -34,29 +34,78 @@ VERTICAL_METRIC_PRIORITY: Dict[str, Tuple[str, ...]] = {
     "retail": (
         "profit",
         "revenue",
+        "sales_amount",
         "growth_rate",
         "customers",
         "orders",
-        "quantity",
     ),
     "marketing": (
         "revenue",
         "conversions",
+        "conversion_rate",
         "spend",
         "satisfaction_score",
         "impressions",
         "clicks",
         "cost",
     ),
-    "hr": ("salary", "attendance", "headcount", "attrition", "compensation"),
+    "hr": (
+        "salary",
+        "performance_rating",
+        "attendance",
+        "headcount",
+        "attrition_rate",
+        "compensation",
+        "bonus",
+    ),
     "finance": ("expense", "budget", "profit", "cash", "margin", "spend"),
     "operations": (
         "downtime",
         "production_loss",
         "defect",
+        "defect_rate",
+        "units_produced",
         "volume",
         "throughput",
         "repair",
+    ),
+    "healthcare": (
+        "claim_amount",
+        "readmission_rate",
+        "wait_time",
+        "visit_count",
+        "patient_volume",
+    ),
+    "saas": (
+        "mrr",
+        "churn_rate",
+        "expansion_revenue",
+        "active_users",
+        "new_signups",
+    ),
+    "support": (
+        "csat_score",
+        "tickets_opened",
+        "tickets_resolved",
+        "resolution_hours",
+        "escalations",
+    ),
+    "insurance": ("claim_amount", "loss_ratio", "premium", "paid_amount"),
+    "real_estate": ("sale_price", "cap_rate", "rent", "noi"),
+    "telecom": ("monthly_revenue", "churn_rate", "arpu", "data_usage_gb"),
+    "hospitality": ("room_revenue", "occupancy_rate", "avg_daily_rate", "revpar"),
+    "energy": ("energy_kwh", "utility_cost", "efficiency_score", "demand_kw"),
+    "education": (
+        "enrollment_count",
+        "pass_rate",
+        "attendance_rate",
+        "graduation_rate",
+    ),
+    "supply_chain": (
+        "freight_cost",
+        "on_time_rate",
+        "delivery_days",
+        "shipment_count",
     ),
 }
 
@@ -68,11 +117,21 @@ VERTICAL_DIMENSION_PRIORITY: Dict[str, Tuple[str, ...]] = {
         "product_type",
         "spend_category",
     ),
-    "retail": ("product_category", "region", "city", "product"),
-    "marketing": ("channel", "campaign", "region"),
-    "hr": ("department", "location", "team"),
+    "retail": ("product_category", "region", "city", "product", "customer_segment"),
+    "marketing": ("channel", "campaign", "campaign_name", "region"),
+    "hr": ("department", "location", "team", "job_level", "status"),
     "finance": ("department", "category", "cost_center"),
-    "operations": ("plant", "region", "severity", "site"),
+    "operations": ("plant", "region", "product_line", "severity", "site"),
+    "healthcare": ("department", "segment", "region", "ward"),
+    "saas": ("plan_type", "customer_segment", "region"),
+    "support": ("ticket_category", "priority", "region", "channel"),
+    "insurance": ("policy_type", "region", "claim_type"),
+    "real_estate": ("property_type", "market_region", "listing_status"),
+    "telecom": ("plan_tier", "market_region", "customer_segment"),
+    "hospitality": ("hotel_brand", "market", "room_type"),
+    "energy": ("facility_type", "grid_region", "site"),
+    "education": ("grade_level", "school_region", "program"),
+    "supply_chain": ("carrier", "destination_region", "origin_region", "route"),
 }
 
 VERTICAL_DOMAIN_NOUN: Dict[str, str] = {
@@ -82,8 +141,39 @@ VERTICAL_DOMAIN_NOUN: Dict[str, str] = {
     "hr": "workforce",
     "finance": "financial",
     "operations": "operations",
+    "healthcare": "patient care",
+    "saas": "subscription",
+    "support": "customer support",
+    "insurance": "claims",
+    "real_estate": "property",
+    "telecom": "subscriber",
+    "hospitality": "hospitality",
+    "energy": "energy",
+    "education": "student outcomes",
+    "supply_chain": "logistics",
     "generic": "business",
 }
+
+_EXEC_DOMAIN_TO_VERTICAL: Dict[str, str] = {
+    "banking": "banking",
+    "hr": "hr",
+    "healthcare": "healthcare",
+    "marketing": "marketing",
+    "operations": "operations",
+    "saas": "saas",
+    "customer_support": "support",
+    "sales": "retail",
+}
+
+_WEAK_SECONDARY_METRIC_TOKENS: Tuple[str, ...] = (
+    "quantity",
+    "discount",
+    "discount_pct",
+    "discount_percent",
+    "active_users",
+    "impressions",
+    "clicks",
+)
 
 
 @dataclass
@@ -185,14 +275,82 @@ def detect_suggestion_vertical(columns: Sequence[str]) -> str:
 
     ops_hits = sum(
         1
-        for k in ("downtime", "defect", "plant", "incident", "production loss", "severity")
+        for k in (
+            "downtime",
+            "defect",
+            "plant",
+            "incident",
+            "production loss",
+            "severity",
+            "units produced",
+        )
         if k in joined
     )
     if ops_hits >= 2:
         return "operations"
 
+    hc_hits = sum(
+        1 for k in ("patient", "claim amount", "readmission", "visit date", "ward") if k in joined
+    )
+    if hc_hits >= 2:
+        return "healthcare"
+
+    saas_hits = sum(
+        1 for k in ("mrr", "subscription", "churn rate", "plan type", "saas") if k in joined
+    )
+    if saas_hits >= 2:
+        return "saas"
+
+    support_hits = sum(
+        1 for k in ("ticket", "csat", "resolution hours", "escalation", "support") if k in joined
+    )
+    if support_hits >= 2:
+        return "support"
+
+    ins_hits = sum(
+        1 for k in ("policy type", "loss ratio", "claim amount", "premium", "insurance") if k in joined
+    )
+    if ins_hits >= 2:
+        return "insurance"
+
+    re_hits = sum(
+        1 for k in ("sale price", "cap rate", "property type", "listing", "real estate") if k in joined
+    )
+    if re_hits >= 2:
+        return "real_estate"
+
+    tel_hits = sum(
+        1 for k in ("plan tier", "monthly revenue", "subscriber", "telecom", "data usage") if k in joined
+    )
+    if tel_hits >= 2:
+        return "telecom"
+
+    hosp_hits = sum(
+        1 for k in ("room revenue", "occupancy", "hotel brand", "hospitality", "check in") if k in joined
+    )
+    if hosp_hits >= 2:
+        return "hospitality"
+
+    energy_hits = sum(
+        1 for k in ("energy kwh", "utility cost", "efficiency score", "grid region") if k in joined
+    )
+    if energy_hits >= 2:
+        return "energy"
+
+    edu_hits = sum(
+        1 for k in ("enrollment", "student", "pass rate", "grade level", "school region") if k in joined
+    )
+    if edu_hits >= 2:
+        return "education"
+
+    sc_hits = sum(
+        1 for k in ("freight", "carrier", "shipment", "on time rate", "supply chain") if k in joined
+    )
+    if sc_hits >= 2:
+        return "supply_chain"
+
     if ("product category" in joined or "product" in joined) and (
-        "revenue" in joined or "profit" in joined
+        "revenue" in joined or "profit" in joined or "sales amount" in joined
     ):
         return "retail"
 
@@ -203,6 +361,213 @@ def detect_suggestion_vertical(columns: Sequence[str]) -> str:
         return "finance"
 
     return "generic"
+
+
+def resolve_suggestion_vertical(
+    columns: Sequence[str],
+    *,
+    dashboard_kind: str = "generic",
+    executive_domain: Optional[str] = None,
+) -> str:
+    """Column heuristics first; then executive domain; then dashboard kind."""
+    vertical = detect_suggestion_vertical(columns)
+    if vertical != "generic":
+        return vertical
+    if executive_domain:
+        mapped = _EXEC_DOMAIN_TO_VERTICAL.get(str(executive_domain).strip().lower())
+        if mapped:
+            return mapped
+    kind = str(dashboard_kind or "").strip().lower()
+    if kind in VERTICAL_DOMAIN_NOUN and kind != "generic":
+        return kind
+    if kind == "sales":
+        return "retail"
+    return vertical
+
+
+def _is_flag_metric_name(col: str) -> bool:
+    n = _norm_col(col).replace(" ", "_")
+    if n.endswith("_flag") or n.endswith(" flag"):
+        return True
+    return any(
+        tok in n
+        for tok in (
+            "fraud_flag",
+            "attrition_flag",
+            "churn_flag",
+            "escalation_flag",
+            "delinquency_flag",
+        )
+    )
+
+
+def _is_binary_numeric_metric(
+    df: Optional[pd.DataFrame], col: str, profile: Optional[Dict[str, Any]]
+) -> bool:
+    if df is None or col not in df.columns:
+        return False
+    ct = (profile or {}).get("column_types", {})
+    if ct.get(col) not in ("number", "category", "text"):
+        return False
+    nums = pd.to_numeric(df[col], errors="coerce").dropna()
+    if nums.empty:
+        return False
+    uniq = {int(v) if float(v).is_integer() else float(v) for v in nums.unique()[:6]}
+    return uniq.issubset({0, 1, 0.0, 1.0}) and len(uniq) <= 2
+
+
+def _is_unusable_suggest_metric(
+    col: str,
+    df: Optional[pd.DataFrame] = None,
+    profile: Optional[Dict[str, Any]] = None,
+) -> bool:
+    if _is_flag_metric_name(col):
+        return True
+    if df is not None and _is_binary_numeric_metric(df, col, profile):
+        return True
+    return False
+
+
+def _is_weak_secondary_metric(
+    col: str, vertical: str, primary: Optional[str]
+) -> bool:
+    if primary and col == primary:
+        return False
+    n = _norm_col(col)
+    if any(tok in n for tok in _WEAK_SECONDARY_METRIC_TOKENS):
+        return vertical in (
+            "retail",
+            "marketing",
+            "saas",
+            "generic",
+            "sales",
+        )
+    return False
+
+
+def _is_temporal_breakdown_dimension(
+    col: str, date_cols: Optional[Sequence[str]] = None
+) -> bool:
+    if date_cols and col in date_cols:
+        return True
+    n = _norm_col(col).replace(" ", "_")
+    if n in (
+        "month",
+        "report_month",
+        "billing_month",
+        "period_month",
+        "week",
+        "quarter",
+        "year",
+        "day",
+        "date",
+        "timestamp",
+        "period",
+        "term_date",
+        "billing_month",
+    ):
+        return True
+    return any(
+        tok in n for tok in ("_month", "_date", "_week", "_quarter", "_year", "_day")
+    )
+
+
+def _is_id_like_dimension(col: str) -> bool:
+    n = _norm_col(col)
+    if n in ("id", "uuid", "guid"):
+        return True
+    return n.endswith(" id") or n.endswith("_id") or " employee id" in f" {n} "
+
+
+def _filter_suggest_metrics(
+    metrics: Sequence[str],
+    *,
+    df: Optional[pd.DataFrame],
+    profile: Optional[Dict[str, Any]],
+    vertical: str,
+    primary: Optional[str],
+) -> List[str]:
+    out: List[str] = []
+    for m in metrics:
+        if _is_unusable_suggest_metric(m, df, profile):
+            continue
+        if _is_weak_secondary_metric(m, vertical, primary):
+            continue
+        out.append(str(m))
+    if primary and primary not in out and not _is_unusable_suggest_metric(
+        primary, df, profile
+    ):
+        out.insert(0, primary)
+    return out or [str(metrics[0])] if metrics else []
+
+
+def _filter_breakdown_dims(
+    dims: Sequence[str],
+    date_cols: Optional[Sequence[str]] = None,
+) -> List[str]:
+    out: List[str] = []
+    for d in dims:
+        if _is_temporal_breakdown_dimension(d, date_cols):
+            continue
+        if _is_id_like_dimension(d):
+            continue
+        out.append(str(d))
+    return out
+
+
+def _reorder_primary_first(metrics: List[str], primary: Optional[str]) -> List[str]:
+    if not primary or primary not in metrics:
+        return metrics
+    return [primary] + [m for m in metrics if m != primary]
+
+
+def _correlation_pair_allowed(
+    m0: str,
+    m1: str,
+    df: Optional[pd.DataFrame],
+    profile: Optional[Dict[str, Any]],
+) -> bool:
+    if not m0 or not m1 or m0 == m1:
+        return False
+    if _is_unusable_suggest_metric(m0, df, profile):
+        return False
+    if _is_unusable_suggest_metric(m1, df, profile):
+        return False
+    n0, n1 = _norm_col(m0), _norm_col(m1)
+    if "flag" in n0 or "flag" in n1:
+        return False
+    rate_tokens = ("rate", "ratio", "pct", "percent", "score", "margin")
+    has_rate = any(t in n0 for t in rate_tokens) or any(t in n1 for t in rate_tokens)
+    amount_tokens = (
+        "revenue",
+        "profit",
+        "cost",
+        "amount",
+        "balance",
+        "salary",
+        "price",
+        "mrr",
+        "freight",
+    )
+    has_amount = any(t in n0 for t in amount_tokens) or any(t in n1 for t in amount_tokens)
+    return has_rate or has_amount
+
+
+def _format_top_performer_question(
+    vertical: str, metric: str, dimension: str
+) -> str:
+    ml, dl = _q_label(metric), _q_label(dimension)
+    if vertical == "support" and "csat" in ml and "priority" in dl:
+        return "Which ticket priority is creating the biggest CSAT risk?"
+    if vertical == "support" and "csat" in ml:
+        return "Where should we focus to improve CSAT scores?"
+    if vertical == "support" and "resolution" in ml:
+        return f"Which {_q_label(dimension)} drives the longest resolution times?"
+    if vertical == "hr" and "attrition" in ml and "rate" in ml:
+        return f"Which {dl} has the highest {ml}?"
+    if vertical == "insurance" and "loss" in ml:
+        return f"Which {dl} shows the highest {ml}?"
+    return f"Which {dl} has the highest {ml}?"
 
 
 def _find_column_by_tokens(
@@ -321,20 +686,23 @@ def _pick_trend_metric(
     metrics: Sequence[str],
     columns: Sequence[str],
 ) -> Optional[str]:
-    """Prefer rate/pct metrics for trends; banking favors utilization over spend."""
+    """Prefer primary metric; banking may use utilization rate when present."""
+    if not metrics:
+        return None
+    primary = metrics[0]
     if vertical == "banking":
         util = _find_column_by_tokens(
             list(columns), ("utilization_pct", "utilization"), pool=list(metrics)
         )
         if util:
             return util
-    for m in metrics:
+    for m in metrics[:3]:
         ml = _norm_col(m)
-        if any(t in ml for t in ("pct", "percent", "rate", "ratio", "score")):
+        if any(t in ml for t in ("pct", "percent", "rate", "ratio")) and not _is_flag_metric_name(
+            m
+        ):
             return m
-    if len(metrics) >= 2:
-        return metrics[1]
-    return metrics[0] if metrics else None
+    return primary
 
 
 def _generate_basic_candidates(
@@ -346,6 +714,7 @@ def _generate_basic_candidates(
     columns: Optional[Sequence[str]] = None,
     df: Optional[pd.DataFrame] = None,
     profile: Optional[Dict[str, Any]] = None,
+    date_cols: Optional[Sequence[str]] = None,
 ) -> List[QuestionCandidate]:
     out: List[QuestionCandidate] = []
     if not metrics or not dims:
@@ -354,7 +723,7 @@ def _generate_basic_candidates(
     m0, d0 = metrics[0], dims[0]
     _add_candidate(
         out,
-        text=f"Which {_q_label(d0)} has the highest {_q_label(m0)}?",
+        text=_format_top_performer_question(vertical, m0, d0),
         category="basic",
         intent="top_performer",
         metric=m0,
@@ -362,32 +731,23 @@ def _generate_basic_candidates(
         score=10.0,
     )
 
-    if len(metrics) > 1 and len(dims) > 1:
-        m1, d1 = metrics[1], dims[1]
-        _add_candidate(
-            out,
-            text=f"Compare {_q_label(m1)} across {_dim_scope_plural(d1)}",
-            category="basic",
-            intent="compare",
-            metric=m1,
-            dimension=d1,
-            score=9.0,
-        )
-    else:
-        _add_candidate(
-            out,
-            text=f"Compare {_q_label(m0)} across {_dim_scope_plural(d0)}",
-            category="basic",
-            intent="compare",
-            metric=m0,
-            dimension=d0,
-            score=8.5,
-        )
+    compare_dim = d0
+    for d in dims[1:]:
+        if d != d0:
+            compare_dim = d
+            break
+    _add_candidate(
+        out,
+        text=f"Compare {_q_label(m0)} across {_dim_scope_plural(compare_dim)}",
+        category="basic",
+        intent="compare",
+        metric=m0,
+        dimension=compare_dim,
+        score=9.0,
+    )
 
     if date_col:
-        trend_metric = _pick_trend_metric(
-            vertical, metrics, columns or metrics
-        )
+        trend_metric = _pick_trend_metric(vertical, metrics, columns or metrics)
         if trend_metric and (
             df is None
             or profile is None
@@ -406,19 +766,21 @@ def _generate_basic_candidates(
                 score=8.0,
             )
 
-    if len(dims) > 0 and len(metrics) > 2:
-        _add_candidate(
-            out,
-            text=(
-                f"What are the top 5 {_q_label(dims[0])} ranked by "
-                f"{_q_label(metrics[2])}?"
-            ),
-            category="basic",
-            intent="ranking",
-            metric=metrics[2],
-            dimension=dims[0],
-            score=7.5,
-        )
+    rank_metric = metrics[1] if len(metrics) > 1 else None
+    if rank_metric and not _is_weak_secondary_metric(rank_metric, vertical, m0):
+        if not _is_unusable_suggest_metric(rank_metric, df, profile):
+            _add_candidate(
+                out,
+                text=(
+                    f"What are the top 5 {_q_label(d0)} ranked by "
+                    f"{_q_label(rank_metric)}?"
+                ),
+                category="basic",
+                intent="ranking",
+                metric=rank_metric,
+                dimension=d0,
+                score=7.5,
+            )
 
     return out
 
@@ -559,6 +921,26 @@ def _generate_executive_candidates(
                 dimension=camp,
                 score=9.0,
             )
+    elif vertical == "support":
+        _add_candidate(
+            out,
+            text="Where should we focus to improve CSAT and resolution performance?",
+            category="executive",
+            intent="opportunity",
+            score=9.5,
+        )
+        cat = _find_column_by_tokens(dims, ("ticket_category", "category"))
+        res = _find_column_by_tokens(metrics, ("resolution_hours", "resolution"))
+        if cat and res:
+            _add_candidate(
+                out,
+                text=f"Which {_q_label(cat)} creates the biggest resolution bottleneck?",
+                category="executive",
+                intent="underperformers",
+                metric=res,
+                dimension=cat,
+                score=9.0,
+            )
 
     if metrics and dims and vertical not in ("retail", "banking"):
         _add_candidate(
@@ -577,6 +959,9 @@ def _generate_executive_candidates(
 def _generate_relationship_candidates(
     metrics: Sequence[str],
     dims: Sequence[str],
+    *,
+    df: Optional[pd.DataFrame] = None,
+    profile: Optional[Dict[str, Any]] = None,
 ) -> List[QuestionCandidate]:
     out: List[QuestionCandidate] = []
     if metrics and dims:
@@ -602,18 +987,20 @@ def _generate_relationship_candidates(
             score=8.0,
         )
     if len(metrics) >= 2:
-        _add_candidate(
-            out,
-            text=(
-                f"How does {_q_label(metrics[0])} correlate with "
-                f"{_q_label(metrics[1])}?"
-            ),
-            category="relationship",
-            intent="correlation",
-            metric=metrics[0],
-            dimension=metrics[1],
-            score=8.0,
-        )
+        m0, m1 = metrics[0], metrics[1]
+        if _correlation_pair_allowed(m0, m1, df, profile):
+            _add_candidate(
+                out,
+                text=(
+                    f"How does {_q_label(m0)} correlate with "
+                    f"{_q_label(m1)}?"
+                ),
+                category="relationship",
+                intent="correlation",
+                metric=m0,
+                dimension=m1,
+                score=8.0,
+            )
     return out
 
 
@@ -626,13 +1013,15 @@ def select_diverse_candidates(
 
     pool = sorted(candidates, key=lambda c: (-c.score, c.text))
     selected: List[QuestionCandidate] = []
-    quotas = {
-        cat: max(1, round(max_n * share))
-        for cat, share in CATEGORY_TARGETS.items()
-    }
-  # 6 -> basic 2, executive 2, relationship 1; one slot flexible
+    has_correlation = any(c.intent == "correlation" for c in pool)
     if max_n == 6:
-        quotas = {"basic": 3, "executive": 2, "relationship": 1}
+        rel_slots = 1 if has_correlation else 1
+        quotas = {"basic": 3, "executive": 2, "relationship": rel_slots}
+    else:
+        quotas = {
+            cat: max(1, round(max_n * share))
+            for cat, share in CATEGORY_TARGETS.items()
+        }
 
     for cat in ("executive", "basic", "relationship"):
         need = quotas.get(cat, 1)
@@ -644,6 +1033,8 @@ def select_diverse_candidates(
         for cand in ranked:
             if need <= 0:
                 break
+            if cand.intent == "correlation" and not has_correlation:
+                continue
             if _diversity_penalty(cand, selected) >= 8:
                 continue
             selected.append(cand)
@@ -654,6 +1045,8 @@ def select_diverse_candidates(
         best_eff = -999.0
         for cand in pool:
             if cand in selected:
+                continue
+            if cand.intent == "correlation" and not has_correlation:
                 continue
             eff = cand.score - _diversity_penalty(cand, selected)
             if eff > best_eff:
@@ -676,10 +1069,14 @@ def compose_suggested_questions(
     columns: List[str],
     dashboard_kind: str = "generic",
     date_col: Optional[str] = None,
+    mapped_primary: Optional[str] = None,
+    executive_domain: Optional[str] = None,
 ) -> List[str]:
-    vertical = detect_suggestion_vertical(columns)
-    if vertical == "generic" and dashboard_kind in VERTICAL_METRIC_PRIORITY:
-        vertical = dashboard_kind
+    vertical = resolve_suggestion_vertical(
+        columns,
+        dashboard_kind=dashboard_kind,
+        executive_domain=executive_domain,
+    )
 
     metric_priority = VERTICAL_METRIC_PRIORITY.get(
         vertical, VERTICAL_METRIC_PRIORITY.get("generic", ())
@@ -694,6 +1091,21 @@ def compose_suggested_questions(
         metrics = [c for c, _ in ranked_metrics[:6]]
     if not dims and ranked_dims:
         dims = [c for c, _ in ranked_dims[:6]]
+
+    primary = mapped_primary if mapped_primary in columns else (metrics[0] if metrics else None)
+    metrics = _reorder_primary_first(metrics, primary)
+    metrics = _filter_suggest_metrics(
+        metrics,
+        df=df,
+        profile=profile,
+        vertical=vertical,
+        primary=primary,
+    )
+    dims = _filter_breakdown_dims(dims, date_cols)
+    if not dims and ranked_dims:
+        dims = _filter_breakdown_dims([c for c, _ in ranked_dims], date_cols)
+    if not dims:
+        return []
 
     date_for_trend = date_col or (date_cols[0] if date_cols else None)
     if not date_for_trend:
@@ -720,9 +1132,12 @@ def compose_suggested_questions(
             columns=columns,
             df=df,
             profile=profile,
+            date_cols=date_cols,
         )
     )
-    candidates.extend(_generate_relationship_candidates(metrics, dims))
+    candidates.extend(
+        _generate_relationship_candidates(metrics, dims, df=df, profile=profile)
+    )
 
     if vertical == "banking":
         trend_date = date_for_trend or _find_column_by_tokens(
