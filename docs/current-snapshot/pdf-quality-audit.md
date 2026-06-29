@@ -1,6 +1,6 @@
 # PDF Quality Audit — Real Export Evidence (June 28–29, 2026)
 
-**Branch:** `DEV` · **final HEAD:** `cf643d9` (PDF-2 complete)  
+**Branch:** `DEV` · **final HEAD:** `b66d5d1` (PDF-2 + mandatory alignment complete)  
 **Scope:** Architecture discovery, P1/P2 audit, and PDF-1/PDF-2 implementation record  
 **Evidence:** User-downloaded PDFs, headless export scripts, phase7 validation matrix
 
@@ -1030,9 +1030,9 @@ npm run build → success (Next.js 16.2.4)
 
 ## 23. PDF-2 final status (June 29, 2026)
 
-**HEAD:** `cf643d9` — fix(frontend): polish pdf technical appendix  
-**Working tree:** clean · **6 commits ahead** of `origin/DEV`  
-**Backend:** not touched during PDF-2 (suggested-questions work at `3ee3e48` predates PDF export passes).
+**HEAD:** `b66d5d1` — fix(frontend): clean pdf insight section labels  
+**Working tree:** clean  
+**Backend:** not touched during PDF-2 or alignment passes (suggested-questions work at `3ee3e48` predates PDF export).
 
 ### 23.1 Commit arc (PDF + related quality)
 
@@ -1045,12 +1045,17 @@ npm run build → success (Next.js 16.2.4)
 | `fe6344f` | PDF-2B — ID/date preview formatting, data quality wording |
 | `5d27fc1` | PDF-2C-1 — KPI dashboard dedupe |
 | `cf643d9` | PDF-2C-2 — technical appendix polish |
+| `042db37` | Mandatory alignment — live/PDF narrative guard (initial) |
+| `cdb1f6d` | Shared aligned insight model; structured PDF sections; PDF bypass fix |
+| `b66d5d1` | PDF structured-section redundant label cleanup |
 
 ### 23.2 PDF quality checklist (final)
 
 | Item | Status |
 |------|--------|
-| Narrative/chart alignment | ✅ PDF-1 |
+| Narrative/chart alignment (generic guard) | ✅ PDF-1 + alignment |
+| Shared live/PDF `insightPresentation` model | ✅ `cdb1f6d` |
+| Structured PDF sections + compact Chart view | ✅ `cdb1f6d` |
 | Root / follow-up / full export contexts | ✅ PDF-1 |
 | AI Insights slim preset | ✅ PDF-1 |
 | Data preview appendix after Visualization | ✅ PDF-1 |
@@ -1061,6 +1066,7 @@ npm run build → success (Next.js 16.2.4)
 | Data quality wording (sample vs file-wide) | ✅ PDF-2B |
 | KPI dashboard dedupe / skip when sparse | ✅ PDF-2C-1 |
 | Technical appendix title / tone / page-break | ✅ PDF-2C-2 |
+| Redundant PDF section label cleanup | ✅ `b66d5d1` |
 
 ### 23.3 Test / build record (arc)
 
@@ -1068,27 +1074,27 @@ npm run build → success (Next.js 16.2.4)
 |-------|--------|
 | Backend suggested-question phase | **492 passed** |
 | Follow-up chip targeted tests | **37 passed** |
-| PDF/export targeted suites (PDF-1 → PDF-2C-2) | **PASS** |
-| Latest `npm run build` | **PASS** (recorded at PDF-2C-2) |
+| PDF/export/alignment targeted suites | **PASS** |
+| Latest `npm run build` | **PASS** (recorded at `b66d5d1`) |
 
 ### 23.4 Remaining known items
 
 - **No PDF-2 backlog**
-- Broader **final release-readiness validation** only (optional browser spot-check, cross-domain AI narrative QA, platform production gaps)
+- **Final release-readiness validation** only (optional browser spot-check, cross-domain AI narrative QA, platform production gaps)
 
 ### 23.5 Constraints going forward
 
 1. Do not reopen **H-Bar/V-Bar parity** unless a measured regression appears.
 2. Do not reopen **chart axis/domain/bar sizing** unless a test or screenshot proves regression.
 3. Do not change **suggested questions** or **follow-up chips** unless a new issue is proven.
-4. Do not reopen **PDF-1/PDF-2** unless a generated PDF proves regression.
+4. Do not reopen **PDF-1/PDF-2 or alignment fixes** unless a generated PDF proves regression.
 5. Future work: **audit-first**, small scoped fixes only.
 
 See also: [`pdf-export-phase-changelog.md`](./pdf-export-phase-changelog.md) · [`latest-working-snapshot.md`](./latest-working-snapshot.md).
 
 ---
 
-## 24. Mandatory alignment fix — generic chart-contract guard (June 29, 2026, uncommitted)
+## 24. Mandatory alignment fix — generic chart-contract guard (June 29, 2026, `042db37`)
 
 **Problem:** Banking **Product Type** alignment passed after PDF-1, but hospitality **Room Revenue by Room Type** still showed **Market** geography narrative (Downtown, Beach, Suburban, etc.) in live AI Insights and PDF analysis while the chart showed room types (Suite, Executive, Deluxe, Family, Standard).
 
@@ -1123,7 +1129,7 @@ Artifacts: `docs/pdf-validation-screenshots/pdf-mandatory-fix-{banking,hospitali
 
 ---
 
-## 25. Mandatory alignment fix — PDF bypass + structured insight model (June 29, 2026, post-`042db37`, uncommitted)
+## 25. Mandatory alignment fix — PDF bypass + structured insight model (June 29, 2026, `cdb1f6d`)
 
 **Problem:** After commit `042db37`, hospitality **Room Revenue by Room Type** PDFs still showed **Market** narrative (“Downtown and Beach markets dominate…”) on AI insight page 2 while the visualization correctly showed Room Type categories.
 
@@ -1144,3 +1150,15 @@ Artifacts: `docs/pdf-validation-screenshots/pdf-mandatory-fix-{banking,hospitali
 | `frontend/app/page.tsx` | Align reasoning blocks + insightSummary; stop stale summary fallback in UI; pass aligned model to export |
 
 **Validation:** 70 targeted tests **PASS**; `npm run build` **PASS**; live script `docs/pdf-mandatory-fix-generic-alignment-validation.py`.
+
+---
+
+## 26. PDF structured-section label cleanup (June 29, 2026, `b66d5d1`)
+
+**Problem:** Structured PDF AI Insight headings (Executive takeaway, Evidence, Why this matters, Supporting detail) were correct, but body bullets sometimes repeated labels such as `Executive takeaway:` or trailing `Evidence:`.
+
+**Fix:** `stripRedundantPdfInsightSectionLabel()` in `pdf-insight-section-text.ts`; applied at PDF render time in `pdf-report.ts` only.
+
+**Validation:** 51 targeted tests **PASS** (including `pdf-insight-section-text.test.ts`); `npm run build` **PASS**.
+
+**Final snapshot HEAD:** `b66d5d1` — all PDF-2 backlog and mandatory alignment work complete.

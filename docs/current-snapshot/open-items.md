@@ -1,9 +1,9 @@
 # Open Items (Prioritized)
 
-**Snapshot:** June 29, 2026 (post–PDF-1) · Branch `DEV` · HEAD `c764f5d`.
+**Snapshot:** June 29, 2026 (final release) · Branch `DEV` · HEAD `b66d5d1`.
 
 Frozen parity: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).  
-PDF-1 record: [`pdf-quality-audit.md`](./pdf-quality-audit.md).  
+PDF record: [`pdf-quality-audit.md`](./pdf-quality-audit.md).  
 Latest git state: [`latest-working-snapshot.md`](./latest-working-snapshot.md).
 
 ---
@@ -15,44 +15,46 @@ Latest git state: [`latest-working-snapshot.md`](./latest-working-snapshot.md).
 | Suggested Questions — 15-domain backend quality | **Complete** | `3ee3e48` |
 | Follow-up chip quality (FU-P1) | **Complete** | `c460bcc` |
 | PDF-1 export quality | **Complete** | `c764f5d` |
+| PDF-2A domain labels and branding | **Complete** | `6e30b8f` |
+| PDF-2B preview formatting and data quality labels | **Complete** | `fe6344f` |
+| PDF-2C-1 KPI dashboard dedupe | **Complete** | `5d27fc1` |
+| PDF-2C-2 technical appendix polish | **Complete** | `cf643d9` |
+| Mandatory live/PDF aligned insight model | **Complete** | `042db37`, `cdb1f6d` |
+| PDF structured-section label cleanup | **Complete** | `b66d5d1` |
 | H-Bar / V-Bar visual parity (5B.1 → 5C.5) | **Frozen** | prior |
 | 15-domain Overview validation | **Complete** | prior |
 | Export regression (PNG + Phase 7 matrix) | **Complete** | prior |
 | Final release snapshot (478/743 green) | **Complete** | prior |
 
-### PDF-1 resolved (in `c764f5d`)
+### PDF quality resolved (PDF-1 → PDF-2 + alignment)
 
-- Narrative/chart alignment
-- Slim AI Insights preset
-- Data preview appendix after Visualization
-- PDF chart embed sizing (live-validated)
-- Category metadata chip fix
+- Narrative/chart alignment (generic chart-contract guard)
+- Shared live/PDF `insightPresentation` model
+- Structured PDF sections + compact Chart view
+- Slim AI Insights preset; data preview appendix after Visualization
+- PDF chart embed sizing; metadata chip fix
 - Follow-up answer export button/context
-- Visualization page-break / orphan fix
+- Visualization page-break / cohesion fix
+- Domain labels; branding/footer polish
+- Preview ID/date formatting; data quality wording
+- KPI dashboard dedupe; technical appendix polish
+- Redundant PDF section label cleanup
 
 ---
 
-## P1 — PDF-2 (audit-first, small scope)
+## P1 — Final release readiness only
 
-**Do not start broad PDF redesign.** Each item needs audit evidence before implementation.
+| Item | Notes |
+|------|-------|
+| Optional browser spot-check | 3–5 domains upload + AI Insights + PDF export |
+| Cross-domain AI Insights narrative QA | Beyond deterministic probes; only if new evidence |
 
-| ID | Item | Notes |
-|----|------|-------|
-| PDF-P2-01 | Sparse KPI dashboard page | Merge/redesign optional |
-| PDF-P2-02 | Technical appendix prominence | Executive-mode layout |
-| PDF-P2-03 | Data quality vs preview slice | Full-file duplicate scan |
-| PDF-P2-04 | Branding/footer placeholder copy | `support@example.com`, etc. |
-| PDF-P2-06 | Preview table date-like IDs | `formatPdfTableCellValue` / ISO heuristics |
-| PDF-P2-07 | Domain label polish | e.g. real estate → “General business” |
-
-Optional: Recent Insights per-row export control.
+**No PDF-2 backlog.** Do not reopen PDF work unless a generated PDF proves regression.
 
 ---
 
 ## P1 — Future production readiness (unchanged)
 
-- Optional browser spot-check (3–5 domains)
-- AI Insights answer-quality validation (cross-domain narratives)
 - Platform: auth, durable storage, metering, optional E2E suite
 
 ---
@@ -62,6 +64,7 @@ Optional: Recent Insights per-row export control.
 - Histogram premium review (no dedicated pass)
 - Large dataset optimization (100k+ fixtures)
 - Cosmetic chart tuning **only** with explicit product approval
+- Optional: per-row export on Recent Insights list
 
 ---
 
@@ -82,4 +85,5 @@ Optional: Recent Insights per-row export control.
 1. **Do not reopen H-Bar/V-Bar parity** unless measured regression appears.
 2. **Do not reopen chart axis/domain/bar sizing** unless test or screenshot proves regression.
 3. **Do not change suggested questions or follow-up chips** unless a new issue is proven.
-4. **PDF-2** — audit-first, small incremental fixes only.
+4. **Do not reopen PDF fixes** unless a generated PDF proves regression.
+5. **Future changes** — audit-first, small incremental fixes, test-backed.

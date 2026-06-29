@@ -1,30 +1,49 @@
 # Final Release Readiness Summary
 
-**Snapshot date:** June 28, 2026 (final release) · **Updated:** June 29, 2026 (post–PDF-1 pointer)  
+**Snapshot date:** June 28, 2026 (final release) · **Updated:** June 29, 2026 (post–PDF-2 + alignment final)  
 **Branch:** `DEV`  
-**Latest commit (June 29):** `c764f5d` — fix(frontend): improve pdf insight export quality
+**Latest commit (June 29):** `b66d5d1` — fix(frontend): clean pdf insight section labels
 
-> **Post–PDF-1 status:** See [`latest-working-snapshot.md`](./latest-working-snapshot.md) for current HEAD, PDF-1 resolved items, and PDF-2 deferred list. This file remains the **June 28 final release** baseline record.
+> **Final status (June 29):** See [`latest-working-snapshot.md`](./latest-working-snapshot.md) for current HEAD, completed PDF-1/PDF-2/alignment work, and validation record. This file retains the **June 28 final release** baseline record below.
 
 ---
 
-## Post–PDF-1 addendum (June 29, 2026)
+## Post–PDF-2 + alignment addendum (June 29, 2026)
+
+| Commit | Scope |
+|--------|--------|
+| `3ee3e48` | Suggested Questions backend quality (15 domains) |
+| `c460bcc` | AI follow-up chip quality (FU-P1) |
+| `c764f5d` | PDF-1 export quality |
+| `6e30b8f` | PDF-2A domain labels and branding |
+| `fe6344f` | PDF-2B preview formatting and data quality labels |
+| `5d27fc1` | PDF-2C-1 KPI dashboard dedupe |
+| `cf643d9` | PDF-2C-2 technical appendix polish |
+| `042db37` | Mandatory live/PDF narrative alignment (initial) |
+| `cdb1f6d` | Shared aligned insight model across UI and PDF |
+| `b66d5d1` | PDF structured-section label cleanup |
+
+| Check | Result (recorded) |
+|-------|-------------------|
+| Backend Phase 1 pytest | **492 passed, 0 failed** |
+| Frontend follow-up targeted | **37 passed** |
+| PDF/export/alignment targeted vitest | **PASS** |
+| Latest `npm run build` | **PASS** |
+| Working tree | **Clean** at `b66d5d1` |
+
+**Final PDF / AI Insight:** Live UI and PDF share normalized `insightPresentation` model. PDF includes Executive takeaway, Evidence, Why this matters, Supporting detail when aligned. Chart view compact. Narrative/chart mismatch fixed for Product Type, Room Type, Grid Region, and related category charts. **No PDF-2 backlog remains.**
+
+Constraints: frozen H-Bar/V-Bar, frozen axis/domain/bar sizing, frozen suggested questions/chips, do not reopen PDF unless generated PDF proves regression.
+
+---
+
+## Post–PDF-1 addendum (June 29, 2026) — superseded by table above
 
 | Commit | Scope |
 |--------|--------|
 | `3ee3e48` | Suggested Questions backend quality (15 domains) |
 | `c460bcc` | AI follow-up chip quality (FU-P1) |
 | `c764f5d` | PDF-1 export quality (narrative alignment, slim preset, appendix, follow-up export, viz layout) |
-
-| Check | Result (recorded) |
-|-------|-------------------|
-| Backend Phase 1 pytest | **492 passed, 0 failed** |
-| Frontend follow-up targeted | **37 passed** |
-| PDF/export targeted vitest | **PASS** |
-| `npm run build` | **PASS** |
-| Working tree | **Clean** at `c764f5d` |
-
-PDF-2 **not started**. Constraints: frozen H-Bar/V-Bar, frozen axis/domain/bar sizing, frozen suggested questions/chips unless new proven issue.
 
 ---
 
