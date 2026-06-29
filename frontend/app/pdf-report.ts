@@ -1772,11 +1772,52 @@ export function shouldStartPdfChartOnFreshPage(
   return availableHeightMm < requiredHeightMm;
 }
 
+/** Section title block height for Visualization (accent bar + rule). */
+export const PDF_VIZ_SECTION_TITLE_BLOCK_MM =
+  PDF_SPACING.sectionBefore + 9.5 + PDF_SPACING.sectionAfterRule;
+
 /** Height of the Visualization “Analysis context” metadata block (kicker + rows). */
 export function estimatePdfVizAnalysisContextHeight(rowCount: number): number {
   if (rowCount <= 0) return 0;
   const metaRowH = pdfLineHeight(PDF_TYPE.bodySmall) + PDF_SPACING.blockTight;
   return 5.5 + rowCount * metaRowH + PDF_SPACING.blockTight;
+}
+
+/** Conservative estimate for chart title/subtitle/metadata chip header panel. */
+export function estimatePdfVizPresentationHeaderHeightMm(
+  metadataChipCount: number = 2
+): number {
+  const titleBlock =
+    PDF_SPACING.panelPad + pdfLineHeight(PDF_TYPE.chartTitle) + 2;
+  const chipsH = metadataChipCount > 0 ? 3 + 5.8 + PDF_SPACING.panelPad : 0;
+  return titleBlock + chipsH + PDF_SPACING.chartHeaderAfter;
+}
+
+/** Minimum chart footprint used for viz cohesion checks (not embed sizing). */
+export function pdfVizChartCohesionMinHeightMm(): number {
+  return PDF_VIZ_EMBED_MIN_HEIGHT_MM + PDF_SPACING.chartFramePad * 2 + 10;
+}
+
+/** True when Visualization title + header + metadata + chart minimum should start together on a fresh page. */
+export function shouldStartPdfVisualizationBlockOnFreshPage(args: {
+  y: number;
+  footerY: number;
+  metaRowCount: number;
+  insightsReserveMm?: number;
+  presentationHeaderMm?: number;
+  pageSafeMm?: number;
+}): boolean {
+  const header =
+    args.presentationHeaderMm ??
+    estimatePdfVizPresentationHeaderHeightMm();
+  const needed =
+    PDF_VIZ_SECTION_TITLE_BLOCK_MM +
+    header +
+    estimatePdfVizAnalysisContextHeight(args.metaRowCount) +
+    pdfVizChartCohesionMinHeightMm() +
+    (args.insightsReserveMm ?? 0);
+  const safe = args.pageSafeMm ?? PDF_SPACING.pageSafe;
+  return args.y + needed > args.footerY - safe;
 }
 
 /** True when analysis-context metadata + chart minimum should start on a fresh page. */
@@ -1796,11 +1837,6 @@ export function shouldStartPdfVizCoreOnFreshPage(args: {
   const needed =
     estimatePdfVizAnalysisContextHeight(args.metaRowCount) + chartMin + insights;
   return args.y + needed > args.footerY - safe;
-}
-
-/** Minimum chart footprint used for viz cohesion checks (not embed sizing). */
-export function pdfVizChartCohesionMinHeightMm(): number {
-  return PDF_VIZ_EMBED_MIN_HEIGHT_MM + PDF_SPACING.chartFramePad * 2 + 10;
 }
 
 export function pdfChartMetadataChipText(
@@ -4038,8 +4074,82 @@ export async function runExecutivePdfExport(
 
   /* -------- Chart -------- */
   if (input.includes.includeChart && input.chart) {
-    breakBeforeMajorSection(56);
     const ch = input.chart;
+    const execBrief = contentPlan.vizBrief?.trim() ?? "";
+    const execBriefNumbered = isNumberedExecutiveBrief(execBrief);
+    const factSlice = contentPlan.vizFacts.slice(0, 6);
+    const hasExecFacts = factSlice.length > 0;
+    const hasLensPanel = contentPlan.useLensExecutivePanel;
+
+    const estimateVizInsightsBlockMm = () => {
+      if (!execBrief && !hasExecFacts && !hasLensPanel) return 0;
+      let h = 6;
+      if (hasLensPanel) {
+        h +=
+          contentPlan.lensSections.length *
+          (PDF_SPACING.insightLineGap * 2 + 8);
+      }
+      if (execBrief) {
+        const wrap = doc.splitTextToSize(execBrief, contentWidth - 10);
+        const lineCap = execBriefNumbered
+          ? Math.min(8, wrap.length)
+          : Math.min(2, wrap.length);
+        h += lineCap * PDF_SPACING.insightLineGap + 3;
+      }
+      if (hasExecFacts) {
+        const gridRows = Math.ceil(factSlice.length / 3);
+        h += 5 + gridRows * 17;
+      }
+      return h + 2;
+    };
+
+    const metaRows: string[][] = [];
+    if (ch.data.length > 0) {
+      metaRows.push([
+        "Analysis Type",
+        pdfChartKindExecutiveLabel(ch.presentationKind),
+      ]);
+      const mShow =
+        ch.alignedMetricDisplay?.trim() || ch.alignedMetric?.trim();
+      if (mShow) {
+        metaRows.push(["Primary Metric", polishPdfExecutiveLabel(mShow)]);
+      }
+      const groupedBy = input.chartAxisLabels?.category?.trim();
+      if (groupedBy) {
+        metaRows.push(["Grouped By", polishPdfExecutiveLabel(groupedBy)]);
+      }
+      const recordsEval =
+        input.provenance?.rowsAnalyzed ?? input.dataset.rows;
+      metaRows.push([
+        "Records Evaluated",
+        Number(recordsEval).toLocaleString(),
+      ]);
+      const attr = ch.chartAttribution?.trim().toLowerCase() ?? "";
+      if (attr.includes("auto") && attr.includes("dashboard")) {
+        metaRows.push(["Source", "Automated dashboard"]);
+      }
+    }
+
+    const metadataChipCount = normalizePdfChartMetadataChips(ch.metadataChips, {
+      dimensionFallback: input.chartAxisLabels?.category?.trim() || null,
+    }).length;
+
+    if (
+      shouldStartPdfVisualizationBlockOnFreshPage({
+        y,
+        footerY,
+        metaRowCount: metaRows.length,
+        insightsReserveMm: estimateVizInsightsBlockMm(),
+        presentationHeaderMm:
+          estimatePdfVizPresentationHeaderHeightMm(metadataChipCount),
+      })
+    ) {
+      doc.addPage();
+      y = contentTop0;
+    } else {
+      breakBeforeMajorSection(56);
+    }
+
     sectionTitle("Visualization");
     const pdfChartHeading =
       ch.title.trim() ||
@@ -4178,36 +4288,9 @@ export async function runExecutivePdfExport(
 
     drawChartPresentationHeader();
 
-    const execBrief = contentPlan.vizBrief?.trim() ?? "";
-    const execBriefNumbered = isNumberedExecutiveBrief(execBrief);
-    const factSlice = contentPlan.vizFacts.slice(0, 6);
-    const hasExecFacts = factSlice.length > 0;
-    const hasLensPanel = contentPlan.useLensExecutivePanel;
     const vizInsightsFollow = Boolean(
       execBrief || hasExecFacts || hasLensPanel
     );
-
-    const estimateVizInsightsBlockMm = () => {
-      if (!execBrief && !hasExecFacts && !hasLensPanel) return 0;
-      let h = 6;
-      if (hasLensPanel) {
-        h +=
-          contentPlan.lensSections.length *
-          (PDF_SPACING.insightLineGap * 2 + 8);
-      }
-      if (execBrief) {
-        const wrap = doc.splitTextToSize(execBrief, contentWidth - 10);
-        const lineCap = execBriefNumbered
-          ? Math.min(8, wrap.length)
-          : Math.min(2, wrap.length);
-        h += lineCap * PDF_SPACING.insightLineGap + 3;
-      }
-      if (hasExecFacts) {
-        const gridRows = Math.ceil(factSlice.length / 3);
-        h += 5 + gridRows * 17;
-      }
-      return h + 2;
-    };
 
     const drawMutedMetaLine = (label: string, value: string) => {
       doc.setFont("helvetica", "bold");
@@ -4223,42 +4306,6 @@ export async function runExecutivePdfExport(
     };
 
     if (ch.data.length > 0) {
-      const metaRows: string[][] = [];
-      metaRows.push([
-        "Analysis Type",
-        pdfChartKindExecutiveLabel(ch.presentationKind),
-      ]);
-      const mShow =
-        ch.alignedMetricDisplay?.trim() || ch.alignedMetric?.trim();
-      if (mShow) {
-        metaRows.push(["Primary Metric", polishPdfExecutiveLabel(mShow)]);
-      }
-      const groupedBy = input.chartAxisLabels?.category?.trim();
-      if (groupedBy) {
-        metaRows.push(["Grouped By", polishPdfExecutiveLabel(groupedBy)]);
-      }
-      const recordsEval =
-        input.provenance?.rowsAnalyzed ?? input.dataset.rows;
-      metaRows.push([
-        "Records Evaluated",
-        Number(recordsEval).toLocaleString(),
-      ]);
-      const attr = ch.chartAttribution?.trim().toLowerCase() ?? "";
-      if (attr.includes("auto") && attr.includes("dashboard")) {
-        metaRows.push(["Source", "Automated dashboard"]);
-      }
-      const insightsReserve = estimateVizInsightsBlockMm();
-      if (
-        shouldStartPdfVizCoreOnFreshPage({
-          y,
-          footerY,
-          metaRowCount: metaRows.length,
-          insightsReserveMm: insightsReserve,
-        })
-      ) {
-        doc.addPage();
-        y = contentTop0;
-      }
       const metaBlockH = estimatePdfVizAnalysisContextHeight(metaRows.length);
       ensurePageSpace(metaBlockH);
       pdfDrawPanelKicker(doc, margin, y, "Analysis context", theme.muted, theme.accent);
@@ -4285,10 +4332,7 @@ export async function runExecutivePdfExport(
           availableMm > 48 ? availableMm : Math.max(72, footerY - y - 12)
         )
       );
-      if (
-        shouldStartPdfChartOnFreshPage(ch.presentationKind, availableMm) ||
-        availableMm < pdfVizChartCohesionMinHeightMm()
-      ) {
+      if (shouldStartPdfChartOnFreshPage(ch.presentationKind, availableMm)) {
         doc.addPage();
         y = contentTop0;
         insightsReserve = estimateVizInsightsBlockMm();

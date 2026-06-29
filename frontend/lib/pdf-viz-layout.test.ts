@@ -4,8 +4,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   estimatePdfVizAnalysisContextHeight,
+  estimatePdfVizPresentationHeaderHeightMm,
+  PDF_VIZ_SECTION_TITLE_BLOCK_MM,
   pdfVizChartCohesionMinHeightMm,
-  shouldStartPdfVizCoreOnFreshPage,
+  shouldStartPdfVisualizationBlockOnFreshPage,
 } from "@/app/pdf-report";
 
 const pdfReportSrc = readFileSync(
@@ -14,50 +16,56 @@ const pdfReportSrc = readFileSync(
 );
 
 describe("pdf visualization layout cohesion", () => {
-  it("estimates analysis context block height from row count", () => {
-    expect(estimatePdfVizAnalysisContextHeight(0)).toBe(0);
-    expect(estimatePdfVizAnalysisContextHeight(5)).toBeGreaterThan(30);
-  });
-
-  it("requests fresh page when metadata + chart minimum would not fit", () => {
+  it("requests fresh page when full Visualization block would not fit", () => {
     const footerY = 280;
     const metaRows = 5;
     const insights = 24;
-    const chartMin = pdfVizChartCohesionMinHeightMm();
+    const header = estimatePdfVizPresentationHeaderHeightMm(3);
     const needed =
-      estimatePdfVizAnalysisContextHeight(metaRows) + chartMin + insights;
+      PDF_VIZ_SECTION_TITLE_BLOCK_MM +
+      header +
+      estimatePdfVizAnalysisContextHeight(metaRows) +
+      pdfVizChartCohesionMinHeightMm() +
+      insights;
     const yTight = footerY - needed + 2;
     expect(
-      shouldStartPdfVizCoreOnFreshPage({
+      shouldStartPdfVisualizationBlockOnFreshPage({
         y: yTight,
         footerY,
         metaRowCount: metaRows,
         insightsReserveMm: insights,
+        presentationHeaderMm: header,
       })
     ).toBe(true);
     expect(
-      shouldStartPdfVizCoreOnFreshPage({
-        y: 40,
+      shouldStartPdfVisualizationBlockOnFreshPage({
+        y: 8,
         footerY,
-        metaRowCount: metaRows,
-        insightsReserveMm: insights,
+        metaRowCount: 0,
+        insightsReserveMm: 0,
+        presentationHeaderMm: estimatePdfVizPresentationHeaderHeightMm(0),
       })
     ).toBe(false);
   });
 
-  it("draws analysis context atomically without per-row mutedLine page breaks", () => {
-    const vizSection = pdfReportSrc.slice(
-      pdfReportSrc.indexOf('sectionTitle("Visualization")'),
-      pdfReportSrc.indexOf("const embedCenteredChartImage")
+  it("starts Visualization block before section title when cohesion guard fires", () => {
+    const vizStart = pdfReportSrc.indexOf("/* -------- Chart -------- */");
+    const sectionTitleIdx = pdfReportSrc.indexOf(
+      'sectionTitle("Visualization")',
+      vizStart
     );
-    expect(vizSection).toContain("drawMutedMetaLine");
-    expect(vizSection).toContain("shouldStartPdfVizCoreOnFreshPage");
-    expect(vizSection).toContain(
-      "estimatePdfVizAnalysisContextHeight(metaRows.length)"
+    const guardIdx = pdfReportSrc.indexOf(
+      "shouldStartPdfVisualizationBlockOnFreshPage",
+      vizStart
     );
-    expect(vizSection).not.toMatch(
-      /metaRows\.forEach\(\(\[label, value\]\) => \{\s*mutedLine/
-    );
+    expect(guardIdx).toBeGreaterThan(-1);
+    expect(guardIdx).toBeLessThan(sectionTitleIdx);
+  });
+
+  it("does not orphan chart embed on cohesion min-height alone", () => {
+    const embedIdx = pdfReportSrc.indexOf("const embedCenteredChartImage");
+    const embedSlice = pdfReportSrc.slice(embedIdx, embedIdx + 1200);
+    expect(embedSlice).not.toContain("availableMm < pdfVizChartCohesionMinHeightMm()");
   });
 
   it("keeps sample data appendix after visualization in render path", () => {

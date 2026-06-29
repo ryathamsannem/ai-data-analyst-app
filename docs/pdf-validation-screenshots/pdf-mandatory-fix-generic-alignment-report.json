@@ -1,0 +1,74 @@
+{
+  "scenarios": [
+    {
+      "id": "banking",
+      "question": "Spend Amount by Product Type",
+      "chartTitle": "Spend Amount by Product Type",
+      "uiAnswerSample": "RISK INSIGHT\n\nspend amount by product type \u2014 #1: Credit Card (8,481,342); #2: Term Deposit (7,556,112); #3: Personal Loan (7,317,710).",
+      "uiScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-banking-ui-answer.png",
+      "insightPdf": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-banking-insight-preset.pdf",
+      "pdfAnalysis": {
+        "file": "pdf-mandatory-fix-banking-insight-preset.pdf",
+        "pages": 4,
+        "imagesPerPage": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "vizPage": 3,
+        "vizScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-banking-viz-page-3.png"
+      },
+      "uiGoodTerms": [
+        "Credit Card",
+        "Term Deposit",
+        "Personal Loan",
+        "Product Type"
+      ],
+      "uiBadTerms": [],
+      "pdfGoodTerms": [
+        "Credit Card",
+        "Term Deposit",
+        "Personal Loan",
+        "Product Type"
+      ],
+      "pdfBadTerms": [],
+      "uiPassesAlignment": true,
+      "pdfPassesAlignment": true
+    },
+    {
+      "id": "hospitality",
+      "question": "Room Revenue by Room Type",
+      "chartTitle": "Room Revenue by Room Type",
+      "uiAnswerSample": "BUSINESS COMPARISON\n\nTotal room revenue across all 1,000 bookings is approximately 54.",
+      "uiScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-hospitality-ui-answer.png",
+      "insightPdf": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-hospitality-insight-preset.pdf",
+      "pdfAnalysis": {
+        "file": "pdf-mandatory-fix-hospitality-insight-preset.pdf",
+        "pages": 5,
+        "imagesPerPage": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "vizPage": 4,
+        "vizScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-hospitality-viz-page-4.png"
+      },
+      "uiGoodTerms": [],
+      "uiBadTerms": [],
+      "pdfGoodTerms": [
+        "Suite",
+        "Executive",
+        "Deluxe",
+        "Standard",
+        "Room Type"
+      ],
+      "pdfBadTerms": [],
+      "uiPassesAlignment": false,
+      "pdfPassesAlignment": true
+    }
+  ],
+  "allPass": false
+}

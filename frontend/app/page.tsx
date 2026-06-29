@@ -742,8 +742,18 @@ import {
   chartExistsInHistory,
   clearInsightResultHistory,
   createInsightSavedResult,
+  resolveLiveInsightAnswerText,
   type InsightSavedResult,
 } from "@/lib/insight-result-history";
+import {
+  alignLiveInsightPresentation,
+  buildLiveInsightChartPrep,
+} from "@/lib/live-insight-narrative-alignment";
+import {
+  buildInsightChartNarrativeContext,
+  chartRowsToRankedSignals,
+  insightNarrativeConflictsWithChart,
+} from "@/lib/insight-chart-narrative-alignment";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   datasetKindLabel,
@@ -10489,7 +10499,7 @@ function HomeInner() {
     lastAskedQuestion,
   ]);
 
-  const insightExecutiveVizInsights = useMemo((): ExecutiveVizInsightCard[] => {
+  const insightExecutiveVizInsightsBuilt = useMemo((): ExecutiveVizInsightCard[] => {
     if (insightUnsupportedGrowth) {
       return buildUnsupportedGrowthExecutiveCards(insightUnsupportedGrowth);
     }
@@ -10784,12 +10794,12 @@ function HomeInner() {
 
   const dualMetricRoasLead = useMemo((): DualMetricRoasLead | null => {
     if (insightVisualization?.multiSeries?.layout !== "grouped_bar") return null;
-    const card = insightExecutiveVizInsights.find((c) => c.key === "dual-roas");
+    const card = insightExecutiveVizInsightsBuilt.find((c) => c.key === "dual-roas");
     if (!card?.value?.trim() || !card.hint?.trim()) return null;
     return { campaign: card.value.trim(), roas: card.hint.trim() };
   }, [
     insightVisualization?.multiSeries?.layout,
-    insightExecutiveVizInsights,
+    insightExecutiveVizInsightsBuilt,
   ]);
 
   const insightNumberedExecutiveBrief = useMemo((): string | null => {
@@ -10869,12 +10879,30 @@ function HomeInner() {
     insightRelationshipEnriched,
   ]);
 
-  const parsedInsightAnswer = useMemo(() => {
+  const insightAnswerTextForDisplay = useMemo(
+    () =>
+      resolveLiveInsightAnswerText({
+        question,
+        lastAskedQuestion,
+        liveAnswer: answer,
+        activeResultId: activeInsightResultId,
+        history: insightResultHistory,
+      }),
+    [
+      question,
+      lastAskedQuestion,
+      answer,
+      activeInsightResultId,
+      insightResultHistory,
+    ]
+  );
+
+  const rawParsedInsightAnswer = useMemo(() => {
     if (insightUnsupportedMultiMetric) {
       return buildUnsupportedMultiMetricParsedSections(insightUnsupportedMultiMetric);
     }
     const parsed = parseAnswerIntoSections(
-      answer,
+      insightAnswerTextForDisplay,
       alignedAnalysis?.insightSummary ?? undefined,
       { reasoningBlockClaim: insightReasoningBlocks[0]?.claim }
     );
@@ -10963,7 +10991,7 @@ function HomeInner() {
         summaryText = `${lead} ${summaryText}`.trim();
       }
     }
-    return {
+    const softened = {
       ...parsed,
       summary: summaryText,
       statistical: softenDetail(parsed.statistical),
@@ -10972,8 +11000,9 @@ function HomeInner() {
       methodology: softenDetail(parsed.methodology),
       moreDetail: softenDetail(parsed.moreDetail),
     };
+    return softened;
   }, [
-    answer,
+    insightAnswerTextForDisplay,
     alignedAnalysis?.insightSummary,
     insightSnapshot?.contract,
     insightNarrativeTone,
@@ -10992,7 +11021,7 @@ function HomeInner() {
     insightReasoningBlocks,
   ]);
 
-  const insightExecutiveBrief = useMemo(() => {
+  const insightExecutiveBriefBeforeAlign = useMemo(() => {
     if (insightUnsupportedMultiMetric) {
       return insightUnsupportedMultiMetric.leadSentence;
     }
@@ -11005,7 +11034,7 @@ function HomeInner() {
       return polishInsightNarrativeText(brief, { dualMetricRoasLead });
     }
     const s = sanitizeNarrativeForTrendContract(
-      parsedInsightAnswer.summary?.trim() ?? "",
+      rawParsedInsightAnswer.summary?.trim() ?? "",
       insightSnapshot?.contract
     );
     if (!s) return "";
@@ -11037,7 +11066,7 @@ function HomeInner() {
     return brief;
   }, [
     insightNumberedExecutiveBrief,
-    parsedInsightAnswer.summary,
+    rawParsedInsightAnswer.summary,
     insightSnapshot?.contract,
     insightNarrativeTone,
     dualMetricRoasLead,
@@ -11046,6 +11075,58 @@ function HomeInner() {
     insightUnsupportedDecline,
     insightUnsupportedMultiMetric,
     insightProfitMarginLead,
+  ]);
+
+  const alignedInsightPresentation = useMemo(
+    () =>
+      alignLiveInsightPresentation(
+        {
+          parsedInsightAnswer: rawParsedInsightAnswer,
+          insightExecutiveBrief: insightExecutiveBriefBeforeAlign,
+          insightExecutiveVizInsights: insightExecutiveVizInsightsBuilt,
+          rankedSignals: chartRowsToRankedSignals(sortedInsightChartData),
+        },
+        buildLiveInsightChartPrep(insightSnapshot, {
+          category: insightChartAxisLabels.categoryAxis,
+          value: insightChartAxisLabels.valueAxis,
+        })
+      ),
+    [
+      rawParsedInsightAnswer,
+      insightExecutiveBriefBeforeAlign,
+      insightExecutiveVizInsightsBuilt,
+      sortedInsightChartData,
+      insightSnapshot,
+      insightChartAxisLabels.categoryAxis,
+      insightChartAxisLabels.valueAxis,
+    ]
+  );
+
+  const parsedInsightAnswer = alignedInsightPresentation.parsedInsightAnswer;
+  const insightExecutiveBrief = alignedInsightPresentation.insightExecutiveBrief;
+  const insightExecutiveVizInsights =
+    alignedInsightPresentation.insightExecutiveVizInsights;
+
+  const insightReasoningBlocksForDisplay = useMemo(() => {
+    const ctx = buildInsightChartNarrativeContext(
+      buildLiveInsightChartPrep(insightSnapshot, {
+        category: insightChartAxisLabels.categoryAxis,
+        value: insightChartAxisLabels.valueAxis,
+      })
+    );
+    if (!ctx?.categoryNames.length) return insightReasoningBlocks;
+    return insightReasoningBlocks.filter(
+      (block) =>
+        !insightNarrativeConflictsWithChart(
+          `${block.claim} ${block.reason}`,
+          ctx
+        )
+    );
+  }, [
+    insightReasoningBlocks,
+    insightSnapshot,
+    insightChartAxisLabels.categoryAxis,
+    insightChartAxisLabels.valueAxis,
   ]);
 
   const pdfInsightExportSidecarRef = useRef({
@@ -11281,12 +11362,14 @@ function HomeInner() {
       }
       const pdfInsightSidecar = pdfInsightExportSidecarRef.current;
       const pdfParsedInsightAnswer =
-        chartScope === "insight"
-          ? parseAnswerIntoSections(
-              pdfInsightAnswer,
-              pdfAlignedAnalysis?.insightSummary ?? undefined
-            )
-          : parsedInsightAnswer;
+        chartScope === "insight" && pdfSnap?.id === insightChartId
+          ? parsedInsightAnswer
+          : chartScope === "insight"
+            ? parseAnswerIntoSections(
+                pdfInsightAnswer,
+                pdfAlignedAnalysis?.insightSummary ?? undefined
+              )
+            : parsedInsightAnswer;
       const pdfChartDataRaw = pdfSnap?.chartData ?? [];
       const pdfChartTitle = pdfSnap?.title ?? "";
       const pdfChartSubtitle = pdfSnap?.subtitle ?? "";
@@ -13744,13 +13827,13 @@ function HomeInner() {
                           )}
                         </p>
                       </div>
-                      {insightReasoningBlocks.length > 0 ? (
+                      {insightReasoningBlocksForDisplay.length > 0 ? (
                         <div className={aiInsightsAnswerDetailsGroup}>
                           <p className={aiInsightsAnswerDetailsLabel}>
                             Why this matters
                           </p>
                           <ul className={aiInsightsReasoningList}>
-                            {insightReasoningBlocks.map((block, idx) => (
+                            {insightReasoningBlocksForDisplay.map((block, idx) => (
                               <li
                                 key={`${block.type}-${idx}-${block.claim.slice(0, 32)}`}
                                 className={aiInsightsReasoningItem}

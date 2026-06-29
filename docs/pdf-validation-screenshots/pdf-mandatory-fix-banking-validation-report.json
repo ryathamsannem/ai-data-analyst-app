@@ -1,0 +1,45 @@
+{
+  "csv": "D:\\Projects\\AI-Data-Analyst-App\\test-fixtures\\domain_upload_1k\\banking_financial_1k.csv",
+  "scenario": {
+    "question": "Spend Amount by Product Type",
+    "chartTitle": "Spend Amount by Product Type",
+    "uiAnswer": "RISK INSIGHT\n\nTotal spend amount across all product types is approximately 37."
+  },
+  "uiScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-banking-ui-answer.png",
+  "uiSegmentTerms": [],
+  "uiProductTerms": [
+    "Product Type"
+  ],
+  "uiPassesAlignment": false,
+  "insightPreset": {
+    "pdf": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-banking-insight-preset.pdf",
+    "download_ms": 2728,
+    "analysis": {
+      "file": "pdf-mandatory-fix-banking-insight-preset.pdf",
+      "pages": 4,
+      "imagesPerPage": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "hasAppendixSampleData": false,
+      "hasDataQuality": false,
+      "hasConversationThread": false,
+      "segmentTermsInPdf": [],
+      "productTermsInPdf": [
+        "Credit Card",
+        "Term Deposit",
+        "Personal Loan",
+        "Product Type"
+      ],
+      "vizPage": 3,
+      "chartOnVizPage": true,
+      "vizSplitAwkward": false,
+      "vizScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf-mandatory-fix-banking-viz-page-3.png"
+    }
+  },
+  "pdfPassesAlignment": true,
+  "pdfPassesVizCohesion": true,
+  "pdfPassesSlimPreset": true
+}

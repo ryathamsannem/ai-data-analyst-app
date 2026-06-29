@@ -109,7 +109,7 @@ describe("pdf narrative alignment", () => {
     expect(aligned.pdfInsightAnswer.toLowerCase()).toContain("product type");
     expect(aligned.pdfInsightAnswer.toLowerCase()).not.toContain("premium");
     expect(aligned.pdfInsightAnswer.toLowerCase()).not.toContain("sme");
-    expect(aligned.insightExecutiveBrief).toBe("");
+    expect(aligned.insightExecutiveBrief.toLowerCase()).toContain("product type");
     expect(aligned.insightExecutiveVizInsights).toHaveLength(0);
   });
 });

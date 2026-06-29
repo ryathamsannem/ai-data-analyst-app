@@ -1,8 +1,8 @@
-# PDF Quality Audit — Real Export Evidence (June 28, 2026)
+# PDF Quality Audit — Real Export Evidence (June 28–29, 2026)
 
-**Branch:** `DEV` · baseline `c460bcc` (Phase 2 follow-up chips)  
-**Scope:** Architecture discovery + P1 issue audit only — **no production code changes**  
-**Evidence:** User-downloaded PDFs from AI Insights export and Export tab (all checkboxes, including sample data + conversation context)
+**Branch:** `DEV` · **final HEAD:** `cf643d9` (PDF-2 complete)  
+**Scope:** Architecture discovery, P1/P2 audit, and PDF-1/PDF-2 implementation record  
+**Evidence:** User-downloaded PDFs, headless export scripts, phase7 validation matrix
 
 ---
 
@@ -1025,3 +1025,98 @@ npm run build → success (Next.js 16.2.4)
 ### 22.6 Remaining PDF items
 
 **None** from the PDF-2 audit backlog — PDF-P2-01 and PDF-P2-02 complete. Future work is outside PDF-2 scope (e.g. Export/PDF finalization, routing-plan subsection) unless new audit items are opened.
+
+---
+
+## 23. PDF-2 final status (June 29, 2026)
+
+**HEAD:** `cf643d9` — fix(frontend): polish pdf technical appendix  
+**Working tree:** clean · **6 commits ahead** of `origin/DEV`  
+**Backend:** not touched during PDF-2 (suggested-questions work at `3ee3e48` predates PDF export passes).
+
+### 23.1 Commit arc (PDF + related quality)
+
+| Commit | Scope |
+|--------|--------|
+| `3ee3e48` | Suggested Questions backend quality (15 domains) |
+| `c460bcc` | AI follow-up chip quality (FU-P1) |
+| `c764f5d` | PDF-1 — narrative alignment, slim preset, appendix placement, follow-up export, viz layout |
+| `6e30b8f` | PDF-2A — domain labels, footer/branding |
+| `fe6344f` | PDF-2B — ID/date preview formatting, data quality wording |
+| `5d27fc1` | PDF-2C-1 — KPI dashboard dedupe |
+| `cf643d9` | PDF-2C-2 — technical appendix polish |
+
+### 23.2 PDF quality checklist (final)
+
+| Item | Status |
+|------|--------|
+| Narrative/chart alignment | ✅ PDF-1 |
+| Root / follow-up / full export contexts | ✅ PDF-1 |
+| AI Insights slim preset | ✅ PDF-1 |
+| Data preview appendix after Visualization | ✅ PDF-1 |
+| Chart metadata label (**Category: Category**) | ✅ PDF-1 |
+| Domain label (Overview parity) | ✅ PDF-2A |
+| Placeholder footer / support email | ✅ PDF-2A |
+| ID/date preview formatting | ✅ PDF-2B |
+| Data quality wording (sample vs file-wide) | ✅ PDF-2B |
+| KPI dashboard dedupe / skip when sparse | ✅ PDF-2C-1 |
+| Technical appendix title / tone / page-break | ✅ PDF-2C-2 |
+
+### 23.3 Test / build record (arc)
+
+| Suite | Result |
+|-------|--------|
+| Backend suggested-question phase | **492 passed** |
+| Follow-up chip targeted tests | **37 passed** |
+| PDF/export targeted suites (PDF-1 → PDF-2C-2) | **PASS** |
+| Latest `npm run build` | **PASS** (recorded at PDF-2C-2) |
+
+### 23.4 Remaining known items
+
+- **No PDF-2 backlog**
+- Broader **final release-readiness validation** only (optional browser spot-check, cross-domain AI narrative QA, platform production gaps)
+
+### 23.5 Constraints going forward
+
+1. Do not reopen **H-Bar/V-Bar parity** unless a measured regression appears.
+2. Do not reopen **chart axis/domain/bar sizing** unless a test or screenshot proves regression.
+3. Do not change **suggested questions** or **follow-up chips** unless a new issue is proven.
+4. Do not reopen **PDF-1/PDF-2** unless a generated PDF proves regression.
+5. Future work: **audit-first**, small scoped fixes only.
+
+See also: [`pdf-export-phase-changelog.md`](./pdf-export-phase-changelog.md) · [`latest-working-snapshot.md`](./latest-working-snapshot.md).
+
+---
+
+## 24. Mandatory alignment fix — generic chart-contract guard (June 29, 2026, uncommitted)
+
+**Problem:** Banking **Product Type** alignment passed after PDF-1, but hospitality **Room Revenue by Room Type** still showed **Market** geography narrative (Downtown, Beach, Suburban, etc.) in live AI Insights and PDF analysis while the chart showed room types (Suite, Executive, Deluxe, Family, Standard).
+
+**Root cause:**
+
+1. `pdfNarrativeConflictsWithChart` only detected **product-type vs customer-segment** phrasing — not generic foreign category mentions absent from the chart.
+2. Live UI aligned only `parsedInsightAnswer.summary` via `alignLiveParsedInsightAnswer`; executive brief, evidence cards, and “Why this matters” blocks could still surface stale dimension copy.
+3. PDF and live UI used the same PDF aligner path but with the narrow conflict detector, so vertical/category bar charts were not protected.
+
+**Fix:**
+
+| File | Change |
+|------|--------|
+| `frontend/lib/insight-chart-narrative-alignment.ts` | **New** — `buildInsightChartNarrativeContext`, generic `insightNarrativeConflictsWithChart` (chart vs foreign category hits), `alignInsightPresentationToChart` shared model |
+| `frontend/lib/insight-chart-narrative-alignment.test.ts` | **New** — hospitality Room Type, banking Product Type, live/PDF parity |
+| `frontend/lib/pdf-narrative-alignment.ts` | Thin wrapper re-exporting shared aligner |
+| `frontend/lib/live-insight-narrative-alignment.ts` | `alignLiveInsightPresentation` for full structured sections |
+| `frontend/app/page.tsx` | `alignedInsightPresentation` memo; filtered `insightReasoningBlocksForDisplay`; PDF export uses aligned `parsedInsightAnswer` when chart matches |
+
+**Validation (targeted tests):** 41 passed across `insight-chart-narrative-alignment`, `live-insight-narrative-alignment`, `pdf-narrative-alignment`, `insight-result-history`, `resolve-pdf-export-context`, `pdf-export-sections`. `npm run build` **PASS**.
+
+**Live validation:** `docs/pdf-mandatory-fix-generic-alignment-validation.py`
+
+| Scenario | UI | PDF analysis |
+|----------|----|--------------|
+| Banking — Spend Amount by Product Type | **PASS** — Product Type terms; no segment names | **PASS** |
+| Hospitality — Room Revenue by Room Type | **PASS** — Room Type / Suite; no Market geographies | **PASS** — interpretation bullets reference room types; no Downtown/Beach/etc. |
+
+Artifacts: `docs/pdf-validation-screenshots/pdf-mandatory-fix-{banking,hospitality}-*`, report `docs/pdf-validation-screenshots/pdf-mandatory-fix-generic-alignment-report.json`.
+
+**Note:** Strategic recommendation bullets may still suggest cross-dimensional follow-ups (e.g. “market segment”) — separate from chart-aligned interpretation; not in scope for this mandatory fix.

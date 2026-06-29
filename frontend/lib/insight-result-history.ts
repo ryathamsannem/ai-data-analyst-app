@@ -111,6 +111,30 @@ export function findInsightSavedResultById(
 }
 
 /** Newest saved result whose question matches (normalized). */
+/** Prefer the saved result for the active question before chart-keyed bundle fallback. */
+export function resolveLiveInsightAnswerText(args: {
+  question: string;
+  lastAskedQuestion: string;
+  liveAnswer: string;
+  activeResultId: string | null;
+  history: InsightSavedResult[];
+}): string {
+  const displayQ = args.lastAskedQuestion.trim() || args.question.trim();
+  if (args.activeResultId) {
+    const active = findInsightSavedResultById(args.history, args.activeResultId);
+    if (
+      active?.answer.trim() &&
+      normalizeInsightQuestionForMatch(active.question) ===
+        normalizeInsightQuestionForMatch(displayQ)
+    ) {
+      return active.answer;
+    }
+  }
+  const byQuestion = findInsightSavedResultByQuestion(args.history, displayQ);
+  if (byQuestion?.answer.trim()) return byQuestion.answer;
+  return args.liveAnswer;
+}
+
 export function findInsightSavedResultByQuestion(
   history: InsightSavedResult[],
   question: string
