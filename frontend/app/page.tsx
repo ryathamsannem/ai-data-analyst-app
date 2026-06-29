@@ -85,7 +85,11 @@ import {
   sortChartRowsChronologically,
   TREND_X_AXIS_ANGLE_DEG,
 } from "@/lib/chart-time-x-axis";
-import { chartLayoutWidthKey } from "@/lib/chart-axis-theme";
+import {
+  CHART_BAR_INLAY_LABEL_CSS,
+  CHART_BAR_VALUE_LABEL_CSS,
+  chartLayoutWidthKey,
+} from "@/lib/chart-axis-theme";
 import {
   presentationCapturePlotStyle,
 } from "@/lib/chart-png-export-layout";
@@ -101,6 +105,8 @@ import {
   OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE,
   OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE,
   shouldShowOverviewBarValueLabels,
+  formatOverviewBarTopValueLabel,
+  formatExecutiveInsightMetricValue,
 } from "@/lib/overview-dashboard-export";
 import {
   cartesianUsesHorizontalPlot,
@@ -158,7 +164,6 @@ import type {
   ChartPngCaptureRequest,
 } from "@/lib/chart-platform/chart-artifact";
 import {
-  formatExecutiveMetricValue,
   formatMetricSpreadGap,
   metricFormatUsesPercent,
   type MetricFormatContext,
@@ -2678,23 +2683,32 @@ function zipStoredVisualizationPairs(
   viz: StoredVisualization
 ): VizInsightDatum[] {
   const n = Math.min(viz.labels.length, viz.values.length);
+  const chartRows: ChartRow[] = [];
+  for (let i = 0; i < n; i++) {
+    const v = Number(viz.values[i]);
+    if (!Number.isFinite(v)) continue;
+    chartRows.push({ name: String(viz.labels[i] ?? ""), value: v });
+  }
+  const presentationKind =
+    viz.roundingHint === "pct_1" ? ("pie" as const) : ("bar" as const);
+  const metricCtx: MetricFormatContext = {
+    metricLabel: viz.title,
+    chartTitle: viz.title,
+    roundingHint: viz.roundingHint,
+    presentationKind,
+    chartRows,
+  };
   const out: VizInsightDatum[] = [];
   for (let i = 0; i < n; i++) {
     const v = Number(viz.values[i]);
     if (!Number.isFinite(v)) continue;
-    const metricCtx: MetricFormatContext = {
-      metricLabel: viz.title,
-      chartTitle: viz.title,
-      roundingHint: viz.roundingHint,
-      presentationKind: viz.roundingHint === "pct_1" ? "pie" : "bar",
-    };
     const preformatted = viz.formattedValues?.[i]?.trim();
     const rowForFmt: ChartRow = { name: String(viz.labels[i] ?? ""), value: v };
     let fmt: string;
     if (preformatted && !metricFormatUsesPercent(metricCtx)) {
       fmt = preformatted;
     } else {
-      fmt = formatExecutiveMetricValue(rowForFmt, metricCtx);
+      fmt = formatExecutiveInsightMetricValue(rowForFmt, metricCtx);
     }
     const xv = viz.scatterXValues?.[i];
     const xNum = typeof xv === "number" && Number.isFinite(xv) ? xv : undefined;
@@ -4244,7 +4258,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     };
     const withDisplay = mapped.map((r) => ({
       ...r,
-      displayValue: formatExecutiveMetricValue(r, metricCtxWithRows),
+      displayValue: formatExecutiveInsightMetricValue(r, metricCtxWithRows),
     }));
     if (displayKind === "line" || displayKind === "area") {
       return sortChartRowsChronologically(withDisplay);
@@ -4418,6 +4432,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chartRows, overviewMetricCtx]
   );
 
+  const barTopLabelFormatter = useCallback(
+    (value: number) =>
+      formatOverviewBarTopValueLabel(value, chartRows, overviewMetricCtx),
+    [chartRows, overviewMetricCtx]
+  );
+
   const overviewVerticalBarAxisProps = useMemo(
     () =>
       displayKind === "bar" || displayKind === "histogram"
@@ -4531,7 +4551,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       : dashGrid.opacity;
     const showBarEndLabels = shouldShowOverviewBarValueLabels(
       chartRows,
-      barValueTickFormatter,
+      barTopLabelFormatter,
       { metricCtx: overviewMetricCtx }
     );
     const localCategoryPlan = computeOverviewMiniCategoryPlan(
@@ -4868,11 +4888,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 <LabelList
                   dataKey="value"
                   position="insideRight"
+                  className="chart-bar-inlay-label"
                   formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
                   style={{
-                    fill: "#e2e8f0",
+                    fill: CHART_BAR_INLAY_LABEL_CSS,
                     fontSize: 13,
-                    fontWeight: 500,
+                    fontWeight: 600,
                   }}
                 />
               ) : null}
@@ -5240,11 +5261,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 <LabelList
                   dataKey="value"
                   position="top"
-                  formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                  className="chart-bar-value-label"
+                  formatter={(v) => barTopLabelFormatter(Number(v ?? 0))}
                   style={{
-                    fill: "#e2e8f0",
+                    fill: CHART_BAR_VALUE_LABEL_CSS,
                     fontSize: 13,
-                    fontWeight: 500,
+                    fontWeight: 600,
                   }}
                 />
               ) : null}
@@ -12030,9 +12052,12 @@ function HomeInner() {
         detailViewLayout={detailViewLayout}
         pngCaptureMode={pngCaptureMode}
         chartRows={insightMode ? sortedInsightChartData : sortedChartData}
-        visualization={
-          (insightMode ? insightVisualization : visualization) as ChartRendererViz
-        }
+        visualization={{
+          ...((insightMode ? insightVisualization : visualization) as ChartRendererViz),
+          chartTitle: insightMode
+            ? (insightVisualization?.title ?? chartTitle)
+            : (visualization?.title ?? chartTitle),
+        }}
         presentationKind={renderedKind}
         axes={insightMode ? insightChartAxisLabels : chartAxisLabels}
         viewportW={layoutViewportW}
@@ -13462,9 +13487,10 @@ function HomeInner() {
                                 detailViewLayout
                                 pngCaptureMode
                                 chartRows={sortedChartData}
-                                visualization={
-                                  visualization as ChartRendererViz
-                                }
+                                visualization={{
+                                  ...(visualization as ChartRendererViz),
+                                  chartTitle: visualization?.title ?? chartTitle,
+                                }}
                                 presentationKind={
                                   chartsTabPngCaptureRequest!.kind ||
                                   sessionRenderedChartKind ||

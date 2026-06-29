@@ -85,7 +85,7 @@ import {
 } from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
 import { formatRadialLegendEntry, resolveRadialPieEdgeProps } from "@/lib/radial-chart-format";
-import { shouldShowOverviewBarValueLabels } from "@/lib/overview-dashboard-export";
+import { shouldShowOverviewBarValueLabels, formatOverviewBarTopValueLabel } from "@/lib/overview-dashboard-export";
 import {
   HORIZONTAL_BAR_END_RADIUS,
   HORIZONTAL_BAR_STACKED_MAX_SIZE,
@@ -98,6 +98,8 @@ import { buildChartCartesianTooltipHandlers, chartTooltipMetricLabel, formatChar
 import { type MetricFormatContext } from "@/lib/metric-value-format";
 import {
   CHART_AXIS_CSS,
+  CHART_BAR_INLAY_LABEL_CSS,
+  CHART_BAR_VALUE_LABEL_CSS,
   chartLayoutWidthKey,
 } from "@/lib/chart-axis-theme";
 import {
@@ -188,6 +190,8 @@ export type ChartRendererViz = {
   interaction?: {
     drillDimensions?: { role: string; column: string; label: string }[];
   } | null;
+  /** Full chart title for metric formatting gates (session / insight charts). */
+  chartTitle?: string | null;
 } | null;
 
 export type ChartRendererProps = {
@@ -256,10 +260,10 @@ function ChartRendererInner({
   const metricTooltipCtx = useMemo(
     (): MetricFormatContext => ({
       metricLabel: rAxes.valueAxis,
-      chartTitle: rAxes.valueAxis,
+      chartTitle: rViz?.chartTitle?.trim() || rAxes.valueAxis,
       presentationKind: rKind,
     }),
-    [rAxes.valueAxis, rKind]
+    [rAxes.valueAxis, rViz?.chartTitle, rKind]
   );
 
   // Metric-aware bar value ticks: currency/large numbers compact to K/M and
@@ -270,15 +274,23 @@ function ChartRendererInner({
     [rData, metricTooltipCtx]
   );
 
-  const showVBarTopLabels = useMemo(
+  const barTopLabelFormatter = useMemo(
+    () => (value: number) =>
+      formatOverviewBarTopValueLabel(value, rData, metricTooltipCtx),
+    [rData, metricTooltipCtx]
+  );
+
+  const allowBarValueLabels = useMemo(
     () =>
-      rKind === "bar" &&
+      (rKind === "bar" || rKind === "bar_horizontal") &&
       !isHistogram &&
-      shouldShowOverviewBarValueLabels(rData, barValueTickFormatter, {
+      shouldShowOverviewBarValueLabels(rData, barTopLabelFormatter, {
         metricCtx: metricTooltipCtx,
       }),
-    [rKind, isHistogram, rData, barValueTickFormatter, metricTooltipCtx]
+    [rKind, isHistogram, rData, barTopLabelFormatter, metricTooltipCtx]
   );
+
+  const showVBarTopLabels = allowBarValueLabels && rKind === "bar";
 
   const cartesianTooltip = useMemo(
     () =>
@@ -434,6 +446,7 @@ function ChartRendererInner({
       yAxisWidth: detailLayout ? verticalValueLayout.yAxisWidth : undefined,
       pointCount: detailLayout ? rData.length : undefined,
       lineChart: detailLayout && rKind === "line",
+      vBarTopLabels: showVBarTopLabels,
     });
 
   const insightVBarCatDense =
@@ -1119,7 +1132,21 @@ function ChartRendererInner({
               if (!nm) return;
               onInsightDrill(nm);
             }}
-          />
+          >
+            {allowBarValueLabels ? (
+              <LabelList
+                dataKey="value"
+                position="insideRight"
+                className="chart-bar-inlay-label"
+                formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                style={{
+                  fill: CHART_BAR_INLAY_LABEL_CSS,
+                  fontSize: compact ? 11 : 13,
+                  fontWeight: 600,
+                }}
+              />
+            ) : null}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     );
@@ -1430,11 +1457,13 @@ function ChartRendererInner({
             <LabelList
               dataKey="value"
               position="top"
-              formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+              offset={8}
+              className="chart-bar-value-label"
+              formatter={(v) => barTopLabelFormatter(Number(v ?? 0))}
               style={{
-                fill: "#e2e8f0",
+                fill: CHART_BAR_VALUE_LABEL_CSS,
                 fontSize: compact ? 11 : 13,
-                fontWeight: 500,
+                fontWeight: 600,
               }}
             />
           ) : null}

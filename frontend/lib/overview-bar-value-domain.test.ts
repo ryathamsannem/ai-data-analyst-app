@@ -6,13 +6,55 @@ import {
   OVERVIEW_HBAR_TARGET_MAX_UTILIZATION,
   resolveBarChartRateDisplayCap,
   resolveBarChartRateUpperBound,
+  resolveFocusedRateBarValueAxisTicks,
   resolveOverviewBarValueDomain,
+  shouldUseFocusedVerticalBarRateDomain,
   resolveOverviewHBarUtilizationDomainMax,
   shouldUseTightBarDomain,
   snapBarDomainBound,
   zeroBaselineImprovesInterpretation,
 } from "@/lib/overview-bar-value-domain";
+import { formatOverviewBarValueAxisTick } from "@/lib/overview-premium-axis-domain";
 import { estimateHorizontalBarLengthUtilization } from "@/lib/horizontal-bar-visual";
+import {
+  metricFormatUsesPercent,
+  resolveMetricValueFormat,
+} from "@/lib/metric-value-format";
+import type { ChartRow } from "@/app/chart-types";
+
+describe("shouldUseFocusedVerticalBarRateDomain", () => {
+  it("returns true for clustered defect rate by shift", () => {
+    expect(
+      shouldUseFocusedVerticalBarRateDomain({
+        presentationKind: "bar",
+        isPercent: true,
+        isScoreOrRatingLike: false,
+        hasBoundedRatingScale: false,
+        tight: true,
+        spanDisplay: 0.2,
+        minDisplay: 2.3,
+        maxDisplay: 2.5,
+        categoryCount: 3,
+        spreadRatio: 0.08,
+      })
+    ).toBe(true);
+  });
+
+  it("detects defect rate metric as percent for domain resolver", () => {
+    expect(
+      metricFormatUsesPercent({
+        metricLabel: "Defect Rate",
+        chartTitle: "Defect Rate by Shift",
+        presentationKind: "bar",
+        chartRows: [
+          { name: "Night", value: 0.023 },
+          { name: "Day", value: 0.025 },
+          { name: "Swing", value: 0.025 },
+        ],
+      })
+    ).toBe(true);
+  });
+});
 
 describe("shouldUseTightBarDomain", () => {
   it("detects low-spread percent metrics", () => {
@@ -477,6 +519,65 @@ describe("resolveOverviewBarValueDomain", () => {
     expect(vBar).toEqual(hBar);
     expect(vBar![0]).toBe(0);
     expect(vBar![1]).toBeLessThanOrEqual(0.055);
+  });
+
+  it("V-Bar defect rate by shift uses focused domain for clustered low rates", () => {
+    const rows: ChartRow[] = [
+      { name: "Night", value: 0.023 },
+      { name: "Day", value: 0.025 },
+      { name: "Swing", value: 0.025 },
+    ];
+    const metricCtx = {
+      chartTitle: "Defect Rate by Shift",
+      metricLabel: "Defect Rate",
+      presentationKind: "bar" as const,
+      chartRows: rows,
+    };
+    expect(resolveMetricValueFormat(metricCtx)).toBe("percent");
+    const domain = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Defect Rate by Shift",
+      metricLabel: "Defect Rate",
+      presentationKind: "bar",
+    });
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBeGreaterThan(0.02);
+    expect(domain![0]).toBeLessThan(0.025);
+    expect(domain![1]).toBeGreaterThan(0.025);
+    expect(domain![1]).toBeLessThan(0.03);
+    expect(domain![1] - domain![0]).toBeLessThan(0.01);
+    const ticks = resolveFocusedRateBarValueAxisTicks(
+      domain!,
+      0.025,
+      2.5
+    );
+    expect(ticks?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("focused defect-rate ticks format to unique percent labels", () => {
+    const rows: ChartRow[] = [
+      { name: "Night", value: 0.023 },
+      { name: "Day", value: 0.025 },
+      { name: "Swing", value: 0.025 },
+    ];
+    const metricCtx = {
+      chartTitle: "Defect Rate by Shift",
+      metricLabel: "Defect Rate",
+      presentationKind: "bar" as const,
+      chartRows: rows,
+    };
+    const domain = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Defect Rate by Shift",
+      metricLabel: "Defect Rate",
+      presentationKind: "bar",
+    });
+    const ticks = resolveFocusedRateBarValueAxisTicks(domain!, 0.025, 2.5);
+    expect(ticks).toBeDefined();
+    const labels = ticks!.map((t) =>
+      formatOverviewBarValueAxisTick(t, rows, metricCtx)
+    );
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels.some((l) => l.includes("2.3"))).toBe(true);
+    expect(labels.some((l) => l.includes("2.5"))).toBe(true);
   });
 
   it("conversion rate 5.6%–7.9% starts at 0 with reasonable upper bound", () => {

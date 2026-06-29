@@ -8,10 +8,16 @@ import {
   type VerticalBarValueAxisProps,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import {
+  coercePercentDisplayNumber,
+  metricFormatUsesPercent,
+  readChartRowRawValue,
   resolveMetricValueFormat,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
-import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
+import {
+  resolveFocusedRateBarValueAxisTicks,
+  resolveOverviewBarValueDomain,
+} from "@/lib/overview-bar-value-domain";
 import {
   resolveOverviewBarCountValueAxisTicks,
   resolveScatterValueAxisProps,
@@ -71,6 +77,31 @@ function attachOverviewCountBarTicks(
   return { ...props, ticks };
 }
 
+function attachOverviewBarValueAxisTicks(
+  props: VerticalBarValueAxisProps | HBarValueAxisProps,
+  ctx: MetricFormatContext,
+  chartKind: ChartKind,
+  domain: readonly [number, number],
+  rows: readonly ChartRow[]
+): VerticalBarValueAxisProps | HBarValueAxisProps {
+  const withCount = attachOverviewCountBarTicks(props, ctx, chartKind);
+  if (withCount.ticks) return withCount;
+
+  if (chartKind !== "bar" || !metricFormatUsesPercent(ctx)) return props;
+
+  const rawVals = rows
+    .map((row) => readChartRowRawValue(row))
+    .filter((v) => Number.isFinite(v));
+  if (rawVals.length < 2 || domain[0] <= 0) return props;
+
+  const maxRaw = Math.max(...rawVals);
+  const displayVals = rawVals.map((v) => coercePercentDisplayNumber(v));
+  const maxDisplay = Math.max(...displayVals);
+  const ticks = resolveFocusedRateBarValueAxisTicks(domain, maxRaw, maxDisplay);
+  if (!ticks) return props;
+  return { ...props, ticks };
+}
+
 export function resolveCartesianBarValueAxisProps(args: {
   chartKind: ChartKind;
   rows: readonly ChartRow[];
@@ -89,18 +120,21 @@ export function resolveCartesianBarValueAxisProps(args: {
         executiveRounding: false,
       });
       if (!domain) return null;
-      return attachOverviewCountBarTicks(
+      const ctx: MetricFormatContext = {
+        chartTitle: chartTitle ?? undefined,
+        metricLabel: metricLabel ?? undefined,
+        presentationKind: chartKind,
+        chartRows: rows as ChartRow[],
+      };
+      return attachOverviewBarValueAxisTicks(
         { domain, allowDataOverflow: false },
-        {
-          chartTitle: chartTitle ?? undefined,
-          metricLabel: metricLabel ?? undefined,
-          presentationKind: chartKind,
-          chartRows: rows as ChartRow[],
-        },
-        chartKind
+        ctx,
+        chartKind,
+        domain,
+        rows
       );
     }
-    return resolveVerticalBarValueAxisProps({
+    const props = resolveVerticalBarValueAxisProps({
       plan: context.capture ? (context.exportAxisPlan ?? null) : null,
       chartKind,
       rows,
@@ -108,6 +142,20 @@ export function resolveCartesianBarValueAxisProps(args: {
       metricLabel,
       executiveRounding: context.capture,
     });
+    if (!props?.domain) return props;
+    const ctx: MetricFormatContext = {
+      chartTitle: chartTitle ?? undefined,
+      metricLabel: metricLabel ?? undefined,
+      presentationKind: chartKind,
+      chartRows: rows as ChartRow[],
+    };
+    return attachOverviewBarValueAxisTicks(
+      props,
+      ctx,
+      chartKind,
+      props.domain,
+      rows
+    );
   }
 
   if (chartKind === "bar_horizontal") {
@@ -120,15 +168,18 @@ export function resolveCartesianBarValueAxisProps(args: {
         overviewHorizontalBarHeadroom: true,
       });
       if (!domain) return null;
-      return attachOverviewCountBarTicks(
+      const ctx: MetricFormatContext = {
+        chartTitle: chartTitle ?? undefined,
+        metricLabel: metricLabel ?? undefined,
+        presentationKind: chartKind,
+        chartRows: rows as ChartRow[],
+      };
+      return attachOverviewBarValueAxisTicks(
         { domain, allowDataOverflow: false },
-        {
-          chartTitle: chartTitle ?? undefined,
-          metricLabel: metricLabel ?? undefined,
-          presentationKind: chartKind,
-          chartRows: rows as ChartRow[],
-        },
-        chartKind
+        ctx,
+        chartKind,
+        domain,
+        rows
       );
     }
     return resolveHBarValueAxisProps({

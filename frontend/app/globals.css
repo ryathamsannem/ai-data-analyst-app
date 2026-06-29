@@ -439,6 +439,26 @@ body {
   font-size: 10.5px;
 }
 
+/* V-Bar top value labels — readable on light session/capture surfaces; avoid plot clip. */
+.chart-viz-theme .ai-insights-viz-plot .recharts-wrapper,
+.chart-viz-theme .ai-insights-viz-plot svg.recharts-surface,
+.pdf-chart-capture .ai-insights-viz-plot .recharts-wrapper,
+.pdf-chart-capture .ai-insights-viz-plot svg.recharts-surface {
+  overflow: visible;
+}
+
+.chart-viz-theme .chart-bar-value-label text,
+.pdf-chart-capture .chart-bar-value-label text {
+  fill: var(--chart-axis-label) !important;
+  font-weight: 600;
+}
+
+.chart-viz-theme .chart-bar-inlay-label text,
+.overview-dash-chart-card .chart-bar-inlay-label text {
+  fill: #f8fafc !important;
+  font-weight: 600;
+}
+
 .pdf-chart-capture .recharts-wrapper {
   margin-inline: auto;
 }

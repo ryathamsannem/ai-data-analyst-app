@@ -70,6 +70,9 @@ export function insightViewportMaxClassForChartKind(kind: ChartKind): string {
 
 type VmBalanced = { marginLeft: number; marginRight: number };
 
+/** Top Recharts margin when vertical bar top value labels are shown (session/detail). */
+export const VBAR_TOP_LABEL_HEADROOM_PX = 28;
+
 export type ChartPlotMarginOpts = {
   /** AI Insights / PDF insight layout — slightly tighter optical centering. */
   insightUi?: boolean;
@@ -77,6 +80,8 @@ export type ChartPlotMarginOpts = {
   yAxisWidth?: number;
   pointCount?: number;
   lineChart?: boolean;
+  /** Vertical bar `LabelList` at top — needs extra margin so labels are not clipped. */
+  vBarTopLabels?: boolean;
 };
 
 function cartesianSideMargin(vmBalanced: VmBalanced, kind: ChartKind): number {
@@ -112,7 +117,10 @@ export function verticalCartesianOuterMargins(
   if (sessionSides && (kind === "bar" || kind === "histogram")) {
     const bottomTrim = insightUi ? 6 : 4;
     const bottom = Math.max(computedBottom - bottomTrim, insightUi ? 18 : 22);
-    const top = insightUi ? 5 : 10;
+    let top = insightUi ? 5 : 10;
+    if (kind === "bar" && opts?.vBarTopLabels) {
+      top = Math.max(top, VBAR_TOP_LABEL_HEADROOM_PX);
+    }
     return {
       top,
       left: sessionSides.marginLeft,
@@ -133,7 +141,10 @@ export function verticalCartesianOuterMargins(
   if (kind === "bar") {
     const bottomTrim = insightUi ? 6 : 4;
     const bottom = Math.max(computedBottom - bottomTrim, insightUi ? 18 : 22);
-    const top = insightUi ? 5 : 10;
+    let top = insightUi ? 5 : 10;
+    if (opts?.vBarTopLabels) {
+      top = Math.max(top, VBAR_TOP_LABEL_HEADROOM_PX);
+    }
     return { top, left: side, right: side, bottom };
   }
 

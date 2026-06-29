@@ -343,6 +343,170 @@ export function resolveBarChartRateDisplayCap(maxDisplay: number): number {
   return maxDisplay * (1 + DEFAULT_BAR_RIGHT_PAD_RATIO);
 }
 
+/** Max display-span (percentage points) for focused vertical-bar rate domains. */
+export const FOCUSED_VERTICAL_BAR_RATE_MAX_SPAN_PP = 0.5;
+
+/** Max display ceiling for focused vertical-bar rate domains (low single-digit rates). */
+export const FOCUSED_VERTICAL_BAR_RATE_MAX_DISPLAY_PP = 15;
+
+/**
+ * Vertical bar only — focused non-zero Y-domain for clustered low single-digit rates
+ * (e.g. Defect Rate 2.3–2.5%). H-Bar and wide-spread rate bars keep zero baseline.
+ */
+export function shouldUseFocusedVerticalBarRateDomain(args: {
+  presentationKind?: ChartKind | string;
+  isPercent: boolean;
+  isScoreOrRatingLike: boolean;
+  hasBoundedRatingScale: boolean;
+  tight: boolean;
+  spanDisplay: number;
+  minDisplay: number;
+  maxDisplay: number;
+  categoryCount: number;
+  spreadRatio: number;
+  boundedBounds?: BoundedMetricBounds | null;
+}): boolean {
+  if (args.presentationKind !== "bar") return false;
+  if (!args.isPercent || args.isScoreOrRatingLike || args.hasBoundedRatingScale) {
+    return false;
+  }
+  if (args.categoryCount > 8) return false;
+  if (args.spanDisplay > FOCUSED_VERTICAL_BAR_RATE_MAX_SPAN_PP) return false;
+  if (args.maxDisplay > FOCUSED_VERTICAL_BAR_RATE_MAX_DISPLAY_PP) return false;
+  if (args.minDisplay < 0) return false;
+  return !zeroBaselineImprovesInterpretation({
+    isPercent: true,
+    minDisplay: args.minDisplay,
+    maxDisplay: args.maxDisplay,
+    spreadRatio: args.spreadRatio,
+    boundedBounds: args.boundedBounds,
+  });
+}
+
+/** True when vertical bar chart uses a focused non-zero rate/percent Y-domain. */
+export function isFocusedVerticalBarRateChart(
+  rows: readonly { value: number }[],
+  ctx: MetricFormatContext
+): boolean {
+  if (ctx.presentationKind !== "bar") return false;
+
+  const rawVals = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
+  if (rawVals.length < 2) return false;
+
+  const isPercent = metricFormatUsesPercent(ctx);
+  if (!isPercent) return false;
+
+  const maxRawAbs = Math.max(...rawVals.map((v) => Math.abs(v)));
+  const displayVals = rawVals.map((v) =>
+    coercePercentDisplayNumber(v, undefined, maxRawAbs)
+  );
+  const minDisplay = Math.min(...displayVals);
+  const maxDisplay = Math.max(...displayVals);
+  const spanDisplay = maxDisplay - minDisplay;
+  const spreadRatio = spanDisplay / Math.max(Math.abs(maxDisplay), 1e-9);
+
+  const boundedBounds = inferBoundedMetricBounds({
+    values: displayVals,
+    metricLabel: ctx.metricLabel,
+    chartTitle: ctx.chartTitle,
+    isPercent,
+  });
+
+  const isScoreOrRatingLike = metricLabelImpliesScoreLike(
+    ctx.metricLabel,
+    ctx.chartTitle
+  );
+  const hasBoundedRatingScale =
+    boundedBounds != null &&
+    (boundedBounds.kind === "rating5" || boundedBounds.kind === "rating10");
+
+  const tight = shouldUseTightBarDomain({
+    isPercent,
+    spanDisplay,
+    spreadRatio,
+    categoryCount: rawVals.length,
+    minDisplay,
+    maxDisplay,
+    boundedBounds,
+  });
+
+  return shouldUseFocusedVerticalBarRateDomain({
+    presentationKind: "bar",
+    isPercent,
+    isScoreOrRatingLike,
+    hasBoundedRatingScale,
+    tight,
+    spanDisplay,
+    minDisplay,
+    maxDisplay,
+    categoryCount: rawVals.length,
+    spreadRatio,
+    boundedBounds,
+  });
+}
+
+/** Focused rate axes: 0.05pp steps collide after 1-decimal percent formatting — prefer 0.1pp. */
+function inferFocusedRateBarTickStep(
+  displaySpan: number,
+  displayMax: number
+): number {
+  const fine = inferDomainTickStep(displaySpan, displayMax);
+  if (
+    fine < 0.1 &&
+    displayMax <= FOCUSED_VERTICAL_BAR_RATE_MAX_DISPLAY_PP
+  ) {
+    return 0.1;
+  }
+  return fine;
+}
+
+function buildFocusedRateBarAxisTicks(
+  displayMin: number,
+  displayMax: number,
+  step: number,
+  fractionScale: boolean
+): number[] {
+  const lo = snapBarDomainBound(displayMin, step, "floor");
+  const hi = snapBarDomainBound(displayMax, step, "ceil");
+  const ticks: number[] = [];
+  for (let t = lo; t <= hi + step * 1e-6; t += step) {
+    const raw = fractionScale
+      ? Number((t / 100).toFixed(6))
+      : Number(t.toFixed(6));
+    ticks.push(raw);
+  }
+  return ticks;
+}
+
+/** Clean ticks for focused vertical-bar rate domains (fraction or 0–100 scale). */
+export function resolveFocusedRateBarValueAxisTicks(
+  domain: readonly [number, number],
+  maxRaw: number,
+  maxDisplay: number
+): number[] | undefined {
+  const [dMin, dMax] = domain;
+  if (!Number.isFinite(dMin) || !Number.isFinite(dMax) || dMax <= dMin) {
+    return undefined;
+  }
+  if (dMin <= 0) return undefined;
+
+  const fractionScale = barRateValuesOnFractionScale(maxRaw, maxDisplay);
+  const displayMin = fractionScale ? dMin * 100 : dMin;
+  const displayMax = fractionScale ? dMax * 100 : dMax;
+  const displaySpan = displayMax - displayMin;
+  if (displaySpan <= 0) return undefined;
+
+  const step = inferFocusedRateBarTickStep(displaySpan, displayMax);
+  const ticks = buildFocusedRateBarAxisTicks(
+    displayMin,
+    displayMax,
+    step,
+    fractionScale
+  );
+  if (ticks.length < 2 || ticks.length > 7) return undefined;
+  return ticks;
+}
+
 /** Raw-axis upper bound for zero-baseline percent/rate bar charts. */
 export function resolveBarChartRateUpperBound(args: {
   maxDisplay: number;
@@ -382,8 +546,9 @@ export function resolveOverviewBarValueDomain(
     chartRows: rows as ChartRow[],
   };
   const isPercent = metricFormatUsesPercent(metricCtx);
+  const maxRawAbs = Math.max(...rawVals.map((v) => Math.abs(v)));
   const displayVals = isPercent
-    ? rawVals.map((v) => coercePercentDisplayNumber(v))
+    ? rawVals.map((v) => coercePercentDisplayNumber(v, undefined, maxRawAbs))
     : rawVals;
   const minDisplay = Math.min(...displayVals);
   const maxDisplay = Math.max(...displayVals);
@@ -475,12 +640,27 @@ export function resolveOverviewBarValueDomain(
     boundedBounds != null &&
     (boundedBounds.kind === "rating5" || boundedBounds.kind === "rating10");
 
+  const focusedVBarRate = shouldUseFocusedVerticalBarRateDomain({
+    presentationKind: options.presentationKind,
+    isPercent,
+    isScoreOrRatingLike,
+    hasBoundedRatingScale,
+    tight,
+    spanDisplay,
+    minDisplay,
+    maxDisplay,
+    categoryCount: rawVals.length,
+    spreadRatio,
+    boundedBounds,
+  });
+
   if (
     isBarChartKind &&
     minRaw >= 0 &&
     !isScoreOrRatingLike &&
     !hasBoundedRatingScale &&
-    domainMin > 0
+    domainMin > 0 &&
+    !focusedVBarRate
   ) {
     domainMin = 0;
   }
@@ -506,13 +686,15 @@ export function resolveOverviewBarValueDomain(
 
   // Zero-baseline rate bars: replace tight-domain / executive-rounding inflation
   // (e.g. 3.4–4.1% → 9.1% top tick) with modest headroom and clean percent ticks.
+  // Skip when using a focused vertical-bar rate domain (clustered low rates).
   if (
     isBarChartKind &&
     isPercent &&
     !isScoreOrRatingLike &&
     !hasBoundedRatingScale &&
     domainMin === 0 &&
-    minRaw >= 0
+    minRaw >= 0 &&
+    !focusedVBarRate
   ) {
     const refinedMax = resolveBarChartRateUpperBound({ maxDisplay, maxRaw });
     domainMax = Math.max(maxRaw * 1.01, refinedMax);
@@ -529,6 +711,24 @@ export function resolveOverviewBarValueDomain(
     !isPercent
   ) {
     domainMax = resolveOverviewHBarUtilizationDomainMax(maxRaw, domainMax);
+  }
+
+  if (focusedVBarRate) {
+    const fractionScale = barRateValuesOnFractionScale(maxRaw, maxDisplay);
+    const step = inferDomainTickStep(spanDisplay, maxDisplay);
+    const pad = Math.max(spanDisplay * 0.15, step * 0.5, 1e-6);
+    const dispMin = snapBarDomainBound(minDisplay - pad, step, "floor");
+    const dispMax = snapBarDomainBound(maxDisplay + pad, step, "ceil");
+    domainMin = fractionScale ? dispMin / 100 : dispMin;
+    domainMax = fractionScale ? dispMax / 100 : dispMax;
+    if (boundedBounds) {
+      [domainMin, domainMax] = clampDomainToBounds(
+        domainMin,
+        domainMax,
+        boundedBounds
+      );
+    }
+    if (domainMin < 0) domainMin = 0;
   }
 
   if (domainMax <= domainMin) {

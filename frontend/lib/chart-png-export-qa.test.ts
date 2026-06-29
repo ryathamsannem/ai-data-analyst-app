@@ -76,6 +76,23 @@ describe("shouldShowOverviewBarValueLabels", () => {
     ).toBe(true);
   });
 
+  it("enables labels for fraction-scale defect rate by shift (session/PNG parity)", () => {
+    const rows = [
+      { value: 0.023 },
+      { value: 0.025 },
+      { value: 0.025 },
+    ];
+    const fmt = (v: number) => `${(v * 100).toFixed(1)}%`;
+    expect(
+      shouldShowOverviewBarValueLabels(rows, fmt, {
+        metricCtx: {
+          metricLabel: "Defect Rate",
+          chartTitle: "Defect Rate by Shift",
+        },
+      })
+    ).toBe(true);
+  });
+
   it("hides labels for long currency strings even with three categories", () => {
     const currency = (v: number) =>
       v.toLocaleString(undefined, { style: "currency", currency: "USD" });

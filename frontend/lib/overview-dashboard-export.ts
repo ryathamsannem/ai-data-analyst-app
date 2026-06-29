@@ -1,15 +1,22 @@
-import type { ChartKind } from "@/app/chart-types";
+import type { ChartKind, ChartRow } from "@/app/chart-types";
 import {
   OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE,
 } from "@/lib/horizontal-bar-visual";
 import {
+  formatExecutiveMetricValue,
+  formatExecutivePercentPointGap,
+  formatMetricSpreadGap,
   metricLabelImpliesPrecisionBarLabels,
+  readChartRowRawValue,
+  resolveMetricValueFormat,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
 import {
+  isFocusedVerticalBarRateChart,
   resolveOverviewBarValueDomain,
   roundExecutiveAxisMaximum,
 } from "@/lib/overview-bar-value-domain";
+import { formatOverviewBarValueAxisTick } from "@/lib/overview-premium-axis-domain";
 import { countMetadataChipsInExportRoot } from "@/lib/chart-metadata-chips";
 
 export { roundExecutiveAxisMaximum };
@@ -104,6 +111,149 @@ export function shouldShowOverviewBarValueLabels(
       : BAR_VALUE_LABEL_MAX_CATEGORIES;
   if (values.length > maxCategories) return false;
   return !barValueLabelOverlapRisk(values, formatValue);
+}
+
+function formatPercentBarTopLabelDisplay(
+  display: number,
+  decimals: number
+): string {
+  const rounded = Number(display.toFixed(decimals));
+  return `${rounded.toLocaleString(undefined, {
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: 0,
+  })}%`;
+}
+
+/** True when focused V-Bar percent labels need extra decimal precision. */
+export function overviewBarLabelsNeedExtraPrecision(
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): boolean {
+  return barTopLabelsNeedExtraPrecision(rows, ctx);
+}
+
+function barTopLabelsNeedExtraPrecision(
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): boolean {
+  if (!isFocusedVerticalBarRateChart(rows, ctx)) return false;
+
+  const rawVals = rows
+    .map((r) => readChartRowRawValue(r))
+    .filter((v) => Number.isFinite(v));
+  if (rawVals.length < 2) return false;
+
+  const defaultLabels = rawVals.map((v) =>
+    formatOverviewBarValueAxisTick(v, rows, ctx)
+  );
+
+  for (let i = 0; i < rawVals.length; i++) {
+    for (let j = i + 1; j < rawVals.length; j++) {
+      if (Math.abs(rawVals[i]! - rawVals[j]!) <= 1e-9) continue;
+      if (defaultLabels[i] === defaultLabels[j]) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * V-Bar top / in-bar value labels — may use extra decimal precision on focused
+ * percent/rate charts when default axis rounding would duplicate distinct values.
+ * Axis tick formatting is unchanged; pass this only to LabelList formatters.
+ */
+export function formatOverviewBarTopValueLabel(
+  value: number,
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext = {}
+): string {
+  if (!Number.isFinite(value)) return String(value);
+
+  const defaultLabel = formatOverviewBarValueAxisTick(value, rows, ctx);
+  if (!barTopLabelsNeedExtraPrecision(rows, ctx)) return defaultLabel;
+
+  const format = resolveMetricValueFormat(ctx);
+  if (format !== "percent") return defaultLabel;
+
+  const rawVals = rows
+    .map((r) => readChartRowRawValue(r))
+    .filter((v) => Number.isFinite(v));
+  const maxAbs = rawVals.length
+    ? Math.max(...rawVals.map((v) => Math.abs(v)))
+    : Math.abs(value);
+  const display = maxAbs <= 1.05 ? value * 100 : value;
+
+  let decimals = 2;
+  while (decimals <= 3) {
+    const labels = rawVals.map((v) => {
+      const d = maxAbs <= 1.05 ? v * 100 : v;
+      return formatPercentBarTopLabelDisplay(d, decimals);
+    });
+    if (new Set(labels).size === labels.length) {
+      return formatPercentBarTopLabelDisplay(display, decimals);
+    }
+    decimals += 1;
+  }
+
+  return formatPercentBarTopLabelDisplay(display, 3);
+}
+
+/**
+ * Executive insight / signal card metric display — matches V-Bar top label
+ * precision on focused percent/rate vertical bars; otherwise unchanged.
+ */
+export function formatExecutiveInsightMetricValue(
+  row: ChartRow,
+  ctx: MetricFormatContext = {}
+): string {
+  const raw = readChartRowRawValue(row);
+  if (!Number.isFinite(raw)) {
+    return formatExecutiveMetricValue(row, ctx);
+  }
+  const format = resolveMetricValueFormat(ctx);
+  const rows = ctx.chartRows;
+  if (
+    format === "percent" &&
+    ctx.presentationKind === "bar" &&
+    rows &&
+    rows.length >= 2 &&
+    overviewBarLabelsNeedExtraPrecision(rows, ctx)
+  ) {
+    return formatOverviewBarTopValueLabel(raw, rows, ctx);
+  }
+  return formatExecutiveMetricValue(row, ctx);
+}
+
+/**
+ * Top/Lowest spread for executive insight chips — matches focused V-Bar label
+ * precision (percentage points) when extra decimal precision is required.
+ */
+export function formatExecutiveInsightSpreadGap(
+  gap: number,
+  ctx: MetricFormatContext = {}
+): string {
+  const rows = ctx.chartRows;
+  const format = resolveMetricValueFormat(ctx);
+  if (
+    format === "percent" &&
+    ctx.presentationKind === "bar" &&
+    rows &&
+    rows.length >= 2 &&
+    overviewBarLabelsNeedExtraPrecision(rows, ctx)
+  ) {
+    let pp = gap;
+    const vals = rows
+      .map((row) => readChartRowRawValue(row))
+      .filter((v) => Number.isFinite(v));
+    const maxV = vals.length ? Math.max(...vals.map(Math.abs)) : Math.abs(gap);
+    if (Math.abs(gap) <= 1 && maxV <= 1.05) {
+      pp = gap * 100;
+    }
+    return formatExecutivePercentPointGap(pp, {
+      skipFractionScale: true,
+      decimals: 2,
+    });
+  }
+  return formatMetricSpreadGap(gap, ctx);
 }
 
 /** Value-axis domain for horizontal bars — smart scale + export rounding. */

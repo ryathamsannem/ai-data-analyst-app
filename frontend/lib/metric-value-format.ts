@@ -301,7 +301,7 @@ export function formatExecutivePercentValue(value: number): string {
 /** Percentage-point spread for rate metrics — always 1 decimal + pp suffix. */
 export function formatExecutivePercentPointGap(
   gap: number,
-  options?: { skipFractionScale?: boolean }
+  options?: { skipFractionScale?: boolean; decimals?: number }
 ): string {
   if (!Number.isFinite(gap)) return "—";
   let n = gap;
@@ -313,7 +313,8 @@ export function formatExecutivePercentPointGap(
     n = n * 100;
   }
   const abs = Math.abs(n);
-  const decimals = abs > 0 && abs < 0.05 ? 2 : 1;
+  const decimals =
+    options?.decimals ?? (abs > 0 && abs < 0.05 ? 2 : 1);
   const rounded = Number(n.toFixed(decimals));
   if (rounded === 0 && abs > 0) {
     return `${n.toLocaleString(undefined, {

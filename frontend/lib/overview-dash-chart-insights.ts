@@ -12,6 +12,7 @@ import {
   metricFormatUsesPercent,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
+import { formatExecutiveInsightMetricValue, formatExecutiveInsightSpreadGap } from "@/lib/overview-dashboard-export";
 import {
   formatRadialLegendEntry,
   formatRadialSliceTotalLabel,
@@ -342,8 +343,12 @@ export function formatOverviewMiniInsightChips(
     presentationKind: opts?.presentationKind,
     chartRows: rows,
   };
-  const hiDisp = formatExecutiveMetricValue(hi, metricCtx);
-  const loDisp = formatExecutiveMetricValue(lo, metricCtx);
+  const formatBarInsightValue = (row: ChartRow) =>
+    opts?.presentationKind === "bar"
+      ? formatExecutiveInsightMetricValue(row, metricCtx)
+      : formatExecutiveMetricValue(row, metricCtx);
+  const hiDisp = formatBarInsightValue(hi);
+  const loDisp = formatBarInsightValue(lo);
 
   const isTrend =
     opts?.isTrendChart === true ||
@@ -367,10 +372,11 @@ export function formatOverviewMiniInsightChips(
         ? latestRow.value - startRow.value
         : NaN;
     const gapDisp = Number.isFinite(gap)
-      ? formatMetricSpreadGap(gap, {
+      ? formatExecutiveInsightSpreadGap(gap, {
           metricLabel: opts?.chartTitle,
           chartTitle: opts?.chartTitle,
           presentationKind: opts?.presentationKind,
+          chartRows: rows,
         })
       : "—";
     const gapChip: OverviewMiniInsightChip = change
@@ -397,11 +403,7 @@ export function formatOverviewMiniInsightChips(
       ? hi.value - lo.value
       : NaN;
   const gapDisp = Number.isFinite(gap)
-    ? formatMetricSpreadGap(gap, {
-        metricLabel: opts?.chartTitle,
-        chartTitle: opts?.chartTitle,
-        presentationKind: opts?.presentationKind,
-      })
+    ? formatExecutiveInsightSpreadGap(gap, metricCtx)
     : "—";
   const gapChip: OverviewMiniInsightChip = {
     key: "gap",

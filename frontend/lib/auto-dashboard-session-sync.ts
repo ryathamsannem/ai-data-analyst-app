@@ -3,7 +3,7 @@
  */
 
 import type { ChartKind, ChartRow } from "@/app/chart-types";
-import { formatExecutiveMetricValue } from "@/lib/metric-value-format";
+import { formatExecutiveInsightMetricValue } from "@/lib/overview-dashboard-export";
 import { chartKindToApiChartType } from "@/lib/final-chart-presentation";
 
 export type AutoDashboardMiniLike = {
@@ -71,20 +71,10 @@ export function buildRowsFromAutoDashboardMini(
   const chartKind = kindOverride ?? normalizeAutoDashboardChartKind(mini.chartType);
   const scatter = chartKind === "scatter";
   const cap = Math.min(mini.labels.length, mini.values.length);
-  const rows: ChartRow[] = [];
+  const baseRows: ChartRow[] = [];
   for (let i = 0; i < cap; i++) {
     const v = mini.values[i];
     if (!Number.isFinite(v)) continue;
-    const dispKind: ChartKind =
-      chartKind === "donut"
-        ? "pie"
-        : chartKind === "bar_horizontal"
-          ? "bar_horizontal"
-          : chartKind === "histogram"
-            ? "histogram"
-            : scatter
-              ? "scatter"
-              : "bar";
     const row: ChartRow = {
       name: mini.labels[i] || "—",
       value: v,
@@ -97,15 +87,28 @@ export function buildRowsFromAutoDashboardMini(
         if (xfmt) row.displayX = xfmt;
       }
     }
-    rows.push({
-      ...row,
-      displayValue: formatExecutiveMetricValue(row, {
-        metricLabel: mini.title,
-        chartTitle: mini.title,
-        presentationKind: dispKind,
-      }),
-    });
+    baseRows.push(row);
   }
+  const dispKind: ChartKind =
+    chartKind === "donut"
+      ? "pie"
+      : chartKind === "bar_horizontal"
+        ? "bar_horizontal"
+        : chartKind === "histogram"
+          ? "histogram"
+          : scatter
+            ? "scatter"
+            : "bar";
+  const metricCtx = {
+    metricLabel: mini.title,
+    chartTitle: mini.title,
+    presentationKind: dispKind,
+    chartRows: baseRows,
+  };
+  const rows = baseRows.map((row) => ({
+    ...row,
+    displayValue: formatExecutiveInsightMetricValue(row, metricCtx),
+  }));
   if (scatter) {
     return rows.filter((r) => typeof r.x === "number" && Number.isFinite(r.x));
   }

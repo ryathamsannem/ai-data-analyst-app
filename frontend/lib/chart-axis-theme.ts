@@ -13,6 +13,12 @@ export const CHART_AXIS_CSS = {
   line: "var(--chart-axis-line)",
 } as const;
 
+/** Top-of-bar value labels — darker than axis ticks for light plot surfaces. */
+export const CHART_BAR_VALUE_LABEL_CSS = CHART_AXIS_CSS.label;
+
+/** Labels rendered inside filled bars (H-Bar end / in-bar values). */
+export const CHART_BAR_INLAY_LABEL_CSS = "#f8fafc";
+
 const LIGHT_FALLBACK: ResolvedChartAxisTheme = {
   tick: "#64748b",
   label: "#475569",

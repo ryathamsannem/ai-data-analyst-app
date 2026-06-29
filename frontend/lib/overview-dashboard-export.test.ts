@@ -1,11 +1,192 @@
 import { describe, expect, it } from "vitest";
+import type { ChartRow } from "@/app/chart-types";
 import {
   detectOverviewExportBarOrientation,
+  formatExecutiveInsightMetricValue,
+  formatExecutiveInsightSpreadGap,
+  formatOverviewBarTopValueLabel,
   horizontalBarValueDomain,
   roundExecutiveAxisMaximum,
   resolveOverviewEffectivePresentationKind,
   validateOverviewDashboardExportParity,
 } from "./overview-dashboard-export";
+import { formatOverviewBarValueAxisTick } from "./overview-premium-axis-domain";
+import { formatExecutiveMetricValue, formatMetricSpreadGap } from "./metric-value-format";
+
+describe("formatOverviewBarTopValueLabel", () => {
+  const defectRows: ChartRow[] = [
+    { name: "Night", value: 0.0246 },
+    { name: "Day", value: 0.0253 },
+    { name: "Swing", value: 0.0253 },
+  ];
+  const defectCtx = {
+    chartTitle: "Defect Rate by Shift",
+    metricLabel: "Defect Rate",
+    presentationKind: "bar" as const,
+    chartRows: defectRows,
+  };
+
+  it("uses extra precision when focused defect-rate values collide at 1 decimal", () => {
+    const labels = defectRows.map((r) =>
+      formatOverviewBarTopValueLabel(r.value, defectRows, defectCtx)
+    );
+    expect(labels).toEqual(["2.46%", "2.53%", "2.53%"]);
+    expect(labels.filter((l) => l === "2.5%").length).toBe(0);
+    expect(
+      formatOverviewBarTopValueLabel(0.0246, defectRows, defectCtx)
+    ).not.toBe(formatOverviewBarTopValueLabel(0.0253, defectRows, defectCtx));
+    expect(formatOverviewBarValueAxisTick(0.0253, defectRows, defectCtx)).toBe(
+      "2.5%"
+    );
+  });
+
+  it("keeps normal percent bar labels when values are not misleadingly duplicated", () => {
+    const rows: ChartRow[] = [
+      { name: "A", value: 0.35 },
+      { name: "B", value: 0.4 },
+      { name: "C", value: 0.45 },
+    ];
+    const ctx = {
+      chartTitle: "Utilization by Segment",
+      metricLabel: "Utilization",
+      presentationKind: "bar" as const,
+      chartRows: rows,
+    };
+    const labels = rows.map((r) =>
+      formatOverviewBarTopValueLabel(r.value, rows, ctx)
+    );
+    expect(labels).toEqual(["35%", "40%", "45%"]);
+  });
+
+  it("leaves amount/count bar top labels unchanged", () => {
+    const rows: ChartRow[] = [
+      { name: "A", value: 1300 },
+      { name: "B", value: 2400 },
+    ];
+    const ctx = {
+      chartTitle: "Units by Shift",
+      metricLabel: "Units",
+      presentationKind: "bar" as const,
+      chartRows: rows,
+    };
+    const top = formatOverviewBarTopValueLabel(1300, rows, ctx);
+    const axis = formatOverviewBarValueAxisTick(1300, rows, ctx);
+    expect(top).toBe(axis);
+    expect(top).toBe("1,300");
+  });
+});
+
+describe("formatExecutiveInsightMetricValue", () => {
+  const defectRows: ChartRow[] = [
+    { name: "Night", value: 0.0252 },
+    { name: "Day", value: 0.0247 },
+    { name: "Swing", value: 0.0235 },
+  ];
+  const defectCtx = {
+    chartTitle: "Defect Rate by Shift",
+    metricLabel: "Defect Rate",
+    presentationKind: "bar" as const,
+    chartRows: defectRows,
+  };
+
+  it("matches V-Bar top label precision for focused defect-rate signal cards", () => {
+    const insightLabels = defectRows.map((r) =>
+      formatExecutiveInsightMetricValue(r, defectCtx)
+    );
+    const barLabels = defectRows.map((r) =>
+      formatOverviewBarTopValueLabel(r.value, defectRows, defectCtx)
+    );
+    expect(insightLabels).toEqual(barLabels);
+    expect(insightLabels).toEqual(["2.52%", "2.47%", "2.35%"]);
+    expect(insightLabels.filter((l) => l === "2.5%").length).toBe(0);
+    expect(insightLabels.filter((l) => l === "2.3%").length).toBe(0);
+  });
+
+  it("keeps normal percent bar insight formatting when values are not misleading", () => {
+    const rows: ChartRow[] = [
+      { name: "A", value: 0.35 },
+      { name: "B", value: 0.4 },
+      { name: "C", value: 0.45 },
+    ];
+    const ctx = {
+      chartTitle: "Utilization by Segment",
+      metricLabel: "Utilization",
+      presentationKind: "bar" as const,
+      chartRows: rows,
+    };
+    const labels = rows.map((r) => formatExecutiveInsightMetricValue(r, ctx));
+    const executive = rows.map((r) => formatExecutiveMetricValue(r, ctx));
+    expect(labels).toEqual(executive);
+    expect(labels).toEqual(["35.0%", "40.0%", "45.0%"]);
+  });
+
+  it("leaves amount/count insight values unchanged", () => {
+    const rows: ChartRow[] = [
+      { name: "A", value: 1300 },
+      { name: "B", value: 2400 },
+    ];
+    const ctx = {
+      chartTitle: "Units by Shift",
+      metricLabel: "Units",
+      presentationKind: "bar" as const,
+      chartRows: rows,
+    };
+    const insight = formatExecutiveInsightMetricValue(rows[0]!, ctx);
+    const executive = formatExecutiveMetricValue(rows[0]!, ctx);
+    expect(insight).toBe(executive);
+    expect(insight).toBe("1,300");
+  });
+});
+
+describe("formatExecutiveInsightSpreadGap", () => {
+  const defectRows: ChartRow[] = [
+    { name: "Night", value: 0.0252 },
+    { name: "Day", value: 0.0247 },
+    { name: "Swing", value: 0.0235 },
+  ];
+  const defectCtx = {
+    chartTitle: "Defect Rate by Shift",
+    metricLabel: "Defect Rate",
+    presentationKind: "bar" as const,
+    chartRows: defectRows,
+  };
+
+  it("formats focused defect-rate spread as 0.17 pp not 0.2 pp", () => {
+    const gap = 0.0252 - 0.0235;
+    expect(formatExecutiveInsightSpreadGap(gap, defectCtx)).toBe("0.17 pp");
+    expect(formatMetricSpreadGap(gap, defectCtx)).toBe("0.2 pp");
+  });
+
+  it("keeps normal percent bar gap formatting when extra precision is not needed", () => {
+    const rows: ChartRow[] = [
+      { name: "Prime", value: 0.031 },
+      { name: "Near Prime", value: 0.038 },
+      { name: "Subprime", value: 0.041 },
+    ];
+    const ctx = {
+      chartTitle: "Average Delinquency Rate by Customer Segment",
+      metricLabel: "Delinquency Rate",
+      presentationKind: "bar" as const,
+      chartRows: rows,
+    };
+    const gap = 0.041 - 0.031;
+    expect(formatExecutiveInsightSpreadGap(gap, ctx)).toBe("1.0 pp");
+  });
+
+  it("leaves amount/count spread gaps unchanged", () => {
+    const rows: ChartRow[] = [
+      { name: "A", value: 1300 },
+      { name: "B", value: 2400 },
+    ];
+    const ctx = {
+      chartTitle: "Units by Shift",
+      metricLabel: "Units",
+      presentationKind: "bar" as const,
+      chartRows: rows,
+    };
+    expect(formatExecutiveInsightSpreadGap(1100, ctx)).toBe("1,100");
+  });
+});
 
 describe("resolveOverviewEffectivePresentationKind", () => {
   it("maps layout flip only when explicitly requested (legacy helper)", () => {
