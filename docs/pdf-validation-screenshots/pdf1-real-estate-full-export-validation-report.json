@@ -1,0 +1,19 @@
+{
+  "csv": "D:\\Projects\\AI-Data-Analyst-App\\test-fixtures\\domain_upload_1k\\real_estate_property_1k.csv",
+  "rootQuestion": "What is the average price by property type?",
+  "followUp": "Why is Condo the highest?",
+  "fullExport": {
+    "pdf": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf1-real-estate-full-export-followup.pdf",
+    "download_ms": 2025,
+    "analysis": {
+      "file": "pdf1-real-estate-full-export-followup.pdf",
+      "pages": 5,
+      "vizPage": 3,
+      "hasConversationThread": true,
+      "hasAppendixSampleData": true,
+      "appendixAfterViz": true,
+      "orphanSourcePageStarts": [],
+      "orphanSourceAtPageTop": false
+    }
+  }
+}

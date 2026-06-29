@@ -189,6 +189,11 @@ export function pdfLineHeight(fontSize: number, factor = 0.44): number {
   return fontSize * factor + 1.55;
 }
 
+/** PDF Visualization section embed defaults (renderer-only; not live chart sizing). */
+export const PDF_VIZ_EMBED_DEFAULT_MAX_HEIGHT_MM = 172;
+export const PDF_VIZ_EMBED_MIN_HEIGHT_MM = 96;
+export const PDF_VIZ_EMBED_DEFAULT_MIN_WIDTH_RATIO = 0.82;
+
 /** Proportional chart embed size — avoids stretch, clip, and extreme aspect ratios. */
 export function computePdfChartEmbedDimensions(
   pxW: number,

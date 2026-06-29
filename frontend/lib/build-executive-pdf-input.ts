@@ -29,6 +29,7 @@ import {
 } from "@/lib/insight-narrative-tone";
 import type { RoutingPlanPayload } from "@/lib/routing-plan";
 import type { SmartChartIntel } from "@/lib/smart-chart-intelligence";
+import { alignPdfNarrativeToChart } from "@/lib/pdf-narrative-alignment";
 import {
   datasetKindLabel,
   type ExecutivePdfExportInput,
@@ -44,6 +45,8 @@ import {
 
 export type PdfExportMode = "executive" | "analyst";
 
+export type PdfExportReportPreset = "insight" | "full";
+
 export type ExecutivePdfExportOptions = {
   includeKPIs: boolean;
   includeAIInsight: boolean;
@@ -55,7 +58,32 @@ export type ExecutivePdfExportOptions = {
   chartScope?: "insight" | "session";
   /** Default: executive (story-first). Analyst adds technical appendix + metadata sections. */
   pdfMode?: PdfExportMode;
+  /** Slim AI Insights export vs Export-tab full selection. */
+  reportPreset?: PdfExportReportPreset;
 };
+
+/** Insight preset defaults: story + chart first; appendix sections opt-in only from the call partial. */
+export function applyPdfExportPreset(
+  merged: ExecutivePdfExportOptions,
+  call?: Partial<ExecutivePdfExportOptions>
+): ExecutivePdfExportOptions {
+  if (merged.reportPreset !== "insight") {
+    return merged;
+  }
+  const explicit = call ?? {};
+  return {
+    ...merged,
+    pdfMode: merged.pdfMode ?? "executive",
+    includeKPIs: merged.includeKPIs ?? true,
+    includeAIInsight: merged.includeAIInsight ?? true,
+    includeChart: merged.includeChart ?? true,
+    includeDataPreview: explicit.includeDataPreview === true,
+    includeDataQuality: explicit.includeDataQuality === true,
+    includeConversationContext: explicit.includeConversationContext === true,
+    includeTechnicalAppendix: explicit.includeTechnicalAppendix === true,
+    chartScope: merged.chartScope ?? "insight",
+  };
+}
 
 function resolvePdfIncludes(
   options: ExecutivePdfExportOptions
@@ -764,14 +792,19 @@ export function chartIntelSliceFromSmartChart(
 }
 
 export function routingPlanSliceForPdf(
-  plan: RoutingPlanPayload | null | undefined
+  plan: RoutingPlanPayload | null | undefined,
+  chartContract?: VisualizationContract | null
 ): PdfRoutingPlanSlice | undefined {
   if (!plan?.intent?.trim()) return undefined;
+  const chartDimension =
+    chartContract?.dimension?.trim() ||
+    chartContract?.semanticContext?.dimensionLabel?.trim() ||
+    null;
   return {
     intent: plan.intent.trim(),
     executiveLens: plan.executiveLens ?? null,
     metricColumn: plan.metricColumn ?? null,
-    dimensionColumn: plan.dimensionColumn ?? null,
+    dimensionColumn: chartDimension ?? plan.dimensionColumn ?? null,
     chartType: plan.chartType ?? null,
     unsupportedReason: plan.unsupportedReason ?? null,
   };
@@ -976,13 +1009,55 @@ export function buildExecutivePdfExportInput(
     chartHistory,
   } = params;
 
-  const resolved = resolvePdfIncludes(options);
+  const resolved = resolvePdfIncludes(applyPdfExportPreset(options));
   const cardsPdf = resolvePdfKpiCards(params);
-  const pdfExecutiveVizInsights =
-    chartScope === "insight" ? insightExecutiveVizInsights : executiveVizInsights;
   const pdfRankedSignals = chartPrep?.rankedSignals ?? null;
   const pdfContract = chartPrep?.contract;
   const pdfTrendMode = chartPrep?.trendMode ?? false;
+
+  const alignedNarrative =
+    chartScope === "insight" && chartPrep
+      ? alignPdfNarrativeToChart({
+          chartPrep,
+          pdfInsightAnswer,
+          insightExecutiveBrief,
+          insightExecutiveVizInsights,
+          parsedInsightAnswer: params.parsedInsightAnswer,
+          alignedInsightSummary: pdfAlignedAnalysis?.insightSummary,
+          rankedSignals: pdfRankedSignals,
+        })
+      : null;
+
+  const effectivePdfInsightAnswer =
+    alignedNarrative?.pdfInsightAnswer ?? pdfInsightAnswer;
+  const effectiveInsightBrief =
+    alignedNarrative?.insightExecutiveBrief ?? insightExecutiveBrief;
+  const effectiveInsightVizInsights =
+    alignedNarrative?.insightExecutiveVizInsights ??
+    insightExecutiveVizInsights;
+  const effectiveParsedInsightAnswer =
+    alignedNarrative?.parsedInsightAnswer ?? params.parsedInsightAnswer;
+  const effectivePdfAlignedAnalysis =
+    alignedNarrative?.alignedInsightSummary != null && pdfAlignedAnalysis
+      ? {
+          ...pdfAlignedAnalysis,
+          insightSummary: alignedNarrative.alignedInsightSummary,
+        }
+      : pdfAlignedAnalysis;
+
+  const narrativeParams: BuildExecutivePdfInputParams = {
+    ...params,
+    pdfInsightAnswer: effectivePdfInsightAnswer,
+    insightExecutiveBrief: effectiveInsightBrief,
+    insightExecutiveVizInsights: effectiveInsightVizInsights,
+    parsedInsightAnswer: effectiveParsedInsightAnswer,
+    pdfAlignedAnalysis: effectivePdfAlignedAnalysis,
+  };
+
+  const pdfExecutiveVizInsights =
+    chartScope === "insight"
+      ? effectiveInsightVizInsights
+      : executiveVizInsights;
 
   const exportQuestion =
     chartScope === "insight"
@@ -1002,6 +1077,7 @@ export function buildExecutivePdfExportInput(
       includeConversationContext: resolved.includeConversationContext === true,
       includeTechnicalAppendix: resolved.includeTechnicalAppendix === true,
       pdfMode: resolved.pdfMode,
+      reportPreset: resolved.reportPreset,
     },
     branding: reportBranding,
     dataset: {
@@ -1013,7 +1089,11 @@ export function buildExecutivePdfExportInput(
     },
     generatedAt: new Date(),
     mappingConfidence,
-    execSummaryLines: buildExecutiveSummaryLines(params, cardsPdf, pdfRankedSignals),
+    execSummaryLines: buildExecutiveSummaryLines(
+      narrativeParams,
+      cardsPdf,
+      pdfRankedSignals
+    ),
     kpiSectionTitle: params.alignedAnalysis?.focusKpis?.length
       ? "KPI dashboard (aligned with your question)"
       : "KPI dashboard",
@@ -1021,25 +1101,31 @@ export function buildExecutivePdfExportInput(
     question: exportQuestion,
     answer:
       pdfTrendMode && pdfContract
-        ? sanitizeNarrativeForTrendContract(pdfInsightAnswer, pdfContract)
-        : pdfInsightAnswer,
-    insightSections: buildInsightSectionsForPdf(params),
+        ? sanitizeNarrativeForTrendContract(
+            effectivePdfInsightAnswer,
+            pdfContract
+          )
+        : effectivePdfInsightAnswer,
+    insightSections: buildInsightSectionsForPdf(narrativeParams),
     insightSummary:
       pdfTrendMode && pdfContract
         ? sanitizeNarrativeForTrendContract(
             narrativeCopyForContract(pdfContract) ||
-              pdfAlignedAnalysis?.insightSummary?.trim() ||
+              effectivePdfAlignedAnalysis?.insightSummary?.trim() ||
               "",
             pdfContract
           )
         : sanitizeNarrativeForTrendContract(
-            pdfAlignedAnalysis?.insightSummary?.trim() ?? "",
+            effectivePdfAlignedAnalysis?.insightSummary?.trim() ?? "",
             pdfContract
-          ) || pdfAlignedAnalysis?.insightSummary?.trim(),
+          ) || effectivePdfAlignedAnalysis?.insightSummary?.trim(),
     insightConfidenceLevel: pdfAlignedAnalysis?.insightConfidenceLevel,
     insightConfidenceRationale:
       pdfAlignedAnalysis?.insightConfidenceRationale?.trim() || undefined,
-    routingPlan: routingPlanSliceForPdf(pdfAlignedAnalysis?.routingPlan),
+    routingPlan: routingPlanSliceForPdf(
+      effectivePdfAlignedAnalysis?.routingPlan,
+      pdfContract
+    ),
     chartIntel: chartIntelSliceFromSmartChart(smartIntel),
     chartInsightBadge: chartPrep?.chartInsightBadge ?? null,
     pdfRankedSignals:
@@ -1050,11 +1136,11 @@ export function buildExecutivePdfExportInput(
     executiveInsightsBrief:
       resolved.includeAIInsight &&
       (chartScope === "insight"
-        ? insightExecutiveBrief.trim()
-        : params.parsedInsightAnswer.summary?.trim() ?? "")
+        ? effectiveInsightBrief.trim()
+        : effectiveParsedInsightAnswer.summary?.trim() ?? "")
         ? chartScope === "insight"
-          ? insightExecutiveBrief.trim()
-          : params.parsedInsightAnswer.summary?.trim()
+          ? effectiveInsightBrief.trim()
+          : effectiveParsedInsightAnswer.summary?.trim()
         : undefined,
     provenance: chartPrep?.provenanceSlice ?? null,
     chart:

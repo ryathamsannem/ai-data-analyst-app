@@ -1,0 +1,555 @@
+# PDF Quality Audit — Real Export Evidence (June 28, 2026)
+
+**Branch:** `DEV` · baseline `c460bcc` (Phase 2 follow-up chips)  
+**Scope:** Architecture discovery + P1 issue audit only — **no production code changes**  
+**Evidence:** User-downloaded PDFs from AI Insights export and Export tab (all checkboxes, including sample data + conversation context)
+
+---
+
+## 1. Executive summary
+
+Both export paths converge on **one template** (`runExecutivePdfExport` in `pdf-report.ts`) fed by **one assembler** (`buildExecutivePdfExportInput`). The AI Insights button **hardcodes nearly the same include flags** as Export tab “select all,” so **8-page structural parity is expected**, not accidental duplication of two different renderers.
+
+Primary trust risk: **narrative text can describe a different breakdown dimension than the embedded chart** (e.g. Spend Amount by **Product Type** chart vs analysis mentioning **customer segments**). Section-order risk: **Data preview renders before AI insight and Visualization** when enabled. Checkbox behavior is **partially broken by design** for AI Insights (hardcoded overrides) and **partially ineffective** for section order (flags toggle inclusion, not executive vs analyst layout).
+
+---
+
+## 2. Architecture map
+
+### 2.1 Shared pipeline (both export entry points)
+
+```mermaid
+flowchart TD
+  subgraph entries [Export entry points]
+    AI[AI Insights button\npage.tsx ~L14548]
+    EXP[Export tab Download\npage.tsx ~L14887]
+  end
+  DR[downloadReport / downloadReportImplRef\npage.tsx ~L11175]
+  CTX[resolvePdfExportContext\nresolve-pdf-export-context.ts]
+  CAP[Chart PNG capture\nchart-png-capture + hidden refs]
+  BUILD[buildExecutivePdfExportInput\nbuild-executive-pdf-input.ts]
+  RUN[runExecutivePdfExport\npdf-report.ts]
+  PDF[(analytics-report.pdf)]
+
+  AI --> DR
+  EXP --> DR
+  DR --> CTX
+  DR --> CAP
+  DR --> BUILD
+  BUILD --> RUN
+  RUN --> PDF
+```
+
+| Layer | File | Key symbols |
+|-------|------|-------------|
+| UI triggers | `frontend/app/page.tsx` | `downloadReport()`, `downloadReportImplRef`, `exportOptions` state |
+| Context alignment | `frontend/lib/resolve-pdf-export-context.ts` | `resolvePdfExportContext()`, `findChartIdForExportQuestion()` |
+| Input assembly | `frontend/lib/build-executive-pdf-input.ts` | `buildExecutivePdfExportInput()`, `resolvePdfIncludes()` |
+| Content planning | `frontend/lib/pdf-executive-content.ts` | `buildPdfExecutiveContentPlan()` |
+| Render + layout | `frontend/app/pdf-report.ts` | `runExecutivePdfExport()`, section drawers |
+| Chart capture | `frontend/lib/chart-png-capture.ts`, `frontend/lib/chart-platform/chart-capture-controller.ts` | PNG artifact for PDF embed |
+| Branding | `frontend/lib/branding-config.ts`, `pdf-report.ts` `ReportBranding` | `BRANDING`, `loadReportBranding()` |
+| Styling / embed math | `frontend/lib/pdf-enterprise-style.ts` | `computePdfChartEmbedDimensions()`, `pdfDrawEnterpriseRunningChrome()` |
+| Metadata chips | `frontend/lib/chart-metadata-chips.ts`, `chart-contract-metadata.ts` | `buildChartMetadataChipSpecs()`, `buildFallbackSemanticHeader()` |
+| Tests | `frontend/lib/resolve-pdf-export-context.test.ts`, `pdf-export-sections.test.ts`, `phase7-pdf-generate.test.ts`, `build-executive-pdf-input.test.ts` | Scope + section flags |
+
+**Answer:** AI Insights PDF and Export-tab PDF **share the same path** — there is no separate “slim insight template.”
+
+### 2.2 Entry-point differences (why PDFs look the same)
+
+| Option | Export tab default (`exportOptions`) | AI Insights button override (`downloadReport({...})`) |
+|--------|--------------------------------------|-----------------------------------------------------|
+| `includeKPIs` | `true` | `true` |
+| `includeAIInsight` | `true` | `true` |
+| `includeChart` | `true` | `true` |
+| `includeDataPreview` | **`false`** | **`true` (hardcoded)** |
+| `includeDataQuality` | `true` | `true` |
+| `includeConversationContext` | `false` | **`true` (hardcoded)** |
+| `includeTechnicalAppendix` | `false` | not passed → inherits tab state |
+| `chartScope` | resolver decides | **`"insight"` forced** |
+| `pdfMode` | `"executive"` | `"executive"` |
+
+When Export tab has **all checkboxes on**, flags match AI Insights except `chartScope` (resolver may still pick `insight` when a stored AI bundle exists) and possibly `includeTechnicalAppendix`. **Same sections + same order → same page count (~8).**
+
+Relevant code:
+
+```14548:14556:frontend/app/page.tsx
+downloadReport({
+  includeKPIs: true,
+  includeAIInsight: true,
+  includeChart: true,
+  includeDataPreview: true,
+  includeDataQuality: true,
+  includeConversationContext: true,
+  chartScope: "insight",
+})
+```
+
+```6696:6705:frontend/app/page.tsx
+const [exportOptions, setExportOptions] = useState<ExportOptions>({
+  pdfMode: "executive",
+  includeKPIs: true,
+  includeAIInsight: true,
+  includeChart: true,
+  includeDataPreview: false,
+  includeDataQuality: true,
+  includeConversationContext: false,
+  includeTechnicalAppendix: false,
+});
+```
+
+### 2.3 Section order map (`runExecutivePdfExport`)
+
+Fixed order in `frontend/app/pdf-report.ts` (inclusion gated by `input.includes.*`):
+
+| # | Section | Flag | Approx. location |
+|---|---------|------|------------------|
+| 1 | Cover + **Executive snapshot** (KPI strip + dominant insight) | always | ~L3433–3480 |
+| 2 | **Executive summary** | always | ~L3486 |
+| 3 | **KPI dashboard** (`kpiSectionTitle`) | `includeKPIs` | ~L3628 |
+| 4 | **Data preview** table | `includeDataPreview` | ~L3656 (`drawDataPreviewSection()`) |
+| 5 | **AI insight** (question + narrative blocks) | `includeAIInsight` | ~L3659 |
+| 6 | **AI conversation thread** | `includeConversationContext` | ~L3821 |
+| 7 | **Visualization** (chart PNG + viz brief/facts) | `includeChart` | ~L3919 |
+| 8 | **Data quality** | `includeDataQuality` | ~L4397 |
+| 9 | **Technical appendix** (new page) | `includeTechnicalAppendix` | ~L4503 |
+
+**Critical ordering issue:** Data preview (4) is **before** AI insight (5) and Visualization (7). Enabling sample data on AI Insights export places tables **ahead of the main insight story**.
+
+`resolvePdfIncludes()` in `build-executive-pdf-input.ts` only normalizes executive vs analyst defaults; it does **not** reorder sections.
+
+---
+
+## 3. Issue table (P0 / P1 / P2)
+
+| ID | Severity | User observation | Root-cause hypothesis | Primary owner file(s) |
+|----|----------|------------------|----------------------|------------------------|
+| **PDF-P0-01** | **P0** | Chart = Spend by **Product Type**; narrative mentions **Premium/SME/Corporate/Retail** segments | Multi-source narrative assembly: (a) stored `bundle.answer` / `parsedInsightAnswer` from prior segment question; (b) `insightExecutiveBrief` / `insightExecutiveVizInsights` sidecar captured from **live** UI state while chart comes from `pdfSnap` bundle; (c) `buildPdfExecutiveContentPlan` generic “segment” reframing in `pdf-executive-content.ts`; (d) Overview KPI cards in exec summary referencing segment dims. Prior fix (`resolve-pdf-export-context`) aligned chart **id** but not **narrative dimension** vs chart contract. | `page.tsx` export assembly, `build-executive-pdf-input.ts`, `pdf-executive-content.ts`, `resolve-pdf-export-context.ts` |
+| **PDF-P1-01** | **P1** | Data preview appears **before** insight/chart | Hardcoded `includeDataPreview: true` on AI Insights button + fixed `drawDataPreviewSection()` call **before** AI insight block (~L3656). | `page.tsx`, `pdf-report.ts` |
+| **PDF-P1-02** | **P1** | AI Insights vs Export-all PDFs **structurally identical** | Single template; AI Insights hardcodes same flags as “all on” (minus appendix unless tab state). No `pdfMode` or preset differentiation for insight-only export. | `page.tsx`, `build-executive-pdf-input.ts` |
+| **PDF-P1-03** | **P1** | Checkboxes don’t clearly change layout | Flags only **include/exclude** sections; order fixed. AI Insights **ignores** Export tab checkbox state for preview + conversation. Export preview labels (`exportTabIncludedLabels`) not enforced in PDF order. | `page.tsx`, `pdf-report.ts` |
+| **PDF-P1-04** | **P1** | Chart too small in large card | `embedCenteredChartImage` reserves space for viz brief/facts below; `maxImgH` capped (`pdfEmbed.maxHeightMm ?? 158`, min ~88mm); `minWidthRatio` 0.74; large header panel eats vertical space before embed. | `pdf-report.ts`, `pdf-enterprise-style.ts`, `chart-presentation-profile.ts` |
+| **PDF-P2-01** | **P2** | KPI dashboard page sparse | Separate full section after exec summary + snapshot KPI strip duplication. | `pdf-report.ts` |
+| **PDF-P2-02** | **P2** | Technical appendix too prominent | When enabled, always **new page** near end with analyst copy even in executive mode. | `pdf-report.ts` |
+| **PDF-P2-03** | **P2** | Data quality “estimated from first N preview rows” | `previewDuplicates()` in `build-executive-pdf-input.ts` explicitly uses first preview slice (15 rows passed from `page.tsx`). Full-file duplicate scan not implemented. | `build-executive-pdf-input.ts`, `page.tsx` |
+| **PDF-P2-04** | **P2** | Placeholder branding/footer | `BRANDING.supportEmail = support@example.com`; footer `Generated by AI Data Analyst`; company from `reportBranding.companyName \|\| BRANDING.appName`. User “Produced by Data Analysis” likely local `reportBranding` or cover tagline. | `branding-config.ts`, `pdf-report.ts`, Export tab branding fields |
+| **PDF-P2-05** | **P2** | Metadata chip **“Category: Category”** | Fallback semantic header sets `roleLabel: "Category"` and `detailLabel: "Category"` when `categoryLabel` missing on contract; chip renders `label: value`. | `chart-contract-metadata.ts`, `chart-metadata-chips.ts`, PDF metadata path |
+| **PDF-P2-06** | **P2** | `account_id` date-like in preview table | `formatPdfTableCellValue` → `parsePdfIsoDateLabel` / `normalizePdfIsoDatesInText` may format ISO-like strings; preview rows from `dataPreviewSortedRows.slice(0,15)` may contain serialized dates or numeric IDs matching date patterns. | `pdf-report.ts`, `pdf-date-format.ts`, data preview source in `page.tsx` |
+
+---
+
+## 4. Narrative/chart mismatch — detailed trace (PDF-P0-01)
+
+### 4.1 What the PDF uses for each layer
+
+| PDF element | Source at export time |
+|-------------|----------------------|
+| Business question | `resolvePdfExportContext` → `exportQuestion` / bundle `lastAskedQuestion` |
+| AI insight body | `pdfInsightAnswer` from `aiAnswerByChartId[chartId]` or live `answer` |
+| Executive brief under chart | `insightExecutiveBrief` via `pdfInsightExportSidecarRef` (live UI memo) |
+| Viz executive facts | `insightExecutiveVizInsights` sidecar + `vizExecutiveFacts` in content plan |
+| Chart PNG / data | `pdfSnap` snapshot + `chartPrep` from pinned/export-resolved chart id |
+| Ranked signal bullets | `computePdfRankedSignalsFromChartRows(pdfChartData)` — **matches chart rows** |
+| Highlighted signals | `buildPdfExecutiveContentPlan` — may pull **answer sections** + brief + ranked narrative |
+
+### 4.2 Likely failure modes (banking product type vs segment text)
+
+1. **Stale answer text:** User asked a segment question earlier; chart re-rendered for product type but `bundle.answer` still describes segments. Export uses bundle answer when chart id matches question lookup — question text may match while **narrative body is from an older interpretation**.
+2. **Sidecar vs snapshot split:** `pdfInsightExportSidecarRef` snapshots **live** `insightExecutiveBrief` / `insightExecutiveVizInsights` at layout time, while chart rows come from **`pdfSnap`**. If UI brief was built from `parsedInsightAnswer.summary` or ranked API insights tied to **segment** dimension, but export chart snapshot is **product_type**, mismatch appears in Visualization narrative panel and AI insight sections.
+3. **Generic segment language:** `pdf-executive-content.ts` reframes copy with “segment” / “peer segments” heuristics independent of chart contract dimension.
+4. **Executive summary KPI lines:** Overview KPI cards (`displayKpiCards`) may reference segment-level metrics while insight chart shows product type.
+
+### 4.3 Existing guardrails (insufficient)
+
+- `resolve-pdf-export-context.ts` + tests — chart **scope/id** alignment (see `docs/pdf-visualization-context-alignment.md`).
+- `validateExportMatchesContract` — blocks export on contract/chart type mismatch; **does not validate narrative dimension**.
+- No test asserts PDF narrative mentions only categories present in chart rows.
+
+---
+
+## 5. Checkbox / template behavior (PDF-P1-02 / P1-03)
+
+| Expected product behavior | Current behavior |
+|---------------------------|------------------|
+| AI Insights export = slim executive report | Hardcoded full pack: KPIs + preview + quality + conversation |
+| Export checkboxes reorder or group sections | Checkboxes only set booleans; **order is fixed** in `runExecutivePdfExport` |
+| Unchecked Export tab options respected from AI Insights | AI Insights **overrides** preview + conversation regardless of tab |
+| Technical appendix executive-safe | Included only when flag true; always full audit page |
+
+---
+
+## 6. Phase PDF-1 — smallest safe implementation plan
+
+**Goal:** Trust + executive layout without H-Bar/V-Bar, axis, Overview, SQ, or follow-up changes.
+
+### 6.1 PDF-P0-01 — Narrative/chart alignment (highest priority)
+
+1. **Bind narrative to export chart contract** in `buildExecutivePdfExportInput` / `buildPdfExecutiveContentPlan`:
+   - Pass `chartPrep.contract` dimension label + chart row category names.
+   - Suppress or rewrite narrative blocks mentioning dimensions not in chart data (e.g. drop “segment” prose when contract dimension is `product_type`).
+2. **Stop using live sidecar for text** when stored bundle exists: prefer `bundle.answer`, `bundle.alignedAnalysis`, and snapshot `presentationContract` over `pdfInsightExportSidecarRef` for brief/facts **unless** they match the same `chartId` + question hash.
+3. **Add validation gate** before `runExecutivePdfExport`: if AI insight text references a breakdown label incompatible with chart dimension (simple token check), prefer chart-aligned ranked signals or contract-sanitized narrative.
+4. **Unit tests:** extend `build-executive-pdf-input.test.ts` + new `pdf-narrative-alignment.test.ts` — product-type chart rows must not produce segment-named executive facts.
+
+**Files:** `build-executive-pdf-input.ts`, `pdf-executive-content.ts`, `page.tsx` (export assembly only), optional `pdf-narrative-alignment.ts` helper.
+
+### 6.2 PDF-P1-01 — Section order + sample data placement
+
+1. Move `drawDataPreviewSection()` **after** Visualization (or into appendix block before technical appendix).
+2. AI Insights button: set `includeDataPreview: false` by default; optional small “Include sample data (appendix)” if product wants it.
+3. When preview enabled from Export tab, label section **“Appendix: Sample data”**.
+
+**Files:** `pdf-report.ts` (reorder only), `page.tsx` (AI Insights defaults).
+
+### 6.3 PDF-P1-02 / P1-03 — Distinct presets
+
+1. Define **`insightExecutivePreset`** in `build-executive-pdf-input.ts`:
+   - KPIs: optional compact (snapshot only)
+   - AI insight + chart: on
+   - Data preview / conversation / appendix: off
+2. AI Insights button passes preset; Export tab keeps user flags.
+3. Surface preset name in Export tab preview summary.
+
+**Files:** `build-executive-pdf-input.ts`, `page.tsx`, `export-tab-preview.ts`.
+
+### 6.4 PDF-P1-04 — Chart embed sizing (localized)
+
+1. Increase usable height when viz brief is short: lower `insightsReserve` or render brief beside chart for bar charts.
+2. Tune `computePdfChartEmbedDimensions` min width ratio for horizontal bar (PDF profile already in `chart-presentation-profile.ts`).
+3. **Do not** change on-screen chart layout — PDF embed math only.
+
+**Files:** `pdf-report.ts`, `pdf-enterprise-style.ts`.
+
+### 6.5 PDF-P2-05 — “Category: Category” chip
+
+1. In PDF metadata rendering, skip chips where `label === value` or value is generic “Category”.
+2. Prefer `chartPrep.chartAxisLabels.category` / contract `semantics.category.label`.
+
+**Files:** `pdf-report.ts` (`normalizePdfChartMetadataChips` filter), or `buildFallbackSemanticHeader` narrow fix.
+
+### 6.6 PDF-P2-04 — Branding constants
+
+1. Update `BRANDING` defaults or Export tab placeholders (support email, footer line).
+2. Document `loadReportBranding()` localStorage override.
+
+**Files:** `branding-config.ts`, Export tab copy in `page.tsx`.
+
+### 6.7 PDF-P2-03 / P2-06 — Data quality + preview formatting
+
+1. Wording: change duplicate note to “preview sample (first 15 rows)” prominently.
+2. Preview table: skip ISO date parsing for columns matching `*_id` / `id` patterns.
+
+**Files:** `build-executive-pdf-input.ts`, `pdf-report.ts` `formatPdfTableCellValue`.
+
+---
+
+## 7. Validation plan (Phase PDF-1)
+
+| Test | Type | Assert |
+|------|------|--------|
+| `resolve-pdf-export-context.test.ts` | unit | Existing scope tests remain green |
+| `build-executive-pdf-input.test.ts` | unit | Insight preset flags; narrative uses chart dimension |
+| `pdf-export-sections.test.ts` | static/source | Data preview after visualization |
+| `phase7-pdf-generate.test.ts` | unit | Section page counts: insight preset < all-sections |
+| New `pdf-narrative-alignment.test.ts` | unit | No segment terms when chart categories are product types |
+| Banking fixture manual | deterministic generate | Re-export spend-by-product-type; narrative mentions product types only |
+
+**No browser tests required** if unit tests cover section order strings + input assembly. Optional: regenerate `docs/pdf-validation-screenshots/` fixtures after PDF-1.
+
+---
+
+## 8. Explicit out of scope
+
+- H-Bar/V-Bar on-screen parity (unless PDF capture proves regression)
+- Chart axis/domain/bar sizing in UI
+- Overview defaults / auto-dashboard
+- Backend suggested questions (`3ee3e48`)
+- Follow-up chips (`c460bcc`)
+- Mapping confidence aggregates
+- Backend `main.py` / LLM narrative generation
+- Broad PDF visual redesign (cover, full KPI page merge)
+- Full-dataset duplicate detection (needs backend; defer)
+
+---
+
+## 9. Files inspected
+
+| File | Purpose |
+|------|---------|
+| `frontend/app/page.tsx` | Export triggers, options, capture, `buildExecutivePdfExportInput` call |
+| `frontend/app/pdf-report.ts` | Full PDF layout, sections, embed, preview table, appendix |
+| `frontend/lib/build-executive-pdf-input.ts` | Shared input, includes, exec summary, preview duplicates |
+| `frontend/lib/resolve-pdf-export-context.ts` | Chart/answer scope resolver |
+| `frontend/lib/pdf-executive-content.ts` | Narrative dedupe + lens plan |
+| `frontend/lib/pdf-enterprise-style.ts` | Embed dimensions, chrome |
+| `frontend/lib/branding-config.ts` | App branding constants |
+| `frontend/lib/chart-metadata-chips.ts` | Metadata chip specs |
+| `frontend/lib/chart-platform/chart-contract-metadata.ts` | Fallback “Category” header |
+| `frontend/lib/chart-png-capture.ts` | PNG artifact |
+| `frontend/lib/export-tab-preview.ts` | Export tab preview summary |
+| `frontend/lib/pdf-export-sections.test.ts` | Section flag guards |
+| `frontend/lib/resolve-pdf-export-context.test.ts` | Scope alignment tests |
+| `docs/pdf-visualization-context-alignment.md` | Prior chart-scope fix notes |
+
+---
+
+## 10. Audit verdict
+
+| Question | Answer |
+|----------|--------|
+| Same template for AI Insights vs Export tab? | **Yes** — `runExecutivePdfExport` |
+| Do checkboxes control inclusion? | **Partially** — booleans only; AI Insights overrides some flags |
+| Do checkboxes control order? | **No** — fixed section sequence |
+| Why ~8 pages both ways? | Same sections enabled (AI Insights ≈ Export all-on) |
+| Top trust fix? | **PDF-P0-01** narrative ↔ chart contract alignment |
+| Top layout fix? | **PDF-P1-01** move sample data after insight/chart |
+
+**Next step:** Review Phase PDF-1 plan (§6) and approve before implementation.
+
+---
+
+## 11. Phase PDF-1 implementation (June 28, 2026)
+
+**Status:** Implemented on `DEV` (not committed). Baseline before changes: `c460bcc`.
+
+### 11.1 Summary
+
+Phase PDF-1 delivers trust and executive-flow fixes without touching chart parity, backend, or broad export capture. AI Insights export now uses a **slim `insight` preset**; sample data moves **after Visualization**; narrative is **aligned to the exported chart contract** when stale segment copy conflicts with a Product Type (or similar) chart; PDF chart embed uses **larger renderer-only sizing**; metadata chips no longer show **“Category: Category”** when a real dimension exists.
+
+### 11.2 Files changed
+
+| File | Change |
+|------|--------|
+| `frontend/lib/pdf-narrative-alignment.ts` | **New** — chart contract context, conflict detection, chart-aligned fallback narrative |
+| `frontend/lib/pdf-narrative-alignment.test.ts` | **New** — Product Type vs segment regression + preset tests |
+| `frontend/lib/build-executive-pdf-input.ts` | `applyPdfExportPreset`, narrative alignment in assembler, routing plan dimension from chart contract |
+| `frontend/app/page.tsx` | AI Insights button → `reportPreset: "insight"`; `applyPdfExportPreset` in download flow |
+| `frontend/app/pdf-report.ts` | Section reorder (appendix after viz), chip normalization, PDF embed constants |
+| `frontend/lib/pdf-enterprise-style.ts` | `PDF_VIZ_EMBED_*` renderer-only sizing constants |
+| `frontend/lib/build-executive-pdf-input.test.ts` | Category chip fix, Export tab flag regression |
+| `frontend/lib/pdf-export-sections.test.ts` | Static assert: sample data after Visualization |
+
+### 11.3 Before / after behavior
+
+| Issue | Before | After |
+|-------|--------|-------|
+| **PDF-P0-01** | Segment narrative could appear with Product Type chart | Mismatched narrative replaced with chart-aligned summary from ranked signals / categories; sidecar brief and viz cards filtered |
+| **PDF-P1-01 / P1-03** | Data preview before AI insight/chart; AI Insights hardcoded preview + conversation | Preview **Appendix: Sample data** after Visualization; AI Insights preset defaults preview/conversation/quality/appendix **off** |
+| **PDF-P1-02** | AI Insights ≈ Export all-on | Distinct `reportPreset: "insight"` slim layout vs Export tab checkbox-driven full export |
+| **PDF-P1-04** | Chart embed max ~158mm, min width ratio 0.74 | PDF-only max 172mm, min height 96mm, min width ratio 0.82 |
+| **Category chip** | “Category: Category” | Replaced with axis label (e.g. “Category: Product Type”) or dropped |
+
+### 11.4 Tests run
+
+```text
+npx vitest run lib/pdf-narrative-alignment.test.ts lib/build-executive-pdf-input.test.ts lib/pdf-export-sections.test.ts lib/pdf-executive-content.test.ts lib/resolve-pdf-export-context.test.ts lib/pdf-export-quota.test.ts
+→ 6 files, 56 tests passed
+
+npm run build
+→ success (Next.js 16.2.4)
+```
+
+No `phase7-pdf-generate` or banking fixture PDF regeneration run in this pass (deferred to manual validation).
+
+### 11.5 Remaining deferred (PDF-2+)
+
+- **PDF-P2-01** — Sparse KPI dashboard page merge/redesign
+- **PDF-P2-02** — Technical appendix prominence / executive-safe layout
+- **PDF-P2-03** — Data quality duplicate wording (full-file scan)
+- **PDF-P2-04** — Branding placeholder / footer copy
+- **PDF-P2-06** — `account_id` date formatting in preview table
+- **Export tab preview** — Surface `insight` vs `full` preset label in preview summary (`export-tab-preview.ts`)
+- **phase7-pdf-generate** — Regenerate validation screenshots after PDF-1
+- Full PDF template redesign
+
+---
+
+## 12. Phase PDF-1 manual validation (June 29, 2026)
+
+**Method:** Deterministic `buildExecutivePdfExportInput` + `runExecutivePdfExport` using `banking_financial_1k.csv` metadata, Product Type chart rows, and **stale segment narrative** input (Premium/SME/Corporate/Retail). No browser automation. Temporary vitest harness deleted after run; artifacts kept under `docs/pdf-validation-screenshots/`.
+
+### 12.1 Generated samples
+
+| File | Preset | Pages |
+|------|--------|-------|
+| `docs/pdf-validation-screenshots/pdf1-banking-insight-preset.pdf` | AI Insights `reportPreset: "insight"` | 3 |
+| `docs/pdf-validation-screenshots/pdf1-banking-export-full.pdf` | Export tab all sections | 5 |
+| `docs/pdf-validation-screenshots/pdf1-banking-validation-report.json` | Machine-readable summary | — |
+
+### 12.2 Section order
+
+**Insight preset (slim):** Executive summary → KPI dashboard → AI insight → Visualization  
+(No data preview, conversation, data quality, or technical appendix.)
+
+**Export full:** Executive summary → KPI dashboard → AI insight → AI conversation thread → Visualization → **Appendix: Sample data** → Data quality → Technical appendix
+
+Sample data is **after** insight and chart in full export. Title uses **“Appendix: Sample data”** (not legacy “Data preview”).
+
+### 12.3 Checklist results
+
+| Requirement | Result |
+|-------------|--------|
+| **Narrative/chart alignment** | **PASS** — Stale segment answer replaced with chart-aligned copy: `Spend Amount by Product Type — #1: Credit Card ($420K); …` No Premium/SME/Corporate/customer segment in insight narrative. |
+| **AI Insights preset slim** | **PASS** — `includeDataPreview: false`, `includeConversationContext: false`, `reportPreset: "insight"`. 3 pages vs 5 for full export. |
+| **Data preview placement** | **PASS** (full export) — Appendix after Visualization. **N/A** in insight preset (preview off by default). |
+| **Visualization sizing** | **INCONCLUSIVE in headless path** — No `captureEl`/chart PNG in deterministic generator → PDF shows “Chart capture unavailable” empty state; embed dimension constants verified by unit tests only. **Recommend one live browser export** to confirm larger in-card chart when PNG capture succeeds. |
+| **Metadata chip** | **PASS** — PDF text contains `Category: Product Type`; no `Category: Category`. |
+| **Export-tab flags** | **PASS** — Full export includes preview, conversation, data quality, appendix; professional section order preserved. |
+
+**Note:** Full-export PDF contains **“Retail”** once in the **Appendix: Sample data** table (`customer_segment` column value), not in AI narrative — expected and not a PDF-P0-01 regression.
+
+### 12.4 Tests / build (re-run after PDF generation)
+
+```text
+npx vitest run (6 PDF-related files) → 56 passed
+npm run build → success
+```
+
+### 12.5 Remaining visual issues
+
+- Headless validation cannot assess chart PNG embed size or axis label clipping (no captured chart image).
+- KPI dashboard page still sparse on full export (deferred PDF-P2-01).
+- Technical appendix still full analyst page when enabled (deferred PDF-P2-02).
+
+### 12.6 Commit readiness
+
+**Safe to commit** for Phase PDF-1 scope. Recommend optional follow-up: one live AI Insights export with visible chart on `banking_financial_1k` to confirm Visualization embed sizing in production capture path.
+
+---
+
+## 13. Phase PDF-1 live browser validation (June 29, 2026)
+
+**Method:** Playwright Chromium (`docs/pdf1-banking-live-export.py`) against `localhost:3000` + `banking_financial_1k.csv`, question **Spend Amount by Product Type**, **Export this insight (PDF)** with `reportPreset: "insight"`.
+
+### 13.1 Generated artifacts
+
+| File | Description |
+|------|-------------|
+| `docs/pdf-validation-screenshots/pdf1-banking-live-insight-preset.pdf` | Live AI Insights preset export (4 pages) |
+| `docs/pdf-validation-screenshots/pdf1-banking-live-viz-page-3.png` | Rendered Visualization page for visual review |
+| `docs/pdf-validation-screenshots/pdf1-banking-live-validation-report.json` | Machine-readable live validation summary |
+
+Full Export-tab PDF was **not** regenerated in this pass (optional scope).
+
+### 13.2 Live validation results
+
+| Check | Result |
+|-------|--------|
+| **Chart capture** | **PASS** — Embedded horizontal bar chart PNG present (4 images in PDF vs 0 in headless path). No “Chart capture unavailable”. |
+| **Chart sizing** | **PASS** — Chart fills ~half of page 3 card width; visibly larger than headless empty-state PDF. All five category labels readable: Credit Card, Term Deposit, Personal Loan, Mortgage, Auto Loan. X-axis `$0`–`8.7M` unclipped. |
+| **Narrative alignment** | **PASS** — Analysis bullets reference **product type** ranks (Credit Card, Term Deposit, Personal Loan). No Premium/SME/Corporate/Retail/customer segment in PDF text. Breakdown dimension: **product type**. |
+| **Insight preset slim** | **PASS** (after fix) — Section order: Executive summary → KPI dashboard → AI insight → Visualization → Executive insights cards. **No** Data preview, conversation, or data quality sections. |
+| **Metadata chip** | **PASS** — `Category: Product Type` on page 3; no `Category: Category`. |
+| **Data preview placement** | **N/A** — Not included in insight preset (expected). |
+
+### 13.3 Regression found and fixed during live validation
+
+**Issue:** `applyPdfExportPreset("insight")` merged Export-tab defaults (`includeDataQuality: true`) before applying slim flags, so the first live export incorrectly included a **Data quality** page.
+
+**Fix:** `applyPdfExportPreset(merged, callPartial)` now ignores Export-tab defaults for appendix sections; only explicit call overrides opt in. Re-export confirmed slim 4-page PDF without Data quality.
+
+### 13.4 Tests / build after fix
+
+```text
+npx vitest run lib/pdf-narrative-alignment.test.ts lib/build-executive-pdf-input.test.ts lib/pdf-export-sections.test.ts → 31 passed
+npm run build → success
+```
+
+### 13.5 Commit readiness
+
+**Safe to commit** — live chart capture, sizing, label readability, narrative alignment, metadata chip, and slim insight preset all verified on `banking_financial_1k`.
+
+---
+
+## 14. Follow-up export bug — P1 fix (June 29, 2026)
+
+### 14.1 Finding
+
+After a follow-up AI Insight (e.g. root **Spend Amount by Product Type** → follow-up **Why is Credit Card highest?**):
+
+- The **Export this insight (PDF)** button was hidden on the active follow-up answer because `canExportInsight` required `insightChartMatchesCurrentQuestion`, which failed when the follow-up reused the parent chart (snapshot question still names the root ask).
+- PDF export could **fall back to the pinned chart bundle** (root `lastAskedQuestion` / narrative) when `findChartIdForExportQuestion` did not match, exporting the root insight instead of the follow-up.
+
+### 14.2 Root cause
+
+1. **UI gate:** `insightHasRenderableVisualization` treated inherited parent charts as misaligned for follow-up questions.
+2. **Context resolver:** `resolvePdfExportContext` keyed narrative only on per-chart bundles (`aiAnswerByChartId`). Root and follow-up share one `chartId`, so a stale bundle or pinned fallback could win over the live follow-up Q/A.
+3. **No explicit export target:** `downloadReport` did not pass the active saved result id (`activeInsightResultId`).
+
+### 14.3 Fix summary
+
+| Area | Change |
+|------|--------|
+| `insight-result-history.ts` | `findInsightSavedResultById`, `findInsightSavedResultByQuestion`, `buildInsightConversationThread` |
+| `resolve-pdf-export-context.ts` | Prefer `exportInsightResultId` / saved history for question, answer, analysis, and chart id before pinned bundle fallback |
+| `page.tsx` | `insightFollowUpInheritsChart` + `insightChartAlignedForExport` for export button gating; pass `exportInsightResultId` on insight export; conversation appendix uses saved thread chain when enabled |
+| Tests | `resolve-pdf-export-context.test.ts` (follow-up vs root), `insight-result-history.test.ts` (thread + lookup) |
+
+Phase PDF-1 narrative alignment, slim preset, appendix placement, embed sizing, and metadata chip fixes **unchanged**.
+
+### 14.4 Tests / build
+
+```text
+npx vitest run lib/resolve-pdf-export-context.test.ts lib/insight-result-history.test.ts lib/pdf-narrative-alignment.test.ts lib/build-executive-pdf-input.test.ts lib/pdf-export-sections.test.ts → 49 passed
+npm run build → success
+```
+
+### 14.5 Live validation (follow-up export)
+
+**Script:** `docs/pdf1-banking-followup-live-export.py`  
+**Artifact:** `docs/pdf-validation-screenshots/pdf1-banking-live-followup-insight-preset.pdf`  
+**Report:** `docs/pdf-validation-screenshots/pdf1-banking-followup-live-validation-report.json`
+
+| Check | Result |
+|-------|--------|
+| Export button on follow-up answer | **PASS** — visible before export |
+| PDF question in scope | **PASS** — `Why is Credit Card highest?` (not root question) |
+| Product Type chart context | **PASS** — breakdown dimension product type; chart PNG embedded (4 pages) |
+| Insight preset slim | **PASS** — no Data preview, conversation thread, or Data quality |
+| Phase PDF-1 root export regression | **PASS** — prior `pdf1-banking-live-insight-preset.pdf` behavior unchanged; narrative alignment tests still green |
+
+### 14.6 Deferred
+
+- Per-item export control on **Recent Insights** list rows (restore-then-export works; optional UX enhancement).
+- Live re-run of full Export-tab all-sections PDF (not required for this fix).
+
+---
+
+## 15. Visualization page-break polish (June 29, 2026)
+
+### 15.1 Finding
+
+Full Export-tab PDFs could split the Visualization section awkwardly: the **Analysis context** metadata block used per-row `mutedLine()` page breaks, orphaning the final **Source · Automated dashboard** row at the top of the next page while the chart followed below.
+
+### 15.2 Root cause
+
+`ensurePageSpace()` ran per metadata row inside the analysis-context block, but the chart embed only reserved space for itself afterward — no cohesion check for **metadata block + minimum chart footprint** together.
+
+### 15.3 Fix
+
+| File | Change |
+|------|--------|
+| `frontend/app/pdf-report.ts` | `estimatePdfVizAnalysisContextHeight`, `shouldStartPdfVizCoreOnFreshPage`, `pdfVizChartCohesionMinHeightMm`; draw analysis context atomically via `drawMutedMetaLine`; fresh page before metadata when block + chart min won't fit; extend chart fresh-page guard for all chart kinds when remaining height is below cohesion minimum |
+| `frontend/lib/pdf-viz-layout.test.ts` | Layout cohesion + appendix-after-viz regression tests |
+
+Slim AI Insights preset unchanged (same helpers only affect full viz stack path).
+
+### 15.4 Tests / build
+
+```text
+npx vitest run lib/pdf-viz-layout.test.ts lib/pdf-export-sections.test.ts (+ PDF export suite) → pass
+npm run build → success
+```
+
+### 15.5 Live validation
+
+**Script:** `docs/pdf1-real-estate-full-export.py`  
+**Artifact:** `docs/pdf-validation-screenshots/pdf1-real-estate-full-export-followup.pdf`  
+**Report:** `docs/pdf-validation-screenshots/pdf1-real-estate-full-export-validation-report.json`
+
+| Check | Result |
+|-------|--------|
+| Orphaned Source row at page top | **PASS** — `orphanSourcePageStarts: []` |
+| Conversation thread included | **PASS** |
+| Appendix: Sample data after Visualization | **PASS** |
+| Chart labels / layout | **PASS** — 5-page full export; viz on page 3 |

@@ -97,3 +97,49 @@ export function chartExistsInHistory(
   if (!chartId?.trim()) return false;
   return chartHistory.some((h) => h.id === chartId);
 }
+
+export function normalizeInsightQuestionForMatch(q: string): string {
+  return q.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function findInsightSavedResultById(
+  history: InsightSavedResult[],
+  resultId: string | null | undefined
+): InsightSavedResult | null {
+  if (!resultId?.trim()) return null;
+  return history.find((r) => r.id === resultId) ?? null;
+}
+
+/** Newest saved result whose question matches (normalized). */
+export function findInsightSavedResultByQuestion(
+  history: InsightSavedResult[],
+  question: string
+): InsightSavedResult | null {
+  const asked = normalizeInsightQuestionForMatch(question);
+  if (!asked) return null;
+  let best: InsightSavedResult | null = null;
+  for (const entry of history) {
+    if (!entry.hasValidAIAnswer || !entry.answer.trim()) continue;
+    if (normalizeInsightQuestionForMatch(entry.question) !== asked) continue;
+    if (!best || entry.savedAt > best.savedAt) best = entry;
+  }
+  return best;
+}
+
+/** Prior questions in order up to and including the selected saved result. */
+export function buildInsightConversationThread(
+  history: InsightSavedResult[],
+  resultId: string
+): string[] {
+  const thread: string[] = [];
+  const visited = new Set<string>();
+  let current = findInsightSavedResultById(history, resultId);
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    const q = current.question.trim();
+    if (q) thread.unshift(q);
+    if (!current.parentResultId) break;
+    current = findInsightSavedResultById(history, current.parentResultId);
+  }
+  return thread;
+}

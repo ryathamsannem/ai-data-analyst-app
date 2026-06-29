@@ -27,4 +27,16 @@ describe("pdf-report optional sections", () => {
       /analystPdf && input\.includes\.includeTechnicalAppendix/
     );
   });
+
+  it("places sample data appendix after visualization", () => {
+    const vizIdx = pdfReportSrc.indexOf('sectionTitle("Visualization")');
+    const previewIdx = pdfReportSrc.indexOf('sectionTitle("Appendix: Sample data")');
+    const drawPreviewIdx = pdfReportSrc.indexOf("drawDataPreviewSection();");
+    expect(vizIdx).toBeGreaterThan(-1);
+    expect(previewIdx).toBeGreaterThan(-1);
+    expect(drawPreviewIdx).toBeGreaterThan(vizIdx);
+    expect(pdfReportSrc.indexOf("drawDataPreviewSection();", vizIdx)).toBe(
+      drawPreviewIdx
+    );
+  });
 });

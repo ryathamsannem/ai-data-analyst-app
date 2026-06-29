@@ -195,6 +195,24 @@ describe("buildExecutivePdfExportInput", () => {
     expect(built.input.includes.includeTechnicalAppendix).toBe(true);
   });
 
+  it("respects Export tab flags when reportPreset is not insight", () => {
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      options: {
+        ...baseParams().options,
+        includeDataPreview: true,
+        includeConversationContext: true,
+        includeDataQuality: true,
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.input.includes.includeDataPreview).toBe(true);
+    expect(built.input.includes.includeConversationContext).toBe(true);
+    expect(built.input.includes.includeDataQuality).toBe(true);
+    expect(built.input.includes.reportPreset).toBeUndefined();
+  });
+
   it("passes UI-built risk/opportunity cards unchanged to PDF facts", () => {
     const cards: ExecutiveVizInsightCard[] = [
       {
@@ -387,6 +405,22 @@ describe("PDF chart metadata chips", () => {
         { id: "blank", kind: "mono", value: " " },
       ])
     ).toEqual(sampleMetadataChips);
+  });
+
+  it("replaces Category: Category with the chart dimension label", () => {
+    expect(
+      pdfChartMetadataChipText(
+        normalizePdfChartMetadataChips(
+          [{ id: "axis", kind: "labeled", label: "Category", value: "Category" }],
+          { dimensionFallback: "Product Type" }
+        )[0]!
+      )
+    ).toBe("Category: Product Type");
+    expect(
+      normalizePdfChartMetadataChips(
+        [{ id: "axis", kind: "labeled", label: "Category", value: "Category" }]
+      )
+    ).toEqual([]);
   });
 });
 

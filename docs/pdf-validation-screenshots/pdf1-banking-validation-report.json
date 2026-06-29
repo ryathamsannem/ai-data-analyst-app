@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-06-29T05:28:28.042Z",
+  "scenario": "banking_financial_1k — Spend Amount by Product Type with stale segment narrative input",
+  "files": [
+    "docs/pdf-validation-screenshots/pdf1-banking-insight-preset.pdf",
+    "docs/pdf-validation-screenshots/pdf1-banking-export-full.pdf"
+  ],
+  "insightPreset": {
+    "pageCount": 3,
+    "includes": {
+      "includeKPIs": true,
+      "includeAIInsight": true,
+      "includeChart": true,
+      "includeDataPreview": false,
+      "includeConversationContext": false,
+      "includeDataQuality": false,
+      "includeTechnicalAppendix": false,
+      "reportPreset": "insight"
+    },
+    "sectionOrder": [
+      "Executive summary",
+      "KPI dashboard",
+      "AI insight",
+      "Visualization"
+    ],
+    "narrativeAligned": true,
+    "narrativeExcerpt": "Spend Amount by Product Type — #1: Credit Card ($420K); #2: Term Deposit ($310K); #3: Personal Loan ($280K).",
+    "segmentTermsInNarrative": [],
+    "productTypesInNarrative": ["Credit Card", "Term Deposit", "Personal Loan"],
+    "hasCategoryCategory": false,
+    "hasCategoryProductType": true,
+    "chartCapturePresent": false
+  },
+  "fullExport": {
+    "pageCount": 5,
+    "sectionOrder": [
+      "Executive summary",
+      "KPI dashboard",
+      "AI insight",
+      "AI conversation thread",
+      "Visualization",
+      "Appendix: Sample data",
+      "Data quality",
+      "Technical appendix"
+    ],
+    "previewAfterVisualization": true,
+    "narrativeAligned": true,
+    "segmentTermsInFullPdf": ["Retail"],
+    "segmentTermsNote": "Retail appears only in Appendix sample data customer_segment column, not in AI narrative",
+    "hasCategoryCategory": false,
+    "hasCategoryProductType": true,
+    "chartCapturePresent": false
+  },
+  "commitReady": true,
+  "followUp": "Optional live browser export with chart PNG capture to validate embed sizing visually"
+}

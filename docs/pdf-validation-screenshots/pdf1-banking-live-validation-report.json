@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-06-29T11:13:00Z",
+  "method": "playwright-live-export",
+  "scenario": "banking_financial_1k — Spend Amount by Product Type — AI Insights preset",
+  "files": [
+    "docs/pdf-validation-screenshots/pdf1-banking-live-insight-preset.pdf",
+    "docs/pdf-validation-screenshots/pdf1-banking-live-viz-page-3.png"
+  ],
+  "insightPreset": {
+    "pages": 4,
+    "totalImages": 4,
+    "hasChartCaptureUnavailable": false,
+    "hasCategoryCategory": false,
+    "hasProductTypeChip": true,
+    "segmentTermsInPdf": [],
+    "productTermsInPdf": ["Credit Card", "Term Deposit", "Personal Loan", "Product Type"],
+    "sectionOrder": ["Executive summary", "KPI dashboard", "AI insight", "Visualization"],
+    "chartSizing": "PASS — all 5 product-type labels and x-axis ticks visible; chart uses ~50% page width",
+    "narrativeAligned": true,
+    "slimPreset": true
+  },
+  "regressionFound": "Export-tab includeDataQuality leaked into insight preset before applyPdfExportPreset call-partial fix",
+  "regressionFixed": true,
+  "commitReady": true
+}

@@ -271,6 +271,7 @@ import {
 import {
   chartSnapshotMatchesAnalysis,
   shouldPreservePinnedInsightChart,
+  type ChartAnalysisAlignmentParsed,
 } from "@/lib/insight-chart-alignment";
 import {
   buildFollowupQuestion,
@@ -736,6 +737,7 @@ import {
 } from "@/lib/chart-insight-answers";
 import {
   appendInsightSavedResult,
+  buildInsightConversationThread,
   buildInsightRestorePayload,
   chartExistsInHistory,
   clearInsightResultHistory,
@@ -750,6 +752,7 @@ import {
   type ReportBranding,
 } from "./pdf-report";
 import {
+  applyPdfExportPreset,
   buildExecutivePdfExportInput,
   computePdfRankedSignalsFromChartRows,
   insightAnswerSummaryForDisplay,
@@ -5599,6 +5602,10 @@ type ExportOptions = {
   chartScope?: "insight" | "session";
   /** Default executive — analyst mode enables technical appendix + metadata sections. */
   pdfMode?: "executive" | "analyst";
+  /** Slim AI Insights preset vs Export-tab full selection. */
+  reportPreset?: "insight" | "full";
+  /** Saved insight result id — export that answer (follow-up or restored), not root bundle fallback. */
+  exportInsightResultId?: string | null;
 };
 
 function inferSalesColumn(
@@ -9188,7 +9195,20 @@ function HomeInner() {
 
   const questionAlignedForExport = useMemo(() => {
     const q = question.trim();
-    if (lastAskedQuestion.trim() === q) return true;
+    const asked = lastAskedQuestion.trim();
+    if (asked && asked === q) return true;
+    if (activeInsightResultId) {
+      const active = insightResultHistory.find(
+        (r) => r.id === activeInsightResultId
+      );
+      if (
+        active?.hasValidAIAnswer &&
+        active.question.trim() === asked &&
+        active.answer.trim()
+      ) {
+        return true;
+      }
+    }
     const stored = getChartInsightAnswer(aiAnswerByChartId, insightChartId);
     return Boolean(
       stored?.hasValidAIAnswer && stored.lastAskedQuestion.trim() === q
@@ -9196,6 +9216,8 @@ function HomeInner() {
   }, [
     question,
     lastAskedQuestion,
+    activeInsightResultId,
+    insightResultHistory,
     aiAnswerByChartId,
     insightChartId,
   ]);
@@ -9283,6 +9305,34 @@ function HomeInner() {
     aiConversationState.turnId,
     alignedAnalysis,
   ]);
+
+  const activeInsightSavedResult = useMemo(() => {
+    if (!activeInsightResultId) return null;
+    return (
+      insightResultHistory.find((r) => r.id === activeInsightResultId) ?? null
+    );
+  }, [activeInsightResultId, insightResultHistory]);
+
+  const insightFollowUpInheritsChart = useMemo(() => {
+    if (!activeInsightSavedResult?.isFollowUp || !insightSnapshot) return false;
+    if (!activeInsightSavedResult.hasValidAIAnswer) return false;
+    if (
+      activeInsightSavedResult.chartId &&
+      activeInsightSavedResult.chartId !== insightChartId
+    ) {
+      return false;
+    }
+    const analysis =
+      activeInsightSavedResult.alignedAnalysis as ChartAnalysisAlignmentParsed | null;
+    if (!analysis) return false;
+    return chartSnapshotMatchesAnalysis(insightSnapshot, analysis);
+  }, [activeInsightSavedResult, insightSnapshot, insightChartId]);
+
+  const insightChartAlignedForExport = useMemo(
+    () =>
+      insightChartMatchesCurrentQuestion || insightFollowUpInheritsChart,
+    [insightChartMatchesCurrentQuestion, insightFollowUpInheritsChart]
+  );
 
   const insightUnsupportedDecline = useMemo(
     () =>
@@ -9376,7 +9426,7 @@ function HomeInner() {
     if (insightUnsupportedDecline) return false;
     if (insightUnsupportedMultiMetric) return false;
     if (!insightSnapshot) return false;
-    if (!insightChartMatchesCurrentQuestion) return false;
+    if (!insightChartAlignedForExport) return false;
     if (
       insightSnapshot.source !== "ai" &&
       insightSnapshot.source !== "auto_dashboard"
@@ -9393,7 +9443,7 @@ function HomeInner() {
     return true;
   }, [
     insightSnapshot,
-    insightChartMatchesCurrentQuestion,
+    insightChartAlignedForExport,
     insightUnsupportedTrend,
     insightUnsupportedGrowth,
     insightUnsupportedDecline,
@@ -11186,10 +11236,14 @@ function HomeInner() {
           setError(msg);
           return;
         }
-        const resolved: ExportOptions = {
-        ...exportOptions,
-        ...options,
-      };
+        const callOptions = options ?? {};
+        const resolved: ExportOptions = applyPdfExportPreset(
+          {
+            ...exportOptions,
+            ...callOptions,
+          },
+          callOptions
+        );
       const pdfExportCtx = resolvePdfExportContext({
         options: resolved,
         chartHistory,
@@ -11201,8 +11255,12 @@ function HomeInner() {
         question,
         liveAnswer: answer,
         liveAlignedAnalysis: alignedAnalysis,
-        insightChartMatchesCurrentQuestion,
+        insightChartMatchesCurrentQuestion:
+          insightChartAlignedForExport,
         insightChartDataLength: insightChartData.length,
+        insightResultHistory,
+        exportInsightResultId:
+          callOptions.exportInsightResultId ?? activeInsightResultId,
       });
       const chartScope = pdfExportCtx.chartScope;
       const pdfAlignedAnalysis =
@@ -11444,6 +11502,23 @@ function HomeInner() {
 
       const conversationAppendix = includeConvPdf
         ? (() => {
+            const exportResultId =
+              callOptions.exportInsightResultId ??
+              activeInsightResultIdRef.current;
+            if (exportResultId) {
+              const thread = buildInsightConversationThread(
+                insightResultHistoryRef.current,
+                exportResultId
+              );
+              if (thread.length > 0) {
+                return {
+                  questionThread: thread,
+                  inheritedFilters: [...aiConversationState.activeFilters],
+                  activeDrillPath: [...aiConversationState.activeDrillPath],
+                  inheritedAssumptionNote: followUpAssumption || null,
+                };
+              }
+            }
             const chainBase =
               aiConversationState.followUpChain.length > 0
                 ? [...aiConversationState.followUpChain]
@@ -14546,13 +14621,9 @@ function HomeInner() {
                       disabled={pdfExportBusy}
                       onClick={() =>
                         downloadReport({
-                          includeKPIs: true,
-                          includeAIInsight: true,
-                          includeChart: true,
-                          includeDataPreview: true,
-                          includeDataQuality: true,
-                          includeConversationContext: true,
+                          reportPreset: "insight",
                           chartScope: "insight",
+                          exportInsightResultId: activeInsightResultId,
                         })
                       }
                       className={`${aiInsightsBtnExport} disabled:cursor-not-allowed disabled:opacity-50`}
