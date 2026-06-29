@@ -70,28 +70,66 @@ export function shouldShowPngBarEndValueLabels(
 }
 
 const BAR_LABEL_MAX_SAFE_CHARS = 7;
-const BAR_LABEL_MIN_BAR_RATIO = 0.62;
+/** V-Bar top labels — shortest bar vs longest (crowded multi-category charts). */
+const VBAR_LABEL_MIN_BAR_RATIO = 0.62;
+/** H-Bar in-bar labels — relaxed; labels sit inside the wide bar dimension. */
+const HBAR_LABEL_MIN_BAR_RATIO = 0.55;
 /** Default max categories for vertical bar top labels when overlap risk is low. */
-const BAR_VALUE_LABEL_MAX_CATEGORIES = 6;
-/** Percent/rate/score metrics may show labels on slightly more categories. */
-const BAR_VALUE_LABEL_PRECISION_MAX_CATEGORIES = 8;
+const VBAR_VALUE_LABEL_MAX_CATEGORIES = 6;
+/** Percent/rate/score metrics may show labels on slightly more categories (V-Bar). */
+const VBAR_VALUE_LABEL_PRECISION_MAX_CATEGORIES = 8;
+/** H-Bar breakdowns (e.g. 7 departments) align with orientation policy. */
+const HBAR_VALUE_LABEL_MAX_CATEGORIES = 10;
+/** Skip H-Bar min/max ratio when categories are modest and compact labels fit. */
+const HBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES = 8;
+/** V-Bar top labels above bars — skewed totals do not block labels for few categories. */
+const VBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES = 4;
 
-/** True when in-bar labels would likely clip or bleed on the shortest bar. */
-export function barValueLabelOverlapRisk(
+export type BarValueLabelOverlapRiskOptions = {
+  orientation?: "hbar" | "vbar";
+};
+
+function barValueLabelLengthOverlapRisk(
   values: readonly number[],
   formatValue: (value: number) => string
+): boolean {
+  const labels = values.map((v) => formatValue(v));
+  const maxLen = Math.max(...labels.map((s) => String(s).length));
+  return maxLen > BAR_LABEL_MAX_SAFE_CHARS;
+}
+
+function barValueLabelMinBarRatioOverlapRisk(
+  values: readonly number[],
+  minRatio: number
 ): boolean {
   if (values.length <= 1) return false;
   const maxV = Math.max(...values);
   const minV = Math.min(...values);
   if (!Number.isFinite(maxV) || maxV <= 0) return true;
-  if (minV / maxV < BAR_LABEL_MIN_BAR_RATIO) return true;
+  return minV / maxV < minRatio;
+}
 
-  const labels = values.map((v) => formatValue(v));
-  const maxLen = Math.max(...labels.map((s) => String(s).length));
-  if (maxLen > BAR_LABEL_MAX_SAFE_CHARS) return true;
+/**
+ * True when value labels would likely clip, bleed, or crowd.
+ * Orientation-aware: H-Bar relaxes ratio; V-Bar skips ratio for n ≤ 4.
+ */
+export function barValueLabelOverlapRisk(
+  values: readonly number[],
+  formatValue: (value: number) => string,
+  options: BarValueLabelOverlapRiskOptions = {}
+): boolean {
+  const orientation = options.orientation ?? "vbar";
+  if (barValueLabelLengthOverlapRisk(values, formatValue)) return true;
 
-  return false;
+  const skipRatio =
+    orientation === "hbar"
+      ? values.length <= HBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES
+      : values.length <= VBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES;
+  if (skipRatio) return false;
+
+  const minRatio =
+    orientation === "hbar" ? HBAR_LABEL_MIN_BAR_RATIO : VBAR_LABEL_MIN_BAR_RATIO;
+  return barValueLabelMinBarRatioOverlapRisk(values, minRatio);
 }
 
 /**
@@ -107,10 +145,25 @@ export function shouldShowOverviewBarValueLabels(
   if (values.length === 0) return false;
   const maxCategories =
     options?.metricCtx && metricLabelImpliesPrecisionBarLabels(options.metricCtx)
-      ? BAR_VALUE_LABEL_PRECISION_MAX_CATEGORIES
-      : BAR_VALUE_LABEL_MAX_CATEGORIES;
+      ? VBAR_VALUE_LABEL_PRECISION_MAX_CATEGORIES
+      : VBAR_VALUE_LABEL_MAX_CATEGORIES;
   if (values.length > maxCategories) return false;
-  return !barValueLabelOverlapRisk(values, formatValue);
+  return !barValueLabelOverlapRisk(values, formatValue, { orientation: "vbar" });
+}
+
+/**
+ * H-Bar in-bar value labels — uses axis tick formatting for overlap checks
+ * (matches Overview inline H-Bar LabelList, not V-Bar top-label precision).
+ */
+export function shouldShowHBarValueLabels(
+  rows: readonly { value: number }[],
+  formatValue: (value: number) => string,
+  options?: { metricCtx?: MetricFormatContext }
+): boolean {
+  const values = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
+  if (values.length === 0) return false;
+  if (values.length > HBAR_VALUE_LABEL_MAX_CATEGORIES) return false;
+  return !barValueLabelOverlapRisk(values, formatValue, { orientation: "hbar" });
 }
 
 function formatPercentBarTopLabelDisplay(

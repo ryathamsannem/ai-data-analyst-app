@@ -117,6 +117,27 @@ describe("shouldShowOverviewBarValueLabels", () => {
     ).toBe(true);
   });
 
+  it("allows skewed V-Bar totals when category count is small (HR bonus pattern)", () => {
+    const rows = [
+      { value: 5_463_724 },
+      { value: 1_993_809 },
+      { value: 1_719_734 },
+    ];
+    const compact = (v: number) => `${(v / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M`;
+    expect(shouldShowOverviewBarValueLabels(rows, compact)).toBe(true);
+  });
+
+  it("still applies min bar ratio for crowded V-Bar charts (5+ categories)", () => {
+    const skewed = [
+      { value: 900 },
+      { value: 120 },
+      { value: 80 },
+      { value: 60 },
+      { value: 40 },
+    ];
+    expect(shouldShowOverviewBarValueLabels(skewed, fmt)).toBe(false);
+  });
+
   it("renders defect rate fractions as percent labels", () => {
     const rows = [
       { value: 0.025 },
@@ -134,7 +155,17 @@ describe("shouldShowOverviewBarValueLabels", () => {
 });
 
 describe("barValueLabelOverlapRisk", () => {
-  it("flags short bars relative to the longest bar", () => {
+  it("flags short bars relative to the longest bar (V-Bar, crowded)", () => {
+    expect(
+      barValueLabelOverlapRisk(
+        [183_916_971, 132_661_579, 90_000_000, 80_000_000, 70_000_000],
+        (v) => String(v),
+        { orientation: "vbar" }
+      )
+    ).toBe(true);
+  });
+
+  it("flags long formatted labels regardless of orientation", () => {
     expect(
       barValueLabelOverlapRisk([183_916_971, 132_661_579], (v) => `$${v}`)
     ).toBe(true);
@@ -144,5 +175,15 @@ describe("barValueLabelOverlapRisk", () => {
     expect(barValueLabelOverlapRisk([23, 22, 21], (v) => String(v))).toBe(
       false
     );
+  });
+
+  it("skips V-Bar min bar ratio for n <= 4", () => {
+    expect(
+      barValueLabelOverlapRisk(
+        [5_463_724, 1_993_809, 1_719_734],
+        (v) => `${(v / 1_000_000).toFixed(1)}M`,
+        { orientation: "vbar" }
+      )
+    ).toBe(false);
   });
 });

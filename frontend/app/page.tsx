@@ -105,6 +105,7 @@ import {
   OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE,
   OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE,
   shouldShowOverviewBarValueLabels,
+  shouldShowHBarValueLabels,
   formatOverviewBarTopValueLabel,
   formatExecutiveInsightMetricValue,
 } from "@/lib/overview-dashboard-export";
@@ -4549,11 +4550,6 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     const exportGridOpacity = pngCapture
       ? Math.min(0.55, dashGrid.opacity + 0.18)
       : dashGrid.opacity;
-    const showBarEndLabels = shouldShowOverviewBarValueLabels(
-      chartRows,
-      barTopLabelFormatter,
-      { metricCtx: overviewMetricCtx }
-    );
     const localCategoryPlan = computeOverviewMiniCategoryPlan(
       displayKind,
       chartRows,
@@ -4564,6 +4560,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     const plotHorizontal = pngCapture
       ? renderBarAsHorizontal
       : cartesianUsesHorizontalPlot(displayKind, localCategoryPlan);
+    const showBarEndLabels = plotHorizontal
+      ? shouldShowHBarValueLabels(chartRows, barValueTickFormatter, {
+          metricCtx: overviewMetricCtx,
+        })
+      : shouldShowOverviewBarValueLabels(chartRows, barTopLabelFormatter, {
+          metricCtx: overviewMetricCtx,
+        });
     const effectivePlotH =
       pngCapture
         ? plotH

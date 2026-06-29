@@ -34,6 +34,24 @@ describe("ChartRenderer V-Bar top labels", () => {
     ).toBe(true);
   });
 
+  it("enables HR Bonus by Employee Status despite skewed totals", () => {
+    const bonusRows = [
+      { name: "Active", value: 5_463_723.57 },
+      { name: "Terminated", value: 1_993_808.96 },
+      { name: "On Leave", value: 1_719_734.37 },
+    ];
+    const bonusCtx = {
+      metricLabel: "Bonus",
+      chartTitle: "Bonus by Employee Status",
+      presentationKind: "bar" as const,
+    };
+    const bonusFmt = (v: number) =>
+      formatOverviewBarTopValueLabel(v, bonusRows, bonusCtx);
+    expect(
+      shouldShowOverviewBarValueLabels(bonusRows, bonusFmt, { metricCtx: bonusCtx })
+    ).toBe(true);
+  });
+
   it("passes vBarTopLabels into session detail margins when labels are shown", () => {
     expect(chartRendererSrc).toContain("vBarTopLabels: showVBarTopLabels");
     const margins = verticalCartesianOuterMargins(
@@ -89,21 +107,8 @@ describe("ChartRenderer V-Bar top labels", () => {
     expect(chartRendererSrc).toContain("offset={8}");
   });
 
-  it("horizontal bar path reuses allowBarValueLabels with inlay LabelList", () => {
-    expect(chartRendererSrc).toContain("allowBarValueLabels");
-    expect(chartRendererSrc).toMatch(
-      /allowBarValueLabels\s*\?\s*\([\s\S]*?position="insideRight"/
-    );
-    expect(chartRendererSrc).toMatch(
-      /chart-bar-inlay-label[\s\S]*?CHART_BAR_INLAY_LABEL_CSS/
-    );
-  });
-
-  it("allowBarValueLabels is not conditioned on pngCaptureMode", () => {
-    const gateBlock = chartRendererSrc.match(
-      /const allowBarValueLabels = useMemo\([\s\S]*?\);/
-    )?.[0];
-    expect(gateBlock).toBeDefined();
-    expect(gateBlock).not.toContain("pngCaptureMode");
+  it("V-Bar gate is not shared with H-Bar showHBarEndLabels", () => {
+    expect(chartRendererSrc).toContain("showHBarEndLabels");
+    expect(chartRendererSrc).not.toContain("allowBarValueLabels");
   });
 });

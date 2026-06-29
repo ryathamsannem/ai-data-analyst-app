@@ -85,7 +85,7 @@ import {
 } from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
 import { formatRadialLegendEntry, resolveRadialPieEdgeProps } from "@/lib/radial-chart-format";
-import { shouldShowOverviewBarValueLabels, formatOverviewBarTopValueLabel } from "@/lib/overview-dashboard-export";
+import { shouldShowOverviewBarValueLabels, shouldShowHBarValueLabels, formatOverviewBarTopValueLabel } from "@/lib/overview-dashboard-export";
 import {
   HORIZONTAL_BAR_END_RADIUS,
   HORIZONTAL_BAR_STACKED_MAX_SIZE,
@@ -280,18 +280,6 @@ function ChartRendererInner({
     [rData, metricTooltipCtx]
   );
 
-  const allowBarValueLabels = useMemo(
-    () =>
-      (rKind === "bar" || rKind === "bar_horizontal") &&
-      !isHistogram &&
-      shouldShowOverviewBarValueLabels(rData, barTopLabelFormatter, {
-        metricCtx: metricTooltipCtx,
-      }),
-    [rKind, isHistogram, rData, barTopLabelFormatter, metricTooltipCtx]
-  );
-
-  const showVBarTopLabels = allowBarValueLabels && rKind === "bar";
-
   const cartesianTooltip = useMemo(
     () =>
       buildChartCartesianTooltipHandlers(
@@ -432,6 +420,23 @@ function ChartRendererInner({
     horizontalBarLayout,
     categoryAxisBottomMargin,
   } = cartesianLayout;
+
+  const shouldRenderHorizontal = cartesianUsesHorizontalPlot(rKind, categoryPlan);
+
+  const showHBarEndLabels =
+    shouldRenderHorizontal &&
+    !isHistogram &&
+    shouldShowHBarValueLabels(rData, barValueTickFormatter, {
+      metricCtx: metricTooltipCtx,
+    });
+
+  const showVBarTopLabels =
+    rKind === "bar" &&
+    !shouldRenderHorizontal &&
+    !isHistogram &&
+    shouldShowOverviewBarValueLabels(rData, barTopLabelFormatter, {
+      metricCtx: metricTooltipCtx,
+    });
 
   const detailLayoutViewportW = detailLayout
     ? getSharedDetailLayoutMetrics(rKind).planViewportPx
@@ -1023,8 +1028,6 @@ function ChartRendererInner({
     );
   }
 
-  const shouldRenderHorizontal = cartesianUsesHorizontalPlot(rKind, categoryPlan);
-
   if (shouldRenderHorizontal) {
     const hb =
       horizontalBarLayout ??
@@ -1039,6 +1042,9 @@ function ChartRendererInner({
       marginLeft: hb.marginLeft,
       chartLayoutMode,
     });
+    const hBarRightMargin = showHBarEndLabels
+      ? Math.max(hmBalanced.marginRight, 52)
+      : hmBalanced.marginRight;
     const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
       chartKind: "bar_horizontal",
       rows: rData,
@@ -1065,7 +1071,7 @@ function ChartRendererInner({
           })}
           margin={{
             left: hmBalanced.marginLeft,
-            right: hmBalanced.marginRight,
+            right: hBarRightMargin,
             top: 16,
             bottom: Math.max(hb.marginBottom, compact ? 14 : 22),
           }}
@@ -1133,7 +1139,7 @@ function ChartRendererInner({
               onInsightDrill(nm);
             }}
           >
-            {allowBarValueLabels ? (
+            {showHBarEndLabels ? (
               <LabelList
                 dataKey="value"
                 position="insideRight"
