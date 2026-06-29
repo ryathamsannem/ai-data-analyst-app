@@ -774,3 +774,198 @@ Script: `python docs/pdf2b-banking-full-export.py`
 |----|------|
 | PDF-P2-01 | KPI snapshot vs dashboard dedupe |
 | PDF-P2-02 | Technical appendix tone / page-break threshold |
+
+---
+
+## 20. PDF-2C audit (June 29, 2026)
+
+**Baseline:** `DEV` @ `fe6344f` (PDF-2B committed).  
+**Scope:** Audit only — **no production code changes**.  
+**Remaining items:** PDF-P2-01 (KPI snapshot vs dashboard), PDF-P2-02 (technical appendix tone / page-break).
+
+### 20.1 Files / symbols inspected
+
+| Area | File | Key symbols |
+|------|------|-------------|
+| KPI snapshot strip | `frontend/app/pdf-report.ts` | `drawExecutiveSnapshotPanel()` — `input.kpiCards.slice(0, 3)` (~L3398–3498) |
+| KPI dashboard section | `frontend/app/pdf-report.ts` | `if (input.includes.includeKPIs)` → `sectionTitle(input.kpiSectionTitle)` → full `input.kpiCards` grid (~L3726–3753) |
+| KPI card assembly | `frontend/lib/build-executive-pdf-input.ts` | `resolvePdfKpiCards()`, `kpiSectionTitle`, `buildFallbackKpiCards()` |
+| KPI label polish | `frontend/app/pdf-report.ts` | `PDF_BUSINESS_COPY_REPLACEMENTS` — `Rows in analysis` → `Records analyzed`, `Chart series points` → `Visualized categories` |
+| Aligned focus KPIs source | `frontend/app/page.tsx` | `parseAlignedAnalysis()` → `focusKpis` from API |
+| Backend focus KPI builder | `backend/main.py` | `_build_focus_kpis_from_intent()`, prepends `Rows in analysis` (~L13132–13210, ~L13738–13747) — **read-only context; no backend change planned** |
+| Content plan / snapshot tagline | `frontend/lib/pdf-executive-content.ts` | `buildPdfExecutiveContentPlan()` — dedupes narrative, **not KPI cards** |
+| Technical appendix gate | `frontend/app/page.tsx` | `exportOptions.includeTechnicalAppendix` default **`false`** (~L6711) |
+| Insight preset includes | `frontend/lib/build-executive-pdf-input.ts` | `applyPdfExportPreset()` — `includeTechnicalAppendix` opt-in only; KPIs default **on** |
+| Technical appendix render | `frontend/app/pdf-report.ts` | `if (input.includes.includeTechnicalAppendix)` — unconditional `doc.addPage()` (~L4637–4654) |
+| Appendix subsections | `frontend/app/pdf-report.ts` | `appendixSubheading()`, `drawAppendixFactGrid()`, `drawAppendixNotePanel("Source"…)`, thumbnails, `Chart specification`, `Series sample` |
+| Section page-break helper | `frontend/app/pdf-report.ts` | `breakBeforeMajorSection()` — used for conversation/viz/data quality; **not** technical appendix |
+| Tests | `frontend/lib/phase7-pdf-generate.test.ts`, `pdf-export-sections.test.ts`, `build-executive-pdf-input.test.ts` | Section markers, include flags, input assembly |
+
+### 20.2 Evidence artifacts (existing PDFs — no new browser run)
+
+| Artifact | PDF-2C signal |
+|----------|----------------|
+| `pdf1-banking-export-full.pdf` (PDF-2B regen) | Page 1 snapshot: **Records analyzed / Metric analyzed / Breakdown dimension**; page 2 KPI dashboard repeats same 3 cards + **Visualized categories**; 6 pages; technical appendix **off** |
+| `pdf1-banking-live-insight-preset.pdf` | Same KPI duplication on pages 1–2; slim preset still includes KPI section; no technical appendix |
+| `phase7-retail-all_sections.pdf` | Technical appendix on pages 5–6; forced new page; **Chart specification** + **Series sample** repeat viz data; thumbnails list present |
+| `phase7-retail-appendix_only.pdf` | Appendix-only 2-page PDF — thumbnails + metadata without story sections |
+
+### 20.3 Findings
+
+#### PDF-P2-01 — KPI snapshot vs KPI dashboard dedupe
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | **P2** — visual density / executive polish; not a trust defect after PDF-2A/B |
+| **Observed** | Cover **Executive snapshot** renders first **3** `input.kpiCards` as compact chips. Next section **KPI dashboard (aligned with your question)** renders **all** `input.kpiCards` (typically **4** for aligned AI exports: Records analyzed, Metric analyzed, Breakdown dimension, Visualized categories). First three cards are **identical titles and values** on consecutive pages. |
+| **Root cause** | Single `kpiCards` array from `resolvePdfKpiCards()` feeds both regions with no dedupe. Snapshot intentionally `slice(0, 3)`; dashboard has no `slice(3)` or title-overlap guard. Backend `focusKpis` always includes cohort + metric + dimension; fourth card is chart point count. |
+| **Related duplication (defer)** | Visualization **Analysis context** block repeats Records evaluated / Primary metric / Grouped by — third layer, but tied to PDF-1 viz cohesion; **out of PDF-2C scope** unless product asks. |
+| **Not broken** | Non-aligned exports (`displayKpiCards` / `buildFallbackKpiCards`) may show different snapshot vs dashboard content; dedupe must be **title-aware**, not unconditional section removal. |
+| **Insight preset** | `reportPreset: "insight"` keeps `includeKPIs: true` — duplication affects slim exports too. |
+
+**Options evaluated:**
+
+| Option | Verdict |
+|--------|---------|
+| a) Compact into executive snapshot only | **Too broad** — loses dedicated KPI section title and 2-column card layout |
+| b) Dashboard shows only non-snapshot cards (`slice(3)` or title dedupe) | **Recommended** — smallest safe fix; preserves Visualized categories |
+| c) Relabel only | **Insufficient** — still reads redundant |
+| d) Hide KPI dashboard in insight preset | **Partial** — helps slim export but not full Export tab |
+
+#### PDF-P2-02 — Technical appendix tone / page-break
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | **P2** — optional section; default **off** on Export tab; prominence only when user checks box |
+| **Observed** | When enabled: **always** `doc.addPage()` before appendix (even if prior page has ample whitespace). Title **Technical appendix** (inconsistent with **Appendix: Sample data**). Intro **"Reference metadata for audit, routing, and calculation context."** reads analyst/internal. Subsection kickers **Source** / **NOTES** feel debug-like. **Session chart thumbnails** + **Series sample** repeat chart categories already shown in Visualization. Appendix often consumes **1–2 pages** (`phase7-retail-all_sections.pdf` pages 5–6). |
+| **Root cause** | `includeTechnicalAppendix` block (~L4637) hard-codes new page; executive vs analyst `pdfMode` only changes intro sentence today; no executive-mode subsection thinning. |
+| **Not P1** | Section is opt-in; executive exports without checkbox are unaffected (confirmed `pdf1-banking-export-full.pdf`). |
+| **Rename?** | **Appendix: Technical details** — aligns with sample-data appendix naming; low-risk copy change. |
+| **Explicit selection** | Already required (`includeTechnicalAppendix === true`); no change needed. |
+
+**Defer / out of scope for 2C:**
+
+| Item | Reason |
+|------|--------|
+| Remove series sample entirely in analyst mode | Risky for audit handoff |
+| Change viz Analysis context block | PDF-1 viz cohesion territory |
+| Backend `focusKpis` shape changes | User constraint: no backend |
+| Chart thumbnail sparkline redesign | Broad visual change |
+
+### 20.4 Proposed minimal PDF-2C implementation
+
+**Recommendation: split into two small passes** (can ship independently).
+
+```mermaid
+flowchart LR
+  A[PDF-2C-1 KPI dedupe] --> B[PDF-2C-2 Appendix polish]
+```
+
+#### PDF-2C-1 — KPI dashboard dedupe (PDF-P2-01)
+
+| Item | Proposal |
+|------|----------|
+| **Change** | Add helper e.g. `pdfKpiCardsForDashboardSection(cards, snapshotCount = 3)` — return cards whose normalized title is **not** in the snapshot set (or `cards.slice(snapshotCount)` when aligned focus KPI order is stable). |
+| **Render** | If remaining cards empty → **skip** KPI dashboard section entirely (no empty heading). If 1+ remain → render section with existing `drawKpiCard` grid. |
+| **Files** | `frontend/app/pdf-report.ts` (primary); optional pure helper + tests in `frontend/lib/build-executive-pdf-input.ts` or new `frontend/lib/pdf-kpi-layout.ts` |
+| **Risk** | **Low** — layout-only; no chart/narrative/export-context changes |
+| **Insight preset** | Same dedupe logic applies automatically |
+
+#### PDF-2C-2 — Technical appendix polish (PDF-P2-02)
+
+| Item | Proposal |
+|------|----------|
+| **Title** | `sectionTitle("Appendix: Technical details")` |
+| **Intro** | Executive `pdfMode`: one-line neutral copy (e.g. "Optional reference for validation and handoff."). Keep longer analyst copy when `pdfMode === "analyst"`. |
+| **Page break** | Replace unconditional `doc.addPage()` with `breakBeforeMajorSection(estimatedAppendixHeight)` or add page only when `y > footerY - threshold` |
+| **Subsections (executive mode)** | Hide **Session chart thumbnails** when primary chart already embedded; keep metadata grid + provenance. Collapse **Series sample** to caption when ≤10 points (table stays in analyst mode). |
+| **Tone** | `drawAppendixNotePanel("Source", …)` → kicker **"Attribution"** or fold into subsection title |
+| **Files** | `frontend/app/pdf-report.ts` only |
+| **Risk** | **Low–med** — page-count may drop by 1 on some exports; verify `phase7-pdf-generate` |
+
+**Do not implement in 2C:** KPI dashboard redesign, full appendix removal, analyst-mode behavior regression, viz analysis-context changes.
+
+### 20.5 Tests / validation plan (implementation phase)
+
+| Target | Approach |
+|--------|----------|
+| KPI dedupe helper | New unit tests: 4-card aligned set → dashboard returns 1 card; non-overlapping cards → no removal; empty remainder → skip section flag |
+| Appendix title / intro | Static string test or snapshot of `pdf-report.ts` markers |
+| Page-break guard | Unit test on helper estimating appendix height; optional `phase7-pdf-generate` page-count assertion for `appendix_only` / `all_sections` |
+| Regression | Existing `pdf-export-sections.test.ts` (section order), `build-executive-pdf-input.test.ts`, `pdf-narrative-alignment.test.ts`, `npm run build` |
+| Live PDF | **One export with technical appendix enabled** after 2C-2 (e.g. extend `phase7-retail-all_sections` path or checkbox-on banking export). **Insight preset PDF** sufficient for 2C-1 KPI dedupe — reuse `pdf1-banking-live-insight-preset.pdf` baseline |
+
+**Audit validation:** Existing PDF text extraction only — **no new PDF generated for this audit**.
+
+### 20.6 Explicit out of scope (PDF-2C)
+
+- PDF-1 narrative/chart alignment, follow-up export context, insight preset flag matrix (except incidental KPI dedupe side effect)
+- Data preview placement, chart embed sizing, viz page-break/orphan logic (`estimatePdfVizAnalysisContextHeight`, analysis-context block)
+- PDF-2A branding/domain labels; PDF-2B ID/date formatting and data-quality wording
+- H-Bar/V-Bar, axis/domain/bar sizing, Overview defaults, suggested questions, follow-up chips
+- Backend `_build_focus_kpis_from_intent` or API payload changes
+- Broad PDF template redesign
+
+### 20.7 Recommended implementation scope
+
+| Pass | ID | Effort | Customer impact |
+|------|-----|--------|-----------------|
+| **PDF-2C-1** | PDF-P2-01 | ~1 file + focused tests | Removes obvious page-1/page-2 KPI repetition on all KPI-enabled exports |
+| **PDF-2C-2** | PDF-P2-02 | ~1 file + phase7 check | Polishes opt-in appendix; may save one trailing page |
+
+**Ship order:** 2C-1 first (higher frequency — every insight/full export with KPIs), then 2C-2 (only when appendix checked).
+
+---
+
+## 21. PDF-2C-1 implementation (June 29, 2026)
+
+**Baseline:** `DEV` @ `fe6344f` + uncommitted PDF-2C-1 changes (not committed per user request).  
+**Scope:** PDF-P2-01 KPI snapshot vs dashboard dedupe only — PDF-2C-2 deferred.
+
+### 21.1 Root cause
+
+Executive snapshot renders `input.kpiCards.slice(0, 3)` as compact chips; KPI dashboard rendered the **full** `input.kpiCards` array on the next page. Aligned AI exports typically have four focus KPIs (Records analyzed, Metric analyzed, Breakdown dimension, Visualized categories) — the first three were duplicated verbatim.
+
+### 21.2 Files changed
+
+| File | Change |
+|------|--------|
+| `frontend/lib/pdf-kpi-layout.ts` | **New** — `pdfKpiCardsForDashboardSection()`, `PDF_EXECUTIVE_SNAPSHOT_KPI_COUNT` |
+| `frontend/lib/pdf-kpi-layout.test.ts` | **New** — dedupe / skip / remainder tests |
+| `frontend/app/pdf-report.ts` | KPI section renders deduped cards only; skips section when none remain |
+| `frontend/lib/pdf-export-sections.test.ts` | Static assert for dedupe helper usage |
+| `frontend/lib/phase7-pdf-generate.test.ts` | KPI dashboard absent when fixture ≤3 cards; preview marker → `Appendix: Sample data` |
+| `docs/pdf-validation-screenshots/pdf1-banking-live-insight-preset.pdf` | Regenerated validation artifact |
+
+**Unchanged:** `build-executive-pdf-input.ts` export payload (`input.kpiCards` intact), executive snapshot strip, viz analysis context, technical appendix, preset flags.
+
+### 21.3 Behavior changes
+
+- **Executive snapshot:** unchanged (still first 3 KPI cards).
+- **KPI dashboard:** shows only cards **not** already in the snapshot prefix (title + value match).
+- **Skip:** when all cards are snapshot duplicates (e.g. ≤3 aligned cards with no extras), KPI dashboard section omitted entirely — no empty heading.
+- **Remainder example:** aligned banking insight → dashboard shows **Visualized categories** only (not Records / Metric / Breakdown).
+- **Refinement:** KPI dashboard renders only when **≥2** non-snapshot cards remain; a single leftover card (e.g. Visualized categories alone) skips the section.
+
+### 21.4 Tests and build
+
+```text
+npx vitest run lib/pdf-kpi-layout.test.ts lib/pdf-export-sections.test.ts lib/build-executive-pdf-input.test.ts lib/phase7-pdf-generate.test.ts
+→ 4 files, 51 tests passed
+
+npm run build → success (Next.js 16.2.4)
+```
+
+### 21.5 Live validation (one PDF)
+
+| Artifact | Result |
+|----------|--------|
+| `docs/pdf-validation-screenshots/pdf1-banking-live-insight-preset.pdf` | Page 1 snapshot: Records / Metric / Breakdown unchanged; page 2 **no KPI dashboard** (only Visualized categories would remain); AI insight starts page 2 |
+
+Script: `python docs/pdf1-banking-live-export.py`
+
+### 21.6 Deferred (PDF-2C-2)
+
+| ID | Item |
+|----|------|
+| PDF-P2-02 | Technical appendix title/tone, page-break threshold, thumbnails/series trimming |

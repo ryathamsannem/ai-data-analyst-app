@@ -53,6 +53,7 @@ import {
   pdfExecutiveHierarchyHeadings,
   type PdfExecutiveContentPlan,
 } from "@/lib/pdf-executive-content";
+import { pdfKpiCardsForDashboardSection, shouldRenderPdfKpiDashboardSection } from "@/lib/pdf-kpi-layout";
 
 type JsPdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
 
@@ -3725,19 +3726,14 @@ export async function runExecutivePdfExport(
 
   /* -------- KPIs -------- */
   if (input.includes.includeKPIs) {
-    sectionTitle(input.kpiSectionTitle);
-    const cards = input.kpiCards;
-    if (!cards.length) {
-      drawPremiumEmptyState(
-        PDF_EMPTY_STATES.kpi.title,
-        PDF_EMPTY_STATES.kpi.body
-      );
-    } else {
+    const dashboardCards = pdfKpiCardsForDashboardSection(input.kpiCards);
+    if (shouldRenderPdfKpiDashboardSection(input.kpiCards)) {
+      sectionTitle(input.kpiSectionTitle);
       const gap = PDF_SPACING.cardGap;
       const colW = (contentWidth - gap) / 2;
-      const rows = Math.ceil(cards.length / 2);
+      const rows = Math.ceil(dashboardCards.length / 2);
       for (let r = 0; r < rows; r++) {
-        const pair = [cards[r * 2], cards[r * 2 + 1]];
+        const pair = [dashboardCards[r * 2], dashboardCards[r * 2 + 1]];
         const rowH = measureKpiRowHeightMm(pair, colW);
         ensurePageSpace(rowH + gap + PDF_SPACING.pageSafe);
         for (let c = 0; c < 2; c++) {

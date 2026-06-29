@@ -39,4 +39,11 @@ describe("pdf-report optional sections", () => {
       drawPreviewIdx
     );
   });
+
+  it("dedupes KPI dashboard cards against the executive snapshot strip", () => {
+    expect(pdfReportSrc).toContain("shouldRenderPdfKpiDashboardSection");
+    expect(pdfReportSrc).toMatch(
+      /if \(shouldRenderPdfKpiDashboardSection\(input\.kpiCards\)\)/
+    );
+  });
 });
