@@ -85,6 +85,7 @@ import {
 } from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
 import { formatRadialLegendEntry, resolveRadialPieEdgeProps } from "@/lib/radial-chart-format";
+import { shouldShowOverviewBarValueLabels } from "@/lib/overview-dashboard-export";
 import {
   HORIZONTAL_BAR_END_RADIUS,
   HORIZONTAL_BAR_STACKED_MAX_SIZE,
@@ -123,6 +124,7 @@ import {
   CartesianGrid,
   ScatterChart,
   Scatter,
+  LabelList,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -266,6 +268,16 @@ function ChartRendererInner({
     () => (tick: number) =>
       formatOverviewBarValueAxisTick(tick, rData, metricTooltipCtx),
     [rData, metricTooltipCtx]
+  );
+
+  const showVBarTopLabels = useMemo(
+    () =>
+      rKind === "bar" &&
+      !isHistogram &&
+      shouldShowOverviewBarValueLabels(rData, barValueTickFormatter, {
+        metricCtx: metricTooltipCtx,
+      }),
+    [rKind, isHistogram, rData, barValueTickFormatter, metricTooltipCtx]
   );
 
   const cartesianTooltip = useMemo(
@@ -1413,7 +1425,20 @@ function ChartRendererInner({
             if (!nm) return;
             onInsightDrill(nm);
           }}
-        />
+        >
+          {showVBarTopLabels ? (
+            <LabelList
+              dataKey="value"
+              position="top"
+              formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+              style={{
+                fill: "#e2e8f0",
+                fontSize: compact ? 11 : 13,
+                fontWeight: 500,
+              }}
+            />
+          ) : null}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );

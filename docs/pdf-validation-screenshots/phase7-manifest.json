@@ -42,7 +42,7 @@
     "combo": "kpi_insight_chart",
     "file": "phase7-retail-kpi_insight_chart.pdf",
     "pageCount": 3,
-    "textLength": 26788,
+    "textLength": 26791,
     "markers": {
       "kpi": false,
       "aiInsight": true,
@@ -61,7 +61,7 @@
     "combo": "all_sections",
     "file": "phase7-retail-all_sections.pdf",
     "pageCount": 5,
-    "textLength": 54152,
+    "textLength": 54120,
     "markers": {
       "kpi": false,
       "aiInsight": true,
@@ -80,7 +80,7 @@
     "combo": "conversation_only",
     "file": "phase7-retail-conversation_only.pdf",
     "pageCount": 2,
-    "textLength": 15844,
+    "textLength": 15564,
     "markers": {
       "kpi": false,
       "aiInsight": false,
@@ -156,7 +156,7 @@
     "combo": "kpi_insight_chart",
     "file": "phase7-generic-kpi_insight_chart.pdf",
     "pageCount": 3,
-    "textLength": 26778,
+    "textLength": 26781,
     "markers": {
       "kpi": false,
       "aiInsight": true,
@@ -175,7 +175,7 @@
     "combo": "all_sections",
     "file": "phase7-generic-all_sections.pdf",
     "pageCount": 5,
-    "textLength": 54161,
+    "textLength": 54129,
     "markers": {
       "kpi": false,
       "aiInsight": true,
@@ -194,7 +194,7 @@
     "combo": "conversation_only",
     "file": "phase7-generic-conversation_only.pdf",
     "pageCount": 2,
-    "textLength": 15839,
+    "textLength": 15559,
     "markers": {
       "kpi": false,
       "aiInsight": false,
@@ -270,7 +270,7 @@
     "combo": "kpi_insight_chart",
     "file": "phase7-geographic-kpi_insight_chart.pdf",
     "pageCount": 3,
-    "textLength": 26945,
+    "textLength": 26948,
     "markers": {
       "kpi": false,
       "aiInsight": true,
@@ -289,7 +289,7 @@
     "combo": "all_sections",
     "file": "phase7-geographic-all_sections.pdf",
     "pageCount": 5,
-    "textLength": 52730,
+    "textLength": 52723,
     "markers": {
       "kpi": false,
       "aiInsight": true,
@@ -308,7 +308,7 @@
     "combo": "conversation_only",
     "file": "phase7-geographic-conversation_only.pdf",
     "pageCount": 2,
-    "textLength": 15989,
+    "textLength": 15709,
     "markers": {
       "kpi": false,
       "aiInsight": false,

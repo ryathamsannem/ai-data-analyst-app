@@ -51,7 +51,16 @@ describe("shouldShowPngBarEndValueLabels", () => {
 describe("shouldShowOverviewBarValueLabels", () => {
   const fmt = (v: number) => String(v);
 
-  it("hides labels when there are more than three categories", () => {
+  it("hides labels when there are too many categories for overlap safety", () => {
+    expect(
+      shouldShowOverviewBarValueLabels(
+        Array.from({ length: 9 }, (_, i) => ({ value: 4.05 + i * 0.01 })),
+        fmt
+      )
+    ).toBe(false);
+  });
+
+  it("allows labels for five close percent values when metric is rate-like", () => {
     expect(
       shouldShowOverviewBarValueLabels(
         [
@@ -61,9 +70,10 @@ describe("shouldShowOverviewBarValueLabels", () => {
           { value: 4.05 },
           { value: 4.05 },
         ],
-        fmt
+        (v) => `${v}%`,
+        { metricCtx: { metricLabel: "Defect Rate", chartTitle: "Defect Rate by Shift" } }
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("hides labels for long currency strings even with three categories", () => {
@@ -87,6 +97,21 @@ describe("shouldShowOverviewBarValueLabels", () => {
         [{ value: 23 }, { value: 22 }, { value: 21 }],
         fmt
       )
+    ).toBe(true);
+  });
+
+  it("renders defect rate fractions as percent labels", () => {
+    const rows = [
+      { value: 0.025 },
+      { value: 0.025 },
+      { value: 0.023 },
+    ];
+    const pctFmt = (v: number) =>
+      v <= 1 ? `${(v * 100).toFixed(1)}%` : `${v}%`;
+    expect(
+      shouldShowOverviewBarValueLabels(rows, pctFmt, {
+        metricCtx: { metricLabel: "Defect Rate", chartTitle: "Defect Rate by Shift" },
+      })
     ).toBe(true);
   });
 });

@@ -3,6 +3,10 @@ import {
   OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE,
 } from "@/lib/horizontal-bar-visual";
 import {
+  metricLabelImpliesPrecisionBarLabels,
+  type MetricFormatContext,
+} from "@/lib/metric-value-format";
+import {
   resolveOverviewBarValueDomain,
   roundExecutiveAxisMaximum,
 } from "@/lib/overview-bar-value-domain";
@@ -60,6 +64,10 @@ export function shouldShowPngBarEndValueLabels(
 
 const BAR_LABEL_MAX_SAFE_CHARS = 7;
 const BAR_LABEL_MIN_BAR_RATIO = 0.62;
+/** Default max categories for vertical bar top labels when overlap risk is low. */
+const BAR_VALUE_LABEL_MAX_CATEGORIES = 6;
+/** Percent/rate/score metrics may show labels on slightly more categories. */
+const BAR_VALUE_LABEL_PRECISION_MAX_CATEGORIES = 8;
 
 /** True when in-bar labels would likely clip or bleed on the shortest bar. */
 export function barValueLabelOverlapRisk(
@@ -80,15 +88,21 @@ export function barValueLabelOverlapRisk(
 }
 
 /**
- * Bar charts hide in-bar value labels by default.
- * Exception: <= 3 categories with zero overlap risk.
+ * Vertical bar top labels when category count is modest and labels fit without overlap.
+ * Percent/rate/score metrics allow a few more categories than large numeric metrics.
  */
 export function shouldShowOverviewBarValueLabels(
   rows: readonly { value: number }[],
-  formatValue: (value: number) => string
+  formatValue: (value: number) => string,
+  options?: { metricCtx?: MetricFormatContext }
 ): boolean {
   const values = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
-  if (values.length === 0 || values.length > 3) return false;
+  if (values.length === 0) return false;
+  const maxCategories =
+    options?.metricCtx && metricLabelImpliesPrecisionBarLabels(options.metricCtx)
+      ? BAR_VALUE_LABEL_PRECISION_MAX_CATEGORIES
+      : BAR_VALUE_LABEL_MAX_CATEGORIES;
+  if (values.length > maxCategories) return false;
   return !barValueLabelOverlapRisk(values, formatValue);
 }
 

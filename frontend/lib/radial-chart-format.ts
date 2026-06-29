@@ -1,9 +1,11 @@
 import type { ChartRow } from "@/app/chart-types";
 import { shareCompositionAllowed } from "@/lib/final-chart-presentation";
 import {
+  appendMetricUnitSuffix,
   formatExecutiveMetricValue,
   formatMetricNumber,
   readChartRowRawValue,
+  resolveMetricValueFormat,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
 
@@ -112,6 +114,18 @@ export function radialShareDisplayAllowed(
   return radialShouldUseSharePercentDisplay(rows);
 }
 
+function radialContributionFormatContext(
+  row: ChartRow,
+  ctx?: MetricFormatContext
+): MetricFormatContext {
+  return {
+    ...ctx,
+    presentationKind: undefined,
+    shareComposition: false,
+    chartRows: ctx?.chartRows ?? [row],
+  };
+}
+
 function formatRadialContributionValue(
   row: ChartRow,
   ctx?: MetricFormatContext
@@ -120,10 +134,24 @@ function formatRadialContributionValue(
   if (!Number.isFinite(raw)) {
     return row.displayValue?.trim() || "—";
   }
+  const contributionCtx = radialContributionFormatContext(row, ctx);
   if (Math.abs(raw) >= 10_000) {
-    return formatMetricNumber(raw, "compact");
+    const compact = formatMetricNumber(raw, "compact");
+    return appendMetricUnitSuffix(
+      compact,
+      contributionCtx.metricLabel,
+      contributionCtx.chartTitle
+    );
   }
-  return formatExecutiveMetricValue(row, ctx ?? { chartRows: [row] });
+  const formatted = formatExecutiveMetricValue(row, contributionCtx);
+  if (resolveMetricValueFormat(contributionCtx) === "percent") {
+    return formatted;
+  }
+  return appendMetricUnitSuffix(
+    formatted,
+    contributionCtx.metricLabel,
+    contributionCtx.chartTitle
+  );
 }
 
 function formatRadialSharePercentRounded(value: number, total: number): string | null {
@@ -166,7 +194,12 @@ export function formatRadialSliceTotalLabel(
   const total = radialSliceTotal(rows);
   if (total <= 0) return "—";
   if (radialShouldUseSharePercentDisplay(rows) && !radialRawValuesSumTo100Percent(rows)) {
-    return formatMetricNumber(total, "compact");
+    const compact = formatMetricNumber(total, "compact");
+    return appendMetricUnitSuffix(
+      compact,
+      ctx?.metricLabel,
+      ctx?.chartTitle
+    );
   }
   return "100%";
 }

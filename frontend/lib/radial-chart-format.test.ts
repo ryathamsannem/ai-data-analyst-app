@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ChartRow } from "@/app/chart-types";
 import {
   formatRadialLegendEntry,
+  formatRadialSliceTotalLabel,
   formatRadialTooltipValue,
   radialRawValuesSumTo100Percent,
   radialSharePercent,
@@ -93,6 +94,44 @@ describe("formatRadialLegendEntry", () => {
       expect(line).toMatch(/\d+%/);
       expect(line.split(RADIAL_LEGEND_SEP).length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it("formats downtime minutes share without percent on raw contribution", () => {
+    const downtimeRows: ChartRow[] = [
+      { name: "Critical", value: 2367 },
+      { name: "High", value: 3224 },
+      { name: "Low", value: 1050 },
+      { name: "Medium", value: 3045 },
+    ];
+    const ctx = {
+      metricLabel: "Severity Downtime Minutes Share",
+      chartTitle: "Severity Downtime Minutes Share",
+      presentationKind: "donut" as const,
+      chartRows: downtimeRows,
+    };
+    const line = formatRadialLegendEntry(downtimeRows, "High", ctx);
+    expect(line).toContain("High");
+    expect(line).toMatch(/33%/);
+    expect(line).toMatch(/3,224 min/);
+    expect(line).not.toMatch(/3,224\.0%/);
+  });
+});
+
+describe("formatRadialSliceTotalLabel", () => {
+  it("appends minute unit for downtime composition totals", () => {
+    const rows: ChartRow[] = [
+      { name: "Critical", value: 2367 },
+      { name: "High", value: 3224 },
+      { name: "Low", value: 1050 },
+      { name: "Medium", value: 3045 },
+    ];
+    const ctx = {
+      metricLabel: "Severity Downtime Minutes Share",
+      chartTitle: "Severity Downtime Minutes Share",
+      presentationKind: "donut" as const,
+      chartRows: rows,
+    };
+    expect(formatRadialSliceTotalLabel(rows, ctx)).toBe("9,686 min");
   });
 });
 

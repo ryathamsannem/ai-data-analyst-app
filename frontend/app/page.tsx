@@ -4531,7 +4531,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       : dashGrid.opacity;
     const showBarEndLabels = shouldShowOverviewBarValueLabels(
       chartRows,
-      barValueTickFormatter
+      barValueTickFormatter,
+      { metricCtx: overviewMetricCtx }
     );
     const localCategoryPlan = computeOverviewMiniCategoryPlan(
       displayKind,
