@@ -1,62 +1,67 @@
 # Open Items (Prioritized)
 
-**Snapshot:** June 28, 2026 (final release snapshot) · Branch `DEV` · commit `61d0145`.
+**Snapshot:** June 29, 2026 (post–PDF-1) · Branch `DEV` · HEAD `c764f5d`.
 
-Completed Overview 5A.x → 5C.x work: [`overview-pass-status.md`](./overview-pass-status.md).  
-Frozen H-Bar/V-Bar parity: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).  
-Final readiness: [`final-release-readiness-summary.md`](./final-release-readiness-summary.md).
-
----
-
-## Closed (this snapshot)
-
-| Item | Status |
-|------|--------|
-| H-Bar / V-Bar visual parity (5B.1 → 5C.5) | **Frozen** |
-| Export regression pass | **Complete** |
-| Overview defaults (4 gold fixtures) | **Complete** |
-| P1 error/loading/empty UX audit | **Complete** |
-| Upload / mapping edge cases | **Complete** |
-| HR discovery cleanup (age-band demotion) | **Complete** |
-| 9-domain 1k upload validation | **Complete** |
-| 15-domain Overview validation | **Complete** — 14 High, 1 justified Medium, 0 default scatter |
-| Healthcare / SaaS distinct secondary + labels | **Complete** |
-| Marketing revenue confidence | **Complete** |
-| Default Overview scatter demotion (business-rich) | **Complete** |
-| Banking utilization suggested question | **Complete** (`61d0145`) |
-| Showcase diversity/scatter backend failures | **Complete** (`61d0145`) |
-| Full backend pytest green | **478 passed, 0 failed** |
-| Full frontend vitest + build green | **743 passed, 0 failed; build PASS** |
-| Cleanup audit + doc archive | **Complete** |
+Frozen parity: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).  
+PDF-1 record: [`pdf-quality-audit.md`](./pdf-quality-audit.md).  
+Latest git state: [`latest-working-snapshot.md`](./latest-working-snapshot.md).
 
 ---
 
-## P1 — Future production readiness (not blocking snapshot)
+## Closed (recent commits)
 
-### Optional browser confirmation
-- Live upload spot-check across 3–5 representative domains (retail, banking, HR, marketing, SaaS).
-- Non-blocking; backend probes and pytest already cover payload correctness.
+| Item | Status | Commit |
+|------|--------|--------|
+| Suggested Questions — 15-domain backend quality | **Complete** | `3ee3e48` |
+| Follow-up chip quality (FU-P1) | **Complete** | `c460bcc` |
+| PDF-1 export quality | **Complete** | `c764f5d` |
+| H-Bar / V-Bar visual parity (5B.1 → 5C.5) | **Frozen** | prior |
+| 15-domain Overview validation | **Complete** | prior |
+| Export regression (PNG + Phase 7 matrix) | **Complete** | prior |
+| Final release snapshot (478/743 green) | **Complete** | prior |
 
-### AI Insights answer-quality validation
-- Cross-domain narrative quality, tone, and follow-up continuity beyond deterministic backend probes.
-- Manual or staged LLM QA using `test-fixtures/domains/` fixtures.
+### PDF-1 resolved (in `c764f5d`)
 
-### Platform gaps (separate initiative)
-- Authentication & tenant isolation
-- Durable multi-tenant dataset storage (currently in-memory `df` per process)
-- Usage metering / billing integration
-- Optional E2E browser regression suite (Playwright export + upload flows)
+- Narrative/chart alignment
+- Slim AI Insights preset
+- Data preview appendix after Visualization
+- PDF chart embed sizing (live-validated)
+- Category metadata chip fix
+- Follow-up answer export button/context
+- Visualization page-break / orphan fix
+
+---
+
+## P1 — PDF-2 (audit-first, small scope)
+
+**Do not start broad PDF redesign.** Each item needs audit evidence before implementation.
+
+| ID | Item | Notes |
+|----|------|-------|
+| PDF-P2-01 | Sparse KPI dashboard page | Merge/redesign optional |
+| PDF-P2-02 | Technical appendix prominence | Executive-mode layout |
+| PDF-P2-03 | Data quality vs preview slice | Full-file duplicate scan |
+| PDF-P2-04 | Branding/footer placeholder copy | `support@example.com`, etc. |
+| PDF-P2-06 | Preview table date-like IDs | `formatPdfTableCellValue` / ISO heuristics |
+| PDF-P2-07 | Domain label polish | e.g. real estate → “General business” |
+
+Optional: Recent Insights per-row export control.
+
+---
+
+## P1 — Future production readiness (unchanged)
+
+- Optional browser spot-check (3–5 domains)
+- AI Insights answer-quality validation (cross-domain narratives)
+- Platform: auth, durable storage, metering, optional E2E suite
 
 ---
 
 ## P2 — Nice to have
 
-### Further visual polish (only if product requests)
-- Histogram premium review (styled V-Bar; no dedicated occupancy pass).
-- Cosmetic chart tuning **only after** explicit product approval — H-Bar/V-Bar parity is frozen.
-
-### Performance
-- Large dataset optimization (100k+ rows) — fixtures exist under `test-fixtures/large-dataset/`; scripts documented.
+- Histogram premium review (no dedicated pass)
+- Large dataset optimization (100k+ fixtures)
+- Cosmetic chart tuning **only** with explicit product approval
 
 ---
 
@@ -64,9 +69,17 @@ Final readiness: [`final-release-readiness-summary.md`](./final-release-readines
 
 | Item | Notes |
 |------|-------|
-| Dual renderer pipelines | Overview inline vs shared `ChartRenderer` — managed via shared domain/visual helpers. |
-| Orientation-natural H-Bar vs V-Bar | 85% utilization cap is the agreed mitigation; parity frozen. |
-| Monolithic `page.tsx` | Incremental extraction only when scoped. |
-| Banking 1k Medium confidence | Justified — utilization vs delinquency profit-role tie; not a blocker. |
-| Generic exec/type labels | Insurance, real estate, telecom, hospitality, energy, education, supply chain use generic executive domain where no dedicated taxonomy exists. |
-| Phase 7 PDF binary drift | `npm run test` may regenerate PDFs under `docs/pdf-validation-screenshots/`; restore before commit unless intentionally refreshed. |
+| Dual renderer pipelines | Managed via shared domain/visual helpers |
+| H-Bar 85% utilization cap | Parity frozen — do not reopen without regression proof |
+| Monolithic `page.tsx` | Incremental extraction only when scoped |
+| Banking 1k Medium confidence | Justified; not a blocker |
+| Generic exec/type labels | Several domains use generic executive domain taxonomy |
+
+---
+
+## Explicit constraints
+
+1. **Do not reopen H-Bar/V-Bar parity** unless measured regression appears.
+2. **Do not reopen chart axis/domain/bar sizing** unless test or screenshot proves regression.
+3. **Do not change suggested questions or follow-up chips** unless a new issue is proven.
+4. **PDF-2** — audit-first, small incremental fixes only.

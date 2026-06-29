@@ -553,3 +553,21 @@ npm run build → success
 | Conversation thread included | **PASS** |
 | Appendix: Sample data after Visualization | **PASS** |
 | Chart labels / layout | **PASS** — 5-page full export; viz on page 3 |
+
+---
+
+## 16. Committed state (June 29, 2026)
+
+**Commit:** `c764f5d` — fix(frontend): improve pdf insight export quality  
+**Branch:** `DEV` · working tree clean after commit.
+
+All PDF-1 items in §11–§15 shipped in this commit (28 files: frontend PDF/export path, tests, audit doc, validation PDFs/PNGs/JSON, live export scripts). Backend unchanged.
+
+**Recorded validation at commit:**
+
+- Backend Phase 1 (suggested questions): 492 passed, 0 failed  
+- Frontend follow-up targeted: 37 passed  
+- PDF/export targeted vitest: PASS  
+- `npm run build`: PASS  
+
+**PDF-2 not started.** See [`open-items.md`](./open-items.md) and [`pdf-export-phase-changelog.md`](./pdf-export-phase-changelog.md).

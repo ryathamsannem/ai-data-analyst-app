@@ -1,12 +1,34 @@
 # Final Release Readiness Summary
 
-**Snapshot date:** June 28, 2026  
+**Snapshot date:** June 28, 2026 (final release) · **Updated:** June 29, 2026 (post–PDF-1 pointer)  
 **Branch:** `DEV`  
-**Latest commit:** `61d0145` — fix(backend): restore showcase diversity/scatter and banking utilization suggested question
+**Latest commit (June 29):** `c764f5d` — fix(frontend): improve pdf insight export quality
+
+> **Post–PDF-1 status:** See [`latest-working-snapshot.md`](./latest-working-snapshot.md) for current HEAD, PDF-1 resolved items, and PDF-2 deferred list. This file remains the **June 28 final release** baseline record.
 
 ---
 
-## 1. Git state
+## Post–PDF-1 addendum (June 29, 2026)
+
+| Commit | Scope |
+|--------|--------|
+| `3ee3e48` | Suggested Questions backend quality (15 domains) |
+| `c460bcc` | AI follow-up chip quality (FU-P1) |
+| `c764f5d` | PDF-1 export quality (narrative alignment, slim preset, appendix, follow-up export, viz layout) |
+
+| Check | Result (recorded) |
+|-------|-------------------|
+| Backend Phase 1 pytest | **492 passed, 0 failed** |
+| Frontend follow-up targeted | **37 passed** |
+| PDF/export targeted vitest | **PASS** |
+| `npm run build` | **PASS** |
+| Working tree | **Clean** at `c764f5d` |
+
+PDF-2 **not started**. Constraints: frozen H-Bar/V-Bar, frozen axis/domain/bar sizing, frozen suggested questions/chips unless new proven issue.
+
+---
+
+## 1. Git state (June 28 final release baseline)
 
 | Item | Value |
 |------|-------|
