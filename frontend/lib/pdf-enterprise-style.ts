@@ -92,7 +92,7 @@ export const PDF_EMPTY_STATES = {
     body: "Load a dataset in the app to include a structured sample table in this export.",
   },
   appendix: {
-    title: "Technical appendix not populated",
+    title: "Technical details not populated",
     body: "Include a chart with series data, provenance metadata, or session thumbnails to populate audit tables in this section.",
   },
   narrative: {

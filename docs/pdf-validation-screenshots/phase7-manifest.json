@@ -60,8 +60,8 @@
     "dataset": "retail",
     "combo": "all_sections",
     "file": "phase7-retail-all_sections.pdf",
-    "pageCount": 6,
-    "textLength": 62290,
+    "pageCount": 5,
+    "textLength": 54152,
     "markers": {
       "kpi": false,
       "aiInsight": true,
@@ -99,7 +99,7 @@
     "combo": "appendix_only",
     "file": "phase7-retail-appendix_only.pdf",
     "pageCount": 2,
-    "textLength": 26006,
+    "textLength": 25573,
     "markers": {
       "kpi": false,
       "aiInsight": false,
@@ -174,8 +174,8 @@
     "dataset": "generic",
     "combo": "all_sections",
     "file": "phase7-generic-all_sections.pdf",
-    "pageCount": 6,
-    "textLength": 62294,
+    "pageCount": 5,
+    "textLength": 54161,
     "markers": {
       "kpi": false,
       "aiInsight": true,
@@ -213,7 +213,7 @@
     "combo": "appendix_only",
     "file": "phase7-generic-appendix_only.pdf",
     "pageCount": 2,
-    "textLength": 26001,
+    "textLength": 25568,
     "markers": {
       "kpi": false,
       "aiInsight": false,
@@ -288,8 +288,8 @@
     "dataset": "geographic",
     "combo": "all_sections",
     "file": "phase7-geographic-all_sections.pdf",
-    "pageCount": 6,
-    "textLength": 60863,
+    "pageCount": 5,
+    "textLength": 52730,
     "markers": {
       "kpi": false,
       "aiInsight": true,
@@ -327,7 +327,7 @@
     "combo": "appendix_only",
     "file": "phase7-geographic-appendix_only.pdf",
     "pageCount": 2,
-    "textLength": 26151,
+    "textLength": 25718,
     "markers": {
       "kpi": false,
       "aiInsight": false,

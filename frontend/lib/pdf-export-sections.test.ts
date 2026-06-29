@@ -46,4 +46,20 @@ describe("pdf-report optional sections", () => {
       /if \(shouldRenderPdfKpiDashboardSection\(input\.kpiCards\)\)/
     );
   });
+
+  it("uses executive-friendly technical appendix title and page-break guard", () => {
+    expect(pdfReportSrc).toContain('sectionTitle(PDF_TECHNICAL_APPENDIX_SECTION_TITLE)');
+    expect(pdfReportSrc).toContain("shouldStartTechnicalAppendixOnNewPage");
+    expect(pdfReportSrc).not.toMatch(
+      /includeTechnicalAppendix[\s\S]{0,400}doc\.addPage\(\);\s*y = contentTop0;\s*sectionTitle\("Technical appendix"\)/
+    );
+    const dataQualityIdx = pdfReportSrc.indexOf(
+      "if (input.includes.includeDataQuality)"
+    );
+    const appendixIdx = pdfReportSrc.indexOf(
+      "if (input.includes.includeTechnicalAppendix)"
+    );
+    expect(dataQualityIdx).toBeGreaterThan(-1);
+    expect(appendixIdx).toBeGreaterThan(dataQualityIdx);
+  });
 });

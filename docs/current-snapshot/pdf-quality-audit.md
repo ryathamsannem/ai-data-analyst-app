@@ -964,8 +964,64 @@ npm run build → success (Next.js 16.2.4)
 
 Script: `python docs/pdf1-banking-live-export.py`
 
-### 21.6 Deferred (PDF-2C-2)
+### 21.6 Deferred (PDF-2C-2) — **implemented in §22**
 
 | ID | Item |
 |----|------|
 | PDF-P2-02 | Technical appendix title/tone, page-break threshold, thumbnails/series trimming |
+
+---
+
+## 22. PDF-2C-2 implementation (June 29, 2026)
+
+**Baseline:** `DEV` @ `5d27fc1` (PDF-2C-1 committed).  
+**Scope:** PDF-P2-02 technical appendix tone / page-break threshold only.
+
+### 22.1 Root cause
+
+The optional technical appendix block always called `doc.addPage()` before rendering, even when the prior page had room — producing an extra trailing page and orphan-prone headings. Copy used **Technical appendix** (inconsistent with **Appendix: Sample data**), analyst-style intro in executive `pdfMode`, and internal kickers (**Source** / **NOTES**). **Session chart thumbnails** and **Series sample** repeated visualization content on full exports.
+
+### 22.2 Files changed
+
+| File | Change |
+|------|--------|
+| `frontend/lib/pdf-technical-appendix-layout.ts` | **New** — title, intro, page-break guard, executive trim flags |
+| `frontend/lib/pdf-technical-appendix-layout.test.ts` | **New** — title, intro, page-break, thumbnail/series trim tests |
+| `frontend/app/pdf-report.ts` | Threshold page break; renamed section; executive intro; softer note panels; executive thumbnail/series trim |
+| `frontend/lib/pdf-export-sections.test.ts` | Static asserts for appendix title guard + section order |
+| `frontend/lib/phase7-pdf-generate.test.ts` | Marker → `Appendix: Technical details` |
+| `frontend/lib/pdf-enterprise-style.ts` | Appendix empty-state title aligned to “Technical details” |
+| `docs/pdf-validation-screenshots/phase7-*-{appendix_only,all_sections}.pdf` | Regenerated (6 PDFs) |
+| `docs/pdf-validation-screenshots/phase7-manifest.json` | Updated page counts / text lengths for appendix combos |
+
+**Restored (incidental regen drift):** `phase7-*-{kpi_only,kpi_insight,kpi_insight_chart,conversation_only}.pdf` (12 files).
+
+### 22.3 Behavior changes
+
+- **Title:** `Appendix: Technical details` (was `Technical appendix`).
+- **Intro:** Executive — audit/validation tone; analyst — full handoff copy unchanged in spirit.
+- **Page break:** `shouldStartTechnicalAppendixOnNewPage()` — new page only when insufficient room for heading + minimum block (~58 mm); otherwise continues on current page.
+- **Optional gate:** unchanged — `includeTechnicalAppendix === true` only.
+- **Executive trim:** hides **Session chart thumbnails** when chart already embedded; replaces **Series sample** table with caption pointing to Visualization.
+- **Analyst mode:** full thumbnails + series table preserved.
+- **Note panels:** **Attribution** kicker for visualization source; provenance notes omit redundant **NOTES** kicker (subsection title carries context).
+
+### 22.4 Tests and build
+
+```text
+npx vitest run lib/pdf-technical-appendix-layout.test.ts lib/pdf-export-sections.test.ts lib/phase7-pdf-generate.test.ts
+→ 3 files, 31 tests passed
+
+npm run build → success (Next.js 16.2.4)
+```
+
+### 22.5 Live validation
+
+| Artifact | Result |
+|----------|--------|
+| `phase7-retail-appendix_only.pdf` | Title **Appendix: Technical details**; thumbnails retained (no embedded chart); 2 pages |
+| `phase7-retail-all_sections.pdf` | Appendix on final page; **no** thumbnail list; series caption references Visualization; **5 pages** (was 6) |
+
+### 22.6 Remaining PDF items
+
+**None** from the PDF-2 audit backlog — PDF-P2-01 and PDF-P2-02 complete. Future work is outside PDF-2 scope (e.g. Export/PDF finalization, routing-plan subsection) unless new audit items are opened.

@@ -54,6 +54,16 @@ import {
   type PdfExecutiveContentPlan,
 } from "@/lib/pdf-executive-content";
 import { pdfKpiCardsForDashboardSection, shouldRenderPdfKpiDashboardSection } from "@/lib/pdf-kpi-layout";
+import {
+  PDF_TECHNICAL_APPENDIX_SECTION_TITLE,
+  pdfTechnicalAppendixEmptyBody,
+  pdfTechnicalAppendixIntro,
+  pdfTechnicalAppendixSeriesSampleCaption,
+  pdfTechnicalAppendixVisualizationKicker,
+  shouldRenderPdfTechnicalAppendixSeriesTable,
+  shouldRenderPdfTechnicalAppendixThumbnails,
+  shouldStartTechnicalAppendixOnNewPage,
+} from "@/lib/pdf-technical-appendix-layout";
 
 type JsPdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
 
@@ -3363,10 +3373,19 @@ export async function runExecutivePdfExport(
     doc.setTextColor(0, 0, 0);
   };
 
-  const drawAppendixNotePanel = (title: string, body: string) => {
+  const drawAppendixNotePanel = (
+    body: string,
+    kicker?: string | null
+  ) => {
+    const showKicker = Boolean(kicker?.trim());
     const lines = doc.splitTextToSize(body, contentWidth - 14);
     const lh = pdfLineHeight(PDF_TYPE.bodySmall);
-    const boxH = PDF_SPACING.panelPad + 4 + lines.length * lh + PDF_SPACING.panelPad;
+    const kickerReserve = showKicker ? 4 : 0;
+    const boxH =
+      PDF_SPACING.panelPad +
+      kickerReserve +
+      lines.length * lh +
+      PDF_SPACING.panelPad;
     ensurePageSpace(boxH + 4);
     pdfDrawEnterprisePanel(doc, margin, y, contentWidth, boxH, {
       fill: theme.panel,
@@ -3374,11 +3393,20 @@ export async function runExecutivePdfExport(
       accent: theme.accent,
       radius: 1.5,
     });
-    pdfDrawPanelKicker(doc, margin + 4, y + PDF_SPACING.panelPad, title, theme.muted, theme.accent);
+    if (showKicker) {
+      pdfDrawPanelKicker(
+        doc,
+        margin + 4,
+        y + PDF_SPACING.panelPad,
+        kicker!,
+        theme.muted,
+        theme.accent
+      );
+    }
     doc.setFont("helvetica", "normal");
     doc.setFontSize(PDF_TYPE.bodySmall);
     doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-    let hy = y + PDF_SPACING.panelPad + 5;
+    let hy = y + PDF_SPACING.panelPad + (showKicker ? 5 : 3);
     lines.forEach((ln: string) => {
       doc.text(ln, margin + 5, hy);
       hy += lh;
@@ -4641,25 +4669,24 @@ export async function runExecutivePdfExport(
         Boolean(chAp?.chartAttribution?.trim()) ||
         Boolean(chAp?.alignedMetric) ||
         Boolean(chAp?.aggregation));
+    const chartEmbedded =
+      input.includes.includeChart && Boolean(chAp) && hasSeries;
     const appendixHasContent =
       hasChartMeta ||
       thumbsAp.length > 0 ||
       Boolean(provNotesAp) ||
       Boolean(input.provenance);
-    doc.addPage();
-    y = contentTop0;
-    sectionTitle("Technical appendix");
-    bodyText(
-      analystPdf
-        ? "Reference metadata for audit and data-team handoff. Omit this section for executive-only distribution."
-        : "Reference metadata for audit, routing, and calculation context.",
-      PDF_TYPE.bodySmall
-    );
+    if (shouldStartTechnicalAppendixOnNewPage(y, footerY, PDF_SPACING.pageSafe)) {
+      doc.addPage();
+      y = contentTop0;
+    }
+    sectionTitle(PDF_TECHNICAL_APPENDIX_SECTION_TITLE);
+    bodyText(pdfTechnicalAppendixIntro(analystPdf), PDF_TYPE.bodySmall);
     y += PDF_SPACING.subsectionBefore;
     if (!appendixHasContent) {
       drawPremiumEmptyState(
         PDF_EMPTY_STATES.appendix.title,
-        "Technical appendix: No technical metadata available."
+        pdfTechnicalAppendixEmptyBody()
       );
     } else if (
       hasChartMeta ||
@@ -4714,17 +4741,23 @@ export async function runExecutivePdfExport(
       if (chAp?.chartAttribution?.trim()) {
         appendixSubheading("Visualization source");
         drawAppendixNotePanel(
-          "Source",
-          polishPdfBusinessCopy(chAp.chartAttribution!.trim())
+          polishPdfBusinessCopy(chAp.chartAttribution!.trim()),
+          pdfTechnicalAppendixVisualizationKicker()
         );
       }
 
       if (provNotesAp) {
         appendixSubheading("Provenance notes");
-        drawAppendixNotePanel("Notes", polishPdfBusinessCopy(provNotesAp));
+        drawAppendixNotePanel(polishPdfBusinessCopy(provNotesAp));
       }
 
-      if (thumbsAp.length >= 1) {
+      if (
+        shouldRenderPdfTechnicalAppendixThumbnails({
+          analystPdf,
+          chartEmbedded,
+          thumbCount: thumbsAp.length,
+        })
+      ) {
         appendixSubheading("Session chart thumbnails");
         const rowH = 16;
         const headerH = 6;
@@ -4784,15 +4817,20 @@ export async function runExecutivePdfExport(
           label,
           value,
         }));
-        const seriesTableH = measureMonolithicTableStackMm(
-          doc,
-          contentWidth,
-          seriesHeads,
-          seriesRows,
-          7.5,
-          2.25,
-          5
-        );
+        const showSeriesTable = shouldRenderPdfTechnicalAppendixSeriesTable({
+          analystPdf,
+        });
+        const seriesTableH = showSeriesTable
+          ? measureMonolithicTableStackMm(
+              doc,
+              contentWidth,
+              seriesHeads,
+              seriesRows,
+              7.5,
+              2.25,
+              5
+            )
+          : 8;
         const specGridRows = Math.ceil(specItems.length / 2);
         const blockH =
           specGridRows * 15.5 +
@@ -4803,17 +4841,27 @@ export async function runExecutivePdfExport(
         ensurePageSpace(blockH);
         appendixSubheading("Chart specification");
         drawAppendixFactGrid(specItems, specItems.length >= 4 ? 3 : 2);
-        appendixSubheading("Series sample");
-        drawDataTable(seriesHeads, seriesRows, {
-          variant: "appendix",
-          fontSize: 7.5,
-          maxCols: 2,
-          maxRows: 20,
-          suppressRowPageBreaks: true,
-        });
-        if (chAp.data.length > 20) {
+        if (showSeriesTable) {
+          appendixSubheading("Series sample");
+          drawDataTable(seriesHeads, seriesRows, {
+            variant: "appendix",
+            fontSize: 7.5,
+            maxCols: 2,
+            maxRows: 20,
+            suppressRowPageBreaks: true,
+          });
+          if (chAp.data.length > 20) {
+            bodyText(
+              `Showing first 20 of ${chAp.data.length} series points.`,
+              PDF_TYPE.caption
+            );
+          }
+        } else {
           bodyText(
-            `Showing first 20 of ${chAp.data.length} series points.`,
+            pdfTechnicalAppendixSeriesSampleCaption(
+              chAp.data.length,
+              chartEmbedded
+            ),
             PDF_TYPE.caption
           );
         }

@@ -49,7 +49,7 @@ const SECTION_MARKERS = {
   preview: /Appendix: Sample data/i,
   dataQuality: /Data quality/i,
   conversation: /AI conversation thread/i,
-  appendix: /Technical appendix/i,
+  appendix: /Appendix: Technical details/i,
   executiveSummary: /Executive summary/i,
   pageFooter: /Page \d+ of \d+/i,
 } as const;
