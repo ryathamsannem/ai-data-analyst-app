@@ -53,6 +53,7 @@ import {
   pdfExecutiveHierarchyHeadings,
   type PdfExecutiveContentPlan,
 } from "@/lib/pdf-executive-content";
+import { stripRedundantPdfInsightSectionLabel } from "@/lib/pdf-insight-section-text";
 import { pdfKpiCardsForDashboardSection, shouldRenderPdfKpiDashboardSection } from "@/lib/pdf-kpi-layout";
 import {
   PDF_TECHNICAL_APPENDIX_SECTION_TITLE,
@@ -3937,59 +3938,76 @@ export async function runExecutivePdfExport(
     );
 
     if (hasStructuredPresentation && presentation) {
-      if (presentation.executiveTakeaway?.trim()) {
-        ensureAiBlockFits(
-          "Executive takeaway",
-          9.5,
-          presentation.executiveTakeaway.trim(),
-          9.5
-        );
+      const takeaway = stripRedundantPdfInsightSectionLabel(
+        presentation.executiveTakeaway?.trim() ?? "",
+        "executive_takeaway"
+      );
+      const evidence = stripRedundantPdfInsightSectionLabel(
+        presentation.evidence?.trim() ?? "",
+        "evidence"
+      );
+      const supportingDetail = stripRedundantPdfInsightSectionLabel(
+        presentation.supportingDetail?.trim() ?? "",
+        "supporting_detail"
+      );
+      const strategicRecommendations = stripRedundantPdfInsightSectionLabel(
+        presentation.strategicRecommendations?.trim() ?? "",
+        "strategic_recommendation"
+      );
+      const whyBullets = presentation.whyThisMatters
+        .map((block) => {
+          const claim = stripRedundantPdfInsightSectionLabel(
+            block.claim.trim(),
+            "why_this_matters"
+          );
+          const reason = block.reason?.trim()
+            ? stripRedundantPdfInsightSectionLabel(
+                block.reason.trim(),
+                "why_this_matters"
+              )
+            : "";
+          return reason ? `${claim} — ${reason}` : claim;
+        })
+        .filter(Boolean);
+
+      if (takeaway) {
+        ensureAiBlockFits("Executive takeaway", 9.5, takeaway, 9.5);
         insightSubheading("Executive takeaway", 18);
-        bodyBullets([presentation.executiveTakeaway.trim()], PDF_TYPE.bodySmall);
+        bodyBullets([takeaway], PDF_TYPE.bodySmall);
       }
-      if (presentation.evidence?.trim()) {
-        ensureAiBlockFits("Evidence", 9.5, presentation.evidence.trim(), 9.5);
+      if (evidence) {
+        ensureAiBlockFits("Evidence", 9.5, evidence, 9.5);
         y += PDF_SPACING.bulletGap;
         insightSubheading("Evidence");
-        bodyBullets([presentation.evidence.trim()], 9.5);
+        bodyBullets([evidence], 9.5);
       }
-      if (presentation.whyThisMatters.length > 0) {
-        const bullets = presentation.whyThisMatters.map((block) =>
-          block.reason?.trim()
-            ? `${block.claim.trim()} — ${block.reason.trim()}`
-            : block.claim.trim()
-        );
+      if (whyBullets.length > 0) {
         ensureAiBlockFits(
           "Why this matters",
           9.5,
-          bullets.join(" "),
+          whyBullets.join(" "),
           9.5
         );
         y += PDF_SPACING.bulletGap;
         insightSubheading("Why this matters");
-        bodyBullets(bullets, 9.5);
+        bodyBullets(whyBullets, 9.5);
       }
-      if (presentation.supportingDetail?.trim()) {
-        ensureAiBlockFits(
-          "Supporting detail",
-          9.5,
-          presentation.supportingDetail.trim(),
-          9.5
-        );
+      if (supportingDetail) {
+        ensureAiBlockFits("Supporting detail", 9.5, supportingDetail, 9.5);
         y += PDF_SPACING.bulletGap;
         insightSubheading("Supporting detail");
-        bodyBullets([presentation.supportingDetail.trim()], 9.5);
+        bodyBullets([supportingDetail], 9.5);
       }
-      if (presentation.strategicRecommendations?.trim()) {
+      if (strategicRecommendations) {
         ensureAiBlockFits(
           hierarchyLabels.recommendation,
           9.5,
-          presentation.strategicRecommendations.trim(),
+          strategicRecommendations,
           9.5
         );
         y += PDF_SPACING.bulletGap;
         insightSubheading(hierarchyLabels.recommendation);
-        bodyBullets([presentation.strategicRecommendations.trim()], 9.5);
+        bodyBullets([strategicRecommendations], 9.5);
       }
     } else {
     const hasHierarchy = Boolean(
