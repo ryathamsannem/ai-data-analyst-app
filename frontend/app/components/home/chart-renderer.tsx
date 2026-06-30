@@ -125,9 +125,10 @@ import {
 import { HBarValueLabelListContent } from "@/app/components/home/hbar-value-label-list";
 import { LineValueLabelListContent } from "@/app/components/home/line-value-label-list";
 import {
-  computeHBarOutsideLabelReservePx,
+  computeHBarSignedOutsideLabelReservesPx,
   resolveHBarLabelPlacementMode,
 } from "@/lib/hbar-value-label-placement";
+import { barChartRowsHaveNegativeValues } from "@/lib/overview-bar-value-domain";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   BarChart,
@@ -149,6 +150,7 @@ import {
   ScatterChart,
   Scatter,
   LabelList,
+  ReferenceLine,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -156,6 +158,8 @@ const RECHARTS_ANIMATION_MAX_POINTS = 72;
 
 const GRID_STROKE = "var(--chart-axis-line)";
 const CHART_AXIS_LINE = CHART_AXIS_CSS.line;
+const SIGNED_BAR_ZERO_LINE_OPACITY = 0.72;
+const SIGNED_BAR_ZERO_LINE_WIDTH = 1.25;
 const AXIS_TICK = CHART_AXIS_CSS.tick;
 const CHART_TOOLTIP_FRAME = {
   cursor: false,
@@ -1178,17 +1182,20 @@ function ChartRendererInner({
       pngCapture: pngCaptureMode,
       detailLayout,
     });
-    const hBarOutsideLabelReserve =
+    const hBarOutsideLabelReserves =
       showHBarEndLabels && hBarPlacementMode !== "overview-live"
-        ? computeHBarOutsideLabelReservePx(
+        ? computeHBarSignedOutsideLabelReservesPx(
             rData.map((r) => r.value),
             (v) => barValueTickFormatter(v),
             hBarLabelFontSize
           )
-        : 0;
+        : { left: 0, right: 0 };
     const hBarRightMargin = showHBarEndLabels
-      ? Math.max(hmBalanced.marginRight, 52) + hBarOutsideLabelReserve
+      ? Math.max(hmBalanced.marginRight, 52) + hBarOutsideLabelReserves.right
       : hmBalanced.marginRight;
+    const hBarLeftMargin =
+      hmBalanced.marginLeft + hBarOutsideLabelReserves.left;
+    const hBarSigned = barChartRowsHaveNegativeValues(rData);
     const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
       chartKind: "bar_horizontal",
       rows: rData,
@@ -1214,7 +1221,7 @@ function ChartRendererInner({
             detailLayout,
           })}
           margin={{
-            left: hmBalanced.marginLeft,
+            left: hBarLeftMargin,
             right: hBarRightMargin,
             top: 16,
             bottom: Math.max(hb.marginBottom, compact ? 14 : 22),
@@ -1227,6 +1234,14 @@ function ChartRendererInner({
             strokeDasharray="4 12"
             strokeOpacity={0.38}
           />
+          {hBarSigned ? (
+            <ReferenceLine
+              x={0}
+              stroke={CHART_AXIS_LINE}
+              strokeOpacity={SIGNED_BAR_ZERO_LINE_OPACITY}
+              strokeWidth={SIGNED_BAR_ZERO_LINE_WIDTH}
+            />
+          ) : null}
           <XAxis
             type="number"
             {...(hBarValueAxisProps ?? {})}
@@ -1299,7 +1314,8 @@ function ChartRendererInner({
                     inlayFill={CHART_BAR_INLAY_LABEL_CSS}
                     outsideFill={CHART_BAR_VALUE_LABEL_CSS}
                     placementMode={hBarPlacementMode}
-                    outsideLabelReservePx={hBarOutsideLabelReserve}
+                    outsideLabelReservePx={hBarOutsideLabelReserves.right}
+                    outsideLabelReserveLeftPx={hBarOutsideLabelReserves.left}
                   />
                 )}
               />
@@ -1573,6 +1589,8 @@ function ChartRendererInner({
     );
   }
 
+  const vBarSigned = barChartRowsHaveNegativeValues(rData);
+
   return (
     <ResponsiveContainer
       key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
@@ -1601,6 +1619,14 @@ function ChartRendererInner({
           strokeDasharray="4 12"
           strokeOpacity={0.38}
         />
+        {vBarSigned ? (
+          <ReferenceLine
+            y={0}
+            stroke={CHART_AXIS_LINE}
+            strokeOpacity={SIGNED_BAR_ZERO_LINE_OPACITY}
+            strokeWidth={SIGNED_BAR_ZERO_LINE_WIDTH}
+          />
+        ) : null}
         <XAxis
           dataKey="name"
           tick={{

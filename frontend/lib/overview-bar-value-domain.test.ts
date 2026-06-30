@@ -6,6 +6,7 @@ import {
   OVERVIEW_HBAR_TARGET_MAX_UTILIZATION,
   resolveBarChartRateDisplayCap,
   resolveBarChartRateUpperBound,
+  resolveFocusedBoundedBarValueAxisTicks,
   resolveFocusedRateBarValueAxisTicks,
   resolveOverviewBarValueDomain,
   shouldUseFocusedVerticalBarRateDomain,
@@ -580,6 +581,63 @@ describe("resolveOverviewBarValueDomain", () => {
     expect(labels.some((l) => l.includes("2.5"))).toBe(true);
   });
 
+  it("defect rate 2.35–2.52% uses focused domain with unique axis labels", () => {
+    const rows: ChartRow[] = [
+      { name: "Night", value: 0.0235 },
+      { name: "Day", value: 0.0247 },
+      { name: "Swing", value: 0.0252 },
+    ];
+    const metricCtx = {
+      chartTitle: "Defect Rate by Shift",
+      metricLabel: "Defect Rate",
+      presentationKind: "bar" as const,
+      chartRows: rows,
+    };
+    const domain = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Defect Rate by Shift",
+      metricLabel: "Defect Rate",
+      presentationKind: "bar",
+    });
+    expect(domain![0]).toBeGreaterThanOrEqual(0.022);
+    expect(domain![1]).toBeLessThanOrEqual(0.026);
+    const ticks = resolveFocusedRateBarValueAxisTicks(domain!, 0.0252, 2.52);
+    const labels = ticks!.map((t) =>
+      formatOverviewBarValueAxisTick(t, rows, metricCtx)
+    );
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it("performance rating H-Bar focused domain gets explicit bounded ticks", () => {
+    const rows: ChartRow[] = [
+      { name: "Eng", value: 3.41 },
+      { name: "Sales", value: 3.48 },
+      { name: "HR", value: 3.49 },
+      { name: "Ops", value: 3.5 },
+      { name: "Fin", value: 3.52 },
+      { name: "Legal", value: 3.53 },
+    ];
+    const domain = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Performance Rating by Department",
+      metricLabel: "Performance Rating",
+      presentationKind: "bar_horizontal",
+      overviewHorizontalBarHeadroom: true,
+    })!;
+    expect(domain[0]).toBeGreaterThan(3.3);
+    expect(domain[1] - domain[0]).toBeLessThan(0.3);
+    const ticks = resolveFocusedBoundedBarValueAxisTicks(domain, 5);
+    expect(ticks).toBeDefined();
+    expect(ticks!.length).toBeGreaterThanOrEqual(3);
+    const labels = ticks!.map((t) =>
+      formatOverviewBarValueAxisTick(t, rows, {
+        chartTitle: "Performance Rating by Department",
+        metricLabel: "Performance Rating",
+        presentationKind: "bar_horizontal",
+        chartRows: rows,
+      })
+    );
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
   it("conversion rate 5.6%–7.9% starts at 0 with reasonable upper bound", () => {
     const domain = resolveOverviewBarValueDomain(
       [
@@ -633,9 +691,7 @@ describe("resolveOverviewBarValueDomain", () => {
     expect(domain![1]).toBeGreaterThanOrEqual(0.05);
   });
 
-  it("negative/positive profit delta still includes zero (minRaw < 0 guard)", () => {
-    // Delta/variance bars: values span negative to positive — the fix does not fire
-    // because minRaw < 0; domain must already include zero by other paths.
+  it("negative/positive profit delta includes zero with signed domain policy", () => {
     const domain = resolveOverviewBarValueDomain(
       [{ value: -12_000 }, { value: 5_000 }, { value: 18_000 }],
       {
@@ -647,6 +703,50 @@ describe("resolveOverviewBarValueDomain", () => {
     expect(domain).toBeDefined();
     expect(domain![0]).toBeLessThan(0);
     expect(domain![1]).toBeGreaterThan(18_000);
+    expect(domain![0]).toBeLessThanOrEqual(0);
+    expect(domain![1]).toBeGreaterThanOrEqual(0);
+  });
+
+  it("signed mixed values force domain to include zero", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [{ value: -5 }, { value: 100 }, { value: 200 }],
+      {
+        chartTitle: "Net Change by Product",
+        metricLabel: "Net Change",
+        presentationKind: "bar_horizontal",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBeLessThanOrEqual(0);
+    expect(domain![1]).toBeGreaterThanOrEqual(0);
+  });
+
+  it("all-negative values include zero as upper bound", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [{ value: -100 }, { value: -20 }],
+      {
+        chartTitle: "Return Amount by Product",
+        metricLabel: "Return Amount",
+        presentationKind: "bar_horizontal",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBeLessThan(-100);
+    expect(domain![1]).toBeGreaterThan(0);
+  });
+
+  it("positive-only bar domain remains unchanged", () => {
+    const domain = resolveOverviewBarValueDomain(
+      [{ value: 100 }, { value: 200 }],
+      {
+        chartTitle: "Revenue by Product",
+        metricLabel: "Revenue",
+        presentationKind: "bar",
+      }
+    );
+    expect(domain).toBeDefined();
+    expect(domain![0]).toBe(0);
+    expect(domain![1]).toBeGreaterThan(200);
   });
 });
 
@@ -692,6 +792,27 @@ describe("bar domain parity across surfaces", () => {
     });
     expect(domain![0]).toBe(0);
     expect(domain![1]).toBeGreaterThan(0.44);
+  });
+
+  it("signed V-Bar and H-Bar domains both include zero", () => {
+    const rows = [
+      { name: "A", value: -5 },
+      { name: "B", value: 120 },
+    ];
+    const vDomain = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Net Change by Product",
+      metricLabel: "Net Change",
+      presentationKind: "bar",
+    });
+    const hDomain = resolveOverviewBarValueDomain(rows, {
+      chartTitle: "Net Change by Product",
+      metricLabel: "Net Change",
+      presentationKind: "bar_horizontal",
+    });
+    expect(vDomain![0]).toBeLessThanOrEqual(0);
+    expect(vDomain![1]).toBeGreaterThanOrEqual(0);
+    expect(hDomain![0]).toBeLessThanOrEqual(0);
+    expect(hDomain![1]).toBeGreaterThanOrEqual(0);
   });
 
   it("controlled fixture: V-Bar and H-Bar both start at 0 with comparable span", () => {

@@ -12,6 +12,7 @@ import {
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
 import {
+  applySignedBarValueDomainPolicy,
   isFocusedVerticalBarRateChart,
   resolveOverviewBarValueDomain,
   roundExecutiveAxisMaximum,
@@ -105,7 +106,14 @@ function barValueLabelMinBarRatioOverlapRisk(
   if (values.length <= 1) return false;
   const maxV = Math.max(...values);
   const minV = Math.min(...values);
-  if (!Number.isFinite(maxV) || maxV <= 0) return true;
+  if (!Number.isFinite(maxV)) return true;
+  if (maxV <= 0) {
+    const magnitudes = values.map((v) => Math.abs(v)).filter((v) => v > 0);
+    if (magnitudes.length <= 1) return false;
+    const maxMag = Math.max(...magnitudes);
+    const minMag = Math.min(...magnitudes);
+    return minMag / maxMag < minRatio;
+  }
   return minV / maxV < minRatio;
 }
 
@@ -326,9 +334,16 @@ export function horizontalBarValueDomain(
   if (smart) return smart;
 
   const vals = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
-  const maxV = vals.length ? Math.max(0, ...vals) : 0;
-  if (maxV <= 0) return [0, 1];
-  const padded = maxV * (1 + rightPadRatio);
+  if (vals.length === 0) return [0, 1];
+  const minV = Math.min(...vals);
+  const maxV = Math.max(...vals);
+  const spanV = maxV - minV;
+  if (minV < 0) {
+    return applySignedBarValueDomainPolicy(0, 1, minV, maxV, spanV || 1);
+  }
+  const maxPos = Math.max(0, ...vals);
+  if (maxPos <= 0) return [0, 1];
+  const padded = maxPos * (1 + rightPadRatio);
   return [0, roundExecutiveAxisMaximum(padded)];
 }
 

@@ -99,7 +99,7 @@ describe("ChartRenderer H-Bar inlay labels", () => {
 
   it("applies Overview-aligned right margin when H-Bar labels are shown", () => {
     expect(chartRendererSrc).toMatch(
-      /const hBarRightMargin = showHBarEndLabels[\s\S]*?Math\.max\(hmBalanced\.marginRight, 52\)[\s\S]*?hBarOutsideLabelReserve/
+      /const hBarRightMargin = showHBarEndLabels[\s\S]*?Math\.max\(hmBalanced\.marginRight, 52\)[\s\S]*?hBarOutsideLabelReserves\.right/
     );
   });
 
@@ -109,18 +109,18 @@ describe("ChartRenderer H-Bar inlay labels", () => {
       /resolveHBarLabelPlacementMode\(\{[\s\S]*?detailLayout/
     );
     expect(chartRendererSrc).toMatch(
-      /hBarPlacementMode !== "overview-live"[\s\S]*?computeHBarOutsideLabelReservePx/
+      /hBarPlacementMode !== "overview-live"[\s\S]*?computeHBarSignedOutsideLabelReservesPx/
     );
     expect(chartRendererSrc).toMatch(
       /placementMode=\{hBarPlacementMode\}/
     );
     expect(chartRendererSrc).toMatch(
-      /outsideLabelReservePx=\{hBarOutsideLabelReserve\}/
+      /outsideLabelReservePx=\{hBarOutsideLabelReserves\.right\}/
     );
   });
 
   it("keeps export capture placement and reserve unchanged", () => {
-    expect(chartRendererSrc).toContain("computeHBarOutsideLabelReservePx");
+    expect(chartRendererSrc).toContain("computeHBarSignedOutsideLabelReservesPx");
     expect(chartRendererSrc).toMatch(
       /pngCapture: pngCaptureMode[\s\S]*?detailLayout/
     );
@@ -132,7 +132,7 @@ describe("ChartRenderer H-Bar inlay labels", () => {
       /hBarPlacementMode = resolveOverviewInlineHBarPlacementMode\(pngCapture\)/
     );
     expect(pageSrc).toMatch(
-      /showBarEndLabels[\s\S]*?computeHBarOutsideLabelReservePx/
+      /showBarEndLabels[\s\S]*?computeHBarSignedOutsideLabelReservesPx/
     );
     expect(pageSrc).not.toMatch(
       /placementMode=\{pngCapture \? "export" : "overview-live"\}/
@@ -141,7 +141,20 @@ describe("ChartRenderer H-Bar inlay labels", () => {
       /placementMode=\{hBarPlacementMode\}/
     );
     expect(pageSrc).toMatch(
-      /outsideLabelReservePx=\{hBarOutsideReserve\}/
+      /outsideLabelReservePx=\{hBarOutsideReserves\.right\}/
+    );
+    expect(pageSrc).toMatch(
+      /outsideLabelReserveLeftPx=\{hBarOutsideReserves\.left\}/
+    );
+  });
+
+  it("renders signed zero ReferenceLine for H-Bar and V-Bar when data is negative", () => {
+    expect(chartRendererSrc).toContain("barChartRowsHaveNegativeValues");
+    expect(chartRendererSrc).toMatch(
+      /hBarSigned \? \([\s\S]*?<ReferenceLine[\s\S]*?x=\{0\}/
+    );
+    expect(chartRendererSrc).toMatch(
+      /vBarSigned \? \([\s\S]*?<ReferenceLine[\s\S]*?y=\{0\}/
     );
   });
 

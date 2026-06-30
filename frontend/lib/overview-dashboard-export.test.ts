@@ -8,6 +8,7 @@ import {
   horizontalBarValueDomain,
   roundExecutiveAxisMaximum,
   resolveOverviewEffectivePresentationKind,
+  shouldShowHBarValueLabels,
   validateOverviewDashboardExportParity,
 } from "./overview-dashboard-export";
 import { formatOverviewBarValueAxisTick } from "./overview-premium-axis-domain";
@@ -264,6 +265,19 @@ describe("horizontalBarValueDomain", () => {
     expect(domain[1]).toBeGreaterThanOrEqual(310_000 / 0.85);
   });
 
+  it("signed fallback domain includes zero for all-negative values", () => {
+    const domain = horizontalBarValueDomain(
+      [{ value: -100_000 }, { value: -20_000 }],
+      undefined,
+      {
+        chartTitle: "Return Amount by Product",
+        metricLabel: "Return Amount",
+      }
+    );
+    expect(domain[0]).toBeLessThan(-100_000);
+    expect(domain[1]).toBeGreaterThan(0);
+  });
+
   it("PNG/export H-Bar loan balance uses the same ~85% utilization cap", () => {
     const maxRaw = 183_916_971;
     const domain = horizontalBarValueDomain(
@@ -340,6 +354,19 @@ describe("horizontalBarValueDomain", () => {
     );
     expect(domain[0]).toBe(0);
     expect(domain[1]).toBeGreaterThan(0.44);
+  });
+});
+
+describe("shouldShowHBarValueLabels — signed data", () => {
+  it("allows labels for all-negative compact charts with few categories", () => {
+    const rows = [
+      { value: -100_000 },
+      { value: -80_000 },
+      { value: -60_000 },
+      { value: -40_000 },
+    ];
+    const fmt = (v: number) => `${(v / 1000).toFixed(0)}K`;
+    expect(shouldShowHBarValueLabels(rows, fmt)).toBe(true);
   });
 });
 

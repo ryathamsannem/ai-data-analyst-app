@@ -486,9 +486,10 @@ import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-re
 import { HBarValueLabelListContent } from "./components/home/hbar-value-label-list";
 import { LineValueLabelListContent } from "./components/home/line-value-label-list";
 import {
-  computeHBarOutsideLabelReservePx,
+  computeHBarSignedOutsideLabelReservesPx,
   resolveOverviewInlineHBarPlacementMode,
 } from "@/lib/hbar-value-label-placement";
+import { barChartRowsHaveNegativeValues } from "@/lib/overview-bar-value-domain";
 import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
 import { DataPreviewQualitySummary } from "./components/home/data-preview-quality-summary";
 import { DataPreviewDatasetInsightsSummary } from "./components/home/data-preview-dataset-insights-summary";
@@ -825,6 +826,7 @@ import {
   CartesianGrid,
   ScatterChart,
   Scatter,
+  ReferenceLine,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -4822,17 +4824,19 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       });
       const hBarLabelFontSize = 13;
       const hBarPlacementMode = resolveOverviewInlineHBarPlacementMode(pngCapture);
-      const hBarOutsideReserve =
+      const hBarOutsideReserves =
         showBarEndLabels
-          ? computeHBarOutsideLabelReservePx(
+          ? computeHBarSignedOutsideLabelReservesPx(
               chartRows.map((r) => r.value),
               (v) => barValueTickFormatter(v),
               hBarLabelFontSize
             )
-          : 0;
+          : { left: 0, right: 0 };
       const hBarRightMargin = showBarEndLabels
-        ? Math.max(hbBalanced.marginRight, 52) + hBarOutsideReserve
+        ? Math.max(hbBalanced.marginRight, 52) + hBarOutsideReserves.right
         : hbBalanced.marginRight;
+      const hBarLeftMargin = hbBalanced.marginLeft + hBarOutsideReserves.left;
+      const hBarSigned = barChartRowsHaveNegativeValues(chartRows);
       const hBarLiveMargins = pngCapture
         ? { top: plotMarginTop, bottom: OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR }
         : computeOverviewHBarLiveMargins(chartRows.length);
@@ -4851,7 +4855,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               categoryCount: chartRows.length,
             })}
             margin={{
-              left: hbBalanced.marginLeft,
+              left: hBarLeftMargin,
               right: hBarRightMargin,
               top: hBarLiveMargins.top,
               bottom: hBarLiveMargins.bottom,
@@ -4864,6 +4868,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
               strokeOpacity={pngCapture ? exportGridOpacity : dashGrid.opacity}
             />
+            {hBarSigned ? (
+              <ReferenceLine
+                x={0}
+                stroke={OV_AXIS_LINE}
+                strokeOpacity={0.72}
+                strokeWidth={1.25}
+              />
+            ) : null}
             <XAxis
               type="number"
               {...(hBarValueAxisProps ?? {})}
@@ -4931,7 +4943,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                       inlayFill={CHART_BAR_INLAY_LABEL_CSS}
                       outsideFill={CHART_BAR_VALUE_LABEL_CSS}
                       placementMode={hBarPlacementMode}
-                      outsideLabelReservePx={hBarOutsideReserve}
+                      outsideLabelReservePx={hBarOutsideReserves.right}
+                      outsideLabelReserveLeftPx={hBarOutsideReserves.left}
                     />
                   )}
                 />
@@ -5314,6 +5327,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           : chartRows.length <= 8
             ? "16%"
             : undefined;
+      const vBarSigned = barChartRowsHaveNegativeValues(chartRows);
       return (
         <ResponsiveContainer
           key={`ov-bar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
@@ -5334,6 +5348,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
               strokeOpacity={pngCapture ? exportGridOpacity : dashGrid.opacity}
             />
+            {vBarSigned ? (
+              <ReferenceLine
+                y={0}
+                stroke={OV_AXIS_LINE}
+                strokeOpacity={0.72}
+                strokeWidth={1.25}
+              />
+            ) : null}
             <XAxis
               dataKey="name"
               tick={{

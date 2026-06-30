@@ -26,6 +26,39 @@ export function resolveOverviewHBarUtilizationDomainMax(
   return Math.max(existingDomainMax, utilizationCap);
 }
 
+/** True when any bar row value is negative (signed bar chart). */
+export function barChartRowsHaveNegativeValues(
+  rows: readonly { value: number }[]
+): boolean {
+  return rows.some((r) => Number.isFinite(r.value) && r.value < 0);
+}
+
+/**
+ * Normalize bar value-axis domain when data includes negatives.
+ * Positive-only callers should not invoke this helper.
+ */
+export function applySignedBarValueDomainPolicy(
+  domainMin: number,
+  domainMax: number,
+  minRaw: number,
+  maxRaw: number,
+  spanRaw: number
+): [number, number] {
+  const pad = Math.max(
+    spanRaw * 0.08,
+    Math.abs(minRaw) * 0.04,
+    Math.abs(maxRaw) * 0.04,
+    1e-6
+  );
+  if (maxRaw <= 0) {
+    return [minRaw - pad, Math.max(pad, maxRaw + pad)];
+  }
+  return [
+    Math.min(domainMin, minRaw - pad, -pad),
+    Math.max(domainMax, maxRaw + pad, pad),
+  ];
+}
+
 export type OverviewBarValueDomainOptions = {
   chartTitle?: string;
   metricLabel?: string;
@@ -507,6 +540,34 @@ export function resolveFocusedRateBarValueAxisTicks(
   return ticks;
 }
 
+/**
+ * Explicit ticks for non-zero focused bar domains (scores, ratings, tight bounded
+ * percent clusters). Complements focused V-Bar rate ticks and zero-baseline count ticks.
+ */
+export function resolveFocusedBoundedBarValueAxisTicks(
+  domain: readonly [number, number],
+  scaleMax: number
+): number[] | undefined {
+  const [dMin, dMax] = domain;
+  if (!Number.isFinite(dMin) || !Number.isFinite(dMax) || dMax <= dMin) {
+    return undefined;
+  }
+  if (dMin <= 0) return undefined;
+
+  const span = dMax - dMin;
+  if (span <= 0) return undefined;
+
+  const step = inferDomainTickStep(span, scaleMax);
+  const lo = snapBarDomainBound(dMin, step, "floor");
+  const hi = snapBarDomainBound(dMax, step, "ceil");
+  const ticks: number[] = [];
+  for (let t = lo; t <= hi + step * 1e-6; t += step) {
+    ticks.push(Number(t.toFixed(6)));
+  }
+  if (ticks.length < 2 || ticks.length > 7) return undefined;
+  return ticks;
+}
+
 /** Raw-axis upper bound for zero-baseline percent/rate bar charts. */
 export function resolveBarChartRateUpperBound(args: {
   maxDisplay: number;
@@ -728,7 +789,17 @@ export function resolveOverviewBarValueDomain(
         boundedBounds
       );
     }
-    if (domainMin < 0) domainMin = 0;
+    if (domainMin < 0 && minRaw >= 0) domainMin = 0;
+  }
+
+  if (isBarChartKind && minRaw < 0) {
+    [domainMin, domainMax] = applySignedBarValueDomainPolicy(
+      domainMin,
+      domainMax,
+      minRaw,
+      maxRaw,
+      spanRaw
+    );
   }
 
   if (domainMax <= domainMin) {

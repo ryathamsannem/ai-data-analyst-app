@@ -7,6 +7,7 @@ Rule-based evidence objects attached to analysis payloads — not LLM-generated.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 ReasoningBlockType = str  # contribution | leader_laggard_gap | trend_movement | evidence
@@ -22,6 +23,11 @@ MAX_REASONING_BLOCKS = 3
 REASON_TOP_SHARE = "Shows how much of the total this group represents."
 REASON_TOP3_CONCENTRATION = "Shows how concentrated the metric is among the top groups."
 REASON_LEADER_LAGGARD = "Shows the spread between the strongest and weakest group."
+REASON_RATE_HIGHEST = "Shows which group has the highest average rate for this metric."
+REASON_RATE_LOWEST = "Shows which group has the lowest average rate for this metric."
+REASON_RATE_SPREAD = (
+    "Shows the spread in percentage points between the highest and lowest group."
+)
 REASON_TREND_MOVEMENT = "Compares the latest period to the one before it."
 REASON_DEFAULT = "Based on the current grouped analysis."
 
@@ -40,6 +46,72 @@ def _fmt_pct(pct: float) -> str:
     if pct >= 10:
         return f"{round(pct)}%"
     return f"{pct:.1f}%"
+
+
+def _norm_metric_text(*parts: str) -> str:
+    return re.sub(r"\s+", " ", " ".join(p.strip() for p in parts if p)).lower()
+
+
+def _rate_metric_phrase(metric_label: str) -> str:
+    phrase = re.sub(r"^average\s+", "", str(metric_label or "").strip(), flags=re.I)
+    return (phrase or "rate").lower()
+
+
+def _fmt_rate_value(v: float) -> str:
+    """Format a rate/percent metric value (fractions or percentage points)."""
+    if math.isfinite(v) and 0 < abs(v) < 1.0:
+        return _fmt_pct(v * 100.0)
+    return _fmt_pct(v)
+
+
+def _fmt_pp_value(gap: float) -> str:
+    g = abs(gap)
+    if g >= 10:
+        return f"{round(g)}"
+    return f"{g:.1f}"
+
+
+def is_rate_percentage_reasoning_metric(
+    metric_label: str = "",
+    metric_column: str = "",
+) -> bool:
+    """
+    True when share-of-total / contribution wording is misleading
+    (rates, percentages, margins — not additive amounts).
+    """
+    col = str(metric_column or "").strip()
+    label = str(metric_label or "").strip()
+    try:
+        from intent_engine.column_resolve import is_existing_margin_metric_column
+
+        if col and is_existing_margin_metric_column(col):
+            return True
+    except Exception:
+        pass
+
+    combined = _norm_metric_text(col, label).replace("_", " ")
+    if not combined:
+        return False
+
+    additive_only = re.search(
+        r"\b(revenue|sales|spend|cost|units|count|amount|orders|headcount)\b",
+        combined,
+    )
+    if additive_only and "margin" not in combined:
+        if not re.search(r"\b(rate|pct|percent|percentage)\b", combined):
+            return False
+
+    if re.search(
+        r"\b(conversion|delinquency|defect|churn|bounce|click[\s-]*through|"
+        r"utilization|retention|discount)\s*rate\b",
+        combined,
+    ):
+        return True
+    if re.search(r"\b(rate|pct|percent|percentage|utilization|delinquency)\b", combined):
+        return True
+    if "margin" in combined:
+        return True
+    return False
 
 
 def _parse_pairs(rows: List[Dict[str, Any]]) -> List[Tuple[str, float]]:
@@ -174,6 +246,99 @@ def build_contribution_blocks(
             )
 
     return blocks
+
+
+def build_rate_comparison_blocks(
+    pairs: List[Tuple[str, float]],
+    *,
+    metric_label: str,
+    dimension_label: str,
+    cohort_n: Optional[int],
+    confidence_level: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Comparison wording for rate/percentage metrics (not share-of-total)."""
+    if len(pairs) < 2:
+        return []
+
+    sorted_pairs = sorted(pairs, key=lambda x: x[1], reverse=True)
+    leader_name, leader_val = sorted_pairs[0]
+    laggard_name, laggard_val = sorted_pairs[-1]
+    if leader_name == laggard_name:
+        return []
+
+    phrase = _rate_metric_phrase(metric_label)
+    dim = dimension_label.strip() or "category"
+    met = metric_label.strip() or "value"
+    conf = _block_confidence(cohort_n, base_level=confidence_level)
+
+    blocks: List[Dict[str, Any]] = [
+        _make_block(
+            block_type="leader_laggard_gap",
+            claim=(
+                f"{leader_name} has the highest average {phrase} "
+                f"at {_fmt_rate_value(leader_val)}."
+            ),
+            metric=met,
+            dimension=dim,
+            entity=leader_name,
+            value=leader_val,
+            comparison_value=laggard_val,
+            share_pct=None,
+            gap_ratio=None,
+            cohort_n=cohort_n,
+            confidence=conf,
+            reason=REASON_RATE_HIGHEST,
+        )
+    ]
+
+    if len(sorted_pairs) >= 3 and laggard_name != leader_name:
+        blocks.append(
+            _make_block(
+                block_type="leader_laggard_gap",
+                claim=(
+                    f"{laggard_name} has the lowest average {phrase} "
+                    f"at {_fmt_rate_value(laggard_val)}."
+                ),
+                metric=met,
+                dimension=dim,
+                entity=laggard_name,
+                value=laggard_val,
+                comparison_value=leader_val,
+                share_pct=None,
+                gap_ratio=None,
+                cohort_n=cohort_n,
+                confidence=conf,
+                reason=REASON_RATE_LOWEST,
+            )
+        )
+
+    spread = leader_val - laggard_val
+    if spread > 1e-12:
+        blocks.append(
+            _make_block(
+                block_type="leader_laggard_gap",
+                claim=(
+                    f"The spread between {leader_name} and {laggard_name} is "
+                    f"{_fmt_pp_value(spread)} percentage points."
+                ),
+                metric=met,
+                dimension=dim,
+                entity=leader_name,
+                value=leader_val,
+                comparison_value=laggard_val,
+                share_pct=None,
+                gap_ratio=(
+                    round(leader_val / laggard_val, 2)
+                    if laggard_val > 1e-12
+                    else None
+                ),
+                cohort_n=cohort_n,
+                confidence=conf,
+                reason=REASON_RATE_SPREAD,
+            )
+        )
+
+    return blocks[:MAX_REASONING_BLOCKS]
 
 
 def build_leader_laggard_gap_blocks(
@@ -320,6 +485,7 @@ def build_reasoning_blocks(
     *,
     chart_kind: str,
     metric_label: str = "value",
+    metric_column: str = "",
     dimension_label: str = "category",
     cohort_row_count: Optional[int] = None,
     confidence_level: Optional[str] = None,
@@ -342,6 +508,15 @@ def build_reasoning_blocks(
             confidence_level=confidence_level,
         )
         return trend_blocks[:1]
+
+    if is_rate_percentage_reasoning_metric(metric_label, metric_column):
+        return build_rate_comparison_blocks(
+            pairs,
+            metric_label=metric_label,
+            dimension_label=dimension_label,
+            cohort_n=cohort_row_count,
+            confidence_level=confidence_level,
+        )
 
     contrib = build_contribution_blocks(
         pairs,
@@ -392,6 +567,7 @@ def attach_reasoning_blocks_to_analysis(
         or str(analysis.get("metricColumn") or "").strip()
         or "value"
     )
+    metric_column = str(analysis.get("metricColumn") or "").strip()
     dimension = (
         str(analysis.get("categoryColumnDisplay") or "").strip()
         or str(analysis.get("categoryColumn") or "").strip()
@@ -407,6 +583,7 @@ def attach_reasoning_blocks_to_analysis(
         rows,
         chart_kind=ct,
         metric_label=metric,
+        metric_column=metric_column,
         dimension_label=dimension,
         cohort_row_count=cohort_n,
         confidence_level=str(analysis.get("insightConfidenceLevel") or ""),
