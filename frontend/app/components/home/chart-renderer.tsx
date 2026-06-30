@@ -112,6 +112,10 @@ import {
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
 import { HBarValueLabelListContent } from "@/app/components/home/hbar-value-label-list";
+import {
+  computeHBarOutsideLabelReservePx,
+  resolveHBarLabelPlacementMode,
+} from "@/lib/hbar-value-label-placement";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   BarChart,
@@ -1062,8 +1066,21 @@ function ChartRendererInner({
       marginLeft: hb.marginLeft,
       chartLayoutMode,
     });
+    const hBarLabelFontSize = compact ? 11 : 13;
+    const hBarPlacementMode = resolveHBarLabelPlacementMode({
+      pngCapture: pngCaptureMode,
+      detailLayout,
+    });
+    const hBarOutsideLabelReserve =
+      showHBarEndLabels && hBarPlacementMode !== "overview-live"
+        ? computeHBarOutsideLabelReservePx(
+            rData.map((r) => r.value),
+            (v) => barValueTickFormatter(v),
+            hBarLabelFontSize
+          )
+        : 0;
     const hBarRightMargin = showHBarEndLabels
-      ? Math.max(hmBalanced.marginRight, 52)
+      ? Math.max(hmBalanced.marginRight, 52) + hBarOutsideLabelReserve
       : hmBalanced.marginRight;
     const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
       chartKind: "bar_horizontal",
@@ -1171,9 +1188,11 @@ function ChartRendererInner({
                     value={labelProps.value}
                     viewBox={labelProps.viewBox}
                     formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
-                    fontSize={compact ? 11 : 13}
+                    fontSize={hBarLabelFontSize}
                     inlayFill={CHART_BAR_INLAY_LABEL_CSS}
                     outsideFill={CHART_BAR_VALUE_LABEL_CSS}
+                    placementMode={hBarPlacementMode}
+                    outsideLabelReservePx={hBarOutsideLabelReserve}
                   />
                 )}
               />

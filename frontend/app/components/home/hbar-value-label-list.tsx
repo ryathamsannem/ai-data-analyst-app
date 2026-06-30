@@ -5,6 +5,7 @@ import {
   resolveHBarPlotValueEndPx,
   HBAR_LABEL_INSIDE_PAD_PX,
   HBAR_LABEL_OUTSIDE_PAD_PX,
+  type HBarLabelPlacementMode,
 } from "@/lib/hbar-value-label-placement";
 
 type HBarValueLabelListContentProps = {
@@ -18,6 +19,8 @@ type HBarValueLabelListContentProps = {
   fontSize: number;
   inlayFill: string;
   outsideFill: string;
+  placementMode?: HBarLabelPlacementMode;
+  outsideLabelReservePx?: number;
 };
 
 export function HBarValueLabelListContent({
@@ -31,6 +34,8 @@ export function HBarValueLabelListContent({
   fontSize,
   inlayFill,
   outsideFill,
+  placementMode = "overview-live",
+  outsideLabelReservePx = 0,
 }: HBarValueLabelListContentProps) {
   const value = Number(valueRaw ?? NaN);
   if (!Number.isFinite(value)) return null;
@@ -51,6 +56,8 @@ export function HBarValueLabelListContent({
     plotValueEndPx,
     labelText: text,
     fontSizePx: fontSize,
+    mode: placementMode,
+    outsideLabelReservePx,
   });
   if (placement === "hidden") return null;
 

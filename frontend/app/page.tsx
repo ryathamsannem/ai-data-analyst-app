@@ -474,6 +474,10 @@ import {
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
 import { HBarValueLabelListContent } from "./components/home/hbar-value-label-list";
+import {
+  computeHBarOutsideLabelReservePx,
+  resolveOverviewInlineHBarPlacementMode,
+} from "@/lib/hbar-value-label-placement";
 import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
 import { DataPreviewQualitySummary } from "./components/home/data-preview-quality-summary";
 import { DataPreviewDatasetInsightsSummary } from "./components/home/data-preview-dataset-insights-summary";
@@ -4804,8 +4808,18 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         metricLabel: overviewMetricLabel,
         context: { pipeline: "overview", capture: pngCapture },
       });
+      const hBarLabelFontSize = 13;
+      const hBarPlacementMode = resolveOverviewInlineHBarPlacementMode(pngCapture);
+      const hBarOutsideReserve =
+        showBarEndLabels
+          ? computeHBarOutsideLabelReservePx(
+              chartRows.map((r) => r.value),
+              (v) => barValueTickFormatter(v),
+              hBarLabelFontSize
+            )
+          : 0;
       const hBarRightMargin = showBarEndLabels
-        ? Math.max(hbBalanced.marginRight, 52)
+        ? Math.max(hbBalanced.marginRight, 52) + hBarOutsideReserve
         : hbBalanced.marginRight;
       const hBarLiveMargins = pngCapture
         ? { top: plotMarginTop, bottom: OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR }
@@ -4901,9 +4915,11 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                       value={labelProps.value}
                       viewBox={labelProps.viewBox}
                       formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
-                      fontSize={13}
+                      fontSize={hBarLabelFontSize}
                       inlayFill={CHART_BAR_INLAY_LABEL_CSS}
                       outsideFill={CHART_BAR_VALUE_LABEL_CSS}
+                      placementMode={hBarPlacementMode}
+                      outsideLabelReservePx={hBarOutsideReserve}
                     />
                   )}
                 />

@@ -11,6 +11,10 @@ const chartRendererSrc = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "../app/components/home/chart-renderer.tsx"),
   "utf8"
 );
+const pageSrc = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "../app/page.tsx"),
+  "utf8"
+);
 
 describe("shouldShowHBarValueLabels", () => {
   const delinquencyRows = [
@@ -95,7 +99,49 @@ describe("ChartRenderer H-Bar inlay labels", () => {
 
   it("applies Overview-aligned right margin when H-Bar labels are shown", () => {
     expect(chartRendererSrc).toMatch(
-      /const hBarRightMargin = showHBarEndLabels[\s\S]*?Math\.max\(hmBalanced\.marginRight, 52\)/
+      /const hBarRightMargin = showHBarEndLabels[\s\S]*?Math\.max\(hmBalanced\.marginRight, 52\)[\s\S]*?hBarOutsideLabelReserve/
+    );
+  });
+
+  it("resolves detail-live placement for Charts tab and AI Insights detail layout", () => {
+    expect(chartRendererSrc).toContain("resolveHBarLabelPlacementMode");
+    expect(chartRendererSrc).toMatch(
+      /resolveHBarLabelPlacementMode\(\{[\s\S]*?detailLayout/
+    );
+    expect(chartRendererSrc).toMatch(
+      /hBarPlacementMode !== "overview-live"[\s\S]*?computeHBarOutsideLabelReservePx/
+    );
+    expect(chartRendererSrc).toMatch(
+      /placementMode=\{hBarPlacementMode\}/
+    );
+    expect(chartRendererSrc).toMatch(
+      /outsideLabelReservePx=\{hBarOutsideLabelReserve\}/
+    );
+  });
+
+  it("keeps export capture placement and reserve unchanged", () => {
+    expect(chartRendererSrc).toContain("computeHBarOutsideLabelReservePx");
+    expect(chartRendererSrc).toMatch(
+      /pngCapture: pngCaptureMode[\s\S]*?detailLayout/
+    );
+  });
+
+  it("Overview inline H-Bar uses safe outside labels on live cards", () => {
+    expect(pageSrc).toContain("resolveOverviewInlineHBarPlacementMode");
+    expect(pageSrc).toMatch(
+      /hBarPlacementMode = resolveOverviewInlineHBarPlacementMode\(pngCapture\)/
+    );
+    expect(pageSrc).toMatch(
+      /showBarEndLabels[\s\S]*?computeHBarOutsideLabelReservePx/
+    );
+    expect(pageSrc).not.toMatch(
+      /placementMode=\{pngCapture \? "export" : "overview-live"\}/
+    );
+    expect(pageSrc).toMatch(
+      /placementMode=\{hBarPlacementMode\}/
+    );
+    expect(pageSrc).toMatch(
+      /outsideLabelReservePx=\{hBarOutsideReserve\}/
     );
   });
 
