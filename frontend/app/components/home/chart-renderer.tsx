@@ -84,7 +84,12 @@ import {
   OVERVIEW_SCATTER_POINT_STROKE_PX,
 } from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
-import { formatRadialLegendEntry, resolveRadialPieEdgeProps } from "@/lib/radial-chart-format";
+import {
+  formatRadialLegendEntry,
+  orderRadialShareDisplayRows,
+  radialSliceStableColorIndex,
+  resolveRadialPieEdgeProps,
+} from "@/lib/radial-chart-format";
 import { shouldShowOverviewBarValueLabels, shouldShowHBarValueLabels, formatOverviewBarTopValueLabel } from "@/lib/overview-dashboard-export";
 import {
   HORIZONTAL_BAR_END_RADIUS,
@@ -106,6 +111,7 @@ import {
   type AxisPresentationPlan,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
+import { HBarValueLabelListContent } from "@/app/components/home/hbar-value-label-list";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   BarChart,
@@ -241,6 +247,14 @@ function ChartRendererInner({
   const rKind = presentationKind;
   const rAxes = axes;
   const isHistogram = rKind === "histogram";
+
+  const radialDisplayRows = useMemo(
+    () =>
+      rKind === "pie" || rKind === "donut"
+        ? orderRadialShareDisplayRows(rData)
+        : rData,
+    [rData, rKind]
+  );
 
   const formatCategoryTick = useMemo(
     () => (v: string | number) => formatChartAxisCategoryTick(String(v), compact),
@@ -972,7 +986,7 @@ function ChartRendererInner({
       >
         <PieChart margin={margins}>
           <Pie
-            data={rData}
+            data={radialDisplayRows}
             dataKey="value"
             nameKey="name"
             cx="50%"
@@ -999,10 +1013,15 @@ function ChartRendererInner({
               onInsightDrill(nm);
             }}
           >
-            {rData.map((_, i) => (
+            {radialDisplayRows.map((row, i) => (
               <Cell
-                key={`cell-${i}`}
-                fill={PIE_COLORS[i % PIE_COLORS.length]}
+                key={`cell-${String(row.name ?? i)}`}
+                fill={
+                  PIE_COLORS[
+                    radialSliceStableColorIndex(rData, String(row.name ?? "")) %
+                      PIE_COLORS.length
+                  ]
+                }
               />
             ))}
           </Pie>
@@ -1016,6 +1035,7 @@ function ChartRendererInner({
             labelFormatter={() => ""}
           />
           <Legend
+            itemSorter={null}
             wrapperStyle={{ fontSize: legendFontSize, paddingTop: legendPaddingTop }}
             iconSize={legendIconSize}
             iconType="circle"
@@ -1142,14 +1162,20 @@ function ChartRendererInner({
             {showHBarEndLabels ? (
               <LabelList
                 dataKey="value"
-                position="insideRight"
-                className="chart-bar-inlay-label"
-                formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
-                style={{
-                  fill: CHART_BAR_INLAY_LABEL_CSS,
-                  fontSize: compact ? 11 : 13,
-                  fontWeight: 600,
-                }}
+                content={(labelProps) => (
+                  <HBarValueLabelListContent
+                    x={labelProps.x}
+                    y={labelProps.y}
+                    width={labelProps.width}
+                    height={labelProps.height}
+                    value={labelProps.value}
+                    viewBox={labelProps.viewBox}
+                    formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                    fontSize={compact ? 11 : 13}
+                    inlayFill={CHART_BAR_INLAY_LABEL_CSS}
+                    outsideFill={CHART_BAR_VALUE_LABEL_CSS}
+                  />
+                )}
               />
             ) : null}
           </Bar>

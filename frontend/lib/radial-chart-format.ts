@@ -15,7 +15,7 @@ export const RADIAL_LEGEND_SEP = " · ";
 /** Tolerance when validating that share percentages sum to ~100%. */
 export const RADIAL_SHARE_SUM_TOLERANCE = 1.5;
 
-export function radialSliceTotal(rows: ChartRow[]): number {
+export function radialSliceTotal(rows: readonly ChartRow[]): number {
   return rows.reduce(
     (sum, row) =>
       sum + (Number.isFinite(row.value) ? Math.abs(Number(row.value)) : 0),
@@ -31,18 +31,18 @@ export function radialSharePercent(value: number, total: number): number | null 
   return (Math.abs(value) / total) * 100;
 }
 
-export function radialSharePercents(rows: ChartRow[]): number[] {
+export function radialSharePercents(rows: readonly ChartRow[]): number[] {
   const total = radialSliceTotal(rows);
   if (total <= 0) return [];
   return rows.map((row) => radialSharePercent(row.value, total) ?? 0);
 }
 
 /** Sum of computed share_pct values (should be ~100 for valid composition). */
-export function radialSharePercentSum(rows: ChartRow[]): number {
+export function radialSharePercentSum(rows: readonly ChartRow[]): number {
   return radialSharePercents(rows).reduce((sum, pct) => sum + pct, 0);
 }
 
-function radialNumericValues(rows: ChartRow[]): number[] {
+function radialNumericValues(rows: readonly ChartRow[]): number[] {
   return rows
     .map((row) => row.value)
     .filter((value): value is number => Number.isFinite(value));
@@ -51,7 +51,7 @@ function radialNumericValues(rows: ChartRow[]): number[] {
 /**
  * True when slice values are already percentage points (or fractions) that sum to ~100%.
  */
-export function radialRawValuesSumTo100Percent(rows: ChartRow[]): boolean {
+export function radialRawValuesSumTo100Percent(rows: readonly ChartRow[]): boolean {
   const values = radialNumericValues(rows);
   if (values.length < 2 || values.some((value) => value < 0)) return false;
   const sum = values.reduce((acc, value) => acc + value, 0);
@@ -71,7 +71,9 @@ export function radialRawValuesSumTo100Percent(rows: ChartRow[]): boolean {
  * False when slice values are rate metrics or %-points that do not form a whole
  * (e.g. conversion rates summing to >100%). In those cases show raw contributions.
  */
-export function radialShouldUseSharePercentDisplay(rows: ChartRow[]): boolean {
+export function radialShouldUseSharePercentDisplay(
+  rows: readonly ChartRow[]
+): boolean {
   const values = radialNumericValues(rows);
   if (values.length < 2) return false;
 
@@ -98,12 +100,12 @@ export function radialShouldUseSharePercentDisplay(rows: ChartRow[]): boolean {
 }
 
 /** Format slice values as % only when data is already normalized to ~100%. */
-export function radialShouldFormatValuesAsPercent(rows: ChartRow[]): boolean {
+export function radialShouldFormatValuesAsPercent(rows: readonly ChartRow[]): boolean {
   return radialRawValuesSumTo100Percent(rows);
 }
 
 export function radialShareDisplayAllowed(
-  rows: ChartRow[],
+  rows: readonly ChartRow[],
   title?: string | null,
   question?: string | null
 ): boolean {
@@ -162,7 +164,7 @@ function formatRadialSharePercentRounded(value: number, total: number): string |
 
 /** Legend / footer line: Category · 54% · 4.27M */
 export function formatRadialLegendEntry(
-  rows: ChartRow[],
+  rows: readonly ChartRow[],
   categoryName: string,
   ctx?: MetricFormatContext
 ): string {
@@ -188,7 +190,7 @@ export function formatRadialLegendEntry(
 
 /** Formatted slice total for radial footer chips. */
 export function formatRadialSliceTotalLabel(
-  rows: ChartRow[],
+  rows: readonly ChartRow[],
   ctx?: MetricFormatContext
 ): string {
   const total = radialSliceTotal(rows);
@@ -214,9 +216,91 @@ export function resolveRadialPieEdgeProps(args: {
   return { paddingAngle, cornerRadius };
 }
 
+/**
+ * Sort share/composition radial rows high-to-low for legend and slice display.
+ * Tie-break: category label ascending, then original row order.
+ */
+export function sortRadialDisplayRows(rows: readonly ChartRow[]): ChartRow[] {
+  return rows
+    .map((row, sourceIndex) => ({ row, sourceIndex }))
+    .sort((a, b) => {
+      const av = a.row.value;
+      const bv = b.row.value;
+      const aFin = Number.isFinite(av);
+      const bFin = Number.isFinite(bv);
+      if (aFin && bFin && av !== bv) return bv - av;
+      if (aFin !== bFin) return aFin ? -1 : 1;
+      const an = String(a.row.name ?? "").trim();
+      const bn = String(b.row.name ?? "").trim();
+      const labelCmp = an.localeCompare(bn, undefined, { sensitivity: "base" });
+      if (labelCmp !== 0) return labelCmp;
+      return a.sourceIndex - b.sourceIndex;
+    })
+    .map(({ row }) => row);
+}
+
+/** Order radial display rows for part-to-whole share charts; preserve source order otherwise. */
+export function orderRadialShareDisplayRows(rows: readonly ChartRow[]): ChartRow[] {
+  if (rows.length < 2 || !radialShouldUseSharePercentDisplay(rows)) {
+    return [...rows];
+  }
+  return sortRadialDisplayRows(rows);
+}
+
+/** Stable palette index from pre-sort row order (category name → original index). */
+export function radialSliceStableColorIndex(
+  sourceRows: readonly ChartRow[],
+  categoryName: string
+): number {
+  const name = categoryName.trim();
+  const idx = sourceRows.findIndex(
+    (row) => String(row.name ?? "").trim() === name
+  );
+  return idx >= 0 ? idx : 0;
+}
+
+export type RadialLegendPayloadItem = {
+  value: string;
+  type: "circle";
+  color: string;
+  id: string;
+};
+
+/**
+ * Explicit Recharts legend payload — preserves high-to-low display order.
+ * (Default Pie Legend sorts categories alphabetically by name.)
+ */
+export function buildRadialLegendPayload(
+  displayRows: readonly ChartRow[],
+  sourceRows: readonly ChartRow[],
+  colors: readonly string[]
+): RadialLegendPayloadItem[] {
+  return displayRows.map((row, i) => {
+    const name = String(row.name ?? "");
+    const colorIndex = radialSliceStableColorIndex(sourceRows, name);
+    return {
+      value: name,
+      type: "circle",
+      color: colors[colorIndex % colors.length] ?? colors[0] ?? "#6366f1",
+      id: `radial-legend-${name || i}`,
+    };
+  });
+}
+
+/** Visible legend label lines in slice/display order (feeds Recharts Legend formatter). */
+export function formatRadialVisibleLegendLines(
+  displayRows: readonly ChartRow[],
+  sourceRows: readonly ChartRow[],
+  ctx?: MetricFormatContext
+): string[] {
+  return displayRows.map((row) =>
+    formatRadialLegendEntry(sourceRows, String(row.name ?? ""), ctx)
+  );
+}
+
 /** Tooltip value line: Category · share · contribution when composition is valid. */
 export function formatRadialTooltipValue(
-  rows: ChartRow[],
+  rows: readonly ChartRow[],
   payload: ChartRow | undefined,
   rawValue: unknown,
   ctx?: MetricFormatContext

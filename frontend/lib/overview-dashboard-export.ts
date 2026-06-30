@@ -82,8 +82,8 @@ const VBAR_VALUE_LABEL_PRECISION_MAX_CATEGORIES = 8;
 const HBAR_VALUE_LABEL_MAX_CATEGORIES = 10;
 /** Skip H-Bar min/max ratio when categories are modest and compact labels fit. */
 const HBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES = 8;
-/** V-Bar top labels above bars — skewed totals do not block labels for few categories. */
-const VBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES = 4;
+/** V-Bar top labels above bars — skewed totals do not block labels for modest category counts. */
+const VBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES = 6;
 
 export type BarValueLabelOverlapRiskOptions = {
   orientation?: "hbar" | "vbar";
@@ -111,7 +111,7 @@ function barValueLabelMinBarRatioOverlapRisk(
 
 /**
  * True when value labels would likely clip, bleed, or crowd.
- * Orientation-aware: H-Bar relaxes ratio; V-Bar skips ratio for n ≤ 4.
+ * Orientation-aware: H-Bar relaxes ratio; V-Bar skips ratio for n ≤ 6.
  */
 export function barValueLabelOverlapRisk(
   values: readonly number[],

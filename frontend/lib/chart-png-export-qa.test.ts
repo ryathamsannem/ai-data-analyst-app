@@ -127,13 +127,15 @@ describe("shouldShowOverviewBarValueLabels", () => {
     expect(shouldShowOverviewBarValueLabels(rows, compact)).toBe(true);
   });
 
-  it("still applies min bar ratio for crowded V-Bar charts (5+ categories)", () => {
+  it("still applies min bar ratio for crowded V-Bar charts (7+ categories)", () => {
     const skewed = [
       { value: 900 },
       { value: 120 },
       { value: 80 },
       { value: 60 },
       { value: 40 },
+      { value: 35 },
+      { value: 30 },
     ];
     expect(shouldShowOverviewBarValueLabels(skewed, fmt)).toBe(false);
   });
@@ -185,5 +187,18 @@ describe("barValueLabelOverlapRisk", () => {
         { orientation: "vbar" }
       )
     ).toBe(false);
+  });
+
+  it("skips V-Bar min bar ratio for six-category retail profit breakdowns", () => {
+    const rows = [
+      { value: 40_427.72 },
+      { value: 35_785.33 },
+      { value: 32_601.15 },
+      { value: 27_926.09 },
+      { value: 27_841.95 },
+      { value: 18_626.26 },
+    ];
+    const compact = (v: number) => `${(v / 1_000).toFixed(1)}K`;
+    expect(shouldShowOverviewBarValueLabels(rows, compact)).toBe(true);
   });
 });

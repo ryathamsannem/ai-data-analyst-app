@@ -1,17 +1,24 @@
 import { describe, expect, it } from "vitest";
 import type { ChartRow } from "@/app/chart-types";
 import {
+  buildRadialLegendPayload,
   formatRadialLegendEntry,
   formatRadialSliceTotalLabel,
   formatRadialTooltipValue,
+  formatRadialVisibleLegendLines,
+  orderRadialShareDisplayRows,
   radialRawValuesSumTo100Percent,
   radialSharePercent,
   radialSharePercentSum,
   radialShouldFormatValuesAsPercent,
   radialShouldUseSharePercentDisplay,
+  radialSliceStableColorIndex,
   resolveRadialPieEdgeProps,
+  sortRadialDisplayRows,
   RADIAL_LEGEND_SEP,
 } from "@/lib/radial-chart-format";
+import { PIE_COLORS } from "@/lib/chart-palette";
+import { formatOverviewMiniInsightChips } from "@/lib/overview-dash-chart-insights";
 
 describe("radialSharePercent", () => {
   it("computes share_pct = value / total * 100", () => {
@@ -132,6 +139,115 @@ describe("formatRadialSliceTotalLabel", () => {
       chartRows: rows,
     };
     expect(formatRadialSliceTotalLabel(rows, ctx)).toBe("9,686 min");
+  });
+});
+
+describe("sortRadialDisplayRows", () => {
+  /** Region Profit Share — unsorted API order from audit example. */
+  const regionProfitShareRows: ChartRow[] = [
+    { name: "East", value: 50_600 },
+    { name: "North", value: 57_900 },
+    { name: "South", value: 54_000 },
+    { name: "West", value: 52_900 },
+  ];
+  const regionProfitCtx = {
+    metricLabel: "Profit",
+    chartTitle: "Region Profit Share",
+    presentationKind: "donut" as const,
+    chartRows: regionProfitShareRows,
+  };
+
+  it("sorts share rows high-to-low by value", () => {
+    const sorted = sortRadialDisplayRows(regionProfitShareRows);
+    expect(sorted.map((r) => r.name)).toEqual(["North", "South", "West", "East"]);
+  });
+
+  it("orders legend lines high-to-low for Region Profit Share", () => {
+    const sorted = orderRadialShareDisplayRows(regionProfitShareRows);
+    const legendLines = formatRadialVisibleLegendLines(
+      sorted,
+      regionProfitShareRows,
+      regionProfitCtx
+    );
+    expect(legendLines[0]).toMatch(/^North · 27%/);
+    expect(legendLines[1]).toMatch(/^South · 25%/);
+    expect(legendLines[2]).toMatch(/^West · 25%/);
+    expect(legendLines[3]).toMatch(/^East · 23%/);
+    expect(legendLines.map((line) => line.split(RADIAL_LEGEND_SEP)[0])).toEqual([
+      "North",
+      "South",
+      "West",
+      "East",
+    ]);
+  });
+
+  it("builds Recharts legend payload in display order with stable colors", () => {
+    const sorted = orderRadialShareDisplayRows(regionProfitShareRows);
+    const payload = buildRadialLegendPayload(
+      sorted,
+      regionProfitShareRows,
+      PIE_COLORS
+    );
+    expect(payload.map((item) => item.value)).toEqual([
+      "North",
+      "South",
+      "West",
+      "East",
+    ]);
+    expect(payload[0]?.color).toBe(PIE_COLORS[1]);
+    expect(payload[3]?.color).toBe(PIE_COLORS[0]);
+  });
+
+  it("qualifies Region Profit Share as a share donut for sorting", () => {
+    expect(radialShouldUseSharePercentDisplay(regionProfitShareRows)).toBe(true);
+  });
+
+  it("breaks equal-value ties by category label ascending", () => {
+    const rows: ChartRow[] = [
+      { name: "West", value: 25 },
+      { name: "Alpha", value: 25 },
+      { name: "Beta", value: 25 },
+    ];
+    expect(sortRadialDisplayRows(rows).map((r) => r.name)).toEqual([
+      "Alpha",
+      "Beta",
+      "West",
+    ]);
+  });
+
+  it("preserves source order for non-share radial metrics", () => {
+    const rateRows: ChartRow[] = [
+      { name: "A", value: 45 },
+      { name: "B", value: 52 },
+      { name: "C", value: 38 },
+    ];
+    expect(radialShouldUseSharePercentDisplay(rateRows)).toBe(false);
+    expect(orderRadialShareDisplayRows(rateRows).map((r) => r.name)).toEqual([
+      "A",
+      "B",
+      "C",
+    ]);
+  });
+
+  it("keeps largest/smallest/total insight chips correct after sorting", () => {
+    const chips = formatOverviewMiniInsightChips(regionProfitShareRows, {
+      chartTitle: "Region Profit Share",
+      presentationKind: "donut",
+    });
+    expect(chips.find((c) => c.key === "top")?.text).toMatch(
+      /^Largest: North · 27% · 57\.9K$/
+    );
+    expect(chips.find((c) => c.key === "lowest")?.text).toMatch(
+      /^Smallest: East · 23% · 50\.6K$/
+    );
+    expect(chips.find((c) => c.key === "gap")?.text).toBe("Total: 215.4K");
+  });
+
+  it("maps slice colors to pre-sort category index", () => {
+    expect(radialSliceStableColorIndex(regionProfitShareRows, "East")).toBe(0);
+    expect(radialSliceStableColorIndex(regionProfitShareRows, "North")).toBe(1);
+    expect(radialSliceStableColorIndex(regionProfitShareRows, "South")).toBe(2);
+    expect(radialSliceStableColorIndex(regionProfitShareRows, "West")).toBe(3);
   });
 });
 

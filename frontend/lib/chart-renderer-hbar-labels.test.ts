@@ -72,26 +72,24 @@ describe("ChartRenderer H-Bar inlay labels", () => {
     );
   });
 
-  it("renders LabelList insideRight when showHBarEndLabels is true", () => {
+  it("renders LabelList with per-bar H-Bar placement content when showHBarEndLabels is true", () => {
     expect(chartRendererSrc).toMatch(
-      /if \(shouldRenderHorizontal\)[\s\S]*?showHBarEndLabels\s*\?\s*\([\s\S]*?position="insideRight"/
+      /if \(shouldRenderHorizontal\)[\s\S]*?showHBarEndLabels\s*\?\s*\([\s\S]*?HBarValueLabelListContent/
     );
   });
 
-  it("H-Bar LabelList uses barValueTickFormatter not barTopLabelFormatter", () => {
+  it("H-Bar LabelList uses barValueTickFormatter via HBarValueLabelListContent", () => {
     const hBarLabelList = chartRendererSrc.match(
       /showHBarEndLabels\s*\?\s*\([\s\S]*?<LabelList[\s\S]*?\/>/
     )?.[0];
     expect(hBarLabelList).toBeDefined();
-    expect(hBarLabelList).toMatch(
-      /formatter=\{\(v\) => barValueTickFormatter/
-    );
+    expect(hBarLabelList).toMatch(/barValueTickFormatter/);
     expect(hBarLabelList).not.toContain("barTopLabelFormatter");
   });
 
   it("uses chart-bar-inlay-label token and CHART_BAR_INLAY_LABEL_CSS", () => {
     expect(chartRendererSrc).toMatch(
-      /showHBarEndLabels[\s\S]*?className="chart-bar-inlay-label"[\s\S]*?CHART_BAR_INLAY_LABEL_CSS/
+      /showHBarEndLabels[\s\S]*?HBarValueLabelListContent[\s\S]*?CHART_BAR_INLAY_LABEL_CSS/
     );
   });
 

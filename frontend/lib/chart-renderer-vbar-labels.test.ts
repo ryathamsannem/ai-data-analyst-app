@@ -13,6 +13,10 @@ const chartRendererSrc = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "../app/components/home/chart-renderer.tsx"),
   "utf8"
 );
+const pageSrc = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "../app/page.tsx"),
+  "utf8"
+);
 
 describe("ChartRenderer V-Bar top labels", () => {
   const defectRows = [
@@ -110,5 +114,15 @@ describe("ChartRenderer V-Bar top labels", () => {
   it("V-Bar gate is not shared with H-Bar showHBarEndLabels", () => {
     expect(chartRendererSrc).toContain("showHBarEndLabels");
     expect(chartRendererSrc).not.toContain("allowBarValueLabels");
+  });
+
+  it("Overview inline V-Bar applies top label headroom when labels are enabled", () => {
+    expect(pageSrc).toContain("VBAR_TOP_LABEL_HEADROOM_PX");
+    expect(pageSrc).toMatch(
+      /vBarTopLabelHeadroom[\s\S]*?VBAR_TOP_LABEL_HEADROOM_PX/
+    );
+    expect(pageSrc).toMatch(
+      /top:\s*Math\.max\([\s\S]*?vBarTopLabelHeadroom/
+    );
   });
 });

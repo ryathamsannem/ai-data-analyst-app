@@ -192,6 +192,7 @@ import {
   getSharedDetailLayoutMetrics,
   resolveSharedDetailPlotHeight,
   timelineTypeToChartKind,
+  VBAR_TOP_LABEL_HEADROOM_PX,
 } from "@/lib/chart-layout-config";
 import {
   chartsTabDesc,
@@ -472,6 +473,7 @@ import {
 } from "@/lib/export-tab-ui";
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
+import { HBarValueLabelListContent } from "./components/home/hbar-value-label-list";
 import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
 import { DataPreviewQualitySummary } from "./components/home/data-preview-quality-summary";
 import { DataPreviewDatasetInsightsSummary } from "./components/home/data-preview-dataset-insights-summary";
@@ -4890,14 +4892,20 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               {showBarEndLabels ? (
                 <LabelList
                   dataKey="value"
-                  position="insideRight"
-                  className="chart-bar-inlay-label"
-                  formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
-                  style={{
-                    fill: CHART_BAR_INLAY_LABEL_CSS,
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
+                  content={(labelProps) => (
+                    <HBarValueLabelListContent
+                      x={labelProps.x}
+                      y={labelProps.y}
+                      width={labelProps.width}
+                      height={labelProps.height}
+                      value={labelProps.value}
+                      viewBox={labelProps.viewBox}
+                      formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                      fontSize={13}
+                      inlayFill={CHART_BAR_INLAY_LABEL_CSS}
+                      outsideFill={CHART_BAR_VALUE_LABEL_CSS}
+                    />
+                  )}
                 />
               ) : null}
             </Bar>
@@ -5153,8 +5161,15 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         vBarLiveOuter && showBarEndLabels
           ? Math.max(vBarLiveOuter.marginRight, 52)
           : vBarLiveOuter?.marginRight;
+      const vBarTopLabelHeadroom =
+        showBarEndLabels && !isHist
+          ? VBAR_TOP_LABEL_HEADROOM_PX
+          : 0;
       const plotMargin = {
-        top: vBarLiveMargins?.top ?? plotMarginTop,
+        top: Math.max(
+          vBarLiveMargins?.top ?? plotMarginTop,
+          vBarTopLabelHeadroom
+        ),
         right: pngCapture
           ? showBarEndLabels
             ? 48
