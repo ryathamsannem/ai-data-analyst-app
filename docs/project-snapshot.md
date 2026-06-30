@@ -176,7 +176,8 @@ Status key: **Stable** = baseline-tested, do not redesign casually · **Experime
 | Data Preview (search, sort, pagination, copy) | **Stable** | Client-side on loaded preview rows only |
 | AI Insights Q&A + visualization | **Stable** | Deterministic viz + Claude narrative |
 | Chart–question alignment gates | **Stable** | Prevents wrong chart for outlier / stale turn |
-| Charts tab timeline + session preview | **Stable** | ≤860px viewport |
+| Charts tab timeline + session preview | **Stable** | ≤860px viewport; chart polish parity live + PNG |
+| Chart cross-surface visual parity | **Stable** | V/H-Bar, donut, line, area, histogram, scatter — audit clean June 29 |
 | Correlation / relationship scatter routing | **Stable** | Jun 2026 fix; schema-driven pair resolution |
 | Pearson + Spearman + strength bands | **Stable** | `correlation_analysis.py` |
 | Confidence scoring (component model) | **Stable** | Backend + frontend; no fixed 38/52 floors |
@@ -189,8 +190,8 @@ Status key: **Stable** = baseline-tested, do not redesign casually · **Experime
 | Intent engine metadata on `/ask` | **Experimental** | `analysis.intent`; parallel to chart pipeline |
 | Intent debug panel | **Experimental** | `NEXT_PUBLIC_AI_INSIGHTS_DEBUG` |
 | Executive insight ranking (category bar) | **Stable** | Not used for scatter (relationship cards instead) |
-| Export tab PDF download | **Experimental** | Works; polish / contract finalization pending |
-| Per-insight PDF export | **Experimental** | Gated; same engine as Export tab |
+| Export tab PDF download | **Stable** | Works; chart embed aligned; optional export-contract hardening only |
+| Per-insight PDF export | **Stable** | Gated; same engine as Export tab |
 | Geographic scope routing | **Stable** | `geographic_scope.py` + tests |
 | Categorical outlier narrative | **Stable** | Backend + frontend unsupported paths |
 | Conversation follow-up context | **Stable** | Sidecar on `/ask` |
@@ -203,7 +204,7 @@ Status key: **Stable** = baseline-tested, do not redesign casually · **Experime
 
 | Issue | Severity | Suspected root cause |
 |-------|----------|----------------------|
-| **Export/PDF not product-finalized** | Medium | Documented next phase; spacing, appendix, and contract validation still evolving ([`PDF_EXPORT_STABLE_BASELINE.md`](../PDF_EXPORT_STABLE_BASELINE.md)) |
+| **Export/PDF not product-finalized** | Low | Narrative/PDF arc complete; optional axis-plan tick hardening only ([`chart-polish-final-snapshot.md`](./current-snapshot/chart-polish-final-snapshot.md)) |
 | **`/preview` ignores dashboard filters** | Medium | `POST /preview` returns raw loaded rows; Data Preview search/sort only sees fetched window, not filtered cohort |
 | **Single-process in-memory `df`** | Medium | No per-user/session isolation; server restart loses data; not horizontally scalable |
 | **`main.py` size (~14k lines)** | Low (maint.) | Chart routing + prompts + upload in one file; `intent_engine` only partially extracted |
@@ -223,6 +224,7 @@ Status key: **Stable** = baseline-tested, do not redesign casually · **Experime
 - `customer count` → `customers` synonym resolution
 - Growth-rate correlation marked `unsupported_analysis` with 0 confidence
 - Generic Revenue Share/Gap cards on scatter relationship questions
+- **Chart visual polish** — V/H-Bar labels, donut, line/area labels, PNG density, signed bars, close-value axes (289 vitest pass; audit clean)
 
 ---
 
@@ -330,6 +332,7 @@ See **[`file-map.md`](file-map.md)** for the full path → purpose → dependenc
 | **Intent engine Phase 1** | `analysis.intent` on API; facades; golden tests | `resolve_analysis_intent.py`, tests |
 | **Executive ranking** | Category bar insight cards | `executive_insight_ranking.py` |
 | **Geographic QA** | Scope + single-period trend unsupported tests | `geographic_scope.py`, tests |
+| **Chart visual polish** | Cross-surface labels, axes, PNG density, signed bars, close-value readability | `overview-bar-value-domain.ts`, `cartesian-chart-decisions.ts`, `chart-png-export-layout.ts`, `radial-chart-format.ts` |
 
 ---
 
@@ -337,7 +340,8 @@ See **[`file-map.md`](file-map.md)** for the full path → purpose → dependenc
 
 | Item | Description |
 |------|-------------|
-| **Export/PDF finalization** | Product polish, validation matrix, regression on capture refs |
+| **Optional chart export hardening** | Axis plan explicit ticks; overview export domain/tick parity validation — low risk |
+| **Release-readiness validation** | Optional browser spot-check per chart family (Overview → PNG → PDF) |
 | **Intent engine extraction** | Move more of `compute_visualization_for_question` branches into `intent_engine/` |
 | **Filter-aware preview** | Optional `POST /preview` with same filters as dashboard |
 | **API base URL config** | Environment-driven backend URL for deployment |
@@ -350,12 +354,13 @@ See **[`file-map.md`](file-map.md)** for the full path → purpose → dependenc
 
 ## 8. Suggested next priorities
 
-1. **Export/PDF finalization** — Run regression checklist in [`PDF_EXPORT_STABLE_BASELINE.md`](../PDF_EXPORT_STABLE_BASELINE.md); verify insight + session capture at 860px; do not break alignment gates.
-2. **Correlation QA on real customer datasets** — Verify pair resolution for column naming variants not in fixtures.
-3. **Filter-aware Data Preview (optional)** — If product needs cohort-consistent row inspection.
-4. **Intent logging consistency** — Align `detected_intent` logs with `analysis.intent.primaryGoal` for easier debugging.
-5. **Expand `unittest` coverage** — Add golden questions for new chart routes without broad refactors.
-6. **Deployment hardening** — Env for API URL, CORS, and dataset session strategy.
+1. **Release-readiness validation** — Spot-check one chart per family on Overview live → PNG → PDF; verify alignment gates still hold.
+2. **Optional chart export hardening** — Only if tightening contracts before ship ([`chart-polish-final-snapshot.md`](./current-snapshot/chart-polish-final-snapshot.md) §5).
+3. **Correlation QA on real customer datasets** — Verify pair resolution for column naming variants not in fixtures.
+4. **Filter-aware Data Preview (optional)** — If product needs cohort-consistent row inspection.
+5. **Intent logging consistency** — Align `detected_intent` logs with `analysis.intent.primaryGoal` for easier debugging.
+6. **Expand `unittest` coverage** — Add golden questions for new chart routes without broad refactors.
+7. **Deployment hardening** — Env for API URL, CORS, and dataset session strategy.
 
 ---
 

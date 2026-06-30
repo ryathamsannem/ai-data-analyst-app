@@ -1,13 +1,13 @@
 # Charts — Stable Summary (Standard Baseline)
 
-**Status:** STANDARD / STABLE baseline (May 2026)  
-**Scope:** `activeTab === "charts"` only — reflects **current working code** after redesign, timeline polish, and reverted over-spacing experiments.
+**Status:** STANDARD / STABLE baseline (updated June 29, 2026)  
+**Scope:** `activeTab === "charts"` only — reflects **current working code** after redesign, timeline polish, chart visual polish pass, and final consistency audit.
 
-**Related:** [`AGENTS.md`](AGENTS.md) · [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md)
+**Related:** [`AGENTS.md`](AGENTS.md) · [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`docs/current-snapshot/chart-polish-final-snapshot.md`](docs/current-snapshot/chart-polish-final-snapshot.md)
 
-**Recovery use:** Pre–Export/PDF enhancement baseline. Extend in place; do not broad-redesign.
+**Recovery use:** Chart polish baseline at `DEV` / `16526f0`. Extend in place; do not broad-redesign.
 
-**Export/PDF:** Charts supplies session PNG/PDF capture via `chartCaptureSessionRef` — Export tab polish is **pending**.
+**Export/PDF:** Charts supplies session PNG/PDF capture via `chartCaptureSessionRef` — chart embed visually aligned with on-screen styling; optional export-contract hardening only (see chart polish snapshot).
 
 ---
 
@@ -259,7 +259,7 @@ Distinct from compact **Why this chart** strip above the plot.
 |------|--------|
 | Overview | Auto charts → timeline |
 | AI Insights | `pushAIChart` after `/ask` |
-| Export | Session PDF — **Export UI pending polish** |
+| Export | Session PDF — chart capture aligned with on-screen styling |
 
 **No** top dataset metadata card on Charts tab.
 
@@ -305,7 +305,26 @@ Distinct from compact **Why this chart** strip above the plot.
 6. **Horizontal bars stay horizontal**
 7. **Tight** metadata-to-plot spacing
 8. PNG + session PDF: `chartCaptureSessionRef`, `insightMode=false`
+9. **Chart polish parity** — labels, axes, PNG density, signed bars per [`chart-polish-final-snapshot.md`](docs/current-snapshot/chart-polish-final-snapshot.md)
 
 ---
 
-*Last updated: May 2026 — stable baseline before Export/PDF enhancements.*
+## 17. Chart polish parity (June 2026)
+
+Cross-surface status after major polish pass — **all families pass** final audit:
+
+| Concern | Owner module | Charts tab status |
+|---------|--------------|-------------------|
+| H-Bar labels (incl. small-bar outside) | `chart-renderer.tsx`, `horizontal-bar-visual.ts` | ✅ Live + PNG |
+| V-Bar / histogram domains | `cartesian-chart-decisions.ts` | ✅ Live + PNG |
+| Line / area value labels | `chart-renderer-line-labels` | ✅ Live + PNG |
+| PNG density (`chartsPng`) | `chart-png-export-layout.ts` | ✅ Standalone export |
+| Signed / negative bars | `ReferenceLine` at 0 + domain includes zero | ✅ |
+| Close-value axes | `overview-bar-value-domain.ts` | ✅ Focused rates / bounded scores |
+| PDF embed | `chart-presentation-profile.ts` | ✅ Centered capture |
+
+**Tests:** 289 chart-consistency vitest cases pass (see chart polish snapshot §6).
+
+---
+
+*Last updated: June 29, 2026 — chart polish baseline at `16526f0`.*

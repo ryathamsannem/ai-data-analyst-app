@@ -1,7 +1,7 @@
 # AI Data Analyst App — Project Snapshot
 
-**Snapshot date:** June 2026  
-**Purpose:** Concise orientation for developers and stakeholders. For deep UI/chart rules, see `AGENTS.md` and the `*_STABLE_SUMMARY.md` baseline docs.
+**Snapshot date:** June 29, 2026  
+**Purpose:** Concise orientation for developers and stakeholders. For deep UI/chart rules, see `AGENTS.md` and the `*_STABLE_SUMMARY.md` baseline docs. Chart polish detail: [`docs/current-snapshot/chart-polish-final-snapshot.md`](docs/current-snapshot/chart-polish-final-snapshot.md).
 
 ---
 
@@ -161,7 +161,8 @@ Export tab or “Export this insight (PDF)”
 | Executive insights | Data-driven KPI cards, gap % on spread cards, numbered executive briefs |
 | Narrative polish | Thousands separators, ROAS terminology, dual-metric ROAS lead in summary |
 | Smart chart read | Single aligned “why this chart” + signal cards |
-| Export / PDF | Section toggles, chart capture, executive summary, appendix |
+| Export / PDF | Section toggles, chart capture, executive summary, appendix — chart embed aligned with on-screen styling |
+| Chart visual polish | V/H-Bar labels, donut, line/area labels, PNG density, signed bars, close-value axes (June 2026) |
 | Theming | Light/dark UI; PDF always print-light |
 
 ---
