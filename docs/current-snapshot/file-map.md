@@ -1,6 +1,6 @@
 # Chart-Related File Map
 
-**Snapshot:** June 27, 2026 (updated after Overview Pass **5C.5** — H-Bar/V-Bar parity frozen)
+**Snapshot:** June 28, 2026 (final release snapshot — H-Bar/V-Bar parity frozen)
 
 Paths relative to repo root.
 
@@ -60,13 +60,21 @@ Paths relative to repo root.
 | `frontend/lib/resolved-dataset-type-label.ts` | Frontend dataset-type label resolution |
 | `frontend/app/pdf-report.ts` | `datasetKindLabel` |
 
-### Tests (5A.x → 5C.x)
+### Tests (5A.x → 5C.x + 15-domain + final snapshot)
 | File | Covers |
 |------|--------|
-| `backend/tests/test_cross_domain_mapping_qa.py` | Cross-domain mapping/domain/label QA |
+| `backend/tests/test_cross_domain_15_overview_validation.py` | 15-domain Overview probes, scatter policy, AI summary inputs |
+| `backend/tests/test_cross_domain_upload_1k.py` | 1k upload + mapping confidence per domain |
+| `backend/tests/test_marketing_campaigns_mapping_dashboard.py` | Marketing revenue confidence + dashboard |
+| `backend/tests/test_upload_mapping_edge_cases.py` | Empty/ambiguous/high-cardinality upload edge cases |
 | `backend/tests/test_overview_banking_gold_dashboard.py` | Banking gold default charts (5A / 5A.1) |
 | `backend/tests/test_overview_banking_financial_services.py` | Banking FS label/cadence/scatter (5A.2) |
+| `backend/tests/test_overview_hr_gold_dashboard.py` | HR gold + age-band demotion |
 | `backend/tests/test_overview_retail_gold_dashboard.py` | Retail default charts |
+| `backend/tests/test_auto_dashboard_opportunities.py` | Showcase diversity/count regression |
+| `backend/tests/test_auto_dashboard_showcase_regression.py` | Showcase scatter payload regression |
+| `backend/tests/intent_engine/test_banking_utilization_routing.py` | Banking utilization suggested question |
+| `backend/tests/test_cross_domain_mapping_qa.py` | Cross-domain mapping/domain/label QA |
 | `backend/tests/test_executive_kpi_domains.py` | Executive KPI domain mapping |
 | `frontend/lib/overview-bar-value-domain.test.ts` | Zero baseline, rate caps, **85% utilization cap** |
 | `frontend/lib/horizontal-bar-visual.test.ts` | H-Bar radius/maxSize/category gap/band fill |

@@ -51,7 +51,16 @@ describe("shouldShowPngBarEndValueLabels", () => {
 describe("shouldShowOverviewBarValueLabels", () => {
   const fmt = (v: number) => String(v);
 
-  it("hides labels when there are more than three categories", () => {
+  it("hides labels when there are too many categories for overlap safety", () => {
+    expect(
+      shouldShowOverviewBarValueLabels(
+        Array.from({ length: 9 }, (_, i) => ({ value: 4.05 + i * 0.01 })),
+        fmt
+      )
+    ).toBe(false);
+  });
+
+  it("allows labels for five close percent values when metric is rate-like", () => {
     expect(
       shouldShowOverviewBarValueLabels(
         [
@@ -61,9 +70,27 @@ describe("shouldShowOverviewBarValueLabels", () => {
           { value: 4.05 },
           { value: 4.05 },
         ],
-        fmt
+        (v) => `${v}%`,
+        { metricCtx: { metricLabel: "Defect Rate", chartTitle: "Defect Rate by Shift" } }
       )
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it("enables labels for fraction-scale defect rate by shift (session/PNG parity)", () => {
+    const rows = [
+      { value: 0.023 },
+      { value: 0.025 },
+      { value: 0.025 },
+    ];
+    const fmt = (v: number) => `${(v * 100).toFixed(1)}%`;
+    expect(
+      shouldShowOverviewBarValueLabels(rows, fmt, {
+        metricCtx: {
+          metricLabel: "Defect Rate",
+          chartTitle: "Defect Rate by Shift",
+        },
+      })
+    ).toBe(true);
   });
 
   it("hides labels for long currency strings even with three categories", () => {
@@ -89,10 +116,58 @@ describe("shouldShowOverviewBarValueLabels", () => {
       )
     ).toBe(true);
   });
+
+  it("allows skewed V-Bar totals when category count is small (HR bonus pattern)", () => {
+    const rows = [
+      { value: 5_463_724 },
+      { value: 1_993_809 },
+      { value: 1_719_734 },
+    ];
+    const compact = (v: number) => `${(v / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M`;
+    expect(shouldShowOverviewBarValueLabels(rows, compact)).toBe(true);
+  });
+
+  it("still applies min bar ratio for crowded V-Bar charts (7+ categories)", () => {
+    const skewed = [
+      { value: 900 },
+      { value: 120 },
+      { value: 80 },
+      { value: 60 },
+      { value: 40 },
+      { value: 35 },
+      { value: 30 },
+    ];
+    expect(shouldShowOverviewBarValueLabels(skewed, fmt)).toBe(false);
+  });
+
+  it("renders defect rate fractions as percent labels", () => {
+    const rows = [
+      { value: 0.025 },
+      { value: 0.025 },
+      { value: 0.023 },
+    ];
+    const pctFmt = (v: number) =>
+      v <= 1 ? `${(v * 100).toFixed(1)}%` : `${v}%`;
+    expect(
+      shouldShowOverviewBarValueLabels(rows, pctFmt, {
+        metricCtx: { metricLabel: "Defect Rate", chartTitle: "Defect Rate by Shift" },
+      })
+    ).toBe(true);
+  });
 });
 
 describe("barValueLabelOverlapRisk", () => {
-  it("flags short bars relative to the longest bar", () => {
+  it("flags short bars relative to the longest bar (V-Bar, crowded)", () => {
+    expect(
+      barValueLabelOverlapRisk(
+        [183_916_971, 132_661_579, 90_000_000, 80_000_000, 70_000_000],
+        (v) => String(v),
+        { orientation: "vbar" }
+      )
+    ).toBe(true);
+  });
+
+  it("flags long formatted labels regardless of orientation", () => {
     expect(
       barValueLabelOverlapRisk([183_916_971, 132_661_579], (v) => `$${v}`)
     ).toBe(true);
@@ -102,5 +177,28 @@ describe("barValueLabelOverlapRisk", () => {
     expect(barValueLabelOverlapRisk([23, 22, 21], (v) => String(v))).toBe(
       false
     );
+  });
+
+  it("skips V-Bar min bar ratio for n <= 4", () => {
+    expect(
+      barValueLabelOverlapRisk(
+        [5_463_724, 1_993_809, 1_719_734],
+        (v) => `${(v / 1_000_000).toFixed(1)}M`,
+        { orientation: "vbar" }
+      )
+    ).toBe(false);
+  });
+
+  it("skips V-Bar min bar ratio for six-category retail profit breakdowns", () => {
+    const rows = [
+      { value: 40_427.72 },
+      { value: 35_785.33 },
+      { value: 32_601.15 },
+      { value: 27_926.09 },
+      { value: 27_841.95 },
+      { value: 18_626.26 },
+    ];
+    const compact = (v: number) => `${(v / 1_000).toFixed(1)}K`;
+    expect(shouldShowOverviewBarValueLabels(rows, compact)).toBe(true);
   });
 });

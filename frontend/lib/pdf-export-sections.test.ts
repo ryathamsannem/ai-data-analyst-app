@@ -27,4 +27,39 @@ describe("pdf-report optional sections", () => {
       /analystPdf && input\.includes\.includeTechnicalAppendix/
     );
   });
+
+  it("places sample data appendix after visualization", () => {
+    const vizIdx = pdfReportSrc.indexOf('sectionTitle("Visualization")');
+    const previewIdx = pdfReportSrc.indexOf('sectionTitle("Appendix: Sample data")');
+    const drawPreviewIdx = pdfReportSrc.indexOf("drawDataPreviewSection();");
+    expect(vizIdx).toBeGreaterThan(-1);
+    expect(previewIdx).toBeGreaterThan(-1);
+    expect(drawPreviewIdx).toBeGreaterThan(vizIdx);
+    expect(pdfReportSrc.indexOf("drawDataPreviewSection();", vizIdx)).toBe(
+      drawPreviewIdx
+    );
+  });
+
+  it("dedupes KPI dashboard cards against the executive snapshot strip", () => {
+    expect(pdfReportSrc).toContain("shouldRenderPdfKpiDashboardSection");
+    expect(pdfReportSrc).toMatch(
+      /if \(shouldRenderPdfKpiDashboardSection\(input\.kpiCards\)\)/
+    );
+  });
+
+  it("uses executive-friendly technical appendix title and page-break guard", () => {
+    expect(pdfReportSrc).toContain('sectionTitle(PDF_TECHNICAL_APPENDIX_SECTION_TITLE)');
+    expect(pdfReportSrc).toContain("shouldStartTechnicalAppendixOnNewPage");
+    expect(pdfReportSrc).not.toMatch(
+      /includeTechnicalAppendix[\s\S]{0,400}doc\.addPage\(\);\s*y = contentTop0;\s*sectionTitle\("Technical appendix"\)/
+    );
+    const dataQualityIdx = pdfReportSrc.indexOf(
+      "if (input.includes.includeDataQuality)"
+    );
+    const appendixIdx = pdfReportSrc.indexOf(
+      "if (input.includes.includeTechnicalAppendix)"
+    );
+    expect(dataQualityIdx).toBeGreaterThan(-1);
+    expect(appendixIdx).toBeGreaterThan(dataQualityIdx);
+  });
 });

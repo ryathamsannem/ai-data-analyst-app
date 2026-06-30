@@ -84,7 +84,16 @@ import {
   OVERVIEW_SCATTER_POINT_STROKE_PX,
 } from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
-import { formatRadialLegendEntry, resolveRadialPieEdgeProps } from "@/lib/radial-chart-format";
+import {
+  buildRadialLegendPayload,
+  formatRadialTooltipValue,
+  formatRadialVisibleLegendLines,
+  orderRadialShareDisplayRows,
+  resolveRadialSliceFill,
+  resolveRadialPieEdgeProps,
+  truncateRadialLegendLine,
+} from "@/lib/radial-chart-format";
+import { shouldShowOverviewBarValueLabels, shouldShowHBarValueLabels, formatOverviewBarTopValueLabel } from "@/lib/overview-dashboard-export";
 import {
   HORIZONTAL_BAR_END_RADIUS,
   HORIZONTAL_BAR_STACKED_MAX_SIZE,
@@ -97,12 +106,19 @@ import { buildChartCartesianTooltipHandlers, chartTooltipMetricLabel, formatChar
 import { type MetricFormatContext } from "@/lib/metric-value-format";
 import {
   CHART_AXIS_CSS,
+  CHART_BAR_INLAY_LABEL_CSS,
+  CHART_BAR_VALUE_LABEL_CSS,
   chartLayoutWidthKey,
 } from "@/lib/chart-axis-theme";
 import {
   type AxisPresentationPlan,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
+import { HBarValueLabelListContent } from "@/app/components/home/hbar-value-label-list";
+import {
+  computeHBarOutsideLabelReservePx,
+  resolveHBarLabelPlacementMode,
+} from "@/lib/hbar-value-label-placement";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   BarChart,
@@ -123,6 +139,7 @@ import {
   CartesianGrid,
   ScatterChart,
   Scatter,
+  LabelList,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -186,6 +203,8 @@ export type ChartRendererViz = {
   interaction?: {
     drillDimensions?: { role: string; column: string; label: string }[];
   } | null;
+  /** Full chart title for metric formatting gates (session / insight charts). */
+  chartTitle?: string | null;
 } | null;
 
 export type ChartRendererProps = {
@@ -236,6 +255,14 @@ function ChartRendererInner({
   const rAxes = axes;
   const isHistogram = rKind === "histogram";
 
+  const radialDisplayRows = useMemo(
+    () =>
+      rKind === "pie" || rKind === "donut"
+        ? orderRadialShareDisplayRows(rData)
+        : rData,
+    [rData, rKind]
+  );
+
   const formatCategoryTick = useMemo(
     () => (v: string | number) => formatChartAxisCategoryTick(String(v), compact),
     [compact]
@@ -254,10 +281,10 @@ function ChartRendererInner({
   const metricTooltipCtx = useMemo(
     (): MetricFormatContext => ({
       metricLabel: rAxes.valueAxis,
-      chartTitle: rAxes.valueAxis,
+      chartTitle: rViz?.chartTitle?.trim() || rAxes.valueAxis,
       presentationKind: rKind,
     }),
-    [rAxes.valueAxis, rKind]
+    [rAxes.valueAxis, rViz?.chartTitle, rKind]
   );
 
   // Metric-aware bar value ticks: currency/large numbers compact to K/M and
@@ -265,6 +292,12 @@ function ChartRendererInner({
   const barValueTickFormatter = useMemo(
     () => (tick: number) =>
       formatOverviewBarValueAxisTick(tick, rData, metricTooltipCtx),
+    [rData, metricTooltipCtx]
+  );
+
+  const barTopLabelFormatter = useMemo(
+    () => (value: number) =>
+      formatOverviewBarTopValueLabel(value, rData, metricTooltipCtx),
     [rData, metricTooltipCtx]
   );
 
@@ -409,6 +442,23 @@ function ChartRendererInner({
     categoryAxisBottomMargin,
   } = cartesianLayout;
 
+  const shouldRenderHorizontal = cartesianUsesHorizontalPlot(rKind, categoryPlan);
+
+  const showHBarEndLabels =
+    shouldRenderHorizontal &&
+    !isHistogram &&
+    shouldShowHBarValueLabels(rData, barValueTickFormatter, {
+      metricCtx: metricTooltipCtx,
+    });
+
+  const showVBarTopLabels =
+    rKind === "bar" &&
+    !shouldRenderHorizontal &&
+    !isHistogram &&
+    shouldShowOverviewBarValueLabels(rData, barTopLabelFormatter, {
+      metricCtx: metricTooltipCtx,
+    });
+
   const detailLayoutViewportW = detailLayout
     ? getSharedDetailLayoutMetrics(rKind).planViewportPx
     : viewportW;
@@ -422,6 +472,7 @@ function ChartRendererInner({
       yAxisWidth: detailLayout ? verticalValueLayout.yAxisWidth : undefined,
       pointCount: detailLayout ? rData.length : undefined,
       lineChart: detailLayout && rKind === "line",
+      vBarTopLabels: showVBarTopLabels,
     });
 
   const insightVBarCatDense =
@@ -934,7 +985,27 @@ function ChartRendererInner({
       ...metricTooltipCtx,
       chartRows: rData,
     };
+    const radialLegendPayload = buildRadialLegendPayload(
+      radialDisplayRows,
+      rData
+    );
+    const radialVisibleLegendLines = formatRadialVisibleLegendLines(
+      radialDisplayRows,
+      rData,
+      radialMetricCtx
+    );
+    const radialLegendMaxChars = polishOverviewMini ? 40 : compact ? 44 : 56;
+    const radialLegendExportJson = JSON.stringify(
+      radialLegendPayload.map((item, i) => ({
+        label: radialVisibleLegendLines[i] ?? item.value,
+        color: item.color,
+      }))
+    );
     return (
+      <div
+        className="h-full w-full min-h-0 min-w-0"
+        data-radial-legend-export={radialLegendExportJson}
+      >
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
         width="100%"
@@ -942,7 +1013,7 @@ function ChartRendererInner({
       >
         <PieChart margin={margins}>
           <Pie
-            data={rData}
+            data={radialDisplayRows}
             dataKey="value"
             nameKey="name"
             cx="50%"
@@ -969,10 +1040,10 @@ function ChartRendererInner({
               onInsightDrill(nm);
             }}
           >
-            {rData.map((_, i) => (
+            {radialDisplayRows.map((row, i) => (
               <Cell
-                key={`cell-${i}`}
-                fill={PIE_COLORS[i % PIE_COLORS.length]}
+                key={`cell-${String(row.name ?? i)}`}
+                fill={resolveRadialSliceFill(rData, String(row.name ?? ""))}
               />
             ))}
           </Pie>
@@ -981,24 +1052,63 @@ function ChartRendererInner({
             formatter={(v, _n, item) => {
               const p = item?.payload as ChartRow;
               const name = String(p?.name ?? "");
-              return [formatRadialLegendEntry(rData, name, radialMetricCtx), ""];
+              return [formatRadialTooltipValue(rData, p, v, radialMetricCtx), ""];
             }}
             labelFormatter={() => ""}
           />
           <Legend
             wrapperStyle={{ fontSize: legendFontSize, paddingTop: legendPaddingTop }}
-            iconSize={legendIconSize}
-            iconType="circle"
-            formatter={(v) =>
-              tickTruncate(formatRadialLegendEntry(rData, String(v ?? ""), radialMetricCtx))
-            }
+            content={() => (
+              <ul
+                style={{
+                  padding: 0,
+                  margin: 0,
+                  listStyle: "none",
+                  textAlign: "center",
+                  fontSize: legendFontSize,
+                  paddingTop: legendPaddingTop,
+                  lineHeight: 1.35,
+                }}
+              >
+                {radialLegendPayload.map((item, index) => (
+                  <li
+                    key={item.id}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      marginRight: 10,
+                      marginBottom: 2,
+                    }}
+                  >
+                    <svg
+                      width={legendIconSize}
+                      height={legendIconSize}
+                      aria-hidden
+                      style={{ marginRight: 4, flexShrink: 0 }}
+                    >
+                      <circle
+                        cx={legendIconSize / 2}
+                        cy={legendIconSize / 2}
+                        r={legendIconSize / 2}
+                        fill={item.color}
+                      />
+                    </svg>
+                    <span className="recharts-legend-item-text">
+                      {truncateRadialLegendLine(
+                        radialVisibleLegendLines[index] ?? item.value,
+                        radialLegendMaxChars
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           />
         </PieChart>
       </ResponsiveContainer>
+      </div>
     );
   }
-
-  const shouldRenderHorizontal = cartesianUsesHorizontalPlot(rKind, categoryPlan);
 
   if (shouldRenderHorizontal) {
     const hb =
@@ -1014,6 +1124,22 @@ function ChartRendererInner({
       marginLeft: hb.marginLeft,
       chartLayoutMode,
     });
+    const hBarLabelFontSize = compact ? 11 : 13;
+    const hBarPlacementMode = resolveHBarLabelPlacementMode({
+      pngCapture: pngCaptureMode,
+      detailLayout,
+    });
+    const hBarOutsideLabelReserve =
+      showHBarEndLabels && hBarPlacementMode !== "overview-live"
+        ? computeHBarOutsideLabelReservePx(
+            rData.map((r) => r.value),
+            (v) => barValueTickFormatter(v),
+            hBarLabelFontSize
+          )
+        : 0;
+    const hBarRightMargin = showHBarEndLabels
+      ? Math.max(hmBalanced.marginRight, 52) + hBarOutsideLabelReserve
+      : hmBalanced.marginRight;
     const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
       chartKind: "bar_horizontal",
       rows: rData,
@@ -1040,7 +1166,7 @@ function ChartRendererInner({
           })}
           margin={{
             left: hmBalanced.marginLeft,
-            right: hmBalanced.marginRight,
+            right: hBarRightMargin,
             top: 16,
             bottom: Math.max(hb.marginBottom, compact ? 14 : 22),
           }}
@@ -1107,7 +1233,29 @@ function ChartRendererInner({
               if (!nm) return;
               onInsightDrill(nm);
             }}
-          />
+          >
+            {showHBarEndLabels ? (
+              <LabelList
+                dataKey="value"
+                content={(labelProps) => (
+                  <HBarValueLabelListContent
+                    x={labelProps.x}
+                    y={labelProps.y}
+                    width={labelProps.width}
+                    height={labelProps.height}
+                    value={labelProps.value}
+                    viewBox={labelProps.viewBox}
+                    formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                    fontSize={hBarLabelFontSize}
+                    inlayFill={CHART_BAR_INLAY_LABEL_CSS}
+                    outsideFill={CHART_BAR_VALUE_LABEL_CSS}
+                    placementMode={hBarPlacementMode}
+                    outsideLabelReservePx={hBarOutsideLabelReserve}
+                  />
+                )}
+              />
+            ) : null}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     );
@@ -1413,7 +1561,22 @@ function ChartRendererInner({
             if (!nm) return;
             onInsightDrill(nm);
           }}
-        />
+        >
+          {showVBarTopLabels ? (
+            <LabelList
+              dataKey="value"
+              position="top"
+              offset={8}
+              className="chart-bar-value-label"
+              formatter={(v) => barTopLabelFormatter(Number(v ?? 0))}
+              style={{
+                fill: CHART_BAR_VALUE_LABEL_CSS,
+                fontSize: compact ? 11 : 13,
+                fontWeight: 600,
+              }}
+            />
+          ) : null}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );

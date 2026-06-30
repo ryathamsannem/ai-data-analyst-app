@@ -1,22 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { chartLayoutWidthKey } from "@/lib/chart-axis-theme";
-import { ensureReadableExportTextFill } from "@/lib/chart-png-export-text";
+import {
+  CHART_AXIS_CSS,
+  CHART_BAR_INLAY_LABEL_CSS,
+  CHART_BAR_VALUE_LABEL_CSS,
+} from "@/lib/chart-axis-theme";
 
-describe("chart axis theme helpers", () => {
-  it("buckets layout width for stable Recharts keys", () => {
-    expect(chartLayoutWidthKey(383)).toBe(384);
-    expect(chartLayoutWidthKey(379)).toBe(376);
+describe("chart bar label tokens", () => {
+  it("uses axis label token for V-Bar top labels (stronger than tick)", () => {
+    expect(CHART_BAR_VALUE_LABEL_CSS).toBe(CHART_AXIS_CSS.label);
+    expect(CHART_BAR_VALUE_LABEL_CSS).not.toBe(CHART_AXIS_CSS.tick);
   });
 
-  it("lightens axis title color for dark PNG backgrounds", () => {
-    const adjusted = ensureReadableExportTextFill("#1e293b", "#0f172a", {
-      lightText: "#cbd5e1",
-    });
-    expect(adjusted).toBe("#cbd5e1");
-  });
-
-  it("keeps light axis label color on dark backgrounds", () => {
-    const adjusted = ensureReadableExportTextFill("#cbd5e1", "#0f172a");
-    expect(adjusted).toBe("#cbd5e1");
+  it("uses high-contrast fill for in-bar H-Bar labels", () => {
+    expect(CHART_BAR_INLAY_LABEL_CSS).toBe("#f8fafc");
   });
 });

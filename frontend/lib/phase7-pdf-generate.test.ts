@@ -46,10 +46,10 @@ const SECTION_MARKERS = {
   kpi: /KPI dashboard/i,
   aiInsight: /AI insight/i,
   chart: /Visualization/i,
-  preview: /Data preview/i,
+  preview: /Appendix: Sample data/i,
   dataQuality: /Data quality/i,
   conversation: /AI conversation thread/i,
-  appendix: /Technical appendix/i,
+  appendix: /Appendix: Technical details/i,
   executiveSummary: /Executive summary/i,
   pageFooter: /Page \d+ of \d+/i,
 } as const;
@@ -280,7 +280,8 @@ function buildInput(dataset: DatasetKey, combo: ComboId): ExecutivePdfExportInpu
     },
     previewDuplicates: () => ({
       duplicates: 0,
-      note: "Estimated from preview excerpt.",
+      label: "Sample duplicate-like rows (preview check)",
+      note: "Preview duplicate check only.",
     }),
     chartAxisLabels: { category: "City", value: "Revenue" },
     conversationAppendix: thread,
@@ -289,11 +290,13 @@ function buildInput(dataset: DatasetKey, combo: ComboId): ExecutivePdfExportInpu
 
 function expectedMarkers(combo: ComboId): Record<string, boolean> {
   const always = { executiveSummary: true, pageFooter: true };
+  /** Phase 7 fixture has 2 KPI cards — all fit in snapshot; dashboard section is skipped. */
+  const kpiDashboard = false;
   switch (combo) {
     case "kpi_only":
       return {
         ...always,
-        kpi: true,
+        kpi: kpiDashboard,
         aiInsight: false,
         chart: false,
         preview: false,
@@ -304,7 +307,7 @@ function expectedMarkers(combo: ComboId): Record<string, boolean> {
     case "kpi_insight":
       return {
         ...always,
-        kpi: true,
+        kpi: kpiDashboard,
         aiInsight: true,
         chart: false,
         preview: false,
@@ -315,7 +318,7 @@ function expectedMarkers(combo: ComboId): Record<string, boolean> {
     case "kpi_insight_chart":
       return {
         ...always,
-        kpi: true,
+        kpi: kpiDashboard,
         aiInsight: true,
         chart: true,
         preview: false,
@@ -326,7 +329,7 @@ function expectedMarkers(combo: ComboId): Record<string, boolean> {
     case "all_sections":
       return {
         ...always,
-        kpi: true,
+        kpi: kpiDashboard,
         aiInsight: true,
         chart: true,
         preview: true,

@@ -1,11 +1,22 @@
-import type { ChartKind } from "@/app/chart-types";
+import type { ChartKind, ChartRow } from "@/app/chart-types";
 import {
   OVERVIEW_HBAR_EXPORT_MAX_BAR_SIZE,
 } from "@/lib/horizontal-bar-visual";
 import {
+  formatExecutiveMetricValue,
+  formatExecutivePercentPointGap,
+  formatMetricSpreadGap,
+  metricLabelImpliesPrecisionBarLabels,
+  readChartRowRawValue,
+  resolveMetricValueFormat,
+  type MetricFormatContext,
+} from "@/lib/metric-value-format";
+import {
+  isFocusedVerticalBarRateChart,
   resolveOverviewBarValueDomain,
   roundExecutiveAxisMaximum,
 } from "@/lib/overview-bar-value-domain";
+import { formatOverviewBarValueAxisTick } from "@/lib/overview-premium-axis-domain";
 import { countMetadataChipsInExportRoot } from "@/lib/chart-metadata-chips";
 
 export { roundExecutiveAxisMaximum };
@@ -59,37 +70,243 @@ export function shouldShowPngBarEndValueLabels(
 }
 
 const BAR_LABEL_MAX_SAFE_CHARS = 7;
-const BAR_LABEL_MIN_BAR_RATIO = 0.62;
+/** V-Bar top labels — shortest bar vs longest (crowded multi-category charts). */
+const VBAR_LABEL_MIN_BAR_RATIO = 0.62;
+/** H-Bar in-bar labels — relaxed; labels sit inside the wide bar dimension. */
+const HBAR_LABEL_MIN_BAR_RATIO = 0.55;
+/** Default max categories for vertical bar top labels when overlap risk is low. */
+const VBAR_VALUE_LABEL_MAX_CATEGORIES = 6;
+/** Percent/rate/score metrics may show labels on slightly more categories (V-Bar). */
+const VBAR_VALUE_LABEL_PRECISION_MAX_CATEGORIES = 8;
+/** H-Bar breakdowns (e.g. 7 departments) align with orientation policy. */
+const HBAR_VALUE_LABEL_MAX_CATEGORIES = 10;
+/** Skip H-Bar min/max ratio when categories are modest and compact labels fit. */
+const HBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES = 8;
+/** V-Bar top labels above bars — skewed totals do not block labels for modest category counts. */
+const VBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES = 6;
 
-/** True when in-bar labels would likely clip or bleed on the shortest bar. */
-export function barValueLabelOverlapRisk(
+export type BarValueLabelOverlapRiskOptions = {
+  orientation?: "hbar" | "vbar";
+};
+
+function barValueLabelLengthOverlapRisk(
   values: readonly number[],
   formatValue: (value: number) => string
+): boolean {
+  const labels = values.map((v) => formatValue(v));
+  const maxLen = Math.max(...labels.map((s) => String(s).length));
+  return maxLen > BAR_LABEL_MAX_SAFE_CHARS;
+}
+
+function barValueLabelMinBarRatioOverlapRisk(
+  values: readonly number[],
+  minRatio: number
 ): boolean {
   if (values.length <= 1) return false;
   const maxV = Math.max(...values);
   const minV = Math.min(...values);
   if (!Number.isFinite(maxV) || maxV <= 0) return true;
-  if (minV / maxV < BAR_LABEL_MIN_BAR_RATIO) return true;
+  return minV / maxV < minRatio;
+}
 
-  const labels = values.map((v) => formatValue(v));
-  const maxLen = Math.max(...labels.map((s) => String(s).length));
-  if (maxLen > BAR_LABEL_MAX_SAFE_CHARS) return true;
+/**
+ * True when value labels would likely clip, bleed, or crowd.
+ * Orientation-aware: H-Bar relaxes ratio; V-Bar skips ratio for n ≤ 6.
+ */
+export function barValueLabelOverlapRisk(
+  values: readonly number[],
+  formatValue: (value: number) => string,
+  options: BarValueLabelOverlapRiskOptions = {}
+): boolean {
+  const orientation = options.orientation ?? "vbar";
+  if (barValueLabelLengthOverlapRisk(values, formatValue)) return true;
 
+  const skipRatio =
+    orientation === "hbar"
+      ? values.length <= HBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES
+      : values.length <= VBAR_SKIP_MIN_BAR_RATIO_MAX_CATEGORIES;
+  if (skipRatio) return false;
+
+  const minRatio =
+    orientation === "hbar" ? HBAR_LABEL_MIN_BAR_RATIO : VBAR_LABEL_MIN_BAR_RATIO;
+  return barValueLabelMinBarRatioOverlapRisk(values, minRatio);
+}
+
+/**
+ * Vertical bar top labels when category count is modest and labels fit without overlap.
+ * Percent/rate/score metrics allow a few more categories than large numeric metrics.
+ */
+export function shouldShowOverviewBarValueLabels(
+  rows: readonly { value: number }[],
+  formatValue: (value: number) => string,
+  options?: { metricCtx?: MetricFormatContext }
+): boolean {
+  const values = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
+  if (values.length === 0) return false;
+  const maxCategories =
+    options?.metricCtx && metricLabelImpliesPrecisionBarLabels(options.metricCtx)
+      ? VBAR_VALUE_LABEL_PRECISION_MAX_CATEGORIES
+      : VBAR_VALUE_LABEL_MAX_CATEGORIES;
+  if (values.length > maxCategories) return false;
+  return !barValueLabelOverlapRisk(values, formatValue, { orientation: "vbar" });
+}
+
+/**
+ * H-Bar in-bar value labels — uses axis tick formatting for overlap checks
+ * (matches Overview inline H-Bar LabelList, not V-Bar top-label precision).
+ */
+export function shouldShowHBarValueLabels(
+  rows: readonly { value: number }[],
+  formatValue: (value: number) => string,
+  options?: { metricCtx?: MetricFormatContext }
+): boolean {
+  const values = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
+  if (values.length === 0) return false;
+  if (values.length > HBAR_VALUE_LABEL_MAX_CATEGORIES) return false;
+  return !barValueLabelOverlapRisk(values, formatValue, { orientation: "hbar" });
+}
+
+function formatPercentBarTopLabelDisplay(
+  display: number,
+  decimals: number
+): string {
+  const rounded = Number(display.toFixed(decimals));
+  return `${rounded.toLocaleString(undefined, {
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: 0,
+  })}%`;
+}
+
+/** True when focused V-Bar percent labels need extra decimal precision. */
+export function overviewBarLabelsNeedExtraPrecision(
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): boolean {
+  return barTopLabelsNeedExtraPrecision(rows, ctx);
+}
+
+function barTopLabelsNeedExtraPrecision(
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): boolean {
+  if (!isFocusedVerticalBarRateChart(rows, ctx)) return false;
+
+  const rawVals = rows
+    .map((r) => readChartRowRawValue(r))
+    .filter((v) => Number.isFinite(v));
+  if (rawVals.length < 2) return false;
+
+  const defaultLabels = rawVals.map((v) =>
+    formatOverviewBarValueAxisTick(v, rows, ctx)
+  );
+
+  for (let i = 0; i < rawVals.length; i++) {
+    for (let j = i + 1; j < rawVals.length; j++) {
+      if (Math.abs(rawVals[i]! - rawVals[j]!) <= 1e-9) continue;
+      if (defaultLabels[i] === defaultLabels[j]) return true;
+    }
+  }
   return false;
 }
 
 /**
- * Bar charts hide in-bar value labels by default.
- * Exception: <= 3 categories with zero overlap risk.
+ * V-Bar top / in-bar value labels — may use extra decimal precision on focused
+ * percent/rate charts when default axis rounding would duplicate distinct values.
+ * Axis tick formatting is unchanged; pass this only to LabelList formatters.
  */
-export function shouldShowOverviewBarValueLabels(
-  rows: readonly { value: number }[],
-  formatValue: (value: number) => string
-): boolean {
-  const values = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
-  if (values.length === 0 || values.length > 3) return false;
-  return !barValueLabelOverlapRisk(values, formatValue);
+export function formatOverviewBarTopValueLabel(
+  value: number,
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext = {}
+): string {
+  if (!Number.isFinite(value)) return String(value);
+
+  const defaultLabel = formatOverviewBarValueAxisTick(value, rows, ctx);
+  if (!barTopLabelsNeedExtraPrecision(rows, ctx)) return defaultLabel;
+
+  const format = resolveMetricValueFormat(ctx);
+  if (format !== "percent") return defaultLabel;
+
+  const rawVals = rows
+    .map((r) => readChartRowRawValue(r))
+    .filter((v) => Number.isFinite(v));
+  const maxAbs = rawVals.length
+    ? Math.max(...rawVals.map((v) => Math.abs(v)))
+    : Math.abs(value);
+  const display = maxAbs <= 1.05 ? value * 100 : value;
+
+  let decimals = 2;
+  while (decimals <= 3) {
+    const labels = rawVals.map((v) => {
+      const d = maxAbs <= 1.05 ? v * 100 : v;
+      return formatPercentBarTopLabelDisplay(d, decimals);
+    });
+    if (new Set(labels).size === labels.length) {
+      return formatPercentBarTopLabelDisplay(display, decimals);
+    }
+    decimals += 1;
+  }
+
+  return formatPercentBarTopLabelDisplay(display, 3);
+}
+
+/**
+ * Executive insight / signal card metric display — matches V-Bar top label
+ * precision on focused percent/rate vertical bars; otherwise unchanged.
+ */
+export function formatExecutiveInsightMetricValue(
+  row: ChartRow,
+  ctx: MetricFormatContext = {}
+): string {
+  const raw = readChartRowRawValue(row);
+  if (!Number.isFinite(raw)) {
+    return formatExecutiveMetricValue(row, ctx);
+  }
+  const format = resolveMetricValueFormat(ctx);
+  const rows = ctx.chartRows;
+  if (
+    format === "percent" &&
+    ctx.presentationKind === "bar" &&
+    rows &&
+    rows.length >= 2 &&
+    overviewBarLabelsNeedExtraPrecision(rows, ctx)
+  ) {
+    return formatOverviewBarTopValueLabel(raw, rows, ctx);
+  }
+  return formatExecutiveMetricValue(row, ctx);
+}
+
+/**
+ * Top/Lowest spread for executive insight chips — matches focused V-Bar label
+ * precision (percentage points) when extra decimal precision is required.
+ */
+export function formatExecutiveInsightSpreadGap(
+  gap: number,
+  ctx: MetricFormatContext = {}
+): string {
+  const rows = ctx.chartRows;
+  const format = resolveMetricValueFormat(ctx);
+  if (
+    format === "percent" &&
+    ctx.presentationKind === "bar" &&
+    rows &&
+    rows.length >= 2 &&
+    overviewBarLabelsNeedExtraPrecision(rows, ctx)
+  ) {
+    let pp = gap;
+    const vals = rows
+      .map((row) => readChartRowRawValue(row))
+      .filter((v) => Number.isFinite(v));
+    const maxV = vals.length ? Math.max(...vals.map(Math.abs)) : Math.abs(gap);
+    if (Math.abs(gap) <= 1 && maxV <= 1.05) {
+      pp = gap * 100;
+    }
+    return formatExecutivePercentPointGap(pp, {
+      skipFractionScale: true,
+      decimals: 2,
+    });
+  }
+  return formatMetricSpreadGap(gap, ctx);
 }
 
 /** Value-axis domain for horizontal bars — smart scale + export rounding. */

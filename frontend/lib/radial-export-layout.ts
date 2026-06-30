@@ -53,6 +53,26 @@ export const SESSION_RADIAL_PLOT_BAND_DIAMETER_RATIO = 0.7;
 /** Donut hole sizing — preserves prior 54/88 proportion at reference scale. */
 export const DONUT_INNER_TO_OUTER_RADIUS_RATIO = 54 / 88;
 
+export type DonutInnerHoleAudit = {
+  innerToOuterRatio: number;
+  holePercentOfOuter: number;
+  recommendation: string;
+};
+
+/** Tier 1 audit — report hole sizing; defer geometry changes unless clearly undersized. */
+export function auditDonutInnerHoleRatio(): DonutInnerHoleAudit {
+  const ratio = DONUT_INNER_TO_OUTER_RADIUS_RATIO;
+  const holePercent = Math.round(ratio * 100);
+  return {
+    innerToOuterRatio: ratio,
+    holePercentOfOuter: holePercent,
+    recommendation:
+      holePercent >= 58 && holePercent <= 66
+        ? "defer_resize"
+        : "review_in_future_tier",
+  };
+}
+
 export type RadialChartRadii = {
   innerRadius: number;
   outerRadius: number;

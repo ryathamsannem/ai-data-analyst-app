@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  auditDonutInnerHoleRatio,
   computeSessionRadialPlotBandOccupancy,
   estimateExportLegendRows,
   RADIAL_COMPACT_OUTER_PX,
@@ -181,5 +182,11 @@ describe("radial export layout", () => {
     expect(resolveRadialExportPlotHeight(8)).toBeGreaterThan(
       resolveRadialExportPlotHeight(4)
     );
+  });
+
+  it("audits donut inner hole ratio — defer resize in Tier 1", () => {
+    const audit = auditDonutInnerHoleRatio();
+    expect(audit.holePercentOfOuter).toBe(61);
+    expect(audit.recommendation).toBe("defer_resize");
   });
 });

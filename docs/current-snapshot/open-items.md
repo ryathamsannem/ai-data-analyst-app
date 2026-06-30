@@ -1,54 +1,70 @@
 # Open Items (Prioritized)
 
-**Snapshot:** June 27, 2026 (after Overview Pass **5C.5** — H-Bar/V-Bar parity **frozen**) · Branch `DEV`.
+**Snapshot:** June 29, 2026 (final release) · Branch `DEV` · HEAD `b66d5d1`.
 
-Completed Overview 5A.x → 5C.x work is in [`overview-pass-status.md`](./overview-pass-status.md).
-Frozen H-Bar/V-Bar parity record: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).
-
----
-
-## P0 — Do first
-
-### ~~1. H-Bar / V-Bar visual parity~~ — **RESOLVED / FROZEN (Pass 5C.5)**
-- Closed after Passes 5B.1 → 5C.5. See [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).
-- **Do not reopen** unless a regression is filed with SVG measurements.
-
-### ~~1. Confirm Overview default charts across domains (manual UI)~~ — **COMPLETE (June 27, 2026)**
-- Validated via backend probe + **37/37** targeted pytest + frontend golden summary tests.
-- All four gold fixtures produce correct type labels, meaningful KPIs, and business-useful default charts.
-- **HR caveat (P2, non-blocker):** discovery still surfaces `Records by Age Band` and `Monthly Age Trend` — defer to narrow HR discovery pass.
-- See [`validation-results.md`](./validation-results.md) § Overview defaults confirmation.
+Frozen parity: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).  
+PDF record: [`pdf-quality-audit.md`](./pdf-quality-audit.md).  
+Latest git state: [`latest-working-snapshot.md`](./latest-working-snapshot.md).
 
 ---
 
-## P1 — Production Readiness Phase 1
+## Closed (recent commits)
 
-### Error handling / loading states
-- **P1 audit complete (June 27, 2026):** See [`p1-error-loading-ux-audit.md`](./p1-error-loading-ux-audit.md). Eight P1 gaps fixed (empty states, filter error, mapping save/validation, export gating, friendly capture errors). P2 backlog: chart ErrorBoundary, PDF artifact warning, malformed CSV diagnostics.
+| Item | Status | Commit |
+|------|--------|--------|
+| Suggested Questions — 15-domain backend quality | **Complete** | `3ee3e48` |
+| Follow-up chip quality (FU-P1) | **Complete** | `c460bcc` |
+| PDF-1 export quality | **Complete** | `c764f5d` |
+| PDF-2A domain labels and branding | **Complete** | `6e30b8f` |
+| PDF-2B preview formatting and data quality labels | **Complete** | `fe6344f` |
+| PDF-2C-1 KPI dashboard dedupe | **Complete** | `5d27fc1` |
+| PDF-2C-2 technical appendix polish | **Complete** | `cf643d9` |
+| Mandatory live/PDF aligned insight model | **Complete** | `042db37`, `cdb1f6d` |
+| PDF structured-section label cleanup | **Complete** | `b66d5d1` |
+| H-Bar / V-Bar visual parity (5B.1 → 5C.5) | **Frozen** | prior |
+| 15-domain Overview validation | **Complete** | prior |
+| Export regression (PNG + Phase 7 matrix) | **Complete** | prior |
+| Final release snapshot (478/743 green) | **Complete** | prior |
 
-### ~~Upload / mapping edge cases~~ — **COMPLETE (June 27, 2026)**
-- Validated empty, ambiguous, high-cardinality, and gold-fixture schemas; fixed all-categorical crash + spurious date mapping.
-- See [`p1-upload-mapping-edge-cases.md`](./p1-upload-mapping-edge-cases.md).
+### PDF quality resolved (PDF-1 → PDF-2 + alignment)
 
-### ~~Export regression pass~~ — **COMPLETE (June 27, 2026)**
-- Closed after P1 pass: 87 targeted export tests + 722 full vitest + clean build; Phase 7 PDF 18/18.
-- See [`validation-results.md`](./validation-results.md) § P1 export regression pass.
-- Optional: manual banking Overview PNG spot-check (Loan Balance ~216M, Delinquency 0–5%).
+- Narrative/chart alignment (generic chart-contract guard)
+- Shared live/PDF `insightPresentation` model
+- Structured PDF sections + compact Chart view
+- Slim AI Insights preset; data preview appendix after Visualization
+- PDF chart embed sizing; metadata chip fix
+- Follow-up answer export button/context
+- Visualization page-break / cohesion fix
+- Domain labels; branding/footer polish
+- Preview ID/date formatting; data quality wording
+- KPI dashboard dedupe; technical appendix polish
+- Redundant PDF section label cleanup
 
-### Platform gaps (production-only)
-- Authentication & tenant isolation; durable usage metering; multi-tenant dataset storage (currently in-memory `df` per process). Separate initiative from chart/Overview work.
+---
+
+## P1 — Final release readiness only
+
+| Item | Notes |
+|------|-------|
+| Optional browser spot-check | 3–5 domains upload + AI Insights + PDF export |
+| Cross-domain AI Insights narrative QA | Beyond deterministic probes; only if new evidence |
+
+**No PDF-2 backlog.** Do not reopen PDF work unless a generated PDF proves regression.
+
+---
+
+## P1 — Future production readiness (unchanged)
+
+- Platform: auth, durable storage, metering, optional E2E suite
 
 ---
 
 ## P2 — Nice to have
 
-### Further visual polish (only if product requests)
-- Histogram premium review (renders as styled V-Bar; no dedicated occupancy pass).
-- Any remaining cosmetic chart tuning **only after** explicit product approval — H-Bar/V-Bar parity is frozen.
-
-### Future / non-blocking
-- Large dataset performance optimization (100k+ rows).
-- Browser E2E export regression suite (Playwright).
+- Histogram premium review (no dedicated pass)
+- Large dataset optimization (100k+ fixtures)
+- Cosmetic chart tuning **only** with explicit product approval
+- Optional: per-row export on Recent Insights list
 
 ---
 
@@ -56,8 +72,18 @@ Frozen H-Bar/V-Bar parity record: [`chart-visual-parity-open-items.md`](./chart-
 
 | Item | Notes |
 |------|-------|
-| Dual renderer pipelines | Overview inline (`page.tsx`) vs shared `ChartRenderer` — managed via shared domain/visual helpers; full pixel convergence not scheduled. |
-| Orientation-natural H-Bar vs V-Bar | H-Bar length vs V-Bar thickness; 85% utilization cap is the agreed mitigation. |
-| Monolithic `page.tsx` | Large file; incremental extraction only when scoped. |
-| Pre-existing backend test failures | 6 `pytest` failures — pre-existing. See [`validation-results.md`](./validation-results.md). |
-| HR `customer` role = `age` | Minor; not a stated requirement. |
+| Dual renderer pipelines | Managed via shared domain/visual helpers |
+| H-Bar 85% utilization cap | Parity frozen — do not reopen without regression proof |
+| Monolithic `page.tsx` | Incremental extraction only when scoped |
+| Banking 1k Medium confidence | Justified; not a blocker |
+| Generic exec/type labels | Several domains use generic executive domain taxonomy |
+
+---
+
+## Explicit constraints
+
+1. **Do not reopen H-Bar/V-Bar parity** unless measured regression appears.
+2. **Do not reopen chart axis/domain/bar sizing** unless test or screenshot proves regression.
+3. **Do not change suggested questions or follow-up chips** unless a new issue is proven.
+4. **Do not reopen PDF fixes** unless a generated PDF proves regression.
+5. **Future changes** — audit-first, small incremental fixes, test-backed.

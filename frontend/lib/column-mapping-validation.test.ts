@@ -57,6 +57,14 @@ const FIXTURE_ROLE_META = {
     region: { selected: null, confidence: "low" },
     customer: { selected: "patient_segment", confidence: "medium" },
   },
+  saas: {
+    sales: { selected: "mrr", confidence: "high" },
+    product: { selected: "plan_type", confidence: "high" },
+    date: { selected: "month", confidence: "high" },
+    profit: { selected: "churn_rate", confidence: "high" },
+    region: { selected: null, confidence: "low" },
+    customer: { selected: "customer_segment", confidence: "high" },
+  },
   banking: {
     sales: { selected: "spend_amount", confidence: "high" },
     product: { selected: "product_type", confidence: "high" },
@@ -103,12 +111,20 @@ describe("aggregateMappingConfidenceFromMetadata", () => {
     ).toBe("High");
   });
 
-  it("returns Medium for healthcare and banking fixtures", () => {
+  it("returns High for healthcare and SaaS when optional customer is medium", () => {
     expect(
       aggregateMappingConfidenceFromMetadata({
         roles: FIXTURE_ROLE_META.healthcare,
       })
-    ).toBe("medium");
+    ).toBe("high");
+    expect(
+      aggregateMappingConfidenceFromMetadata({
+        roles: FIXTURE_ROLE_META.saas,
+      })
+    ).toBe("high");
+  });
+
+  it("returns Medium for banking when core profit role competes closely", () => {
     expect(
       aggregateMappingConfidenceFromMetadata({
         roles: FIXTURE_ROLE_META.banking,

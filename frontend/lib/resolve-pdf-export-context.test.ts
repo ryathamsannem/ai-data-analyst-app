@@ -116,4 +116,145 @@ describe("resolvePdfExportContext", () => {
     );
     expect(id).toBe("rank-1");
   });
+
+  it("exports follow-up saved result instead of stale root chart bundle", () => {
+    const rootQuestion = "Spend Amount by Product Type";
+    const followUpQuestion = "Why is Credit Card highest?";
+    const store = {
+      "product-chart": {
+        answer: "Credit Card leads product-type spend.",
+        lastAskedQuestion: rootQuestion,
+        hasValidAIAnswer: true,
+        alignedAnalysis: {
+          metricColumn: "spend_amount",
+          categoryColumn: "product_type",
+          insightSummary: "Root summary about product types.",
+        },
+        savedAt: 100,
+      },
+    };
+    const history = [
+      {
+        id: "result-root",
+        turnId: "t1",
+        question: rootQuestion,
+        answer: "Credit Card leads product-type spend.",
+        hasValidAIAnswer: true,
+        alignedAnalysis: store["product-chart"].alignedAnalysis,
+        chartId: "product-chart",
+        isFollowUp: false,
+        parentResultId: null,
+        lastAskVisualizationHydrated: true,
+        savedAt: 100,
+      },
+      {
+        id: "result-follow",
+        turnId: "t2",
+        question: followUpQuestion,
+        answer:
+          "Credit Card is highest because it accounts for the largest share of spend in this cohort.",
+        hasValidAIAnswer: true,
+        alignedAnalysis: {
+          metricColumn: "spend_amount",
+          categoryColumn: "product_type",
+          insightSummary: "Credit Card dominates spend among product types.",
+        },
+        chartId: "product-chart",
+        isFollowUp: true,
+        parentResultId: "result-root",
+        lastAskVisualizationHydrated: true,
+        savedAt: 200,
+      },
+    ];
+    const snap = {
+      ...rankingSnap,
+      id: "product-chart",
+      title: "Spend Amount by Product Type",
+      question: rootQuestion,
+    };
+    const ctx = resolvePdfExportContext({
+      ...baseInput(),
+      chartHistory: [snap],
+      aiAnswerByChartId: store,
+      insightChartId: "product-chart",
+      pinnedInsightChartId: "product-chart",
+      lastAskedQuestion: followUpQuestion,
+      question: followUpQuestion,
+      liveAnswer: history[1]!.answer,
+      liveAlignedAnalysis: history[1]!.alignedAnalysis,
+      insightChartMatchesCurrentQuestion: true,
+      insightChartDataLength: 5,
+      insightResultHistory: history,
+      exportInsightResultId: "result-follow",
+    });
+    expect(ctx.chartScope).toBe("insight");
+    expect(ctx.chartId).toBe("product-chart");
+    expect(ctx.lastAskedQuestion).toBe(followUpQuestion);
+    expect(ctx.insightAnswer).toContain("Credit Card is highest");
+    expect(ctx.insightAnswer).not.toContain("Root summary");
+  });
+
+  it("root answer export still uses root question when explicitly selected", () => {
+    const rootQuestion = "Spend Amount by Product Type";
+    const followUpQuestion = "Why is Credit Card highest?";
+    const store = {
+      "product-chart": {
+        answer: "Follow-up narrative",
+        lastAskedQuestion: followUpQuestion,
+        hasValidAIAnswer: true,
+        alignedAnalysis: { metricColumn: "spend_amount" },
+        savedAt: 200,
+      },
+    };
+    const history = [
+      {
+        id: "result-root",
+        question: rootQuestion,
+        answer: "Product-type ranking narrative.",
+        hasValidAIAnswer: true,
+        alignedAnalysis: { metricColumn: "spend_amount" },
+        chartId: "product-chart",
+        isFollowUp: false,
+        parentResultId: null,
+        lastAskVisualizationHydrated: true,
+        savedAt: 100,
+      },
+      {
+        id: "result-follow",
+        question: followUpQuestion,
+        answer: "Follow-up narrative",
+        hasValidAIAnswer: true,
+        alignedAnalysis: { metricColumn: "spend_amount" },
+        chartId: "product-chart",
+        isFollowUp: true,
+        parentResultId: "result-root",
+        lastAskVisualizationHydrated: true,
+        savedAt: 200,
+      },
+    ];
+    const ctx = resolvePdfExportContext({
+      ...baseInput(),
+      chartHistory: [
+        {
+          ...rankingSnap,
+          id: "product-chart",
+          title: rootQuestion,
+          question: rootQuestion,
+        },
+      ],
+      aiAnswerByChartId: store,
+      insightChartId: "product-chart",
+      pinnedInsightChartId: "product-chart",
+      lastAskedQuestion: rootQuestion,
+      question: rootQuestion,
+      liveAnswer: history[0]!.answer,
+      liveAlignedAnalysis: history[0]!.alignedAnalysis,
+      insightChartMatchesCurrentQuestion: true,
+      insightChartDataLength: 5,
+      insightResultHistory: history,
+      exportInsightResultId: "result-root",
+    });
+    expect(ctx.lastAskedQuestion).toBe(rootQuestion);
+    expect(ctx.insightAnswer).toContain("Product-type ranking");
+  });
 });

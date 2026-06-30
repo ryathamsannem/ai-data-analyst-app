@@ -1,0 +1,1001 @@
+booking_id,check_in_date,hotel_brand,room_type,market,room_revenue,occupancy_rate,avg_daily_rate,guest_rating
+BKG-000001,2024-01-01,Grand Plaza,Standard,Suburban,34045.63,0.9173,105.29,4.4
+BKG-000002,2024-01-01,Grand Plaza,Deluxe,Beach,30784.22,0.782,123.78,3.7
+BKG-000003,2024-01-01,Grand Plaza,Suite,Beach,36927.16,0.6529,121.5,4.1
+BKG-000004,2024-01-01,Grand Plaza,Executive,Business District,85009.36,0.7695,109.84,3.9
+BKG-000005,2024-01-01,Grand Plaza,Family,Suburban,67238.08,0.5738,156.61,3.5
+BKG-000006,2024-01-01,Harbor Inn,Standard,Downtown,21920.06,0.6968,150.28,3.7
+BKG-000007,2024-01-01,Harbor Inn,Deluxe,Downtown,52396.73,0.8987,109.52,4.6
+BKG-000008,2024-01-01,Harbor Inn,Suite,Business District,102311.24,0.6291,174.33,3.7
+BKG-000009,2024-01-01,Harbor Inn,Executive,Business District,25081.4,0.6706,166.65,4.5
+BKG-000010,2024-01-01,Harbor Inn,Family,Airport,14113.53,0.7879,145.13,4.0
+BKG-000011,2024-01-01,Summit Lodge,Standard,Downtown,54910.23,0.8697,175.47,4.1
+BKG-000012,2024-01-01,Summit Lodge,Deluxe,Beach,70310.52,0.7593,186.48,4.2
+BKG-000013,2024-01-01,Summit Lodge,Suite,Airport,68383.4,0.6016,157.62,4.7
+BKG-000014,2024-01-01,Summit Lodge,Executive,Airport,96054.23,0.8042,182.74,3.3
+BKG-000015,2024-01-01,Summit Lodge,Family,Airport,14486.21,0.7684,187.42,3.6
+BKG-000016,2024-01-01,City Suites,Standard,Beach,29951.53,0.8294,124.24,4.1
+BKG-000017,2024-01-01,City Suites,Deluxe,Downtown,34970.29,0.6947,148.71,4.5
+BKG-000018,2024-01-01,City Suites,Suite,Airport,80868.82,0.6606,144.47,4.4
+BKG-000019,2024-01-01,City Suites,Executive,Downtown,41525.73,0.6576,160.58,3.9
+BKG-000020,2024-01-01,City Suites,Family,Business District,88408.54,0.8424,110.25,4.7
+BKG-000021,2024-01-01,Coastal Resort,Standard,Suburban,58451.99,0.8385,145.51,3.6
+BKG-000022,2024-01-01,Coastal Resort,Deluxe,Suburban,104568.79,0.8816,111.32,3.4
+BKG-000023,2024-01-01,Coastal Resort,Suite,Beach,62572.77,0.8723,161.96,3.8
+BKG-000024,2024-01-01,Coastal Resort,Executive,Beach,60584.2,0.5475,187.63,3.7
+BKG-000025,2024-01-01,Coastal Resort,Family,Downtown,48697.68,0.8498,112.31,3.8
+BKG-000026,2024-02-01,Grand Plaza,Standard,Suburban,77570.65,0.5844,185.08,3.7
+BKG-000027,2024-02-01,Grand Plaza,Deluxe,Airport,89482.7,0.9023,157.76,3.8
+BKG-000028,2024-02-01,Grand Plaza,Suite,Beach,47866.82,0.7551,173.05,4.1
+BKG-000029,2024-02-01,Grand Plaza,Executive,Suburban,86592.61,0.533,167.36,4.2
+BKG-000030,2024-02-01,Grand Plaza,Family,Downtown,77303.15,0.6089,121.35,3.6
+BKG-000031,2024-02-01,Harbor Inn,Standard,Airport,55092.16,0.8094,181.84,4.2
+BKG-000032,2024-02-01,Harbor Inn,Deluxe,Beach,58357.27,0.5741,108.78,3.6
+BKG-000033,2024-02-01,Harbor Inn,Suite,Suburban,22871.07,0.9042,165.09,3.5
+BKG-000034,2024-02-01,Harbor Inn,Executive,Beach,77353.82,0.7062,179.34,3.7
+BKG-000035,2024-02-01,Harbor Inn,Family,Beach,13274.35,0.8814,138.29,3.8
+BKG-000036,2024-02-01,Summit Lodge,Standard,Business District,38336.61,0.7135,106.8,3.7
+BKG-000037,2024-02-01,Summit Lodge,Deluxe,Business District,97503.56,0.6658,101.87,4.1
+BKG-000038,2024-02-01,Summit Lodge,Suite,Airport,14835.82,0.7784,118.5,3.6
+BKG-000039,2024-02-01,Summit Lodge,Executive,Airport,44576.9,0.6804,139.69,4.2
+BKG-000040,2024-02-01,Summit Lodge,Family,Airport,59426.11,0.8374,138.72,4.6
+BKG-000041,2024-02-01,City Suites,Standard,Downtown,78466.65,0.8307,133.94,4.9
+BKG-000042,2024-02-01,City Suites,Deluxe,Suburban,74406.98,0.5727,156.03,4.2
+BKG-000043,2024-02-01,City Suites,Suite,Business District,66948.69,0.6807,152.59,3.6
+BKG-000044,2024-02-01,City Suites,Executive,Business District,29299.55,0.7804,139.47,3.6
+BKG-000045,2024-02-01,City Suites,Family,Suburban,54130.91,0.6793,128.21,4.2
+BKG-000046,2024-02-01,Coastal Resort,Standard,Downtown,36532.31,0.8788,169.89,4.2
+BKG-000047,2024-02-01,Coastal Resort,Deluxe,Airport,33516.99,0.7418,159.22,3.9
+BKG-000048,2024-02-01,Coastal Resort,Suite,Beach,46939.81,0.7118,181.4,3.5
+BKG-000049,2024-02-01,Coastal Resort,Executive,Suburban,48172.35,0.7059,121.8,4.0
+BKG-000050,2024-02-01,Coastal Resort,Family,Beach,107647.72,0.8078,101.83,4.6
+BKG-000051,2024-03-01,Grand Plaza,Standard,Suburban,33456.9,0.6111,141.42,3.7
+BKG-000052,2024-03-01,Grand Plaza,Deluxe,Downtown,79144.6,0.8916,171.7,3.9
+BKG-000053,2024-03-01,Grand Plaza,Suite,Downtown,65443.75,0.5598,168.76,3.7
+BKG-000054,2024-03-01,Grand Plaza,Executive,Beach,72608.99,0.5747,151.94,3.4
+BKG-000055,2024-03-01,Grand Plaza,Family,Business District,91021.08,0.6188,127.86,4.0
+BKG-000056,2024-03-01,Harbor Inn,Standard,Downtown,16304.44,0.8507,166.3,3.5
+BKG-000057,2024-03-01,Harbor Inn,Deluxe,Beach,57845.05,0.7609,125.25,4.2
+BKG-000058,2024-03-01,Harbor Inn,Suite,Business District,79841.69,0.7889,146.21,3.5
+BKG-000059,2024-03-01,Harbor Inn,Executive,Suburban,17296.19,0.5819,119.32,4.2
+BKG-000060,2024-03-01,Harbor Inn,Family,Beach,89730.98,0.8259,167.35,4.4
+BKG-000061,2024-03-01,Summit Lodge,Standard,Beach,41737.35,0.8854,170.69,4.1
+BKG-000062,2024-03-01,Summit Lodge,Deluxe,Downtown,68736.54,0.7315,124.59,4.6
+BKG-000063,2024-03-01,Summit Lodge,Suite,Suburban,100423.47,0.6013,103.54,3.9
+BKG-000064,2024-03-01,Summit Lodge,Executive,Downtown,51427.85,0.6577,155.07,3.8
+BKG-000065,2024-03-01,Summit Lodge,Family,Business District,13587.08,0.9215,187.18,3.6
+BKG-000066,2024-03-01,City Suites,Standard,Airport,71327.98,0.5751,106.31,4.6
+BKG-000067,2024-03-01,City Suites,Deluxe,Suburban,25546.04,0.6864,182.26,3.7
+BKG-000068,2024-03-01,City Suites,Suite,Business District,69204.54,0.5426,107.77,4.3
+BKG-000069,2024-03-01,City Suites,Executive,Downtown,71378.92,0.9003,143.5,3.8
+BKG-000070,2024-03-01,City Suites,Family,Business District,31689.29,0.6278,167.44,4.1
+BKG-000071,2024-03-01,Coastal Resort,Standard,Suburban,111998.79,0.5608,134.38,4.6
+BKG-000072,2024-03-01,Coastal Resort,Deluxe,Suburban,19738.65,0.8729,104.66,3.9
+BKG-000073,2024-03-01,Coastal Resort,Suite,Suburban,67456.71,0.6876,152.46,3.7
+BKG-000074,2024-03-01,Coastal Resort,Executive,Downtown,78359.94,0.5444,174.45,3.9
+BKG-000075,2024-03-01,Coastal Resort,Family,Downtown,41094.38,0.807,139.69,4.2
+BKG-000076,2024-04-01,Grand Plaza,Standard,Business District,74320.62,0.5588,116.36,4.5
+BKG-000077,2024-04-01,Grand Plaza,Deluxe,Beach,50887.33,0.9213,145.92,3.7
+BKG-000078,2024-04-01,Grand Plaza,Suite,Suburban,26731.97,0.7243,182.06,4.2
+BKG-000079,2024-04-01,Grand Plaza,Executive,Airport,73352.52,0.6186,142.05,3.4
+BKG-000080,2024-04-01,Grand Plaza,Family,Suburban,48586.28,0.7345,133.29,4.6
+BKG-000081,2024-04-01,Harbor Inn,Standard,Suburban,35540.51,0.8223,140.53,3.3
+BKG-000082,2024-04-01,Harbor Inn,Deluxe,Beach,30809.31,0.8036,165.08,3.4
+BKG-000083,2024-04-01,Harbor Inn,Suite,Business District,84871.91,0.7423,155.1,4.1
+BKG-000084,2024-04-01,Harbor Inn,Executive,Suburban,66982.48,0.7254,172.13,3.5
+BKG-000085,2024-04-01,Harbor Inn,Family,Suburban,75957.25,0.7464,108.99,4.4
+BKG-000086,2024-04-01,Summit Lodge,Standard,Beach,69521.99,0.7928,152.12,3.7
+BKG-000087,2024-04-01,Summit Lodge,Deluxe,Downtown,67376.3,0.758,155.82,3.7
+BKG-000088,2024-04-01,Summit Lodge,Suite,Beach,66652.62,0.5624,163.66,3.4
+BKG-000089,2024-04-01,Summit Lodge,Executive,Business District,54170.87,0.7957,132.88,3.4
+BKG-000090,2024-04-01,Summit Lodge,Family,Suburban,56809.82,0.8464,153.93,3.5
+BKG-000091,2024-04-01,City Suites,Standard,Downtown,40730.56,0.9252,137.59,3.3
+BKG-000092,2024-04-01,City Suites,Deluxe,Downtown,17268.02,0.8478,156.58,4.2
+BKG-000093,2024-04-01,City Suites,Suite,Airport,88554.66,0.5712,180.2,3.7
+BKG-000094,2024-04-01,City Suites,Executive,Downtown,20745.27,0.717,176.94,3.8
+BKG-000095,2024-04-01,City Suites,Family,Suburban,65723.54,0.7743,121.59,3.6
+BKG-000096,2024-04-01,Coastal Resort,Standard,Beach,31048.36,0.7723,105.31,4.4
+BKG-000097,2024-04-01,Coastal Resort,Deluxe,Suburban,40641.05,0.8569,120.92,4.5
+BKG-000098,2024-04-01,Coastal Resort,Suite,Downtown,35540.94,0.5687,178.23,4.9
+BKG-000099,2024-04-01,Coastal Resort,Executive,Beach,111973.96,0.8539,183.17,4.5
+BKG-000100,2024-04-01,Coastal Resort,Family,Downtown,64216.61,0.8524,108.88,4.6
+BKG-000101,2024-05-01,Grand Plaza,Standard,Downtown,53780.15,0.7426,160.95,3.4
+BKG-000102,2024-05-01,Grand Plaza,Deluxe,Airport,76406.18,0.6541,173.26,4.0
+BKG-000103,2024-05-01,Grand Plaza,Suite,Airport,14075.28,0.7055,174.21,3.4
+BKG-000104,2024-05-01,Grand Plaza,Executive,Business District,84639.12,0.8646,110.81,3.2
+BKG-000105,2024-05-01,Grand Plaza,Family,Downtown,12957.49,0.9284,156.59,4.4
+BKG-000106,2024-05-01,Harbor Inn,Standard,Downtown,36970.16,0.6495,150.21,4.0
+BKG-000107,2024-05-01,Harbor Inn,Deluxe,Suburban,79065.57,0.5209,140.86,4.6
+BKG-000108,2024-05-01,Harbor Inn,Suite,Downtown,15881.85,0.9249,176.24,3.2
+BKG-000109,2024-05-01,Harbor Inn,Executive,Downtown,80208.38,0.9032,109.19,4.9
+BKG-000110,2024-05-01,Harbor Inn,Family,Beach,28098.96,0.912,161.51,3.7
+BKG-000111,2024-05-01,Summit Lodge,Standard,Business District,16746.54,0.5683,158.58,4.9
+BKG-000112,2024-05-01,Summit Lodge,Deluxe,Suburban,96173.43,0.561,182.22,3.6
+BKG-000113,2024-05-01,Summit Lodge,Suite,Downtown,89992.97,0.6074,151.2,4.8
+BKG-000114,2024-05-01,Summit Lodge,Executive,Business District,93545.93,0.6309,176.8,3.6
+BKG-000115,2024-05-01,Summit Lodge,Family,Airport,56416.75,0.7978,166.23,4.7
+BKG-000116,2024-05-01,City Suites,Standard,Suburban,72006.24,0.6475,115.23,4.4
+BKG-000117,2024-05-01,City Suites,Deluxe,Suburban,32986.48,0.5287,178.78,3.3
+BKG-000118,2024-05-01,City Suites,Suite,Suburban,25987.24,0.5212,142.78,4.6
+BKG-000119,2024-05-01,City Suites,Executive,Suburban,41963.04,0.639,168.35,3.9
+BKG-000120,2024-05-01,City Suites,Family,Suburban,79352.31,0.5579,111.62,3.2
+BKG-000121,2024-05-01,Coastal Resort,Standard,Suburban,18270.35,0.6651,176.19,3.7
+BKG-000122,2024-05-01,Coastal Resort,Deluxe,Beach,96743.41,0.7881,132.57,3.7
+BKG-000123,2024-05-01,Coastal Resort,Suite,Suburban,53629.08,0.6434,174.79,3.8
+BKG-000124,2024-05-01,Coastal Resort,Executive,Downtown,59921.98,0.5519,108.16,3.7
+BKG-000125,2024-05-01,Coastal Resort,Family,Airport,53597.95,0.7395,187.4,4.6
+BKG-000126,2024-06-01,Grand Plaza,Standard,Airport,36891.18,0.5974,155.45,3.4
+BKG-000127,2024-06-01,Grand Plaza,Deluxe,Downtown,82016.19,0.8199,182.72,4.1
+BKG-000128,2024-06-01,Grand Plaza,Suite,Downtown,85392.13,0.7378,157.84,4.6
+BKG-000129,2024-06-01,Grand Plaza,Executive,Downtown,41777.24,0.8677,114.63,4.2
+BKG-000130,2024-06-01,Grand Plaza,Family,Beach,52162.97,0.7761,180.27,4.5
+BKG-000131,2024-06-01,Harbor Inn,Standard,Downtown,25137.92,0.5246,187.51,4.1
+BKG-000132,2024-06-01,Harbor Inn,Deluxe,Downtown,35900.11,0.8913,185.42,4.7
+BKG-000133,2024-06-01,Harbor Inn,Suite,Beach,65438.62,0.8805,114.39,4.6
+BKG-000134,2024-06-01,Harbor Inn,Executive,Beach,66879.97,0.5709,142.51,4.8
+BKG-000135,2024-06-01,Harbor Inn,Family,Suburban,39348.74,0.6812,144.24,4.1
+BKG-000136,2024-06-01,Summit Lodge,Standard,Suburban,13155.84,0.6959,157.03,3.5
+BKG-000137,2024-06-01,Summit Lodge,Deluxe,Airport,77837.47,0.7796,161.54,3.7
+BKG-000138,2024-06-01,Summit Lodge,Suite,Airport,27159.57,0.5659,107.89,4.2
+BKG-000139,2024-06-01,Summit Lodge,Executive,Downtown,72014.77,0.6346,128.99,4.4
+BKG-000140,2024-06-01,Summit Lodge,Family,Downtown,102504.72,0.5754,158.78,3.5
+BKG-000141,2024-06-01,City Suites,Standard,Beach,46196.89,0.6462,122.76,4.3
+BKG-000142,2024-06-01,City Suites,Deluxe,Beach,45780.15,0.646,109.22,4.2
+BKG-000143,2024-06-01,City Suites,Suite,Downtown,62936.95,0.8561,102.17,4.0
+BKG-000144,2024-06-01,City Suites,Executive,Airport,33463.5,0.8627,150.96,3.9
+BKG-000145,2024-06-01,City Suites,Family,Downtown,79770.89,0.7808,147.84,4.0
+BKG-000146,2024-06-01,Coastal Resort,Standard,Beach,75021.18,0.6979,135.4,3.5
+BKG-000147,2024-06-01,Coastal Resort,Deluxe,Beach,45508.86,0.5922,113.11,3.5
+BKG-000148,2024-06-01,Coastal Resort,Suite,Beach,80219.7,0.7139,130.71,4.2
+BKG-000149,2024-06-01,Coastal Resort,Executive,Business District,68595.93,0.6644,167.88,4.3
+BKG-000150,2024-06-01,Coastal Resort,Family,Downtown,36831.01,0.8431,169.59,3.7
+BKG-000151,2024-07-01,Grand Plaza,Standard,Beach,63157.12,0.6965,185.13,3.8
+BKG-000152,2024-07-01,Grand Plaza,Deluxe,Downtown,34720.88,0.5267,106.56,4.6
+BKG-000153,2024-07-01,Grand Plaza,Suite,Downtown,63747.61,0.9014,187.16,3.7
+BKG-000154,2024-07-01,Grand Plaza,Executive,Downtown,50671.53,0.9304,145.74,3.8
+BKG-000155,2024-07-01,Grand Plaza,Family,Airport,62968.53,0.7082,171.21,3.3
+BKG-000156,2024-07-01,Harbor Inn,Standard,Airport,76019.04,0.8509,158.15,4.5
+BKG-000157,2024-07-01,Harbor Inn,Deluxe,Downtown,56506.41,0.6323,142.21,4.8
+BKG-000158,2024-07-01,Harbor Inn,Suite,Business District,43671.75,0.8798,186.62,4.6
+BKG-000159,2024-07-01,Harbor Inn,Executive,Airport,66615.07,0.7126,133.31,3.3
+BKG-000160,2024-07-01,Harbor Inn,Family,Beach,56093.45,0.7894,187.98,4.2
+BKG-000161,2024-07-01,Summit Lodge,Standard,Suburban,92389.24,0.8158,170.54,4.1
+BKG-000162,2024-07-01,Summit Lodge,Deluxe,Airport,30016.84,0.8441,115.0,3.8
+BKG-000163,2024-07-01,Summit Lodge,Suite,Airport,18376.63,0.7487,103.85,4.7
+BKG-000164,2024-07-01,Summit Lodge,Executive,Suburban,74036.51,0.8836,126.62,3.6
+BKG-000165,2024-07-01,Summit Lodge,Family,Downtown,28921.54,0.8513,179.23,3.6
+BKG-000166,2024-07-01,City Suites,Standard,Business District,19802.73,0.789,108.46,4.4
+BKG-000167,2024-07-01,City Suites,Deluxe,Downtown,76833.4,0.9357,104.75,3.6
+BKG-000168,2024-07-01,City Suites,Suite,Airport,44329.28,0.6666,108.24,3.3
+BKG-000169,2024-07-01,City Suites,Executive,Downtown,68033.74,0.8176,139.95,3.4
+BKG-000170,2024-07-01,City Suites,Family,Downtown,108751.67,0.6087,121.86,4.4
+BKG-000171,2024-07-01,Coastal Resort,Standard,Suburban,57334.99,0.887,170.7,3.6
+BKG-000172,2024-07-01,Coastal Resort,Deluxe,Business District,46812.51,0.9068,129.32,3.2
+BKG-000173,2024-07-01,Coastal Resort,Suite,Suburban,87810.48,0.8035,102.11,4.6
+BKG-000174,2024-07-01,Coastal Resort,Executive,Suburban,48874.09,0.8783,112.42,3.7
+BKG-000175,2024-07-01,Coastal Resort,Family,Beach,18768.3,0.8218,105.75,3.4
+BKG-000176,2024-08-01,Grand Plaza,Standard,Downtown,80565.39,0.9356,180.63,4.5
+BKG-000177,2024-08-01,Grand Plaza,Deluxe,Airport,66053.51,0.5327,164.14,4.2
+BKG-000178,2024-08-01,Grand Plaza,Suite,Suburban,65783.07,0.5691,152.41,4.1
+BKG-000179,2024-08-01,Grand Plaza,Executive,Business District,109205.57,0.7808,120.47,3.5
+BKG-000180,2024-08-01,Grand Plaza,Family,Airport,17668.48,0.8172,139.24,4.0
+BKG-000181,2024-08-01,Harbor Inn,Standard,Business District,49490.5,0.5469,139.06,3.4
+BKG-000182,2024-08-01,Harbor Inn,Deluxe,Airport,25640.89,0.5675,162.45,4.1
+BKG-000183,2024-08-01,Harbor Inn,Suite,Beach,36833.29,0.7448,179.98,3.2
+BKG-000184,2024-08-01,Harbor Inn,Executive,Suburban,37499.44,0.7586,154.98,3.6
+BKG-000185,2024-08-01,Harbor Inn,Family,Beach,86754.37,0.5907,109.71,4.0
+BKG-000186,2024-08-01,Summit Lodge,Standard,Suburban,74402.97,0.6159,104.28,3.7
+BKG-000187,2024-08-01,Summit Lodge,Deluxe,Beach,66537.82,0.745,102.9,4.2
+BKG-000188,2024-08-01,Summit Lodge,Suite,Suburban,67147.55,0.7216,172.44,3.4
+BKG-000189,2024-08-01,Summit Lodge,Executive,Suburban,43874.52,0.5389,180.33,4.7
+BKG-000190,2024-08-01,Summit Lodge,Family,Downtown,40573.18,0.6477,137.07,4.8
+BKG-000191,2024-08-01,City Suites,Standard,Airport,17817.24,0.5656,106.46,4.1
+BKG-000192,2024-08-01,City Suites,Deluxe,Beach,57863.38,0.8566,113.43,4.2
+BKG-000193,2024-08-01,City Suites,Suite,Airport,18862.66,0.6318,179.54,4.8
+BKG-000194,2024-08-01,City Suites,Executive,Airport,66269.76,0.6948,104.02,3.3
+BKG-000195,2024-08-01,City Suites,Family,Beach,49824.57,0.6919,188.46,4.4
+BKG-000196,2024-08-01,Coastal Resort,Standard,Business District,83102.03,0.7769,166.44,3.9
+BKG-000197,2024-08-01,Coastal Resort,Deluxe,Beach,23863.22,0.8376,162.18,4.0
+BKG-000198,2024-08-01,Coastal Resort,Suite,Beach,102067.16,0.8833,175.34,3.9
+BKG-000199,2024-08-01,Coastal Resort,Executive,Downtown,51317.66,0.7441,108.11,4.2
+BKG-000200,2024-08-01,Coastal Resort,Family,Beach,14388.61,0.5238,176.89,4.0
+BKG-000201,2024-09-01,Grand Plaza,Standard,Beach,66312.02,0.8219,157.81,4.8
+BKG-000202,2024-09-01,Grand Plaza,Deluxe,Beach,24875.98,0.8754,163.49,4.6
+BKG-000203,2024-09-01,Grand Plaza,Suite,Beach,100273.79,0.9364,165.57,4.5
+BKG-000204,2024-09-01,Grand Plaza,Executive,Airport,51332.11,0.8092,104.27,4.9
+BKG-000205,2024-09-01,Grand Plaza,Family,Suburban,21106.55,0.5611,179.29,3.4
+BKG-000206,2024-09-01,Harbor Inn,Standard,Business District,28775.41,0.6611,108.14,4.2
+BKG-000207,2024-09-01,Harbor Inn,Deluxe,Business District,59080.36,0.8952,131.13,3.4
+BKG-000208,2024-09-01,Harbor Inn,Suite,Suburban,90563.21,0.5574,134.14,3.9
+BKG-000209,2024-09-01,Harbor Inn,Executive,Beach,76872.2,0.5284,168.77,3.5
+BKG-000210,2024-09-01,Harbor Inn,Family,Downtown,52706.93,0.6164,158.59,4.5
+BKG-000211,2024-09-01,Summit Lodge,Standard,Business District,87662.45,0.8757,132.89,3.5
+BKG-000212,2024-09-01,Summit Lodge,Deluxe,Beach,111238.87,0.6145,102.22,3.5
+BKG-000213,2024-09-01,Summit Lodge,Suite,Airport,64838.17,0.8958,110.91,3.9
+BKG-000214,2024-09-01,Summit Lodge,Executive,Business District,26727.39,0.7789,180.56,4.2
+BKG-000215,2024-09-01,Summit Lodge,Family,Downtown,83174.29,0.558,182.39,3.3
+BKG-000216,2024-09-01,City Suites,Standard,Airport,32712.37,0.6788,114.4,3.6
+BKG-000217,2024-09-01,City Suites,Deluxe,Downtown,62555.42,0.8738,134.93,4.5
+BKG-000218,2024-09-01,City Suites,Suite,Beach,39219.28,0.6153,161.11,4.7
+BKG-000219,2024-09-01,City Suites,Executive,Suburban,85703.01,0.9115,120.89,4.3
+BKG-000220,2024-09-01,City Suites,Family,Downtown,52404.63,0.6143,186.55,4.7
+BKG-000221,2024-09-01,Coastal Resort,Standard,Business District,50551.62,0.9044,176.99,3.8
+BKG-000222,2024-09-01,Coastal Resort,Deluxe,Business District,59086.89,0.874,124.32,4.7
+BKG-000223,2024-09-01,Coastal Resort,Suite,Airport,94588.41,0.5707,107.22,3.4
+BKG-000224,2024-09-01,Coastal Resort,Executive,Downtown,16590.31,0.7185,137.15,4.4
+BKG-000225,2024-09-01,Coastal Resort,Family,Downtown,79904.55,0.552,180.06,3.2
+BKG-000226,2024-10-01,Grand Plaza,Standard,Beach,14016.98,0.5394,141.12,4.1
+BKG-000227,2024-10-01,Grand Plaza,Deluxe,Beach,42004.13,0.6057,119.1,3.4
+BKG-000228,2024-10-01,Grand Plaza,Suite,Downtown,44633.08,0.7362,119.35,4.0
+BKG-000229,2024-10-01,Grand Plaza,Executive,Suburban,29351.67,0.5621,168.51,4.2
+BKG-000230,2024-10-01,Grand Plaza,Family,Business District,83647.28,0.5602,130.14,3.8
+BKG-000231,2024-10-01,Harbor Inn,Standard,Downtown,90068.21,0.9102,150.16,4.4
+BKG-000232,2024-10-01,Harbor Inn,Deluxe,Business District,31399.11,0.5481,152.98,4.1
+BKG-000233,2024-10-01,Harbor Inn,Suite,Downtown,94953.23,0.769,115.57,3.8
+BKG-000234,2024-10-01,Harbor Inn,Executive,Business District,101623.09,0.5827,148.11,3.9
+BKG-000235,2024-10-01,Harbor Inn,Family,Suburban,21575.7,0.6742,159.41,3.7
+BKG-000236,2024-10-01,Summit Lodge,Standard,Airport,15592.16,0.8692,102.19,3.8
+BKG-000237,2024-10-01,Summit Lodge,Deluxe,Airport,41384.97,0.8585,185.65,4.0
+BKG-000238,2024-10-01,Summit Lodge,Suite,Airport,23849.12,0.7391,115.33,3.6
+BKG-000239,2024-10-01,Summit Lodge,Executive,Airport,24103.95,0.8154,143.67,3.8
+BKG-000240,2024-10-01,Summit Lodge,Family,Airport,18931.68,0.8443,183.72,4.3
+BKG-000241,2024-10-01,City Suites,Standard,Beach,72318.74,0.8303,182.37,4.6
+BKG-000242,2024-10-01,City Suites,Deluxe,Business District,14473.53,0.9147,144.0,4.9
+BKG-000243,2024-10-01,City Suites,Suite,Downtown,27009.75,0.7203,129.77,4.7
+BKG-000244,2024-10-01,City Suites,Executive,Downtown,15290.14,0.84,154.7,3.7
+BKG-000245,2024-10-01,City Suites,Family,Airport,74580.04,0.7901,150.37,4.0
+BKG-000246,2024-10-01,Coastal Resort,Standard,Business District,61674.66,0.9288,120.19,3.5
+BKG-000247,2024-10-01,Coastal Resort,Deluxe,Business District,13260.41,0.7112,173.41,4.5
+BKG-000248,2024-10-01,Coastal Resort,Suite,Beach,80929.85,0.9075,155.3,3.2
+BKG-000249,2024-10-01,Coastal Resort,Executive,Suburban,15179.51,0.8444,168.55,4.0
+BKG-000250,2024-10-01,Coastal Resort,Family,Beach,72632.34,0.7769,116.97,4.4
+BKG-000001,2024-01-01,Grand Plaza,Standard,Suburban,34045.63,0.9173,105.29,4.4
+BKG-000002,2024-01-01,Grand Plaza,Deluxe,Beach,30784.22,0.782,123.78,3.7
+BKG-000003,2024-01-01,Grand Plaza,Suite,Beach,36927.16,0.6529,121.5,4.1
+BKG-000004,2024-01-01,Grand Plaza,Executive,Business District,85009.36,0.7695,109.84,3.9
+BKG-000005,2024-01-01,Grand Plaza,Family,Suburban,67238.08,0.5738,156.61,3.5
+BKG-000006,2024-01-01,Harbor Inn,Standard,Downtown,21920.06,0.6968,150.28,3.7
+BKG-000007,2024-01-01,Harbor Inn,Deluxe,Downtown,52396.73,0.8987,109.52,4.6
+BKG-000008,2024-01-01,Harbor Inn,Suite,Business District,102311.24,0.6291,174.33,3.7
+BKG-000009,2024-01-01,Harbor Inn,Executive,Business District,25081.4,0.6706,166.65,4.5
+BKG-000010,2024-01-01,Harbor Inn,Family,Airport,14113.53,0.7879,145.13,4.0
+BKG-000011,2024-01-01,Summit Lodge,Standard,Downtown,54910.23,0.8697,175.47,4.1
+BKG-000012,2024-01-01,Summit Lodge,Deluxe,Beach,70310.52,0.7593,186.48,4.2
+BKG-000013,2024-01-01,Summit Lodge,Suite,Airport,68383.4,0.6016,157.62,4.7
+BKG-000014,2024-01-01,Summit Lodge,Executive,Airport,96054.23,0.8042,182.74,3.3
+BKG-000015,2024-01-01,Summit Lodge,Family,Airport,14486.21,0.7684,187.42,3.6
+BKG-000016,2024-01-01,City Suites,Standard,Beach,29951.53,0.8294,124.24,4.1
+BKG-000017,2024-01-01,City Suites,Deluxe,Downtown,34970.29,0.6947,148.71,4.5
+BKG-000018,2024-01-01,City Suites,Suite,Airport,80868.82,0.6606,144.47,4.4
+BKG-000019,2024-01-01,City Suites,Executive,Downtown,41525.73,0.6576,160.58,3.9
+BKG-000020,2024-01-01,City Suites,Family,Business District,88408.54,0.8424,110.25,4.7
+BKG-000021,2024-01-01,Coastal Resort,Standard,Suburban,58451.99,0.8385,145.51,3.6
+BKG-000022,2024-01-01,Coastal Resort,Deluxe,Suburban,104568.79,0.8816,111.32,3.4
+BKG-000023,2024-01-01,Coastal Resort,Suite,Beach,62572.77,0.8723,161.96,3.8
+BKG-000024,2024-01-01,Coastal Resort,Executive,Beach,60584.2,0.5475,187.63,3.7
+BKG-000025,2024-01-01,Coastal Resort,Family,Downtown,48697.68,0.8498,112.31,3.8
+BKG-000026,2024-02-01,Grand Plaza,Standard,Suburban,77570.65,0.5844,185.08,3.7
+BKG-000027,2024-02-01,Grand Plaza,Deluxe,Airport,89482.7,0.9023,157.76,3.8
+BKG-000028,2024-02-01,Grand Plaza,Suite,Beach,47866.82,0.7551,173.05,4.1
+BKG-000029,2024-02-01,Grand Plaza,Executive,Suburban,86592.61,0.533,167.36,4.2
+BKG-000030,2024-02-01,Grand Plaza,Family,Downtown,77303.15,0.6089,121.35,3.6
+BKG-000031,2024-02-01,Harbor Inn,Standard,Airport,55092.16,0.8094,181.84,4.2
+BKG-000032,2024-02-01,Harbor Inn,Deluxe,Beach,58357.27,0.5741,108.78,3.6
+BKG-000033,2024-02-01,Harbor Inn,Suite,Suburban,22871.07,0.9042,165.09,3.5
+BKG-000034,2024-02-01,Harbor Inn,Executive,Beach,77353.82,0.7062,179.34,3.7
+BKG-000035,2024-02-01,Harbor Inn,Family,Beach,13274.35,0.8814,138.29,3.8
+BKG-000036,2024-02-01,Summit Lodge,Standard,Business District,38336.61,0.7135,106.8,3.7
+BKG-000037,2024-02-01,Summit Lodge,Deluxe,Business District,97503.56,0.6658,101.87,4.1
+BKG-000038,2024-02-01,Summit Lodge,Suite,Airport,14835.82,0.7784,118.5,3.6
+BKG-000039,2024-02-01,Summit Lodge,Executive,Airport,44576.9,0.6804,139.69,4.2
+BKG-000040,2024-02-01,Summit Lodge,Family,Airport,59426.11,0.8374,138.72,4.6
+BKG-000041,2024-02-01,City Suites,Standard,Downtown,78466.65,0.8307,133.94,4.9
+BKG-000042,2024-02-01,City Suites,Deluxe,Suburban,74406.98,0.5727,156.03,4.2
+BKG-000043,2024-02-01,City Suites,Suite,Business District,66948.69,0.6807,152.59,3.6
+BKG-000044,2024-02-01,City Suites,Executive,Business District,29299.55,0.7804,139.47,3.6
+BKG-000045,2024-02-01,City Suites,Family,Suburban,54130.91,0.6793,128.21,4.2
+BKG-000046,2024-02-01,Coastal Resort,Standard,Downtown,36532.31,0.8788,169.89,4.2
+BKG-000047,2024-02-01,Coastal Resort,Deluxe,Airport,33516.99,0.7418,159.22,3.9
+BKG-000048,2024-02-01,Coastal Resort,Suite,Beach,46939.81,0.7118,181.4,3.5
+BKG-000049,2024-02-01,Coastal Resort,Executive,Suburban,48172.35,0.7059,121.8,4.0
+BKG-000050,2024-02-01,Coastal Resort,Family,Beach,107647.72,0.8078,101.83,4.6
+BKG-000051,2024-03-01,Grand Plaza,Standard,Suburban,33456.9,0.6111,141.42,3.7
+BKG-000052,2024-03-01,Grand Plaza,Deluxe,Downtown,79144.6,0.8916,171.7,3.9
+BKG-000053,2024-03-01,Grand Plaza,Suite,Downtown,65443.75,0.5598,168.76,3.7
+BKG-000054,2024-03-01,Grand Plaza,Executive,Beach,72608.99,0.5747,151.94,3.4
+BKG-000055,2024-03-01,Grand Plaza,Family,Business District,91021.08,0.6188,127.86,4.0
+BKG-000056,2024-03-01,Harbor Inn,Standard,Downtown,16304.44,0.8507,166.3,3.5
+BKG-000057,2024-03-01,Harbor Inn,Deluxe,Beach,57845.05,0.7609,125.25,4.2
+BKG-000058,2024-03-01,Harbor Inn,Suite,Business District,79841.69,0.7889,146.21,3.5
+BKG-000059,2024-03-01,Harbor Inn,Executive,Suburban,17296.19,0.5819,119.32,4.2
+BKG-000060,2024-03-01,Harbor Inn,Family,Beach,89730.98,0.8259,167.35,4.4
+BKG-000061,2024-03-01,Summit Lodge,Standard,Beach,41737.35,0.8854,170.69,4.1
+BKG-000062,2024-03-01,Summit Lodge,Deluxe,Downtown,68736.54,0.7315,124.59,4.6
+BKG-000063,2024-03-01,Summit Lodge,Suite,Suburban,100423.47,0.6013,103.54,3.9
+BKG-000064,2024-03-01,Summit Lodge,Executive,Downtown,51427.85,0.6577,155.07,3.8
+BKG-000065,2024-03-01,Summit Lodge,Family,Business District,13587.08,0.9215,187.18,3.6
+BKG-000066,2024-03-01,City Suites,Standard,Airport,71327.98,0.5751,106.31,4.6
+BKG-000067,2024-03-01,City Suites,Deluxe,Suburban,25546.04,0.6864,182.26,3.7
+BKG-000068,2024-03-01,City Suites,Suite,Business District,69204.54,0.5426,107.77,4.3
+BKG-000069,2024-03-01,City Suites,Executive,Downtown,71378.92,0.9003,143.5,3.8
+BKG-000070,2024-03-01,City Suites,Family,Business District,31689.29,0.6278,167.44,4.1
+BKG-000071,2024-03-01,Coastal Resort,Standard,Suburban,111998.79,0.5608,134.38,4.6
+BKG-000072,2024-03-01,Coastal Resort,Deluxe,Suburban,19738.65,0.8729,104.66,3.9
+BKG-000073,2024-03-01,Coastal Resort,Suite,Suburban,67456.71,0.6876,152.46,3.7
+BKG-000074,2024-03-01,Coastal Resort,Executive,Downtown,78359.94,0.5444,174.45,3.9
+BKG-000075,2024-03-01,Coastal Resort,Family,Downtown,41094.38,0.807,139.69,4.2
+BKG-000076,2024-04-01,Grand Plaza,Standard,Business District,74320.62,0.5588,116.36,4.5
+BKG-000077,2024-04-01,Grand Plaza,Deluxe,Beach,50887.33,0.9213,145.92,3.7
+BKG-000078,2024-04-01,Grand Plaza,Suite,Suburban,26731.97,0.7243,182.06,4.2
+BKG-000079,2024-04-01,Grand Plaza,Executive,Airport,73352.52,0.6186,142.05,3.4
+BKG-000080,2024-04-01,Grand Plaza,Family,Suburban,48586.28,0.7345,133.29,4.6
+BKG-000081,2024-04-01,Harbor Inn,Standard,Suburban,35540.51,0.8223,140.53,3.3
+BKG-000082,2024-04-01,Harbor Inn,Deluxe,Beach,30809.31,0.8036,165.08,3.4
+BKG-000083,2024-04-01,Harbor Inn,Suite,Business District,84871.91,0.7423,155.1,4.1
+BKG-000084,2024-04-01,Harbor Inn,Executive,Suburban,66982.48,0.7254,172.13,3.5
+BKG-000085,2024-04-01,Harbor Inn,Family,Suburban,75957.25,0.7464,108.99,4.4
+BKG-000086,2024-04-01,Summit Lodge,Standard,Beach,69521.99,0.7928,152.12,3.7
+BKG-000087,2024-04-01,Summit Lodge,Deluxe,Downtown,67376.3,0.758,155.82,3.7
+BKG-000088,2024-04-01,Summit Lodge,Suite,Beach,66652.62,0.5624,163.66,3.4
+BKG-000089,2024-04-01,Summit Lodge,Executive,Business District,54170.87,0.7957,132.88,3.4
+BKG-000090,2024-04-01,Summit Lodge,Family,Suburban,56809.82,0.8464,153.93,3.5
+BKG-000091,2024-04-01,City Suites,Standard,Downtown,40730.56,0.9252,137.59,3.3
+BKG-000092,2024-04-01,City Suites,Deluxe,Downtown,17268.02,0.8478,156.58,4.2
+BKG-000093,2024-04-01,City Suites,Suite,Airport,88554.66,0.5712,180.2,3.7
+BKG-000094,2024-04-01,City Suites,Executive,Downtown,20745.27,0.717,176.94,3.8
+BKG-000095,2024-04-01,City Suites,Family,Suburban,65723.54,0.7743,121.59,3.6
+BKG-000096,2024-04-01,Coastal Resort,Standard,Beach,31048.36,0.7723,105.31,4.4
+BKG-000097,2024-04-01,Coastal Resort,Deluxe,Suburban,40641.05,0.8569,120.92,4.5
+BKG-000098,2024-04-01,Coastal Resort,Suite,Downtown,35540.94,0.5687,178.23,4.9
+BKG-000099,2024-04-01,Coastal Resort,Executive,Beach,111973.96,0.8539,183.17,4.5
+BKG-000100,2024-04-01,Coastal Resort,Family,Downtown,64216.61,0.8524,108.88,4.6
+BKG-000101,2024-05-01,Grand Plaza,Standard,Downtown,53780.15,0.7426,160.95,3.4
+BKG-000102,2024-05-01,Grand Plaza,Deluxe,Airport,76406.18,0.6541,173.26,4.0
+BKG-000103,2024-05-01,Grand Plaza,Suite,Airport,14075.28,0.7055,174.21,3.4
+BKG-000104,2024-05-01,Grand Plaza,Executive,Business District,84639.12,0.8646,110.81,3.2
+BKG-000105,2024-05-01,Grand Plaza,Family,Downtown,12957.49,0.9284,156.59,4.4
+BKG-000106,2024-05-01,Harbor Inn,Standard,Downtown,36970.16,0.6495,150.21,4.0
+BKG-000107,2024-05-01,Harbor Inn,Deluxe,Suburban,79065.57,0.5209,140.86,4.6
+BKG-000108,2024-05-01,Harbor Inn,Suite,Downtown,15881.85,0.9249,176.24,3.2
+BKG-000109,2024-05-01,Harbor Inn,Executive,Downtown,80208.38,0.9032,109.19,4.9
+BKG-000110,2024-05-01,Harbor Inn,Family,Beach,28098.96,0.912,161.51,3.7
+BKG-000111,2024-05-01,Summit Lodge,Standard,Business District,16746.54,0.5683,158.58,4.9
+BKG-000112,2024-05-01,Summit Lodge,Deluxe,Suburban,96173.43,0.561,182.22,3.6
+BKG-000113,2024-05-01,Summit Lodge,Suite,Downtown,89992.97,0.6074,151.2,4.8
+BKG-000114,2024-05-01,Summit Lodge,Executive,Business District,93545.93,0.6309,176.8,3.6
+BKG-000115,2024-05-01,Summit Lodge,Family,Airport,56416.75,0.7978,166.23,4.7
+BKG-000116,2024-05-01,City Suites,Standard,Suburban,72006.24,0.6475,115.23,4.4
+BKG-000117,2024-05-01,City Suites,Deluxe,Suburban,32986.48,0.5287,178.78,3.3
+BKG-000118,2024-05-01,City Suites,Suite,Suburban,25987.24,0.5212,142.78,4.6
+BKG-000119,2024-05-01,City Suites,Executive,Suburban,41963.04,0.639,168.35,3.9
+BKG-000120,2024-05-01,City Suites,Family,Suburban,79352.31,0.5579,111.62,3.2
+BKG-000121,2024-05-01,Coastal Resort,Standard,Suburban,18270.35,0.6651,176.19,3.7
+BKG-000122,2024-05-01,Coastal Resort,Deluxe,Beach,96743.41,0.7881,132.57,3.7
+BKG-000123,2024-05-01,Coastal Resort,Suite,Suburban,53629.08,0.6434,174.79,3.8
+BKG-000124,2024-05-01,Coastal Resort,Executive,Downtown,59921.98,0.5519,108.16,3.7
+BKG-000125,2024-05-01,Coastal Resort,Family,Airport,53597.95,0.7395,187.4,4.6
+BKG-000126,2024-06-01,Grand Plaza,Standard,Airport,36891.18,0.5974,155.45,3.4
+BKG-000127,2024-06-01,Grand Plaza,Deluxe,Downtown,82016.19,0.8199,182.72,4.1
+BKG-000128,2024-06-01,Grand Plaza,Suite,Downtown,85392.13,0.7378,157.84,4.6
+BKG-000129,2024-06-01,Grand Plaza,Executive,Downtown,41777.24,0.8677,114.63,4.2
+BKG-000130,2024-06-01,Grand Plaza,Family,Beach,52162.97,0.7761,180.27,4.5
+BKG-000131,2024-06-01,Harbor Inn,Standard,Downtown,25137.92,0.5246,187.51,4.1
+BKG-000132,2024-06-01,Harbor Inn,Deluxe,Downtown,35900.11,0.8913,185.42,4.7
+BKG-000133,2024-06-01,Harbor Inn,Suite,Beach,65438.62,0.8805,114.39,4.6
+BKG-000134,2024-06-01,Harbor Inn,Executive,Beach,66879.97,0.5709,142.51,4.8
+BKG-000135,2024-06-01,Harbor Inn,Family,Suburban,39348.74,0.6812,144.24,4.1
+BKG-000136,2024-06-01,Summit Lodge,Standard,Suburban,13155.84,0.6959,157.03,3.5
+BKG-000137,2024-06-01,Summit Lodge,Deluxe,Airport,77837.47,0.7796,161.54,3.7
+BKG-000138,2024-06-01,Summit Lodge,Suite,Airport,27159.57,0.5659,107.89,4.2
+BKG-000139,2024-06-01,Summit Lodge,Executive,Downtown,72014.77,0.6346,128.99,4.4
+BKG-000140,2024-06-01,Summit Lodge,Family,Downtown,102504.72,0.5754,158.78,3.5
+BKG-000141,2024-06-01,City Suites,Standard,Beach,46196.89,0.6462,122.76,4.3
+BKG-000142,2024-06-01,City Suites,Deluxe,Beach,45780.15,0.646,109.22,4.2
+BKG-000143,2024-06-01,City Suites,Suite,Downtown,62936.95,0.8561,102.17,4.0
+BKG-000144,2024-06-01,City Suites,Executive,Airport,33463.5,0.8627,150.96,3.9
+BKG-000145,2024-06-01,City Suites,Family,Downtown,79770.89,0.7808,147.84,4.0
+BKG-000146,2024-06-01,Coastal Resort,Standard,Beach,75021.18,0.6979,135.4,3.5
+BKG-000147,2024-06-01,Coastal Resort,Deluxe,Beach,45508.86,0.5922,113.11,3.5
+BKG-000148,2024-06-01,Coastal Resort,Suite,Beach,80219.7,0.7139,130.71,4.2
+BKG-000149,2024-06-01,Coastal Resort,Executive,Business District,68595.93,0.6644,167.88,4.3
+BKG-000150,2024-06-01,Coastal Resort,Family,Downtown,36831.01,0.8431,169.59,3.7
+BKG-000151,2024-07-01,Grand Plaza,Standard,Beach,63157.12,0.6965,185.13,3.8
+BKG-000152,2024-07-01,Grand Plaza,Deluxe,Downtown,34720.88,0.5267,106.56,4.6
+BKG-000153,2024-07-01,Grand Plaza,Suite,Downtown,63747.61,0.9014,187.16,3.7
+BKG-000154,2024-07-01,Grand Plaza,Executive,Downtown,50671.53,0.9304,145.74,3.8
+BKG-000155,2024-07-01,Grand Plaza,Family,Airport,62968.53,0.7082,171.21,3.3
+BKG-000156,2024-07-01,Harbor Inn,Standard,Airport,76019.04,0.8509,158.15,4.5
+BKG-000157,2024-07-01,Harbor Inn,Deluxe,Downtown,56506.41,0.6323,142.21,4.8
+BKG-000158,2024-07-01,Harbor Inn,Suite,Business District,43671.75,0.8798,186.62,4.6
+BKG-000159,2024-07-01,Harbor Inn,Executive,Airport,66615.07,0.7126,133.31,3.3
+BKG-000160,2024-07-01,Harbor Inn,Family,Beach,56093.45,0.7894,187.98,4.2
+BKG-000161,2024-07-01,Summit Lodge,Standard,Suburban,92389.24,0.8158,170.54,4.1
+BKG-000162,2024-07-01,Summit Lodge,Deluxe,Airport,30016.84,0.8441,115.0,3.8
+BKG-000163,2024-07-01,Summit Lodge,Suite,Airport,18376.63,0.7487,103.85,4.7
+BKG-000164,2024-07-01,Summit Lodge,Executive,Suburban,74036.51,0.8836,126.62,3.6
+BKG-000165,2024-07-01,Summit Lodge,Family,Downtown,28921.54,0.8513,179.23,3.6
+BKG-000166,2024-07-01,City Suites,Standard,Business District,19802.73,0.789,108.46,4.4
+BKG-000167,2024-07-01,City Suites,Deluxe,Downtown,76833.4,0.9357,104.75,3.6
+BKG-000168,2024-07-01,City Suites,Suite,Airport,44329.28,0.6666,108.24,3.3
+BKG-000169,2024-07-01,City Suites,Executive,Downtown,68033.74,0.8176,139.95,3.4
+BKG-000170,2024-07-01,City Suites,Family,Downtown,108751.67,0.6087,121.86,4.4
+BKG-000171,2024-07-01,Coastal Resort,Standard,Suburban,57334.99,0.887,170.7,3.6
+BKG-000172,2024-07-01,Coastal Resort,Deluxe,Business District,46812.51,0.9068,129.32,3.2
+BKG-000173,2024-07-01,Coastal Resort,Suite,Suburban,87810.48,0.8035,102.11,4.6
+BKG-000174,2024-07-01,Coastal Resort,Executive,Suburban,48874.09,0.8783,112.42,3.7
+BKG-000175,2024-07-01,Coastal Resort,Family,Beach,18768.3,0.8218,105.75,3.4
+BKG-000176,2024-08-01,Grand Plaza,Standard,Downtown,80565.39,0.9356,180.63,4.5
+BKG-000177,2024-08-01,Grand Plaza,Deluxe,Airport,66053.51,0.5327,164.14,4.2
+BKG-000178,2024-08-01,Grand Plaza,Suite,Suburban,65783.07,0.5691,152.41,4.1
+BKG-000179,2024-08-01,Grand Plaza,Executive,Business District,109205.57,0.7808,120.47,3.5
+BKG-000180,2024-08-01,Grand Plaza,Family,Airport,17668.48,0.8172,139.24,4.0
+BKG-000181,2024-08-01,Harbor Inn,Standard,Business District,49490.5,0.5469,139.06,3.4
+BKG-000182,2024-08-01,Harbor Inn,Deluxe,Airport,25640.89,0.5675,162.45,4.1
+BKG-000183,2024-08-01,Harbor Inn,Suite,Beach,36833.29,0.7448,179.98,3.2
+BKG-000184,2024-08-01,Harbor Inn,Executive,Suburban,37499.44,0.7586,154.98,3.6
+BKG-000185,2024-08-01,Harbor Inn,Family,Beach,86754.37,0.5907,109.71,4.0
+BKG-000186,2024-08-01,Summit Lodge,Standard,Suburban,74402.97,0.6159,104.28,3.7
+BKG-000187,2024-08-01,Summit Lodge,Deluxe,Beach,66537.82,0.745,102.9,4.2
+BKG-000188,2024-08-01,Summit Lodge,Suite,Suburban,67147.55,0.7216,172.44,3.4
+BKG-000189,2024-08-01,Summit Lodge,Executive,Suburban,43874.52,0.5389,180.33,4.7
+BKG-000190,2024-08-01,Summit Lodge,Family,Downtown,40573.18,0.6477,137.07,4.8
+BKG-000191,2024-08-01,City Suites,Standard,Airport,17817.24,0.5656,106.46,4.1
+BKG-000192,2024-08-01,City Suites,Deluxe,Beach,57863.38,0.8566,113.43,4.2
+BKG-000193,2024-08-01,City Suites,Suite,Airport,18862.66,0.6318,179.54,4.8
+BKG-000194,2024-08-01,City Suites,Executive,Airport,66269.76,0.6948,104.02,3.3
+BKG-000195,2024-08-01,City Suites,Family,Beach,49824.57,0.6919,188.46,4.4
+BKG-000196,2024-08-01,Coastal Resort,Standard,Business District,83102.03,0.7769,166.44,3.9
+BKG-000197,2024-08-01,Coastal Resort,Deluxe,Beach,23863.22,0.8376,162.18,4.0
+BKG-000198,2024-08-01,Coastal Resort,Suite,Beach,102067.16,0.8833,175.34,3.9
+BKG-000199,2024-08-01,Coastal Resort,Executive,Downtown,51317.66,0.7441,108.11,4.2
+BKG-000200,2024-08-01,Coastal Resort,Family,Beach,14388.61,0.5238,176.89,4.0
+BKG-000201,2024-09-01,Grand Plaza,Standard,Beach,66312.02,0.8219,157.81,4.8
+BKG-000202,2024-09-01,Grand Plaza,Deluxe,Beach,24875.98,0.8754,163.49,4.6
+BKG-000203,2024-09-01,Grand Plaza,Suite,Beach,100273.79,0.9364,165.57,4.5
+BKG-000204,2024-09-01,Grand Plaza,Executive,Airport,51332.11,0.8092,104.27,4.9
+BKG-000205,2024-09-01,Grand Plaza,Family,Suburban,21106.55,0.5611,179.29,3.4
+BKG-000206,2024-09-01,Harbor Inn,Standard,Business District,28775.41,0.6611,108.14,4.2
+BKG-000207,2024-09-01,Harbor Inn,Deluxe,Business District,59080.36,0.8952,131.13,3.4
+BKG-000208,2024-09-01,Harbor Inn,Suite,Suburban,90563.21,0.5574,134.14,3.9
+BKG-000209,2024-09-01,Harbor Inn,Executive,Beach,76872.2,0.5284,168.77,3.5
+BKG-000210,2024-09-01,Harbor Inn,Family,Downtown,52706.93,0.6164,158.59,4.5
+BKG-000211,2024-09-01,Summit Lodge,Standard,Business District,87662.45,0.8757,132.89,3.5
+BKG-000212,2024-09-01,Summit Lodge,Deluxe,Beach,111238.87,0.6145,102.22,3.5
+BKG-000213,2024-09-01,Summit Lodge,Suite,Airport,64838.17,0.8958,110.91,3.9
+BKG-000214,2024-09-01,Summit Lodge,Executive,Business District,26727.39,0.7789,180.56,4.2
+BKG-000215,2024-09-01,Summit Lodge,Family,Downtown,83174.29,0.558,182.39,3.3
+BKG-000216,2024-09-01,City Suites,Standard,Airport,32712.37,0.6788,114.4,3.6
+BKG-000217,2024-09-01,City Suites,Deluxe,Downtown,62555.42,0.8738,134.93,4.5
+BKG-000218,2024-09-01,City Suites,Suite,Beach,39219.28,0.6153,161.11,4.7
+BKG-000219,2024-09-01,City Suites,Executive,Suburban,85703.01,0.9115,120.89,4.3
+BKG-000220,2024-09-01,City Suites,Family,Downtown,52404.63,0.6143,186.55,4.7
+BKG-000221,2024-09-01,Coastal Resort,Standard,Business District,50551.62,0.9044,176.99,3.8
+BKG-000222,2024-09-01,Coastal Resort,Deluxe,Business District,59086.89,0.874,124.32,4.7
+BKG-000223,2024-09-01,Coastal Resort,Suite,Airport,94588.41,0.5707,107.22,3.4
+BKG-000224,2024-09-01,Coastal Resort,Executive,Downtown,16590.31,0.7185,137.15,4.4
+BKG-000225,2024-09-01,Coastal Resort,Family,Downtown,79904.55,0.552,180.06,3.2
+BKG-000226,2024-10-01,Grand Plaza,Standard,Beach,14016.98,0.5394,141.12,4.1
+BKG-000227,2024-10-01,Grand Plaza,Deluxe,Beach,42004.13,0.6057,119.1,3.4
+BKG-000228,2024-10-01,Grand Plaza,Suite,Downtown,44633.08,0.7362,119.35,4.0
+BKG-000229,2024-10-01,Grand Plaza,Executive,Suburban,29351.67,0.5621,168.51,4.2
+BKG-000230,2024-10-01,Grand Plaza,Family,Business District,83647.28,0.5602,130.14,3.8
+BKG-000231,2024-10-01,Harbor Inn,Standard,Downtown,90068.21,0.9102,150.16,4.4
+BKG-000232,2024-10-01,Harbor Inn,Deluxe,Business District,31399.11,0.5481,152.98,4.1
+BKG-000233,2024-10-01,Harbor Inn,Suite,Downtown,94953.23,0.769,115.57,3.8
+BKG-000234,2024-10-01,Harbor Inn,Executive,Business District,101623.09,0.5827,148.11,3.9
+BKG-000235,2024-10-01,Harbor Inn,Family,Suburban,21575.7,0.6742,159.41,3.7
+BKG-000236,2024-10-01,Summit Lodge,Standard,Airport,15592.16,0.8692,102.19,3.8
+BKG-000237,2024-10-01,Summit Lodge,Deluxe,Airport,41384.97,0.8585,185.65,4.0
+BKG-000238,2024-10-01,Summit Lodge,Suite,Airport,23849.12,0.7391,115.33,3.6
+BKG-000239,2024-10-01,Summit Lodge,Executive,Airport,24103.95,0.8154,143.67,3.8
+BKG-000240,2024-10-01,Summit Lodge,Family,Airport,18931.68,0.8443,183.72,4.3
+BKG-000241,2024-10-01,City Suites,Standard,Beach,72318.74,0.8303,182.37,4.6
+BKG-000242,2024-10-01,City Suites,Deluxe,Business District,14473.53,0.9147,144.0,4.9
+BKG-000243,2024-10-01,City Suites,Suite,Downtown,27009.75,0.7203,129.77,4.7
+BKG-000244,2024-10-01,City Suites,Executive,Downtown,15290.14,0.84,154.7,3.7
+BKG-000245,2024-10-01,City Suites,Family,Airport,74580.04,0.7901,150.37,4.0
+BKG-000246,2024-10-01,Coastal Resort,Standard,Business District,61674.66,0.9288,120.19,3.5
+BKG-000247,2024-10-01,Coastal Resort,Deluxe,Business District,13260.41,0.7112,173.41,4.5
+BKG-000248,2024-10-01,Coastal Resort,Suite,Beach,80929.85,0.9075,155.3,3.2
+BKG-000249,2024-10-01,Coastal Resort,Executive,Suburban,15179.51,0.8444,168.55,4.0
+BKG-000250,2024-10-01,Coastal Resort,Family,Beach,72632.34,0.7769,116.97,4.4
+BKG-000001,2024-01-01,Grand Plaza,Standard,Suburban,34045.63,0.9173,105.29,4.4
+BKG-000002,2024-01-01,Grand Plaza,Deluxe,Beach,30784.22,0.782,123.78,3.7
+BKG-000003,2024-01-01,Grand Plaza,Suite,Beach,36927.16,0.6529,121.5,4.1
+BKG-000004,2024-01-01,Grand Plaza,Executive,Business District,85009.36,0.7695,109.84,3.9
+BKG-000005,2024-01-01,Grand Plaza,Family,Suburban,67238.08,0.5738,156.61,3.5
+BKG-000006,2024-01-01,Harbor Inn,Standard,Downtown,21920.06,0.6968,150.28,3.7
+BKG-000007,2024-01-01,Harbor Inn,Deluxe,Downtown,52396.73,0.8987,109.52,4.6
+BKG-000008,2024-01-01,Harbor Inn,Suite,Business District,102311.24,0.6291,174.33,3.7
+BKG-000009,2024-01-01,Harbor Inn,Executive,Business District,25081.4,0.6706,166.65,4.5
+BKG-000010,2024-01-01,Harbor Inn,Family,Airport,14113.53,0.7879,145.13,4.0
+BKG-000011,2024-01-01,Summit Lodge,Standard,Downtown,54910.23,0.8697,175.47,4.1
+BKG-000012,2024-01-01,Summit Lodge,Deluxe,Beach,70310.52,0.7593,186.48,4.2
+BKG-000013,2024-01-01,Summit Lodge,Suite,Airport,68383.4,0.6016,157.62,4.7
+BKG-000014,2024-01-01,Summit Lodge,Executive,Airport,96054.23,0.8042,182.74,3.3
+BKG-000015,2024-01-01,Summit Lodge,Family,Airport,14486.21,0.7684,187.42,3.6
+BKG-000016,2024-01-01,City Suites,Standard,Beach,29951.53,0.8294,124.24,4.1
+BKG-000017,2024-01-01,City Suites,Deluxe,Downtown,34970.29,0.6947,148.71,4.5
+BKG-000018,2024-01-01,City Suites,Suite,Airport,80868.82,0.6606,144.47,4.4
+BKG-000019,2024-01-01,City Suites,Executive,Downtown,41525.73,0.6576,160.58,3.9
+BKG-000020,2024-01-01,City Suites,Family,Business District,88408.54,0.8424,110.25,4.7
+BKG-000021,2024-01-01,Coastal Resort,Standard,Suburban,58451.99,0.8385,145.51,3.6
+BKG-000022,2024-01-01,Coastal Resort,Deluxe,Suburban,104568.79,0.8816,111.32,3.4
+BKG-000023,2024-01-01,Coastal Resort,Suite,Beach,62572.77,0.8723,161.96,3.8
+BKG-000024,2024-01-01,Coastal Resort,Executive,Beach,60584.2,0.5475,187.63,3.7
+BKG-000025,2024-01-01,Coastal Resort,Family,Downtown,48697.68,0.8498,112.31,3.8
+BKG-000026,2024-02-01,Grand Plaza,Standard,Suburban,77570.65,0.5844,185.08,3.7
+BKG-000027,2024-02-01,Grand Plaza,Deluxe,Airport,89482.7,0.9023,157.76,3.8
+BKG-000028,2024-02-01,Grand Plaza,Suite,Beach,47866.82,0.7551,173.05,4.1
+BKG-000029,2024-02-01,Grand Plaza,Executive,Suburban,86592.61,0.533,167.36,4.2
+BKG-000030,2024-02-01,Grand Plaza,Family,Downtown,77303.15,0.6089,121.35,3.6
+BKG-000031,2024-02-01,Harbor Inn,Standard,Airport,55092.16,0.8094,181.84,4.2
+BKG-000032,2024-02-01,Harbor Inn,Deluxe,Beach,58357.27,0.5741,108.78,3.6
+BKG-000033,2024-02-01,Harbor Inn,Suite,Suburban,22871.07,0.9042,165.09,3.5
+BKG-000034,2024-02-01,Harbor Inn,Executive,Beach,77353.82,0.7062,179.34,3.7
+BKG-000035,2024-02-01,Harbor Inn,Family,Beach,13274.35,0.8814,138.29,3.8
+BKG-000036,2024-02-01,Summit Lodge,Standard,Business District,38336.61,0.7135,106.8,3.7
+BKG-000037,2024-02-01,Summit Lodge,Deluxe,Business District,97503.56,0.6658,101.87,4.1
+BKG-000038,2024-02-01,Summit Lodge,Suite,Airport,14835.82,0.7784,118.5,3.6
+BKG-000039,2024-02-01,Summit Lodge,Executive,Airport,44576.9,0.6804,139.69,4.2
+BKG-000040,2024-02-01,Summit Lodge,Family,Airport,59426.11,0.8374,138.72,4.6
+BKG-000041,2024-02-01,City Suites,Standard,Downtown,78466.65,0.8307,133.94,4.9
+BKG-000042,2024-02-01,City Suites,Deluxe,Suburban,74406.98,0.5727,156.03,4.2
+BKG-000043,2024-02-01,City Suites,Suite,Business District,66948.69,0.6807,152.59,3.6
+BKG-000044,2024-02-01,City Suites,Executive,Business District,29299.55,0.7804,139.47,3.6
+BKG-000045,2024-02-01,City Suites,Family,Suburban,54130.91,0.6793,128.21,4.2
+BKG-000046,2024-02-01,Coastal Resort,Standard,Downtown,36532.31,0.8788,169.89,4.2
+BKG-000047,2024-02-01,Coastal Resort,Deluxe,Airport,33516.99,0.7418,159.22,3.9
+BKG-000048,2024-02-01,Coastal Resort,Suite,Beach,46939.81,0.7118,181.4,3.5
+BKG-000049,2024-02-01,Coastal Resort,Executive,Suburban,48172.35,0.7059,121.8,4.0
+BKG-000050,2024-02-01,Coastal Resort,Family,Beach,107647.72,0.8078,101.83,4.6
+BKG-000051,2024-03-01,Grand Plaza,Standard,Suburban,33456.9,0.6111,141.42,3.7
+BKG-000052,2024-03-01,Grand Plaza,Deluxe,Downtown,79144.6,0.8916,171.7,3.9
+BKG-000053,2024-03-01,Grand Plaza,Suite,Downtown,65443.75,0.5598,168.76,3.7
+BKG-000054,2024-03-01,Grand Plaza,Executive,Beach,72608.99,0.5747,151.94,3.4
+BKG-000055,2024-03-01,Grand Plaza,Family,Business District,91021.08,0.6188,127.86,4.0
+BKG-000056,2024-03-01,Harbor Inn,Standard,Downtown,16304.44,0.8507,166.3,3.5
+BKG-000057,2024-03-01,Harbor Inn,Deluxe,Beach,57845.05,0.7609,125.25,4.2
+BKG-000058,2024-03-01,Harbor Inn,Suite,Business District,79841.69,0.7889,146.21,3.5
+BKG-000059,2024-03-01,Harbor Inn,Executive,Suburban,17296.19,0.5819,119.32,4.2
+BKG-000060,2024-03-01,Harbor Inn,Family,Beach,89730.98,0.8259,167.35,4.4
+BKG-000061,2024-03-01,Summit Lodge,Standard,Beach,41737.35,0.8854,170.69,4.1
+BKG-000062,2024-03-01,Summit Lodge,Deluxe,Downtown,68736.54,0.7315,124.59,4.6
+BKG-000063,2024-03-01,Summit Lodge,Suite,Suburban,100423.47,0.6013,103.54,3.9
+BKG-000064,2024-03-01,Summit Lodge,Executive,Downtown,51427.85,0.6577,155.07,3.8
+BKG-000065,2024-03-01,Summit Lodge,Family,Business District,13587.08,0.9215,187.18,3.6
+BKG-000066,2024-03-01,City Suites,Standard,Airport,71327.98,0.5751,106.31,4.6
+BKG-000067,2024-03-01,City Suites,Deluxe,Suburban,25546.04,0.6864,182.26,3.7
+BKG-000068,2024-03-01,City Suites,Suite,Business District,69204.54,0.5426,107.77,4.3
+BKG-000069,2024-03-01,City Suites,Executive,Downtown,71378.92,0.9003,143.5,3.8
+BKG-000070,2024-03-01,City Suites,Family,Business District,31689.29,0.6278,167.44,4.1
+BKG-000071,2024-03-01,Coastal Resort,Standard,Suburban,111998.79,0.5608,134.38,4.6
+BKG-000072,2024-03-01,Coastal Resort,Deluxe,Suburban,19738.65,0.8729,104.66,3.9
+BKG-000073,2024-03-01,Coastal Resort,Suite,Suburban,67456.71,0.6876,152.46,3.7
+BKG-000074,2024-03-01,Coastal Resort,Executive,Downtown,78359.94,0.5444,174.45,3.9
+BKG-000075,2024-03-01,Coastal Resort,Family,Downtown,41094.38,0.807,139.69,4.2
+BKG-000076,2024-04-01,Grand Plaza,Standard,Business District,74320.62,0.5588,116.36,4.5
+BKG-000077,2024-04-01,Grand Plaza,Deluxe,Beach,50887.33,0.9213,145.92,3.7
+BKG-000078,2024-04-01,Grand Plaza,Suite,Suburban,26731.97,0.7243,182.06,4.2
+BKG-000079,2024-04-01,Grand Plaza,Executive,Airport,73352.52,0.6186,142.05,3.4
+BKG-000080,2024-04-01,Grand Plaza,Family,Suburban,48586.28,0.7345,133.29,4.6
+BKG-000081,2024-04-01,Harbor Inn,Standard,Suburban,35540.51,0.8223,140.53,3.3
+BKG-000082,2024-04-01,Harbor Inn,Deluxe,Beach,30809.31,0.8036,165.08,3.4
+BKG-000083,2024-04-01,Harbor Inn,Suite,Business District,84871.91,0.7423,155.1,4.1
+BKG-000084,2024-04-01,Harbor Inn,Executive,Suburban,66982.48,0.7254,172.13,3.5
+BKG-000085,2024-04-01,Harbor Inn,Family,Suburban,75957.25,0.7464,108.99,4.4
+BKG-000086,2024-04-01,Summit Lodge,Standard,Beach,69521.99,0.7928,152.12,3.7
+BKG-000087,2024-04-01,Summit Lodge,Deluxe,Downtown,67376.3,0.758,155.82,3.7
+BKG-000088,2024-04-01,Summit Lodge,Suite,Beach,66652.62,0.5624,163.66,3.4
+BKG-000089,2024-04-01,Summit Lodge,Executive,Business District,54170.87,0.7957,132.88,3.4
+BKG-000090,2024-04-01,Summit Lodge,Family,Suburban,56809.82,0.8464,153.93,3.5
+BKG-000091,2024-04-01,City Suites,Standard,Downtown,40730.56,0.9252,137.59,3.3
+BKG-000092,2024-04-01,City Suites,Deluxe,Downtown,17268.02,0.8478,156.58,4.2
+BKG-000093,2024-04-01,City Suites,Suite,Airport,88554.66,0.5712,180.2,3.7
+BKG-000094,2024-04-01,City Suites,Executive,Downtown,20745.27,0.717,176.94,3.8
+BKG-000095,2024-04-01,City Suites,Family,Suburban,65723.54,0.7743,121.59,3.6
+BKG-000096,2024-04-01,Coastal Resort,Standard,Beach,31048.36,0.7723,105.31,4.4
+BKG-000097,2024-04-01,Coastal Resort,Deluxe,Suburban,40641.05,0.8569,120.92,4.5
+BKG-000098,2024-04-01,Coastal Resort,Suite,Downtown,35540.94,0.5687,178.23,4.9
+BKG-000099,2024-04-01,Coastal Resort,Executive,Beach,111973.96,0.8539,183.17,4.5
+BKG-000100,2024-04-01,Coastal Resort,Family,Downtown,64216.61,0.8524,108.88,4.6
+BKG-000101,2024-05-01,Grand Plaza,Standard,Downtown,53780.15,0.7426,160.95,3.4
+BKG-000102,2024-05-01,Grand Plaza,Deluxe,Airport,76406.18,0.6541,173.26,4.0
+BKG-000103,2024-05-01,Grand Plaza,Suite,Airport,14075.28,0.7055,174.21,3.4
+BKG-000104,2024-05-01,Grand Plaza,Executive,Business District,84639.12,0.8646,110.81,3.2
+BKG-000105,2024-05-01,Grand Plaza,Family,Downtown,12957.49,0.9284,156.59,4.4
+BKG-000106,2024-05-01,Harbor Inn,Standard,Downtown,36970.16,0.6495,150.21,4.0
+BKG-000107,2024-05-01,Harbor Inn,Deluxe,Suburban,79065.57,0.5209,140.86,4.6
+BKG-000108,2024-05-01,Harbor Inn,Suite,Downtown,15881.85,0.9249,176.24,3.2
+BKG-000109,2024-05-01,Harbor Inn,Executive,Downtown,80208.38,0.9032,109.19,4.9
+BKG-000110,2024-05-01,Harbor Inn,Family,Beach,28098.96,0.912,161.51,3.7
+BKG-000111,2024-05-01,Summit Lodge,Standard,Business District,16746.54,0.5683,158.58,4.9
+BKG-000112,2024-05-01,Summit Lodge,Deluxe,Suburban,96173.43,0.561,182.22,3.6
+BKG-000113,2024-05-01,Summit Lodge,Suite,Downtown,89992.97,0.6074,151.2,4.8
+BKG-000114,2024-05-01,Summit Lodge,Executive,Business District,93545.93,0.6309,176.8,3.6
+BKG-000115,2024-05-01,Summit Lodge,Family,Airport,56416.75,0.7978,166.23,4.7
+BKG-000116,2024-05-01,City Suites,Standard,Suburban,72006.24,0.6475,115.23,4.4
+BKG-000117,2024-05-01,City Suites,Deluxe,Suburban,32986.48,0.5287,178.78,3.3
+BKG-000118,2024-05-01,City Suites,Suite,Suburban,25987.24,0.5212,142.78,4.6
+BKG-000119,2024-05-01,City Suites,Executive,Suburban,41963.04,0.639,168.35,3.9
+BKG-000120,2024-05-01,City Suites,Family,Suburban,79352.31,0.5579,111.62,3.2
+BKG-000121,2024-05-01,Coastal Resort,Standard,Suburban,18270.35,0.6651,176.19,3.7
+BKG-000122,2024-05-01,Coastal Resort,Deluxe,Beach,96743.41,0.7881,132.57,3.7
+BKG-000123,2024-05-01,Coastal Resort,Suite,Suburban,53629.08,0.6434,174.79,3.8
+BKG-000124,2024-05-01,Coastal Resort,Executive,Downtown,59921.98,0.5519,108.16,3.7
+BKG-000125,2024-05-01,Coastal Resort,Family,Airport,53597.95,0.7395,187.4,4.6
+BKG-000126,2024-06-01,Grand Plaza,Standard,Airport,36891.18,0.5974,155.45,3.4
+BKG-000127,2024-06-01,Grand Plaza,Deluxe,Downtown,82016.19,0.8199,182.72,4.1
+BKG-000128,2024-06-01,Grand Plaza,Suite,Downtown,85392.13,0.7378,157.84,4.6
+BKG-000129,2024-06-01,Grand Plaza,Executive,Downtown,41777.24,0.8677,114.63,4.2
+BKG-000130,2024-06-01,Grand Plaza,Family,Beach,52162.97,0.7761,180.27,4.5
+BKG-000131,2024-06-01,Harbor Inn,Standard,Downtown,25137.92,0.5246,187.51,4.1
+BKG-000132,2024-06-01,Harbor Inn,Deluxe,Downtown,35900.11,0.8913,185.42,4.7
+BKG-000133,2024-06-01,Harbor Inn,Suite,Beach,65438.62,0.8805,114.39,4.6
+BKG-000134,2024-06-01,Harbor Inn,Executive,Beach,66879.97,0.5709,142.51,4.8
+BKG-000135,2024-06-01,Harbor Inn,Family,Suburban,39348.74,0.6812,144.24,4.1
+BKG-000136,2024-06-01,Summit Lodge,Standard,Suburban,13155.84,0.6959,157.03,3.5
+BKG-000137,2024-06-01,Summit Lodge,Deluxe,Airport,77837.47,0.7796,161.54,3.7
+BKG-000138,2024-06-01,Summit Lodge,Suite,Airport,27159.57,0.5659,107.89,4.2
+BKG-000139,2024-06-01,Summit Lodge,Executive,Downtown,72014.77,0.6346,128.99,4.4
+BKG-000140,2024-06-01,Summit Lodge,Family,Downtown,102504.72,0.5754,158.78,3.5
+BKG-000141,2024-06-01,City Suites,Standard,Beach,46196.89,0.6462,122.76,4.3
+BKG-000142,2024-06-01,City Suites,Deluxe,Beach,45780.15,0.646,109.22,4.2
+BKG-000143,2024-06-01,City Suites,Suite,Downtown,62936.95,0.8561,102.17,4.0
+BKG-000144,2024-06-01,City Suites,Executive,Airport,33463.5,0.8627,150.96,3.9
+BKG-000145,2024-06-01,City Suites,Family,Downtown,79770.89,0.7808,147.84,4.0
+BKG-000146,2024-06-01,Coastal Resort,Standard,Beach,75021.18,0.6979,135.4,3.5
+BKG-000147,2024-06-01,Coastal Resort,Deluxe,Beach,45508.86,0.5922,113.11,3.5
+BKG-000148,2024-06-01,Coastal Resort,Suite,Beach,80219.7,0.7139,130.71,4.2
+BKG-000149,2024-06-01,Coastal Resort,Executive,Business District,68595.93,0.6644,167.88,4.3
+BKG-000150,2024-06-01,Coastal Resort,Family,Downtown,36831.01,0.8431,169.59,3.7
+BKG-000151,2024-07-01,Grand Plaza,Standard,Beach,63157.12,0.6965,185.13,3.8
+BKG-000152,2024-07-01,Grand Plaza,Deluxe,Downtown,34720.88,0.5267,106.56,4.6
+BKG-000153,2024-07-01,Grand Plaza,Suite,Downtown,63747.61,0.9014,187.16,3.7
+BKG-000154,2024-07-01,Grand Plaza,Executive,Downtown,50671.53,0.9304,145.74,3.8
+BKG-000155,2024-07-01,Grand Plaza,Family,Airport,62968.53,0.7082,171.21,3.3
+BKG-000156,2024-07-01,Harbor Inn,Standard,Airport,76019.04,0.8509,158.15,4.5
+BKG-000157,2024-07-01,Harbor Inn,Deluxe,Downtown,56506.41,0.6323,142.21,4.8
+BKG-000158,2024-07-01,Harbor Inn,Suite,Business District,43671.75,0.8798,186.62,4.6
+BKG-000159,2024-07-01,Harbor Inn,Executive,Airport,66615.07,0.7126,133.31,3.3
+BKG-000160,2024-07-01,Harbor Inn,Family,Beach,56093.45,0.7894,187.98,4.2
+BKG-000161,2024-07-01,Summit Lodge,Standard,Suburban,92389.24,0.8158,170.54,4.1
+BKG-000162,2024-07-01,Summit Lodge,Deluxe,Airport,30016.84,0.8441,115.0,3.8
+BKG-000163,2024-07-01,Summit Lodge,Suite,Airport,18376.63,0.7487,103.85,4.7
+BKG-000164,2024-07-01,Summit Lodge,Executive,Suburban,74036.51,0.8836,126.62,3.6
+BKG-000165,2024-07-01,Summit Lodge,Family,Downtown,28921.54,0.8513,179.23,3.6
+BKG-000166,2024-07-01,City Suites,Standard,Business District,19802.73,0.789,108.46,4.4
+BKG-000167,2024-07-01,City Suites,Deluxe,Downtown,76833.4,0.9357,104.75,3.6
+BKG-000168,2024-07-01,City Suites,Suite,Airport,44329.28,0.6666,108.24,3.3
+BKG-000169,2024-07-01,City Suites,Executive,Downtown,68033.74,0.8176,139.95,3.4
+BKG-000170,2024-07-01,City Suites,Family,Downtown,108751.67,0.6087,121.86,4.4
+BKG-000171,2024-07-01,Coastal Resort,Standard,Suburban,57334.99,0.887,170.7,3.6
+BKG-000172,2024-07-01,Coastal Resort,Deluxe,Business District,46812.51,0.9068,129.32,3.2
+BKG-000173,2024-07-01,Coastal Resort,Suite,Suburban,87810.48,0.8035,102.11,4.6
+BKG-000174,2024-07-01,Coastal Resort,Executive,Suburban,48874.09,0.8783,112.42,3.7
+BKG-000175,2024-07-01,Coastal Resort,Family,Beach,18768.3,0.8218,105.75,3.4
+BKG-000176,2024-08-01,Grand Plaza,Standard,Downtown,80565.39,0.9356,180.63,4.5
+BKG-000177,2024-08-01,Grand Plaza,Deluxe,Airport,66053.51,0.5327,164.14,4.2
+BKG-000178,2024-08-01,Grand Plaza,Suite,Suburban,65783.07,0.5691,152.41,4.1
+BKG-000179,2024-08-01,Grand Plaza,Executive,Business District,109205.57,0.7808,120.47,3.5
+BKG-000180,2024-08-01,Grand Plaza,Family,Airport,17668.48,0.8172,139.24,4.0
+BKG-000181,2024-08-01,Harbor Inn,Standard,Business District,49490.5,0.5469,139.06,3.4
+BKG-000182,2024-08-01,Harbor Inn,Deluxe,Airport,25640.89,0.5675,162.45,4.1
+BKG-000183,2024-08-01,Harbor Inn,Suite,Beach,36833.29,0.7448,179.98,3.2
+BKG-000184,2024-08-01,Harbor Inn,Executive,Suburban,37499.44,0.7586,154.98,3.6
+BKG-000185,2024-08-01,Harbor Inn,Family,Beach,86754.37,0.5907,109.71,4.0
+BKG-000186,2024-08-01,Summit Lodge,Standard,Suburban,74402.97,0.6159,104.28,3.7
+BKG-000187,2024-08-01,Summit Lodge,Deluxe,Beach,66537.82,0.745,102.9,4.2
+BKG-000188,2024-08-01,Summit Lodge,Suite,Suburban,67147.55,0.7216,172.44,3.4
+BKG-000189,2024-08-01,Summit Lodge,Executive,Suburban,43874.52,0.5389,180.33,4.7
+BKG-000190,2024-08-01,Summit Lodge,Family,Downtown,40573.18,0.6477,137.07,4.8
+BKG-000191,2024-08-01,City Suites,Standard,Airport,17817.24,0.5656,106.46,4.1
+BKG-000192,2024-08-01,City Suites,Deluxe,Beach,57863.38,0.8566,113.43,4.2
+BKG-000193,2024-08-01,City Suites,Suite,Airport,18862.66,0.6318,179.54,4.8
+BKG-000194,2024-08-01,City Suites,Executive,Airport,66269.76,0.6948,104.02,3.3
+BKG-000195,2024-08-01,City Suites,Family,Beach,49824.57,0.6919,188.46,4.4
+BKG-000196,2024-08-01,Coastal Resort,Standard,Business District,83102.03,0.7769,166.44,3.9
+BKG-000197,2024-08-01,Coastal Resort,Deluxe,Beach,23863.22,0.8376,162.18,4.0
+BKG-000198,2024-08-01,Coastal Resort,Suite,Beach,102067.16,0.8833,175.34,3.9
+BKG-000199,2024-08-01,Coastal Resort,Executive,Downtown,51317.66,0.7441,108.11,4.2
+BKG-000200,2024-08-01,Coastal Resort,Family,Beach,14388.61,0.5238,176.89,4.0
+BKG-000201,2024-09-01,Grand Plaza,Standard,Beach,66312.02,0.8219,157.81,4.8
+BKG-000202,2024-09-01,Grand Plaza,Deluxe,Beach,24875.98,0.8754,163.49,4.6
+BKG-000203,2024-09-01,Grand Plaza,Suite,Beach,100273.79,0.9364,165.57,4.5
+BKG-000204,2024-09-01,Grand Plaza,Executive,Airport,51332.11,0.8092,104.27,4.9
+BKG-000205,2024-09-01,Grand Plaza,Family,Suburban,21106.55,0.5611,179.29,3.4
+BKG-000206,2024-09-01,Harbor Inn,Standard,Business District,28775.41,0.6611,108.14,4.2
+BKG-000207,2024-09-01,Harbor Inn,Deluxe,Business District,59080.36,0.8952,131.13,3.4
+BKG-000208,2024-09-01,Harbor Inn,Suite,Suburban,90563.21,0.5574,134.14,3.9
+BKG-000209,2024-09-01,Harbor Inn,Executive,Beach,76872.2,0.5284,168.77,3.5
+BKG-000210,2024-09-01,Harbor Inn,Family,Downtown,52706.93,0.6164,158.59,4.5
+BKG-000211,2024-09-01,Summit Lodge,Standard,Business District,87662.45,0.8757,132.89,3.5
+BKG-000212,2024-09-01,Summit Lodge,Deluxe,Beach,111238.87,0.6145,102.22,3.5
+BKG-000213,2024-09-01,Summit Lodge,Suite,Airport,64838.17,0.8958,110.91,3.9
+BKG-000214,2024-09-01,Summit Lodge,Executive,Business District,26727.39,0.7789,180.56,4.2
+BKG-000215,2024-09-01,Summit Lodge,Family,Downtown,83174.29,0.558,182.39,3.3
+BKG-000216,2024-09-01,City Suites,Standard,Airport,32712.37,0.6788,114.4,3.6
+BKG-000217,2024-09-01,City Suites,Deluxe,Downtown,62555.42,0.8738,134.93,4.5
+BKG-000218,2024-09-01,City Suites,Suite,Beach,39219.28,0.6153,161.11,4.7
+BKG-000219,2024-09-01,City Suites,Executive,Suburban,85703.01,0.9115,120.89,4.3
+BKG-000220,2024-09-01,City Suites,Family,Downtown,52404.63,0.6143,186.55,4.7
+BKG-000221,2024-09-01,Coastal Resort,Standard,Business District,50551.62,0.9044,176.99,3.8
+BKG-000222,2024-09-01,Coastal Resort,Deluxe,Business District,59086.89,0.874,124.32,4.7
+BKG-000223,2024-09-01,Coastal Resort,Suite,Airport,94588.41,0.5707,107.22,3.4
+BKG-000224,2024-09-01,Coastal Resort,Executive,Downtown,16590.31,0.7185,137.15,4.4
+BKG-000225,2024-09-01,Coastal Resort,Family,Downtown,79904.55,0.552,180.06,3.2
+BKG-000226,2024-10-01,Grand Plaza,Standard,Beach,14016.98,0.5394,141.12,4.1
+BKG-000227,2024-10-01,Grand Plaza,Deluxe,Beach,42004.13,0.6057,119.1,3.4
+BKG-000228,2024-10-01,Grand Plaza,Suite,Downtown,44633.08,0.7362,119.35,4.0
+BKG-000229,2024-10-01,Grand Plaza,Executive,Suburban,29351.67,0.5621,168.51,4.2
+BKG-000230,2024-10-01,Grand Plaza,Family,Business District,83647.28,0.5602,130.14,3.8
+BKG-000231,2024-10-01,Harbor Inn,Standard,Downtown,90068.21,0.9102,150.16,4.4
+BKG-000232,2024-10-01,Harbor Inn,Deluxe,Business District,31399.11,0.5481,152.98,4.1
+BKG-000233,2024-10-01,Harbor Inn,Suite,Downtown,94953.23,0.769,115.57,3.8
+BKG-000234,2024-10-01,Harbor Inn,Executive,Business District,101623.09,0.5827,148.11,3.9
+BKG-000235,2024-10-01,Harbor Inn,Family,Suburban,21575.7,0.6742,159.41,3.7
+BKG-000236,2024-10-01,Summit Lodge,Standard,Airport,15592.16,0.8692,102.19,3.8
+BKG-000237,2024-10-01,Summit Lodge,Deluxe,Airport,41384.97,0.8585,185.65,4.0
+BKG-000238,2024-10-01,Summit Lodge,Suite,Airport,23849.12,0.7391,115.33,3.6
+BKG-000239,2024-10-01,Summit Lodge,Executive,Airport,24103.95,0.8154,143.67,3.8
+BKG-000240,2024-10-01,Summit Lodge,Family,Airport,18931.68,0.8443,183.72,4.3
+BKG-000241,2024-10-01,City Suites,Standard,Beach,72318.74,0.8303,182.37,4.6
+BKG-000242,2024-10-01,City Suites,Deluxe,Business District,14473.53,0.9147,144.0,4.9
+BKG-000243,2024-10-01,City Suites,Suite,Downtown,27009.75,0.7203,129.77,4.7
+BKG-000244,2024-10-01,City Suites,Executive,Downtown,15290.14,0.84,154.7,3.7
+BKG-000245,2024-10-01,City Suites,Family,Airport,74580.04,0.7901,150.37,4.0
+BKG-000246,2024-10-01,Coastal Resort,Standard,Business District,61674.66,0.9288,120.19,3.5
+BKG-000247,2024-10-01,Coastal Resort,Deluxe,Business District,13260.41,0.7112,173.41,4.5
+BKG-000248,2024-10-01,Coastal Resort,Suite,Beach,80929.85,0.9075,155.3,3.2
+BKG-000249,2024-10-01,Coastal Resort,Executive,Suburban,15179.51,0.8444,168.55,4.0
+BKG-000250,2024-10-01,Coastal Resort,Family,Beach,72632.34,0.7769,116.97,4.4
+BKG-000001,2024-01-01,Grand Plaza,Standard,Suburban,34045.63,0.9173,105.29,4.4
+BKG-000002,2024-01-01,Grand Plaza,Deluxe,Beach,30784.22,0.782,123.78,3.7
+BKG-000003,2024-01-01,Grand Plaza,Suite,Beach,36927.16,0.6529,121.5,4.1
+BKG-000004,2024-01-01,Grand Plaza,Executive,Business District,85009.36,0.7695,109.84,3.9
+BKG-000005,2024-01-01,Grand Plaza,Family,Suburban,67238.08,0.5738,156.61,3.5
+BKG-000006,2024-01-01,Harbor Inn,Standard,Downtown,21920.06,0.6968,150.28,3.7
+BKG-000007,2024-01-01,Harbor Inn,Deluxe,Downtown,52396.73,0.8987,109.52,4.6
+BKG-000008,2024-01-01,Harbor Inn,Suite,Business District,102311.24,0.6291,174.33,3.7
+BKG-000009,2024-01-01,Harbor Inn,Executive,Business District,25081.4,0.6706,166.65,4.5
+BKG-000010,2024-01-01,Harbor Inn,Family,Airport,14113.53,0.7879,145.13,4.0
+BKG-000011,2024-01-01,Summit Lodge,Standard,Downtown,54910.23,0.8697,175.47,4.1
+BKG-000012,2024-01-01,Summit Lodge,Deluxe,Beach,70310.52,0.7593,186.48,4.2
+BKG-000013,2024-01-01,Summit Lodge,Suite,Airport,68383.4,0.6016,157.62,4.7
+BKG-000014,2024-01-01,Summit Lodge,Executive,Airport,96054.23,0.8042,182.74,3.3
+BKG-000015,2024-01-01,Summit Lodge,Family,Airport,14486.21,0.7684,187.42,3.6
+BKG-000016,2024-01-01,City Suites,Standard,Beach,29951.53,0.8294,124.24,4.1
+BKG-000017,2024-01-01,City Suites,Deluxe,Downtown,34970.29,0.6947,148.71,4.5
+BKG-000018,2024-01-01,City Suites,Suite,Airport,80868.82,0.6606,144.47,4.4
+BKG-000019,2024-01-01,City Suites,Executive,Downtown,41525.73,0.6576,160.58,3.9
+BKG-000020,2024-01-01,City Suites,Family,Business District,88408.54,0.8424,110.25,4.7
+BKG-000021,2024-01-01,Coastal Resort,Standard,Suburban,58451.99,0.8385,145.51,3.6
+BKG-000022,2024-01-01,Coastal Resort,Deluxe,Suburban,104568.79,0.8816,111.32,3.4
+BKG-000023,2024-01-01,Coastal Resort,Suite,Beach,62572.77,0.8723,161.96,3.8
+BKG-000024,2024-01-01,Coastal Resort,Executive,Beach,60584.2,0.5475,187.63,3.7
+BKG-000025,2024-01-01,Coastal Resort,Family,Downtown,48697.68,0.8498,112.31,3.8
+BKG-000026,2024-02-01,Grand Plaza,Standard,Suburban,77570.65,0.5844,185.08,3.7
+BKG-000027,2024-02-01,Grand Plaza,Deluxe,Airport,89482.7,0.9023,157.76,3.8
+BKG-000028,2024-02-01,Grand Plaza,Suite,Beach,47866.82,0.7551,173.05,4.1
+BKG-000029,2024-02-01,Grand Plaza,Executive,Suburban,86592.61,0.533,167.36,4.2
+BKG-000030,2024-02-01,Grand Plaza,Family,Downtown,77303.15,0.6089,121.35,3.6
+BKG-000031,2024-02-01,Harbor Inn,Standard,Airport,55092.16,0.8094,181.84,4.2
+BKG-000032,2024-02-01,Harbor Inn,Deluxe,Beach,58357.27,0.5741,108.78,3.6
+BKG-000033,2024-02-01,Harbor Inn,Suite,Suburban,22871.07,0.9042,165.09,3.5
+BKG-000034,2024-02-01,Harbor Inn,Executive,Beach,77353.82,0.7062,179.34,3.7
+BKG-000035,2024-02-01,Harbor Inn,Family,Beach,13274.35,0.8814,138.29,3.8
+BKG-000036,2024-02-01,Summit Lodge,Standard,Business District,38336.61,0.7135,106.8,3.7
+BKG-000037,2024-02-01,Summit Lodge,Deluxe,Business District,97503.56,0.6658,101.87,4.1
+BKG-000038,2024-02-01,Summit Lodge,Suite,Airport,14835.82,0.7784,118.5,3.6
+BKG-000039,2024-02-01,Summit Lodge,Executive,Airport,44576.9,0.6804,139.69,4.2
+BKG-000040,2024-02-01,Summit Lodge,Family,Airport,59426.11,0.8374,138.72,4.6
+BKG-000041,2024-02-01,City Suites,Standard,Downtown,78466.65,0.8307,133.94,4.9
+BKG-000042,2024-02-01,City Suites,Deluxe,Suburban,74406.98,0.5727,156.03,4.2
+BKG-000043,2024-02-01,City Suites,Suite,Business District,66948.69,0.6807,152.59,3.6
+BKG-000044,2024-02-01,City Suites,Executive,Business District,29299.55,0.7804,139.47,3.6
+BKG-000045,2024-02-01,City Suites,Family,Suburban,54130.91,0.6793,128.21,4.2
+BKG-000046,2024-02-01,Coastal Resort,Standard,Downtown,36532.31,0.8788,169.89,4.2
+BKG-000047,2024-02-01,Coastal Resort,Deluxe,Airport,33516.99,0.7418,159.22,3.9
+BKG-000048,2024-02-01,Coastal Resort,Suite,Beach,46939.81,0.7118,181.4,3.5
+BKG-000049,2024-02-01,Coastal Resort,Executive,Suburban,48172.35,0.7059,121.8,4.0
+BKG-000050,2024-02-01,Coastal Resort,Family,Beach,107647.72,0.8078,101.83,4.6
+BKG-000051,2024-03-01,Grand Plaza,Standard,Suburban,33456.9,0.6111,141.42,3.7
+BKG-000052,2024-03-01,Grand Plaza,Deluxe,Downtown,79144.6,0.8916,171.7,3.9
+BKG-000053,2024-03-01,Grand Plaza,Suite,Downtown,65443.75,0.5598,168.76,3.7
+BKG-000054,2024-03-01,Grand Plaza,Executive,Beach,72608.99,0.5747,151.94,3.4
+BKG-000055,2024-03-01,Grand Plaza,Family,Business District,91021.08,0.6188,127.86,4.0
+BKG-000056,2024-03-01,Harbor Inn,Standard,Downtown,16304.44,0.8507,166.3,3.5
+BKG-000057,2024-03-01,Harbor Inn,Deluxe,Beach,57845.05,0.7609,125.25,4.2
+BKG-000058,2024-03-01,Harbor Inn,Suite,Business District,79841.69,0.7889,146.21,3.5
+BKG-000059,2024-03-01,Harbor Inn,Executive,Suburban,17296.19,0.5819,119.32,4.2
+BKG-000060,2024-03-01,Harbor Inn,Family,Beach,89730.98,0.8259,167.35,4.4
+BKG-000061,2024-03-01,Summit Lodge,Standard,Beach,41737.35,0.8854,170.69,4.1
+BKG-000062,2024-03-01,Summit Lodge,Deluxe,Downtown,68736.54,0.7315,124.59,4.6
+BKG-000063,2024-03-01,Summit Lodge,Suite,Suburban,100423.47,0.6013,103.54,3.9
+BKG-000064,2024-03-01,Summit Lodge,Executive,Downtown,51427.85,0.6577,155.07,3.8
+BKG-000065,2024-03-01,Summit Lodge,Family,Business District,13587.08,0.9215,187.18,3.6
+BKG-000066,2024-03-01,City Suites,Standard,Airport,71327.98,0.5751,106.31,4.6
+BKG-000067,2024-03-01,City Suites,Deluxe,Suburban,25546.04,0.6864,182.26,3.7
+BKG-000068,2024-03-01,City Suites,Suite,Business District,69204.54,0.5426,107.77,4.3
+BKG-000069,2024-03-01,City Suites,Executive,Downtown,71378.92,0.9003,143.5,3.8
+BKG-000070,2024-03-01,City Suites,Family,Business District,31689.29,0.6278,167.44,4.1
+BKG-000071,2024-03-01,Coastal Resort,Standard,Suburban,111998.79,0.5608,134.38,4.6
+BKG-000072,2024-03-01,Coastal Resort,Deluxe,Suburban,19738.65,0.8729,104.66,3.9
+BKG-000073,2024-03-01,Coastal Resort,Suite,Suburban,67456.71,0.6876,152.46,3.7
+BKG-000074,2024-03-01,Coastal Resort,Executive,Downtown,78359.94,0.5444,174.45,3.9
+BKG-000075,2024-03-01,Coastal Resort,Family,Downtown,41094.38,0.807,139.69,4.2
+BKG-000076,2024-04-01,Grand Plaza,Standard,Business District,74320.62,0.5588,116.36,4.5
+BKG-000077,2024-04-01,Grand Plaza,Deluxe,Beach,50887.33,0.9213,145.92,3.7
+BKG-000078,2024-04-01,Grand Plaza,Suite,Suburban,26731.97,0.7243,182.06,4.2
+BKG-000079,2024-04-01,Grand Plaza,Executive,Airport,73352.52,0.6186,142.05,3.4
+BKG-000080,2024-04-01,Grand Plaza,Family,Suburban,48586.28,0.7345,133.29,4.6
+BKG-000081,2024-04-01,Harbor Inn,Standard,Suburban,35540.51,0.8223,140.53,3.3
+BKG-000082,2024-04-01,Harbor Inn,Deluxe,Beach,30809.31,0.8036,165.08,3.4
+BKG-000083,2024-04-01,Harbor Inn,Suite,Business District,84871.91,0.7423,155.1,4.1
+BKG-000084,2024-04-01,Harbor Inn,Executive,Suburban,66982.48,0.7254,172.13,3.5
+BKG-000085,2024-04-01,Harbor Inn,Family,Suburban,75957.25,0.7464,108.99,4.4
+BKG-000086,2024-04-01,Summit Lodge,Standard,Beach,69521.99,0.7928,152.12,3.7
+BKG-000087,2024-04-01,Summit Lodge,Deluxe,Downtown,67376.3,0.758,155.82,3.7
+BKG-000088,2024-04-01,Summit Lodge,Suite,Beach,66652.62,0.5624,163.66,3.4
+BKG-000089,2024-04-01,Summit Lodge,Executive,Business District,54170.87,0.7957,132.88,3.4
+BKG-000090,2024-04-01,Summit Lodge,Family,Suburban,56809.82,0.8464,153.93,3.5
+BKG-000091,2024-04-01,City Suites,Standard,Downtown,40730.56,0.9252,137.59,3.3
+BKG-000092,2024-04-01,City Suites,Deluxe,Downtown,17268.02,0.8478,156.58,4.2
+BKG-000093,2024-04-01,City Suites,Suite,Airport,88554.66,0.5712,180.2,3.7
+BKG-000094,2024-04-01,City Suites,Executive,Downtown,20745.27,0.717,176.94,3.8
+BKG-000095,2024-04-01,City Suites,Family,Suburban,65723.54,0.7743,121.59,3.6
+BKG-000096,2024-04-01,Coastal Resort,Standard,Beach,31048.36,0.7723,105.31,4.4
+BKG-000097,2024-04-01,Coastal Resort,Deluxe,Suburban,40641.05,0.8569,120.92,4.5
+BKG-000098,2024-04-01,Coastal Resort,Suite,Downtown,35540.94,0.5687,178.23,4.9
+BKG-000099,2024-04-01,Coastal Resort,Executive,Beach,111973.96,0.8539,183.17,4.5
+BKG-000100,2024-04-01,Coastal Resort,Family,Downtown,64216.61,0.8524,108.88,4.6
+BKG-000101,2024-05-01,Grand Plaza,Standard,Downtown,53780.15,0.7426,160.95,3.4
+BKG-000102,2024-05-01,Grand Plaza,Deluxe,Airport,76406.18,0.6541,173.26,4.0
+BKG-000103,2024-05-01,Grand Plaza,Suite,Airport,14075.28,0.7055,174.21,3.4
+BKG-000104,2024-05-01,Grand Plaza,Executive,Business District,84639.12,0.8646,110.81,3.2
+BKG-000105,2024-05-01,Grand Plaza,Family,Downtown,12957.49,0.9284,156.59,4.4
+BKG-000106,2024-05-01,Harbor Inn,Standard,Downtown,36970.16,0.6495,150.21,4.0
+BKG-000107,2024-05-01,Harbor Inn,Deluxe,Suburban,79065.57,0.5209,140.86,4.6
+BKG-000108,2024-05-01,Harbor Inn,Suite,Downtown,15881.85,0.9249,176.24,3.2
+BKG-000109,2024-05-01,Harbor Inn,Executive,Downtown,80208.38,0.9032,109.19,4.9
+BKG-000110,2024-05-01,Harbor Inn,Family,Beach,28098.96,0.912,161.51,3.7
+BKG-000111,2024-05-01,Summit Lodge,Standard,Business District,16746.54,0.5683,158.58,4.9
+BKG-000112,2024-05-01,Summit Lodge,Deluxe,Suburban,96173.43,0.561,182.22,3.6
+BKG-000113,2024-05-01,Summit Lodge,Suite,Downtown,89992.97,0.6074,151.2,4.8
+BKG-000114,2024-05-01,Summit Lodge,Executive,Business District,93545.93,0.6309,176.8,3.6
+BKG-000115,2024-05-01,Summit Lodge,Family,Airport,56416.75,0.7978,166.23,4.7
+BKG-000116,2024-05-01,City Suites,Standard,Suburban,72006.24,0.6475,115.23,4.4
+BKG-000117,2024-05-01,City Suites,Deluxe,Suburban,32986.48,0.5287,178.78,3.3
+BKG-000118,2024-05-01,City Suites,Suite,Suburban,25987.24,0.5212,142.78,4.6
+BKG-000119,2024-05-01,City Suites,Executive,Suburban,41963.04,0.639,168.35,3.9
+BKG-000120,2024-05-01,City Suites,Family,Suburban,79352.31,0.5579,111.62,3.2
+BKG-000121,2024-05-01,Coastal Resort,Standard,Suburban,18270.35,0.6651,176.19,3.7
+BKG-000122,2024-05-01,Coastal Resort,Deluxe,Beach,96743.41,0.7881,132.57,3.7
+BKG-000123,2024-05-01,Coastal Resort,Suite,Suburban,53629.08,0.6434,174.79,3.8
+BKG-000124,2024-05-01,Coastal Resort,Executive,Downtown,59921.98,0.5519,108.16,3.7
+BKG-000125,2024-05-01,Coastal Resort,Family,Airport,53597.95,0.7395,187.4,4.6
+BKG-000126,2024-06-01,Grand Plaza,Standard,Airport,36891.18,0.5974,155.45,3.4
+BKG-000127,2024-06-01,Grand Plaza,Deluxe,Downtown,82016.19,0.8199,182.72,4.1
+BKG-000128,2024-06-01,Grand Plaza,Suite,Downtown,85392.13,0.7378,157.84,4.6
+BKG-000129,2024-06-01,Grand Plaza,Executive,Downtown,41777.24,0.8677,114.63,4.2
+BKG-000130,2024-06-01,Grand Plaza,Family,Beach,52162.97,0.7761,180.27,4.5
+BKG-000131,2024-06-01,Harbor Inn,Standard,Downtown,25137.92,0.5246,187.51,4.1
+BKG-000132,2024-06-01,Harbor Inn,Deluxe,Downtown,35900.11,0.8913,185.42,4.7
+BKG-000133,2024-06-01,Harbor Inn,Suite,Beach,65438.62,0.8805,114.39,4.6
+BKG-000134,2024-06-01,Harbor Inn,Executive,Beach,66879.97,0.5709,142.51,4.8
+BKG-000135,2024-06-01,Harbor Inn,Family,Suburban,39348.74,0.6812,144.24,4.1
+BKG-000136,2024-06-01,Summit Lodge,Standard,Suburban,13155.84,0.6959,157.03,3.5
+BKG-000137,2024-06-01,Summit Lodge,Deluxe,Airport,77837.47,0.7796,161.54,3.7
+BKG-000138,2024-06-01,Summit Lodge,Suite,Airport,27159.57,0.5659,107.89,4.2
+BKG-000139,2024-06-01,Summit Lodge,Executive,Downtown,72014.77,0.6346,128.99,4.4
+BKG-000140,2024-06-01,Summit Lodge,Family,Downtown,102504.72,0.5754,158.78,3.5
+BKG-000141,2024-06-01,City Suites,Standard,Beach,46196.89,0.6462,122.76,4.3
+BKG-000142,2024-06-01,City Suites,Deluxe,Beach,45780.15,0.646,109.22,4.2
+BKG-000143,2024-06-01,City Suites,Suite,Downtown,62936.95,0.8561,102.17,4.0
+BKG-000144,2024-06-01,City Suites,Executive,Airport,33463.5,0.8627,150.96,3.9
+BKG-000145,2024-06-01,City Suites,Family,Downtown,79770.89,0.7808,147.84,4.0
+BKG-000146,2024-06-01,Coastal Resort,Standard,Beach,75021.18,0.6979,135.4,3.5
+BKG-000147,2024-06-01,Coastal Resort,Deluxe,Beach,45508.86,0.5922,113.11,3.5
+BKG-000148,2024-06-01,Coastal Resort,Suite,Beach,80219.7,0.7139,130.71,4.2
+BKG-000149,2024-06-01,Coastal Resort,Executive,Business District,68595.93,0.6644,167.88,4.3
+BKG-000150,2024-06-01,Coastal Resort,Family,Downtown,36831.01,0.8431,169.59,3.7
+BKG-000151,2024-07-01,Grand Plaza,Standard,Beach,63157.12,0.6965,185.13,3.8
+BKG-000152,2024-07-01,Grand Plaza,Deluxe,Downtown,34720.88,0.5267,106.56,4.6
+BKG-000153,2024-07-01,Grand Plaza,Suite,Downtown,63747.61,0.9014,187.16,3.7
+BKG-000154,2024-07-01,Grand Plaza,Executive,Downtown,50671.53,0.9304,145.74,3.8
+BKG-000155,2024-07-01,Grand Plaza,Family,Airport,62968.53,0.7082,171.21,3.3
+BKG-000156,2024-07-01,Harbor Inn,Standard,Airport,76019.04,0.8509,158.15,4.5
+BKG-000157,2024-07-01,Harbor Inn,Deluxe,Downtown,56506.41,0.6323,142.21,4.8
+BKG-000158,2024-07-01,Harbor Inn,Suite,Business District,43671.75,0.8798,186.62,4.6
+BKG-000159,2024-07-01,Harbor Inn,Executive,Airport,66615.07,0.7126,133.31,3.3
+BKG-000160,2024-07-01,Harbor Inn,Family,Beach,56093.45,0.7894,187.98,4.2
+BKG-000161,2024-07-01,Summit Lodge,Standard,Suburban,92389.24,0.8158,170.54,4.1
+BKG-000162,2024-07-01,Summit Lodge,Deluxe,Airport,30016.84,0.8441,115.0,3.8
+BKG-000163,2024-07-01,Summit Lodge,Suite,Airport,18376.63,0.7487,103.85,4.7
+BKG-000164,2024-07-01,Summit Lodge,Executive,Suburban,74036.51,0.8836,126.62,3.6
+BKG-000165,2024-07-01,Summit Lodge,Family,Downtown,28921.54,0.8513,179.23,3.6
+BKG-000166,2024-07-01,City Suites,Standard,Business District,19802.73,0.789,108.46,4.4
+BKG-000167,2024-07-01,City Suites,Deluxe,Downtown,76833.4,0.9357,104.75,3.6
+BKG-000168,2024-07-01,City Suites,Suite,Airport,44329.28,0.6666,108.24,3.3
+BKG-000169,2024-07-01,City Suites,Executive,Downtown,68033.74,0.8176,139.95,3.4
+BKG-000170,2024-07-01,City Suites,Family,Downtown,108751.67,0.6087,121.86,4.4
+BKG-000171,2024-07-01,Coastal Resort,Standard,Suburban,57334.99,0.887,170.7,3.6
+BKG-000172,2024-07-01,Coastal Resort,Deluxe,Business District,46812.51,0.9068,129.32,3.2
+BKG-000173,2024-07-01,Coastal Resort,Suite,Suburban,87810.48,0.8035,102.11,4.6
+BKG-000174,2024-07-01,Coastal Resort,Executive,Suburban,48874.09,0.8783,112.42,3.7
+BKG-000175,2024-07-01,Coastal Resort,Family,Beach,18768.3,0.8218,105.75,3.4
+BKG-000176,2024-08-01,Grand Plaza,Standard,Downtown,80565.39,0.9356,180.63,4.5
+BKG-000177,2024-08-01,Grand Plaza,Deluxe,Airport,66053.51,0.5327,164.14,4.2
+BKG-000178,2024-08-01,Grand Plaza,Suite,Suburban,65783.07,0.5691,152.41,4.1
+BKG-000179,2024-08-01,Grand Plaza,Executive,Business District,109205.57,0.7808,120.47,3.5
+BKG-000180,2024-08-01,Grand Plaza,Family,Airport,17668.48,0.8172,139.24,4.0
+BKG-000181,2024-08-01,Harbor Inn,Standard,Business District,49490.5,0.5469,139.06,3.4
+BKG-000182,2024-08-01,Harbor Inn,Deluxe,Airport,25640.89,0.5675,162.45,4.1
+BKG-000183,2024-08-01,Harbor Inn,Suite,Beach,36833.29,0.7448,179.98,3.2
+BKG-000184,2024-08-01,Harbor Inn,Executive,Suburban,37499.44,0.7586,154.98,3.6
+BKG-000185,2024-08-01,Harbor Inn,Family,Beach,86754.37,0.5907,109.71,4.0
+BKG-000186,2024-08-01,Summit Lodge,Standard,Suburban,74402.97,0.6159,104.28,3.7
+BKG-000187,2024-08-01,Summit Lodge,Deluxe,Beach,66537.82,0.745,102.9,4.2
+BKG-000188,2024-08-01,Summit Lodge,Suite,Suburban,67147.55,0.7216,172.44,3.4
+BKG-000189,2024-08-01,Summit Lodge,Executive,Suburban,43874.52,0.5389,180.33,4.7
+BKG-000190,2024-08-01,Summit Lodge,Family,Downtown,40573.18,0.6477,137.07,4.8
+BKG-000191,2024-08-01,City Suites,Standard,Airport,17817.24,0.5656,106.46,4.1
+BKG-000192,2024-08-01,City Suites,Deluxe,Beach,57863.38,0.8566,113.43,4.2
+BKG-000193,2024-08-01,City Suites,Suite,Airport,18862.66,0.6318,179.54,4.8
+BKG-000194,2024-08-01,City Suites,Executive,Airport,66269.76,0.6948,104.02,3.3
+BKG-000195,2024-08-01,City Suites,Family,Beach,49824.57,0.6919,188.46,4.4
+BKG-000196,2024-08-01,Coastal Resort,Standard,Business District,83102.03,0.7769,166.44,3.9
+BKG-000197,2024-08-01,Coastal Resort,Deluxe,Beach,23863.22,0.8376,162.18,4.0
+BKG-000198,2024-08-01,Coastal Resort,Suite,Beach,102067.16,0.8833,175.34,3.9
+BKG-000199,2024-08-01,Coastal Resort,Executive,Downtown,51317.66,0.7441,108.11,4.2
+BKG-000200,2024-08-01,Coastal Resort,Family,Beach,14388.61,0.5238,176.89,4.0
+BKG-000201,2024-09-01,Grand Plaza,Standard,Beach,66312.02,0.8219,157.81,4.8
+BKG-000202,2024-09-01,Grand Plaza,Deluxe,Beach,24875.98,0.8754,163.49,4.6
+BKG-000203,2024-09-01,Grand Plaza,Suite,Beach,100273.79,0.9364,165.57,4.5
+BKG-000204,2024-09-01,Grand Plaza,Executive,Airport,51332.11,0.8092,104.27,4.9
+BKG-000205,2024-09-01,Grand Plaza,Family,Suburban,21106.55,0.5611,179.29,3.4
+BKG-000206,2024-09-01,Harbor Inn,Standard,Business District,28775.41,0.6611,108.14,4.2
+BKG-000207,2024-09-01,Harbor Inn,Deluxe,Business District,59080.36,0.8952,131.13,3.4
+BKG-000208,2024-09-01,Harbor Inn,Suite,Suburban,90563.21,0.5574,134.14,3.9
+BKG-000209,2024-09-01,Harbor Inn,Executive,Beach,76872.2,0.5284,168.77,3.5
+BKG-000210,2024-09-01,Harbor Inn,Family,Downtown,52706.93,0.6164,158.59,4.5
+BKG-000211,2024-09-01,Summit Lodge,Standard,Business District,87662.45,0.8757,132.89,3.5
+BKG-000212,2024-09-01,Summit Lodge,Deluxe,Beach,111238.87,0.6145,102.22,3.5
+BKG-000213,2024-09-01,Summit Lodge,Suite,Airport,64838.17,0.8958,110.91,3.9
+BKG-000214,2024-09-01,Summit Lodge,Executive,Business District,26727.39,0.7789,180.56,4.2
+BKG-000215,2024-09-01,Summit Lodge,Family,Downtown,83174.29,0.558,182.39,3.3
+BKG-000216,2024-09-01,City Suites,Standard,Airport,32712.37,0.6788,114.4,3.6
+BKG-000217,2024-09-01,City Suites,Deluxe,Downtown,62555.42,0.8738,134.93,4.5
+BKG-000218,2024-09-01,City Suites,Suite,Beach,39219.28,0.6153,161.11,4.7
+BKG-000219,2024-09-01,City Suites,Executive,Suburban,85703.01,0.9115,120.89,4.3
+BKG-000220,2024-09-01,City Suites,Family,Downtown,52404.63,0.6143,186.55,4.7
+BKG-000221,2024-09-01,Coastal Resort,Standard,Business District,50551.62,0.9044,176.99,3.8
+BKG-000222,2024-09-01,Coastal Resort,Deluxe,Business District,59086.89,0.874,124.32,4.7
+BKG-000223,2024-09-01,Coastal Resort,Suite,Airport,94588.41,0.5707,107.22,3.4
+BKG-000224,2024-09-01,Coastal Resort,Executive,Downtown,16590.31,0.7185,137.15,4.4
+BKG-000225,2024-09-01,Coastal Resort,Family,Downtown,79904.55,0.552,180.06,3.2
+BKG-000226,2024-10-01,Grand Plaza,Standard,Beach,14016.98,0.5394,141.12,4.1
+BKG-000227,2024-10-01,Grand Plaza,Deluxe,Beach,42004.13,0.6057,119.1,3.4
+BKG-000228,2024-10-01,Grand Plaza,Suite,Downtown,44633.08,0.7362,119.35,4.0
+BKG-000229,2024-10-01,Grand Plaza,Executive,Suburban,29351.67,0.5621,168.51,4.2
+BKG-000230,2024-10-01,Grand Plaza,Family,Business District,83647.28,0.5602,130.14,3.8
+BKG-000231,2024-10-01,Harbor Inn,Standard,Downtown,90068.21,0.9102,150.16,4.4
+BKG-000232,2024-10-01,Harbor Inn,Deluxe,Business District,31399.11,0.5481,152.98,4.1
+BKG-000233,2024-10-01,Harbor Inn,Suite,Downtown,94953.23,0.769,115.57,3.8
+BKG-000234,2024-10-01,Harbor Inn,Executive,Business District,101623.09,0.5827,148.11,3.9
+BKG-000235,2024-10-01,Harbor Inn,Family,Suburban,21575.7,0.6742,159.41,3.7
+BKG-000236,2024-10-01,Summit Lodge,Standard,Airport,15592.16,0.8692,102.19,3.8
+BKG-000237,2024-10-01,Summit Lodge,Deluxe,Airport,41384.97,0.8585,185.65,4.0
+BKG-000238,2024-10-01,Summit Lodge,Suite,Airport,23849.12,0.7391,115.33,3.6
+BKG-000239,2024-10-01,Summit Lodge,Executive,Airport,24103.95,0.8154,143.67,3.8
+BKG-000240,2024-10-01,Summit Lodge,Family,Airport,18931.68,0.8443,183.72,4.3
+BKG-000241,2024-10-01,City Suites,Standard,Beach,72318.74,0.8303,182.37,4.6
+BKG-000242,2024-10-01,City Suites,Deluxe,Business District,14473.53,0.9147,144.0,4.9
+BKG-000243,2024-10-01,City Suites,Suite,Downtown,27009.75,0.7203,129.77,4.7
+BKG-000244,2024-10-01,City Suites,Executive,Downtown,15290.14,0.84,154.7,3.7
+BKG-000245,2024-10-01,City Suites,Family,Airport,74580.04,0.7901,150.37,4.0
+BKG-000246,2024-10-01,Coastal Resort,Standard,Business District,61674.66,0.9288,120.19,3.5
+BKG-000247,2024-10-01,Coastal Resort,Deluxe,Business District,13260.41,0.7112,173.41,4.5
+BKG-000248,2024-10-01,Coastal Resort,Suite,Beach,80929.85,0.9075,155.3,3.2
+BKG-000249,2024-10-01,Coastal Resort,Executive,Suburban,15179.51,0.8444,168.55,4.0
+BKG-000250,2024-10-01,Coastal Resort,Family,Beach,72632.34,0.7769,116.97,4.4

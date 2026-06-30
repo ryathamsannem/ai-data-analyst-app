@@ -401,6 +401,10 @@ def build_kpi_subtitle(
             dim_col = city
         elif "product" in tl or "category" in tl or "line" in tl:
             dim_col = product
+        elif "campaign" in tl or "channel" in tl:
+            dim_col = _pick_first_valid_dim(
+                columns, ("campaign", "campaign name", "channel")
+            )
         elif "department" in tl:
             dim_col = dept
         elif "plant" in tl or "facility" in tl:

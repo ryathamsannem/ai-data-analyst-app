@@ -5,6 +5,7 @@ import {
   resolveMetricValueFormat,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
+import { inferDomainTickStep } from "@/lib/overview-bar-value-domain";
 import { sessionDetailVerticalOuterMargins } from "@/lib/shared-chart-layout";
 
 /** Rounded domain + explicit tick positions for Overview mini charts (live only). */
@@ -140,6 +141,40 @@ export function resolveOverviewBarCountValueAxisTicks(
   return ticks;
 }
 
+/** Target share of axis span occupied by the data cluster on low-variance trends. */
+export const OVERVIEW_TREND_LOW_VARIANCE_SPREAD_RATIO = 0.08;
+
+/** Finer tick steps when trend values cluster (e.g. weekly units 1.02M–1.05M). */
+export function chooseFocusedTrendAxisStep(span: number, maxAbs: number): number {
+  if (maxAbs > 100_000 && span <= 100_000) {
+    if (span <= 5_000) return 1_000;
+    if (span <= 15_000) return 5_000;
+    if (span <= 50_000) return 10_000;
+    return 20_000;
+  }
+  return inferDomainTickStep(span, maxAbs);
+}
+
+const PREMIUM_AXIS_MAX_TICK_COUNT = 7;
+
+function capPremiumAxisTicks(
+  lo: number,
+  hi: number,
+  step: number
+): { ticks: number[]; step: number; lo: number; hi: number } {
+  let s = step;
+  let domainLo = lo;
+  let domainHi = hi;
+  let ticks = buildTicks(domainLo, domainHi, s);
+  while (ticks.length > PREMIUM_AXIS_MAX_TICK_COUNT && s < domainHi - domainLo) {
+    s *= 2;
+    domainLo = snapDown(lo, s);
+    domainHi = snapUp(hi, s);
+    ticks = buildTicks(domainLo, domainHi, s);
+  }
+  return { ticks, step: s, lo: domainLo, hi: domainHi };
+}
+
 /**
  * Data-focused axis with rounded bounds and 4–6 even ticks — Overview live charts only.
  */
@@ -155,19 +190,36 @@ export function resolveOverviewPremiumAxisScale(
   const span = max - min;
   if (span <= 0) return undefined;
 
+  const spreadRatio = span / Math.max(Math.abs(max), 1e-9);
+  const lowVariance = spreadRatio < OVERVIEW_TREND_LOW_VARIANCE_SPREAD_RATIO;
+
   const padRatio = options?.padRatio ?? 0.1;
   const minPadRatio = options?.minPadRatio ?? 0.06;
-  const pad = Math.max(span * padRatio, span * minPadRatio, 1e-9);
+  const effectivePadRatio = lowVariance ? Math.min(padRatio, 0.04) : padRatio;
+  const effectiveMinPadRatio = lowVariance
+    ? Math.min(minPadRatio, 0.02)
+    : minPadRatio;
+  const pad = Math.max(
+    span * effectivePadRatio,
+    span * effectiveMinPadRatio,
+    1e-9
+  );
   let paddedMin = min - pad;
   let paddedMax = max + pad;
   if (min >= 0 && paddedMin < 0) paddedMin = 0;
 
-  const step = chooseOverviewPremiumStep(paddedMin, paddedMax);
-  const domainMin = snapDown(paddedMin, step);
-  const domainMax = snapUp(paddedMax, step);
-  const ticks = buildTicks(domainMin, domainMax, step);
+  const step = lowVariance
+    ? chooseFocusedTrendAxisStep(span, max)
+    : chooseOverviewPremiumStep(paddedMin, paddedMax);
+  const initialLo = snapDown(paddedMin, step);
+  const initialHi = snapUp(paddedMax, step);
+  const capped = capPremiumAxisTicks(initialLo, initialHi, step);
+  const domainMin = capped.lo;
+  const domainMax = capped.hi;
+  const ticks = capped.ticks;
 
   if (domainMax <= domainMin) return undefined;
+  if (ticks.length < 2) return undefined;
   return { domain: [domainMin, domainMax], ticks };
 }
 
@@ -330,6 +382,23 @@ export function formatOverviewLineYAxisTick(
     if (rounded % 100_000 === 0) {
       const m = rounded / 1_000_000;
       return Number.isInteger(m) ? `${m}M` : `${m.toFixed(1).replace(/\.0$/, "")}M`;
+    }
+    // Focused low-variance trends (e.g. weekly units 1.02M–1.05M) — avoid compact "1M" collapse.
+    if (rounded % 10_000 === 0) {
+      const m = rounded / 1_000_000;
+      const label = m.toFixed(2).replace(/\.?0+$/, "");
+      return `${label}M`;
+    }
+    const compactM = formatMetricNumber(tick, "compact", {
+      compactThreshold: 10_000,
+    });
+    if (
+      compactM.endsWith("M") &&
+      compactM.length <= 2 &&
+      rounded % 1_000_000 !== 0
+    ) {
+      const m = tick / 1_000_000;
+      return `${m.toFixed(2).replace(/\.?0+$/, "")}M`;
     }
   }
 

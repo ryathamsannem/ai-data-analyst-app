@@ -136,6 +136,33 @@ describe("buildExecutivePdfExportInput", () => {
     expect(input.includes.pdfMode).toBe("executive");
   });
 
+  it("carries resolved profileLabel from mapping domain into dataset and exec summary", () => {
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      datasetKind: "generic",
+      typeLabel: "Generic",
+      mappingDomain: "real_estate",
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.input.dataset.profileLabel).toBe("Real Estate / Property");
+    expect(built.input.execSummaryLines[0]).toContain("Real Estate / Property");
+    expect(built.input.execSummaryLines[0]).not.toContain("General business");
+  });
+
+  it("keeps banking dataset_kind label without regression", () => {
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      datasetKind: "banking",
+      typeLabel: "Banking / Financial Services",
+      mappingDomain: null,
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.input.dataset.profileLabel).toBe("Banking / Financial Services");
+    expect(built.input.execSummaryLines[0]).toContain("Banking / Financial Services");
+  });
+
   it("defaults analyst mode to technical appendix", () => {
     const built = buildExecutivePdfExportInput({
       ...baseParams(),
@@ -193,6 +220,44 @@ describe("buildExecutivePdfExportInput", () => {
     expect(built.input.includes.includeDataQuality).toBe(true);
     expect(built.input.includes.includeConversationContext).toBe(true);
     expect(built.input.includes.includeTechnicalAppendix).toBe(true);
+  });
+
+  it("assembles preview-only duplicate quality metadata with file row context", () => {
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      options: {
+        ...baseParams().options,
+        includeDataQuality: true,
+      },
+      preview: [
+        { city: "A", revenue: 1 },
+        { city: "A", revenue: 1 },
+      ],
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const dup = built.input.previewDuplicates();
+    expect(dup.label).toMatch(/preview check/i);
+    expect(dup.note).toMatch(/not a full-file duplicate audit/i);
+    expect(dup.note).toMatch(/100 file rows/i);
+  });
+
+  it("respects Export tab flags when reportPreset is not insight", () => {
+    const built = buildExecutivePdfExportInput({
+      ...baseParams(),
+      options: {
+        ...baseParams().options,
+        includeDataPreview: true,
+        includeConversationContext: true,
+        includeDataQuality: true,
+      },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.input.includes.includeDataPreview).toBe(true);
+    expect(built.input.includes.includeConversationContext).toBe(true);
+    expect(built.input.includes.includeDataQuality).toBe(true);
+    expect(built.input.includes.reportPreset).toBeUndefined();
   });
 
   it("passes UI-built risk/opportunity cards unchanged to PDF facts", () => {
@@ -387,6 +452,22 @@ describe("PDF chart metadata chips", () => {
         { id: "blank", kind: "mono", value: " " },
       ])
     ).toEqual(sampleMetadataChips);
+  });
+
+  it("replaces Category: Category with the chart dimension label", () => {
+    expect(
+      pdfChartMetadataChipText(
+        normalizePdfChartMetadataChips(
+          [{ id: "axis", kind: "labeled", label: "Category", value: "Category" }],
+          { dimensionFallback: "Product Type" }
+        )[0]!
+      )
+    ).toBe("Category: Product Type");
+    expect(
+      normalizePdfChartMetadataChips(
+        [{ id: "axis", kind: "labeled", label: "Category", value: "Category" }]
+      )
+    ).toEqual([]);
   });
 });
 
