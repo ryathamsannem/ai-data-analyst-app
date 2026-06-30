@@ -1,4 +1,5 @@
 import type { ChartKind } from "@/app/chart-types";
+import type { ChartArtifactProfile } from "@/lib/chart-platform/chart-artifact";
 import {
   resolveRadialExportCanvasHeight,
   resolveRadialExportPlotHeight,
@@ -15,6 +16,15 @@ export const PRESENTATION_EXPORT_HORIZONTAL_WIDTH_PX = 1100;
 
 /** Wider horizontal-bar canvas when many categories need vertical room. */
 export const PRESENTATION_EXPORT_HORIZONTAL_WIDE_WIDTH_PX = 1300;
+
+/** Standalone PNG (overview/charts) — vertical bar width tiers by category count. */
+export const STANDALONE_PNG_VBAR_WIDTH_SPARSE_PX = 790;
+export const STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX = 870;
+export const STANDALONE_PNG_VBAR_WIDTH_DENSE_PX = 1050;
+
+/** Standalone PNG (overview/charts) — horizontal bar width tiers by category count. */
+export const STANDALONE_PNG_HBAR_WIDTH_SPARSE_PX = 870;
+export const STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX = 960;
 
 /** Target total PNG height for line/area exports. */
 export const PRESENTATION_EXPORT_HEIGHT_PX = 900;
@@ -46,7 +56,36 @@ export type PresentationExportSpec = PresentationCaptureLayout & {
 export type PresentationCaptureLayoutOptions = {
   /** Category / time-step count — used to grow horizontal-bar export height. */
   categoryCount?: number;
+  /**
+   * When `overviewPng` or `chartsPng`, vertical/horizontal bar exports use
+   * category-count-aware widths. PDF and legacy callers omit this.
+   */
+  exportProfile?: ChartArtifactProfile;
 };
+
+function isStandalonePngExportProfile(
+  profile: ChartArtifactProfile | undefined
+): profile is Extract<ChartArtifactProfile, "overviewPng" | "chartsPng"> {
+  return profile === "overviewPng" || profile === "chartsPng";
+}
+
+/** Category-count-aware canvas width for standalone PNG bar exports only. */
+export function resolveStandalonePngBarCanvasWidth(
+  kind: "bar" | "bar_horizontal",
+  categoryCount: number
+): number {
+  const n = Math.max(1, categoryCount);
+  if (kind === "bar") {
+    if (n <= 3) return STANDALONE_PNG_VBAR_WIDTH_SPARSE_PX;
+    if (n <= 6) return STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX;
+    if (n <= 10) return STANDALONE_PNG_VBAR_WIDTH_DENSE_PX;
+    return PRESENTATION_EXPORT_WIDTH_PX;
+  }
+  if (n <= 3) return STANDALONE_PNG_HBAR_WIDTH_SPARSE_PX;
+  if (n <= 6) return STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX;
+  if (n <= 10) return PRESENTATION_EXPORT_HORIZONTAL_WIDTH_PX;
+  return PRESENTATION_EXPORT_HORIZONTAL_WIDE_WIDTH_PX;
+}
 
 /** Canvas width by chart kind — avoids overly wide empty bar charts. */
 export function resolvePresentationExportCanvasWidth(
@@ -54,6 +93,12 @@ export function resolvePresentationExportCanvasWidth(
   options: PresentationCaptureLayoutOptions = {}
 ): number {
   const categoryCount = Math.max(0, options.categoryCount ?? 0);
+  if (
+    isStandalonePngExportProfile(options.exportProfile) &&
+    (kind === "bar" || kind === "bar_horizontal")
+  ) {
+    return resolveStandalonePngBarCanvasWidth(kind, categoryCount);
+  }
   switch (kind) {
     case "bar_horizontal":
       return categoryCount > 10

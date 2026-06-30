@@ -114,7 +114,16 @@ import {
   type AxisPresentationPlan,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
+import {
+  buildAreaValueLabelIndexSet,
+  buildLineValueLabelIndexSet,
+  formatLineValueLabel,
+  shouldShowAreaPointLabels,
+  shouldShowLinePointLabels,
+  type LineValueLabelSurface,
+} from "@/lib/line-value-labels";
 import { HBarValueLabelListContent } from "@/app/components/home/hbar-value-label-list";
+import { LineValueLabelListContent } from "@/app/components/home/line-value-label-list";
 import {
   computeHBarOutsideLabelReservePx,
   resolveHBarLabelPlacementMode,
@@ -459,6 +468,44 @@ function ChartRendererInner({
       metricCtx: metricTooltipCtx,
     });
 
+  const lineLabelSurface: LineValueLabelSurface = pngCaptureMode
+    ? "export"
+    : "live";
+  const lineLabelPlotWidthPx = detailLayout
+    ? getSharedDetailLayoutMetrics("line").planViewportPx
+    : viewportW;
+  const lineLabelOptions = {
+    surface: lineLabelSurface,
+    plotWidthPx: lineLabelPlotWidthPx,
+    fontSizePx: pngCaptureMode ? 11 : detailLayout ? 13 : compact ? 10 : 11,
+    formatLabel: (v: number) => formatLineValueLabel(v, metricTooltipCtx),
+  };
+  const areaLabelPlotWidthPx = detailLayout
+    ? getSharedDetailLayoutMetrics("area").planViewportPx
+    : viewportW;
+  const areaLabelOptions = {
+    surface: lineLabelSurface,
+    plotWidthPx: areaLabelPlotWidthPx,
+    fontSizePx: pngCaptureMode ? 11 : detailLayout ? 13 : compact ? 10 : 11,
+    formatLabel: (v: number) => formatLineValueLabel(v, metricTooltipCtx),
+  };
+  const showLineValueLabels =
+    rKind === "line" &&
+    shouldShowLinePointLabels(rData, lineLabelOptions);
+  const showAreaValueLabels =
+    rKind === "area" &&
+    shouldShowAreaPointLabels(rData, areaLabelOptions);
+  const lineValueLabelIndices = showLineValueLabels
+    ? buildLineValueLabelIndexSet(rData, lineLabelOptions)
+    : null;
+  const areaValueLabelIndices = showAreaValueLabels
+    ? buildAreaValueLabelIndexSet(rData, areaLabelOptions)
+    : null;
+  const lineValueSeries = useMemo(
+    () => rData.map((row) => row.value),
+    [rData]
+  );
+
   const detailLayoutViewportW = detailLayout
     ? getSharedDetailLayoutMetrics(rKind).planViewportPx
     : viewportW;
@@ -473,6 +520,8 @@ function ChartRendererInner({
       pointCount: detailLayout ? rData.length : undefined,
       lineChart: detailLayout && rKind === "line",
       vBarTopLabels: showVBarTopLabels,
+      lineTopLabels: showLineValueLabels,
+      areaTopLabels: showAreaValueLabels,
     });
 
   const insightVBarCatDense =
@@ -1322,8 +1371,11 @@ function ChartRendererInner({
             yAxisWidth: trendValueLayout.yAxisWidth,
             pointCount: rData.length,
             lineChart: rKind === "line",
+            lineTopLabels: showLineValueLabels,
+            areaTopLabels: showAreaValueLabels,
           })
         : pickCartesianMargin(lineAreaBottomMargin);
+    const lineLabelFontSize = detailLayout ? (compact ? 11 : 13) : compact ? 10 : 11;
     const detailLineStroke =
       detailLayout && rKind === "line"
         ? OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX
@@ -1434,7 +1486,37 @@ function ChartRendererInner({
               }
               activeDot={{ r: 6 }}
               connectNulls
-            />
+            >
+              {showAreaValueLabels && areaValueLabelIndices ? (
+                <LabelList
+                  dataKey="value"
+                  content={(labelProps) => (
+                    <LineValueLabelListContent
+                      x={labelProps.x}
+                      y={labelProps.y}
+                      value={labelProps.value}
+                      index={labelProps.index}
+                      labelIndices={areaValueLabelIndices}
+                      lineValues={lineValueSeries}
+                      viewBox={
+                        labelProps.viewBox as {
+                          x?: number;
+                          y?: number;
+                          width?: number;
+                          height?: number;
+                        }
+                      }
+                      chartKind="area"
+                      formatter={(v) =>
+                        formatLineValueLabel(v, metricTooltipCtx)
+                      }
+                      fontSize={lineLabelFontSize}
+                      fill={CHART_BAR_VALUE_LABEL_CSS}
+                    />
+                  )}
+                />
+              ) : null}
+            </Area>
           ) : (
             <Line
               type="monotone"
@@ -1455,7 +1537,36 @@ function ChartRendererInner({
               }
               activeDot={{ r: 6 }}
               connectNulls
-            />
+            >
+              {showLineValueLabels && lineValueLabelIndices ? (
+                <LabelList
+                  dataKey="value"
+                  content={(labelProps) => (
+                    <LineValueLabelListContent
+                      x={labelProps.x}
+                      y={labelProps.y}
+                      value={labelProps.value}
+                      index={labelProps.index}
+                      labelIndices={lineValueLabelIndices}
+                      lineValues={lineValueSeries}
+                      viewBox={
+                        labelProps.viewBox as {
+                          x?: number;
+                          y?: number;
+                          width?: number;
+                          height?: number;
+                        }
+                      }
+                      formatter={(v) =>
+                        formatLineValueLabel(v, metricTooltipCtx)
+                      }
+                      fontSize={lineLabelFontSize}
+                      fill={CHART_BAR_VALUE_LABEL_CSS}
+                    />
+                  )}
+                />
+              ) : null}
+            </Line>
           )}
         </ChartBody>
       </ResponsiveContainer>

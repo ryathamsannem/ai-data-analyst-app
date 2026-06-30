@@ -148,6 +148,14 @@ import {
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
 } from "@/lib/overview-premium-axis-domain";
 import {
+  buildAreaValueLabelIndexSet,
+  buildLineValueLabelIndexSet,
+  formatLineValueLabel,
+  shouldShowAreaPointLabels,
+  shouldShowLinePointLabels,
+  type LineValueLabelSurface,
+} from "@/lib/line-value-labels";
+import {
   HORIZONTAL_BAR_END_RADIUS,
   resolveHorizontalBarCategoryGap,
   resolveOverviewHorizontalBarMaxSize,
@@ -192,6 +200,8 @@ import {
   getSharedDetailLayoutMetrics,
   resolveSharedDetailPlotHeight,
   timelineTypeToChartKind,
+  LINE_BOTTOM_LABEL_HEADROOM_PX,
+  LINE_TOP_LABEL_HEADROOM_PX,
   VBAR_TOP_LABEL_HEADROOM_PX,
 } from "@/lib/chart-layout-config";
 import {
@@ -474,6 +484,7 @@ import {
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
 import { HBarValueLabelListContent } from "./components/home/hbar-value-label-list";
+import { LineValueLabelListContent } from "./components/home/line-value-label-list";
 import {
   computeHBarOutsideLabelReservePx,
   resolveOverviewInlineHBarPlacementMode,
@@ -4932,6 +4943,42 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "line" || displayKind === "area") {
+      const lineLabelSurface: LineValueLabelSurface = pngCapture
+        ? "export"
+        : "live";
+      const lineLabelFontSize = pngCapture ? 11 : 10;
+      const lineLabelOptions = {
+        surface: lineLabelSurface,
+        plotWidthPx: viewW,
+        fontSizePx: lineLabelFontSize,
+        formatLabel: (v: number) => formatLineValueLabel(v, overviewMetricCtx),
+      };
+      const areaLabelOptions = {
+        surface: lineLabelSurface,
+        plotWidthPx: viewW,
+        fontSizePx: lineLabelFontSize,
+        formatLabel: (v: number) => formatLineValueLabel(v, overviewMetricCtx),
+      };
+      const showLineValueLabels =
+        displayKind === "line" &&
+        shouldShowLinePointLabels(chartRows, lineLabelOptions);
+      const showAreaValueLabels =
+        displayKind === "area" &&
+        shouldShowAreaPointLabels(chartRows, areaLabelOptions);
+      const lineValueLabelIndices = showLineValueLabels
+        ? buildLineValueLabelIndexSet(chartRows, lineLabelOptions)
+        : null;
+      const areaValueLabelIndices = showAreaValueLabels
+        ? buildAreaValueLabelIndexSet(chartRows, areaLabelOptions)
+        : null;
+      const lineValueSeries = chartRows.map((row) => row.value);
+      const showTrendValueLabels = showLineValueLabels || showAreaValueLabels;
+      const lineTopLabelHeadroom = showTrendValueLabels
+        ? LINE_TOP_LABEL_HEADROOM_PX
+        : 0;
+      const lineBottomLabelHeadroom = showTrendValueLabels
+        ? LINE_BOTTOM_LABEL_HEADROOM_PX
+        : 0;
       const trendValueAxisProps = resolveTrendValueAxisProps({
         chartKind: displayKind,
         values: chartRows.map((r) => r.value),
@@ -5013,9 +5060,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           ? dashGrid.opacity
           : dashGrid.opacity * 0.72;
       const plotMargin = {
-        top: trendLiveMargins.top,
+        top: Math.max(trendLiveMargins.top, lineTopLabelHeadroom),
         right: pngCapture ? plotMarginSide : trendSideLive!.marginRight,
-        bottom: trendLiveMargins.bottom,
+        bottom: trendLiveMargins.bottom + lineBottomLabelHeadroom,
         left: pngCapture ? plotMarginSide : trendSideLive!.marginLeft,
       };
       return (
@@ -5100,7 +5147,37 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                         fill: "#4f46e5",
                       }
                 }
-              />
+              >
+                {showAreaValueLabels && areaValueLabelIndices ? (
+                  <LabelList
+                    dataKey="value"
+                    content={(labelProps) => (
+                      <LineValueLabelListContent
+                        x={labelProps.x}
+                        y={labelProps.y}
+                        value={labelProps.value}
+                        index={labelProps.index}
+                        labelIndices={areaValueLabelIndices}
+                        lineValues={lineValueSeries}
+                        viewBox={
+                          labelProps.viewBox as {
+                            x?: number;
+                            y?: number;
+                            width?: number;
+                            height?: number;
+                          }
+                        }
+                        chartKind="area"
+                        formatter={(v) =>
+                          formatLineValueLabel(v, overviewMetricCtx)
+                        }
+                        fontSize={lineLabelFontSize}
+                        fill={CHART_BAR_VALUE_LABEL_CSS}
+                      />
+                    )}
+                  />
+                ) : null}
+              </Area>
             ) : (
               <Line
                 type="monotone"
@@ -5127,7 +5204,36 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                         fill: "#4f46e5",
                       }
                 }
-              />
+              >
+                {showLineValueLabels && lineValueLabelIndices ? (
+                  <LabelList
+                    dataKey="value"
+                    content={(labelProps) => (
+                      <LineValueLabelListContent
+                        x={labelProps.x}
+                        y={labelProps.y}
+                        value={labelProps.value}
+                        index={labelProps.index}
+                        labelIndices={lineValueLabelIndices}
+                        lineValues={lineValueSeries}
+                        viewBox={
+                          labelProps.viewBox as {
+                            x?: number;
+                            y?: number;
+                            width?: number;
+                            height?: number;
+                          }
+                        }
+                        formatter={(v) =>
+                          formatLineValueLabel(v, overviewMetricCtx)
+                        }
+                        fontSize={lineLabelFontSize}
+                        fill={CHART_BAR_VALUE_LABEL_CSS}
+                      />
+                    )}
+                  />
+                ) : null}
+              </Line>
             )}
           </ChartWrap>
         </ResponsiveContainer>

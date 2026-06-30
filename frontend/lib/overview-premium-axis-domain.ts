@@ -1,4 +1,5 @@
 import type { ChartRow } from "@/app/chart-types";
+import { LINE_BOTTOM_LABEL_HEADROOM_PX, LINE_TOP_LABEL_HEADROOM_PX } from "@/lib/chart-layout-config";
 import {
   formatMetricNumber,
   readChartRowRawValue,
@@ -327,17 +328,28 @@ export function sessionTrendDetailPlotMargins(args: {
   yAxisWidth: number;
   pointCount?: number;
   lineChart?: boolean;
+  lineTopLabels?: boolean;
+  areaTopLabels?: boolean;
 }): { top: number; right: number; bottom: number; left: number } {
   const side = sessionTrendDetailSideMargins(args.yAxisWidth, {
     lineChart: args.lineChart,
     pointCount: args.pointCount,
   });
-  const bottom = Math.min(
+  let top = SESSION_DETAIL_TREND_MARGIN_TOP_PX;
+  let bottom = Math.min(
     sessionLineAreaDetailBottomMargin(args.computedBottom),
     SESSION_DETAIL_TREND_MARGIN_BOTTOM_CAP_PX
   );
+  if (args.lineTopLabels) {
+    top = Math.max(top, LINE_TOP_LABEL_HEADROOM_PX);
+    bottom += LINE_BOTTOM_LABEL_HEADROOM_PX;
+  }
+  if (args.areaTopLabels) {
+    top = Math.max(top, LINE_TOP_LABEL_HEADROOM_PX);
+    bottom += LINE_BOTTOM_LABEL_HEADROOM_PX;
+  }
   return {
-    top: SESSION_DETAIL_TREND_MARGIN_TOP_PX,
+    top,
     right: side.right,
     bottom,
     left: side.left,

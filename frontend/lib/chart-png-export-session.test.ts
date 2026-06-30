@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildPresentationExportSpec } from "@/lib/chart-png-export-layout";
+import {
+  PRESENTATION_EXPORT_WIDTH_PX,
+  STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX,
+  STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX,
+  buildPresentationExportSpec,
+} from "@/lib/chart-png-export-layout";
 import { isOffscreenPngExportRoot } from "@/lib/chart-png-capture";
 import { resolveChartsPngExportKind } from "@/lib/chart-png-export-session";
 
@@ -18,6 +23,22 @@ describe("chart PNG export session", () => {
     });
     expect(spec.canvasWidth).toBe(1100);
     expect(spec.canvasHeight).toBe(900);
+  });
+
+  it("builds standalone PNG bar specs with category-aware widths", () => {
+    const vBar = buildPresentationExportSpec("bar", {
+      categoryCount: 5,
+      exportProfile: "overviewPng",
+    });
+    expect(vBar.canvasWidth).toBe(STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX);
+    expect(vBar.width).toBe(vBar.canvasWidth);
+
+    const hBar = buildPresentationExportSpec("bar_horizontal", {
+      categoryCount: 5,
+      exportProfile: "chartsPng",
+    });
+    expect(hBar.canvasWidth).toBe(STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX);
+    expect(hBar.width).toBe(hBar.canvasWidth);
   });
 
   it("detects offscreen export roots when DOM is available", () => {

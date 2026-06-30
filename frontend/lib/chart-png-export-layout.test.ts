@@ -7,6 +7,8 @@ import {
   PRESENTATION_EXPORT_HORIZONTAL_WIDE_WIDTH_PX,
   PRESENTATION_EXPORT_LINE_HEIGHT_PX,
   PRESENTATION_EXPORT_WIDTH_PX,
+  STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX,
+  STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX,
   buildPresentationCaptureLayout,
   buildPresentationExportSpec,
   presentationCaptureRootStyle,
@@ -14,6 +16,7 @@ import {
   resolvePresentationExportCanvasHeight,
   resolvePresentationExportCanvasWidth,
   resolvePresentationExportPlotHeight,
+  resolveStandalonePngBarCanvasWidth,
 } from "@/lib/chart-png-export-layout";
 
 describe("chart PNG export layout", () => {
@@ -33,7 +36,7 @@ describe("chart PNG export layout", () => {
     expect(spec.height).toBe(668);
   });
 
-  it("uses tighter width for horizontal bars with few categories", () => {
+  it("uses tighter width for horizontal bars with few categories (legacy callers)", () => {
     expect(
       resolvePresentationExportCanvasWidth("bar_horizontal", { categoryCount: 8 })
     ).toBe(PRESENTATION_EXPORT_HORIZONTAL_WIDTH_PX);
@@ -45,6 +48,73 @@ describe("chart PNG export layout", () => {
     expect(PRESENTATION_EXPORT_WIDTH_PX).toBeGreaterThan(
       PRESENTATION_EXPORT_HORIZONTAL_WIDE_WIDTH_PX
     );
+  });
+
+  it("narrows standalone PNG vertical bar exports for low category counts", () => {
+    expect(
+      resolvePresentationExportCanvasWidth("bar", {
+        categoryCount: 5,
+        exportProfile: "chartsPng",
+      })
+    ).toBe(STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX);
+    expect(STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX).toBeLessThan(
+      PRESENTATION_EXPORT_WIDTH_PX
+    );
+    expect(resolveStandalonePngBarCanvasWidth("bar", 5)).toBe(870);
+    expect(
+      resolvePresentationExportCanvasWidth("bar", {
+        categoryCount: 12,
+        exportProfile: "overviewPng",
+      })
+    ).toBe(PRESENTATION_EXPORT_WIDTH_PX);
+  });
+
+  it("narrows standalone PNG horizontal bar exports for low category counts", () => {
+    expect(
+      resolvePresentationExportCanvasWidth("bar_horizontal", {
+        categoryCount: 5,
+        exportProfile: "chartsPng",
+      })
+    ).toBe(STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX);
+    expect(STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX).toBeLessThan(
+      PRESENTATION_EXPORT_HORIZONTAL_WIDTH_PX
+    );
+    expect(
+      resolvePresentationExportCanvasWidth("bar_horizontal", {
+        categoryCount: 12,
+        exportProfile: "overviewPng",
+      })
+    ).toBe(PRESENTATION_EXPORT_HORIZONTAL_WIDE_WIDTH_PX);
+  });
+
+  it("leaves line, area, and histogram widths unchanged for standalone PNG profiles", () => {
+    for (const kind of ["line", "area", "histogram"] as const) {
+      expect(
+        resolvePresentationExportCanvasWidth(kind, {
+          categoryCount: 5,
+          exportProfile: "chartsPng",
+        })
+      ).toBe(
+        kind === "histogram"
+          ? PRESENTATION_EXPORT_WIDTH_PX
+          : PRESENTATION_EXPORT_COMPACT_WIDTH_PX
+      );
+    }
+  });
+
+  it("keeps pdfChart and legacy bar widths without exportProfile", () => {
+    expect(
+      resolvePresentationExportCanvasWidth("bar", { categoryCount: 5 })
+    ).toBe(PRESENTATION_EXPORT_WIDTH_PX);
+    expect(
+      resolvePresentationExportCanvasWidth("bar", {
+        categoryCount: 5,
+        exportProfile: "pdfChart",
+      })
+    ).toBe(PRESENTATION_EXPORT_WIDTH_PX);
+    expect(
+      buildPresentationExportSpec("bar", { categoryCount: 5 }).canvasWidth
+    ).toBe(PRESENTATION_EXPORT_WIDTH_PX);
   });
 
   it("targets balanced canvas heights by chart type", () => {

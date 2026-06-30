@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { buildChartPresentationContract } from "@/lib/chart-platform/build-chart-contract";
 import {
+  createChartPngCaptureRequest,
   pdfChartScatterUsesContentTightComposite,
   pdfChartUsesContentTightComposite,
 } from "@/lib/chart-platform/chart-capture-controller";
+import {
+  PRESENTATION_EXPORT_WIDTH_PX,
+  STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX,
+} from "@/lib/chart-png-export-layout";
 
 describe("pdfChartUsesContentTightComposite", () => {
   it("enables content-tight composite for pdfChart scatter, vertical bar, and histogram", () => {
@@ -25,5 +31,44 @@ describe("pdfChartUsesContentTightComposite", () => {
     expect(pdfChartScatterUsesContentTightComposite("pdfChart", "scatter")).toBe(
       pdfChartUsesContentTightComposite("pdfChart", "scatter")
     );
+  });
+});
+
+describe("createChartPngCaptureRequest", () => {
+  const contract = buildChartPresentationContract({
+    chartId: "chart-1",
+    source: "charts",
+    apiChartType: "bar",
+    resolvedKind: "bar",
+    title: "Credit Utilization by Customer Segment",
+    rows: Array.from({ length: 5 }, (_, i) => ({
+      name: `Segment ${i + 1}`,
+      value: 10 + i,
+    })),
+  });
+
+  it("uses category-aware width for chartsPng bar exports", () => {
+    const request = createChartPngCaptureRequest({
+      contract,
+      profile: "chartsPng",
+      sourceSurface: "charts",
+      kind: "bar",
+      categoryCount: 5,
+      filename: "chart.png",
+    });
+    expect(request.layout.width).toBe(STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX);
+    expect(request.layout.width).toBeLessThan(PRESENTATION_EXPORT_WIDTH_PX);
+  });
+
+  it("keeps pdfChart bar export width unchanged", () => {
+    const request = createChartPngCaptureRequest({
+      contract,
+      profile: "pdfChart",
+      sourceSurface: "pdf",
+      kind: "bar",
+      categoryCount: 5,
+      filename: "chart.png",
+    });
+    expect(request.layout.width).toBe(PRESENTATION_EXPORT_WIDTH_PX);
   });
 });
