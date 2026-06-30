@@ -3,8 +3,8 @@ import type { RadialChartRadii } from "@/lib/radial-export-layout";
 /** Modest live boost — ~70% plot-band diameter on 300px cards (Charts/AI parity). */
 export const OVERVIEW_MINI_RADIAL_SIZE_SCALE = 1.24;
 
-export const OVERVIEW_MINI_RADIAL_SLICE_STROKE = "rgba(255, 255, 255, 0.48)";
-export const OVERVIEW_MINI_RADIAL_SLICE_STROKE_WIDTH = 1;
+export const OVERVIEW_MINI_RADIAL_SLICE_STROKE = "rgba(255, 255, 255, 0.72)";
+export const OVERVIEW_MINI_RADIAL_SLICE_STROKE_WIDTH = 1.25;
 export const OVERVIEW_MINI_RADIAL_LEGEND_PADDING_TOP_PX = 2;
 
 export function scaleOverviewMiniRadialRadii(

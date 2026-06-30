@@ -8,7 +8,7 @@ export function isOverviewChartGridSoloRow(index: number, total: number): boolea
   return total > 1 && total % 2 === 1 && index === total - 1;
 }
 
-/** Inline grid placement — sequential L→R; lone last row spans full width. */
+/** Inline grid placement — sequential L→R; lone last row spans row and centers. */
 export function overviewChartGridSoloRowStyle(
   index: number,
   total: number,
@@ -16,8 +16,8 @@ export function overviewChartGridSoloRowStyle(
   if (isOverviewChartGridSoloRow(index, total)) {
     return {
       gridColumn: "1 / -1",
+      justifySelf: "center",
       width: "100%",
-      maxWidth: "100%",
     };
   }
   return {

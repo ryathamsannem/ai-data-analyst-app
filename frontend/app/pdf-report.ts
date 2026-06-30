@@ -19,6 +19,7 @@ import {
   formatPdfGeneratedTimestamp,
   normalizePdfIsoDatesInText,
   parsePdfIsoDateLabel,
+  shouldFormatPdfCellAsDate,
 } from "@/lib/pdf-date-format";
 import {
   PDF_CHART_CAPTURE_SCALE,
@@ -30,6 +31,9 @@ import {
   PDF_TYPE,
   buildPdfExportTheme,
   computePdfChartEmbedDimensions,
+  PDF_VIZ_EMBED_DEFAULT_MAX_HEIGHT_MM,
+  PDF_VIZ_EMBED_DEFAULT_MIN_WIDTH_RATIO,
+  PDF_VIZ_EMBED_MIN_HEIGHT_MM,
   pdfCellLooksNumeric,
   pdfDrawEnterprisePanel,
   pdfDrawEnterpriseRunningChrome,
@@ -41,15 +45,26 @@ import {
 } from "@/lib/pdf-enterprise-style";
 import {
   buildExportPdfFilename,
-  buildPdfFooterCenterLine,
-  buildPdfSupportLine,
   BRANDING,
+  resolvePdfExportFooter,
 } from "@/lib/branding-config";
 import {
   buildPdfExecutiveContentPlan,
   pdfExecutiveHierarchyHeadings,
   type PdfExecutiveContentPlan,
 } from "@/lib/pdf-executive-content";
+import { stripRedundantPdfInsightSectionLabel } from "@/lib/pdf-insight-section-text";
+import { pdfKpiCardsForDashboardSection, shouldRenderPdfKpiDashboardSection } from "@/lib/pdf-kpi-layout";
+import {
+  PDF_TECHNICAL_APPENDIX_SECTION_TITLE,
+  pdfTechnicalAppendixEmptyBody,
+  pdfTechnicalAppendixIntro,
+  pdfTechnicalAppendixSeriesSampleCaption,
+  pdfTechnicalAppendixVisualizationKicker,
+  shouldRenderPdfTechnicalAppendixSeriesTable,
+  shouldRenderPdfTechnicalAppendixThumbnails,
+  shouldStartTechnicalAppendixOnNewPage,
+} from "@/lib/pdf-technical-appendix-layout";
 
 type JsPdfDocument = InstanceType<(typeof import("jspdf"))["jsPDF"]>;
 
@@ -425,13 +440,27 @@ function formatPdfBusinessNumber(n: number): string {
 }
 
 /** Consistent dates and numbers for PDF table cells. */
-function formatPdfTableCellValue(value: unknown, maxChars = 140): string {
+export function formatPdfTableCellDisplayValue(
+  value: unknown,
+  columnName?: string,
+  maxChars = 140
+): string {
+  return formatPdfTableCellValue(value, maxChars, columnName);
+}
+
+function formatPdfTableCellValue(
+  value: unknown,
+  maxChars = 140,
+  columnName?: string
+): string {
   if (value === null || value === undefined) return "—";
   let s = String(value).replace(/\s+/g, " ").trim();
   if (!s) return "—";
-  const isoOnly = parsePdfIsoDateLabel(s);
-  if (isoOnly) s = isoOnly;
-  else s = normalizePdfIsoDatesInText(s);
+  if (shouldFormatPdfCellAsDate(columnName, s)) {
+    const isoOnly = parsePdfIsoDateLabel(s);
+    if (isoOnly) s = isoOnly;
+    else s = normalizePdfIsoDatesInText(s);
+  }
   const plainNum = s.replace(/,/g, "");
   if (/^-?[\d]+(\.\d+)?$/.test(plainNum)) {
     const n = Number(plainNum);
@@ -446,8 +475,12 @@ function truncatePdfPreviewColumnLabel(label: string, maxLen = 28): string {
   return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
 }
 
-function formatPdfPreviewCellValue(value: unknown, maxChars = 56): string {
-  return formatPdfTableCellValue(value, maxChars);
+function formatPdfPreviewCellValue(
+  value: unknown,
+  columnName?: string,
+  maxChars = 56
+): string {
+  return formatPdfTableCellValue(value, maxChars, columnName);
 }
 
 function ellipsizePdfCellToWidth(
@@ -491,7 +524,7 @@ function computePdfPreviewColumnWidths(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(fontSize);
     for (const row of body) {
-      const cell = formatPdfPreviewCellValue(row[col]);
+      const cell = formatPdfPreviewCellValue(row[col], headers[col]);
       w = Math.max(
         w,
         Math.min(doc.getTextWidth(cell) + pad * 2, contentWidth * 0.3)
@@ -539,7 +572,9 @@ function drawPdfDataPreviewTable(args: {
   const rows = body
     .slice(0, PDF_DATA_PREVIEW_MAX_ROWS)
     .map((r) =>
-      Array.from({ length: n }, (_, i) => formatPdfPreviewCellValue(r[i]))
+      Array.from({ length: n }, (_, i) =>
+        formatPdfPreviewCellValue(r[i], headers[i])
+      )
     );
   if (rows.length === 0) return y;
 
@@ -832,6 +867,8 @@ export type PdfExportIncludes = {
   includeTechnicalAppendix?: boolean;
   /** Executive (default): story-first brief. Analyst: technical appendix + metadata. */
   pdfMode?: PdfExportMode;
+  /** Slim AI Insights preset vs Export-tab full selection. */
+  reportPreset?: "insight" | "full";
 };
 
 export type PdfProvenanceSlice = {
@@ -864,6 +901,15 @@ export type PdfInsightSections = {
   recommendations?: string;
   methodology?: string;
   moreDetail?: string;
+};
+
+/** Normalized aligned insight sections shared with live AI Insights UI. */
+export type PdfInsightPresentation = {
+  executiveTakeaway: string;
+  evidence: string | null;
+  whyThisMatters: Array<{ claim: string; reason?: string | null }>;
+  supportingDetail: string | null;
+  strategicRecommendations: string | null;
 };
 
 /** Top chart categories for PDF executive summary + highlighted signals (numeric order matches key figures). */
@@ -907,6 +953,8 @@ export type ExecutivePdfExportInput = {
     sheet?: string;
     fileName: string;
     datasetKind: string;
+    /** Resolved domain/type label (Overview parity); falls back to datasetKind. */
+    profileLabel?: string;
   };
   generatedAt: Date;
   mappingConfidence: Confidence;
@@ -917,6 +965,8 @@ export type ExecutivePdfExportInput = {
   answer: string;
   /** When set, insight narrative uses these blocks instead of raw `answer`. */
   insightSections?: PdfInsightSections | null;
+  /** Structured aligned insight model (live UI parity) for executive PDF sections. */
+  insightPresentation?: PdfInsightPresentation | null;
   /** Category (X) and value (Y) axis labels for the exported chart context */
   chartAxisLabels?: { category: string; value: string } | null;
   /** Structured one-liner from aligned analysis when present */
@@ -953,7 +1003,11 @@ export type ExecutivePdfExportInput = {
   chartThumbnails: PdfChartThumb[];
   preview: { rows: Record<string, unknown>[]; columns: string[] };
   profile: { null_counts: Record<string, number> } | null;
-  previewDuplicates: () => { duplicates: number; note: string };
+  previewDuplicates: () => {
+    duplicates: number;
+    note: string;
+    label: string;
+  };
   conversationAppendix?: PdfConversationAppendix | null;
 };
 
@@ -1730,6 +1784,73 @@ export function shouldStartPdfChartOnFreshPage(
   return availableHeightMm < requiredHeightMm;
 }
 
+/** Section title block height for Visualization (accent bar + rule). */
+export const PDF_VIZ_SECTION_TITLE_BLOCK_MM =
+  PDF_SPACING.sectionBefore + 9.5 + PDF_SPACING.sectionAfterRule;
+
+/** Height of the Visualization “Analysis context” metadata block (kicker + rows). */
+export function estimatePdfVizAnalysisContextHeight(rowCount: number): number {
+  if (rowCount <= 0) return 0;
+  const metaRowH = pdfLineHeight(PDF_TYPE.bodySmall) + PDF_SPACING.blockTight;
+  return 5.5 + rowCount * metaRowH + PDF_SPACING.blockTight;
+}
+
+/** Conservative estimate for chart title/subtitle/metadata chip header panel. */
+export function estimatePdfVizPresentationHeaderHeightMm(
+  metadataChipCount: number = 2
+): number {
+  const titleBlock =
+    PDF_SPACING.panelPad + pdfLineHeight(PDF_TYPE.chartTitle) + 2;
+  const chipsH = metadataChipCount > 0 ? 3 + 5.8 + PDF_SPACING.panelPad : 0;
+  return titleBlock + chipsH + PDF_SPACING.chartHeaderAfter;
+}
+
+/** Minimum chart footprint used for viz cohesion checks (not embed sizing). */
+export function pdfVizChartCohesionMinHeightMm(): number {
+  return PDF_VIZ_EMBED_MIN_HEIGHT_MM + PDF_SPACING.chartFramePad * 2 + 10;
+}
+
+/** True when Visualization title + header + metadata + chart minimum should start together on a fresh page. */
+export function shouldStartPdfVisualizationBlockOnFreshPage(args: {
+  y: number;
+  footerY: number;
+  metaRowCount: number;
+  insightsReserveMm?: number;
+  presentationHeaderMm?: number;
+  pageSafeMm?: number;
+}): boolean {
+  const header =
+    args.presentationHeaderMm ??
+    estimatePdfVizPresentationHeaderHeightMm();
+  const needed =
+    PDF_VIZ_SECTION_TITLE_BLOCK_MM +
+    header +
+    estimatePdfVizAnalysisContextHeight(args.metaRowCount) +
+    pdfVizChartCohesionMinHeightMm() +
+    (args.insightsReserveMm ?? 0);
+  const safe = args.pageSafeMm ?? PDF_SPACING.pageSafe;
+  return args.y + needed > args.footerY - safe;
+}
+
+/** True when analysis-context metadata + chart minimum should start on a fresh page. */
+export function shouldStartPdfVizCoreOnFreshPage(args: {
+  y: number;
+  footerY: number;
+  metaRowCount: number;
+  chartMinHeightMm?: number;
+  insightsReserveMm?: number;
+  pageSafeMm?: number;
+}): boolean {
+  const chartMin =
+    args.chartMinHeightMm ??
+    PDF_VIZ_EMBED_MIN_HEIGHT_MM + PDF_SPACING.chartFramePad * 2 + 10;
+  const insights = args.insightsReserveMm ?? 0;
+  const safe = args.pageSafeMm ?? PDF_SPACING.pageSafe;
+  const needed =
+    estimatePdfVizAnalysisContextHeight(args.metaRowCount) + chartMin + insights;
+  return args.y + needed > args.footerY - safe;
+}
+
 export function pdfChartMetadataChipText(
   chip: ChartPresentationMetadataChip
 ): string {
@@ -1739,10 +1860,37 @@ export function pdfChartMetadataChipText(
 }
 
 export function normalizePdfChartMetadataChips(
-  chips: readonly ChartPresentationMetadataChip[] | null | undefined
+  chips: readonly ChartPresentationMetadataChip[] | null | undefined,
+  opts?: { dimensionFallback?: string | null }
 ): ChartPresentationMetadataChip[] {
+  const dimensionFallback = opts?.dimensionFallback?.trim() || "";
   return (chips ?? [])
-    .filter((chip) => chip.value.trim())
+    .map((chip) => {
+      const value = chip.value.trim();
+      if (!value) return null;
+      const label = chip.label?.trim() ?? "";
+      const labelLower = label.toLowerCase();
+      const valueLower = value.toLowerCase();
+      if (
+        chip.kind === "labeled" &&
+        (labelLower === "category" || labelLower === "axis") &&
+        valueLower === "category" &&
+        dimensionFallback
+      ) {
+        return {
+          ...chip,
+          label: labelLower === "axis" ? "Grouped by" : label,
+          value: dimensionFallback,
+        };
+      }
+      return chip;
+    })
+    .filter((chip): chip is ChartPresentationMetadataChip => {
+      if (!chip) return false;
+      const value = chip.value.trim();
+      const label = chip.label?.trim().toLowerCase() ?? "";
+      return !(label === "category" && value.toLowerCase() === "category");
+    })
     .slice(0, 6);
 }
 
@@ -1886,6 +2034,16 @@ export function datasetKindLabel(kind: string): string {
   if (map[k]) return map[k];
   if (!k) return "General business";
   return k.charAt(0).toUpperCase() + k.slice(1);
+}
+
+/** Domain/type line for PDF cover, snapshot, and exec summary. */
+export function resolvePdfDatasetProfileLabel(dataset: {
+  datasetKind: string;
+  profileLabel?: string;
+}): string {
+  const explicit = (dataset.profileLabel ?? "").trim();
+  if (explicit) return explicit;
+  return datasetKindLabel(dataset.datasetKind);
 }
 
 function humanizePdfDumpLabel(s: string): string {
@@ -2735,7 +2893,7 @@ export async function runExecutivePdfExport(
       const previewColKeys = cols.slice(0, maxCols);
       previewHeads = previewColKeys;
       previewBody = preview.slice(0, excerptRowCount).map((row) =>
-        previewColKeys.map((c) => formatPdfPreviewCellValue(row[c]))
+        previewColKeys.map((c) => formatPdfPreviewCellValue(row[c], c))
       );
     }
     const previewTableH =
@@ -2747,7 +2905,7 @@ export async function runExecutivePdfExport(
       doc.addPage();
       y = contentTop0;
     }
-    sectionTitle("Data preview");
+    sectionTitle("Appendix: Sample data");
     if (!preview.length || !cols.length) {
       drawPremiumEmptyState(
         PDF_EMPTY_STATES.preview.title,
@@ -3263,10 +3421,19 @@ export async function runExecutivePdfExport(
     doc.setTextColor(0, 0, 0);
   };
 
-  const drawAppendixNotePanel = (title: string, body: string) => {
+  const drawAppendixNotePanel = (
+    body: string,
+    kicker?: string | null
+  ) => {
+    const showKicker = Boolean(kicker?.trim());
     const lines = doc.splitTextToSize(body, contentWidth - 14);
     const lh = pdfLineHeight(PDF_TYPE.bodySmall);
-    const boxH = PDF_SPACING.panelPad + 4 + lines.length * lh + PDF_SPACING.panelPad;
+    const kickerReserve = showKicker ? 4 : 0;
+    const boxH =
+      PDF_SPACING.panelPad +
+      kickerReserve +
+      lines.length * lh +
+      PDF_SPACING.panelPad;
     ensurePageSpace(boxH + 4);
     pdfDrawEnterprisePanel(doc, margin, y, contentWidth, boxH, {
       fill: theme.panel,
@@ -3274,11 +3441,20 @@ export async function runExecutivePdfExport(
       accent: theme.accent,
       radius: 1.5,
     });
-    pdfDrawPanelKicker(doc, margin + 4, y + PDF_SPACING.panelPad, title, theme.muted, theme.accent);
+    if (showKicker) {
+      pdfDrawPanelKicker(
+        doc,
+        margin + 4,
+        y + PDF_SPACING.panelPad,
+        kicker!,
+        theme.muted,
+        theme.accent
+      );
+    }
     doc.setFont("helvetica", "normal");
     doc.setFontSize(PDF_TYPE.bodySmall);
     doc.setTextColor(theme.body[0], theme.body[1], theme.body[2]);
-    let hy = y + PDF_SPACING.panelPad + 5;
+    let hy = y + PDF_SPACING.panelPad + (showKicker ? 5 : 3);
     lines.forEach((ln: string) => {
       doc.text(ln, margin + 5, hy);
       hy += lh;
@@ -3287,7 +3463,7 @@ export async function runExecutivePdfExport(
     doc.setTextColor(0, 0, 0);
   };
 
-  const kindLabel = datasetKindLabel(input.dataset.datasetKind);
+  const kindLabel = resolvePdfDatasetProfileLabel(input.dataset);
   const genStr = formatPdfGeneratedTimestamp(input.generatedAt);
   const sourceRaw = (input.dataset.fileName || "").trim() || "—";
   const sourceShort =
@@ -3626,19 +3802,14 @@ export async function runExecutivePdfExport(
 
   /* -------- KPIs -------- */
   if (input.includes.includeKPIs) {
-    sectionTitle(input.kpiSectionTitle);
-    const cards = input.kpiCards;
-    if (!cards.length) {
-      drawPremiumEmptyState(
-        PDF_EMPTY_STATES.kpi.title,
-        PDF_EMPTY_STATES.kpi.body
-      );
-    } else {
+    const dashboardCards = pdfKpiCardsForDashboardSection(input.kpiCards);
+    if (shouldRenderPdfKpiDashboardSection(input.kpiCards)) {
+      sectionTitle(input.kpiSectionTitle);
       const gap = PDF_SPACING.cardGap;
       const colW = (contentWidth - gap) / 2;
-      const rows = Math.ceil(cards.length / 2);
+      const rows = Math.ceil(dashboardCards.length / 2);
       for (let r = 0; r < rows; r++) {
-        const pair = [cards[r * 2], cards[r * 2 + 1]];
+        const pair = [dashboardCards[r * 2], dashboardCards[r * 2 + 1]];
         const rowH = measureKpiRowHeightMm(pair, colW);
         ensurePageSpace(rowH + gap + PDF_SPACING.pageSafe);
         for (let c = 0; c < 2; c++) {
@@ -3652,8 +3823,6 @@ export async function runExecutivePdfExport(
       y += PDF_SPACING.sectionTail;
     }
   }
-
-  drawDataPreviewSection();
 
   /* -------- AI insight -------- */
   if (input.includes.includeAIInsight) {
@@ -3752,15 +3921,95 @@ export async function runExecutivePdfExport(
 
     if (contentPlan.chartIntelBlocks) {
       const intel = contentPlan.chartIntelBlocks;
-      ensurePageSpace(20);
+      ensurePageSpace(14);
       insightSubheading("Chart view", 12);
-      bodyText(`Why this chart: ${intel.whySelected}`, PDF_TYPE.bodySmall);
-      bodyText(`Recommended read: ${intel.interpretation}`, PDF_TYPE.bodySmall);
-      bodyText(`Chart fit: ${intel.suitability}`, PDF_TYPE.bodySmall);
+      bodyText(intel.whySelected, PDF_TYPE.bodySmall);
     }
 
     y += PDF_SPACING.subsectionBefore;
+    const presentation = input.insightPresentation;
     const hierarchy = contentPlan.hierarchy;
+    const hasStructuredPresentation = Boolean(
+      presentation?.executiveTakeaway?.trim() ||
+        presentation?.evidence?.trim() ||
+        presentation?.whyThisMatters.length ||
+        presentation?.supportingDetail?.trim() ||
+        presentation?.strategicRecommendations?.trim()
+    );
+
+    if (hasStructuredPresentation && presentation) {
+      const takeaway = stripRedundantPdfInsightSectionLabel(
+        presentation.executiveTakeaway?.trim() ?? "",
+        "executive_takeaway"
+      );
+      const evidence = stripRedundantPdfInsightSectionLabel(
+        presentation.evidence?.trim() ?? "",
+        "evidence"
+      );
+      const supportingDetail = stripRedundantPdfInsightSectionLabel(
+        presentation.supportingDetail?.trim() ?? "",
+        "supporting_detail"
+      );
+      const strategicRecommendations = stripRedundantPdfInsightSectionLabel(
+        presentation.strategicRecommendations?.trim() ?? "",
+        "strategic_recommendation"
+      );
+      const whyBullets = presentation.whyThisMatters
+        .map((block) => {
+          const claim = stripRedundantPdfInsightSectionLabel(
+            block.claim.trim(),
+            "why_this_matters"
+          );
+          const reason = block.reason?.trim()
+            ? stripRedundantPdfInsightSectionLabel(
+                block.reason.trim(),
+                "why_this_matters"
+              )
+            : "";
+          return reason ? `${claim} — ${reason}` : claim;
+        })
+        .filter(Boolean);
+
+      if (takeaway) {
+        ensureAiBlockFits("Executive takeaway", 9.5, takeaway, 9.5);
+        insightSubheading("Executive takeaway", 18);
+        bodyBullets([takeaway], PDF_TYPE.bodySmall);
+      }
+      if (evidence) {
+        ensureAiBlockFits("Evidence", 9.5, evidence, 9.5);
+        y += PDF_SPACING.bulletGap;
+        insightSubheading("Evidence");
+        bodyBullets([evidence], 9.5);
+      }
+      if (whyBullets.length > 0) {
+        ensureAiBlockFits(
+          "Why this matters",
+          9.5,
+          whyBullets.join(" "),
+          9.5
+        );
+        y += PDF_SPACING.bulletGap;
+        insightSubheading("Why this matters");
+        bodyBullets(whyBullets, 9.5);
+      }
+      if (supportingDetail) {
+        ensureAiBlockFits("Supporting detail", 9.5, supportingDetail, 9.5);
+        y += PDF_SPACING.bulletGap;
+        insightSubheading("Supporting detail");
+        bodyBullets([supportingDetail], 9.5);
+      }
+      if (strategicRecommendations) {
+        ensureAiBlockFits(
+          hierarchyLabels.recommendation,
+          9.5,
+          strategicRecommendations,
+          9.5
+        );
+        y += PDF_SPACING.bulletGap;
+        insightSubheading(hierarchyLabels.recommendation);
+        bodyBullets([strategicRecommendations], 9.5);
+      }
+    } else {
     const hasHierarchy = Boolean(
       hierarchy.executiveSummary?.trim() ||
         hierarchy.businessInterpretation?.trim() ||
@@ -3811,6 +4060,7 @@ export async function runExecutivePdfExport(
         PDF_EMPTY_STATES.aiInsight.title,
         PDF_EMPTY_STATES.aiInsight.body
       );
+    }
     }
     y += PDF_SPACING.subsectionAfter;
   }
@@ -3917,8 +4167,82 @@ export async function runExecutivePdfExport(
 
   /* -------- Chart -------- */
   if (input.includes.includeChart && input.chart) {
-    breakBeforeMajorSection(56);
     const ch = input.chart;
+    const execBrief = contentPlan.vizBrief?.trim() ?? "";
+    const execBriefNumbered = isNumberedExecutiveBrief(execBrief);
+    const factSlice = contentPlan.vizFacts.slice(0, 6);
+    const hasExecFacts = factSlice.length > 0;
+    const hasLensPanel = contentPlan.useLensExecutivePanel;
+
+    const estimateVizInsightsBlockMm = () => {
+      if (!execBrief && !hasExecFacts && !hasLensPanel) return 0;
+      let h = 6;
+      if (hasLensPanel) {
+        h +=
+          contentPlan.lensSections.length *
+          (PDF_SPACING.insightLineGap * 2 + 8);
+      }
+      if (execBrief) {
+        const wrap = doc.splitTextToSize(execBrief, contentWidth - 10);
+        const lineCap = execBriefNumbered
+          ? Math.min(8, wrap.length)
+          : Math.min(2, wrap.length);
+        h += lineCap * PDF_SPACING.insightLineGap + 3;
+      }
+      if (hasExecFacts) {
+        const gridRows = Math.ceil(factSlice.length / 3);
+        h += 5 + gridRows * 17;
+      }
+      return h + 2;
+    };
+
+    const metaRows: string[][] = [];
+    if (ch.data.length > 0) {
+      metaRows.push([
+        "Analysis Type",
+        pdfChartKindExecutiveLabel(ch.presentationKind),
+      ]);
+      const mShow =
+        ch.alignedMetricDisplay?.trim() || ch.alignedMetric?.trim();
+      if (mShow) {
+        metaRows.push(["Primary Metric", polishPdfExecutiveLabel(mShow)]);
+      }
+      const groupedBy = input.chartAxisLabels?.category?.trim();
+      if (groupedBy) {
+        metaRows.push(["Grouped By", polishPdfExecutiveLabel(groupedBy)]);
+      }
+      const recordsEval =
+        input.provenance?.rowsAnalyzed ?? input.dataset.rows;
+      metaRows.push([
+        "Records Evaluated",
+        Number(recordsEval).toLocaleString(),
+      ]);
+      const attr = ch.chartAttribution?.trim().toLowerCase() ?? "";
+      if (attr.includes("auto") && attr.includes("dashboard")) {
+        metaRows.push(["Source", "Automated dashboard"]);
+      }
+    }
+
+    const metadataChipCount = normalizePdfChartMetadataChips(ch.metadataChips, {
+      dimensionFallback: input.chartAxisLabels?.category?.trim() || null,
+    }).length;
+
+    if (
+      shouldStartPdfVisualizationBlockOnFreshPage({
+        y,
+        footerY,
+        metaRowCount: metaRows.length,
+        insightsReserveMm: estimateVizInsightsBlockMm(),
+        presentationHeaderMm:
+          estimatePdfVizPresentationHeaderHeightMm(metadataChipCount),
+      })
+    ) {
+      doc.addPage();
+      y = contentTop0;
+    } else {
+      breakBeforeMajorSection(56);
+    }
+
     sectionTitle("Visualization");
     const pdfChartHeading =
       ch.title.trim() ||
@@ -3934,7 +4258,9 @@ export async function runExecutivePdfExport(
 
     const drawChartPresentationHeader = () => {
       const subtitle = ch.subtitle.trim();
-      const metadataChips = normalizePdfChartMetadataChips(ch.metadataChips);
+      const metadataChips = normalizePdfChartMetadataChips(ch.metadataChips, {
+        dimensionFallback: input.chartAxisLabels?.category?.trim() || null,
+      });
       const attr =
         ch.data.length === 0 && ch.chartAttribution?.trim()
           ? ch.chartAttribution.trim()
@@ -4055,70 +4381,33 @@ export async function runExecutivePdfExport(
 
     drawChartPresentationHeader();
 
-    if (ch.data.length > 0) {
-      const metaRows: string[][] = [];
-      metaRows.push([
-        "Analysis Type",
-        pdfChartKindExecutiveLabel(ch.presentationKind),
-      ]);
-      const mShow =
-        ch.alignedMetricDisplay?.trim() || ch.alignedMetric?.trim();
-      if (mShow) {
-        metaRows.push(["Primary Metric", polishPdfExecutiveLabel(mShow)]);
-      }
-      const groupedBy = input.chartAxisLabels?.category?.trim();
-      if (groupedBy) {
-        metaRows.push(["Grouped By", polishPdfExecutiveLabel(groupedBy)]);
-      }
-      const recordsEval =
-        input.provenance?.rowsAnalyzed ?? input.dataset.rows;
-      metaRows.push([
-        "Records Evaluated",
-        Number(recordsEval).toLocaleString(),
-      ]);
-      const attr = ch.chartAttribution?.trim().toLowerCase() ?? "";
-      if (attr.includes("auto") && attr.includes("dashboard")) {
-        metaRows.push(["Source", "Automated dashboard"]);
-      }
-      ensurePageSpace(metaRows.length * 5.5 + 8);
-      pdfDrawPanelKicker(doc, margin, y, "Analysis context", theme.muted, theme.accent);
-      y += 5.5;
-      metaRows.forEach(([label, value]) => {
-        mutedLine(label, value);
-      });
-      y += PDF_SPACING.blockTight;
-    }
-
-    const execBrief = contentPlan.vizBrief?.trim() ?? "";
-    const execBriefNumbered = isNumberedExecutiveBrief(execBrief);
-    const factSlice = contentPlan.vizFacts.slice(0, 6);
-    const hasExecFacts = factSlice.length > 0;
-    const hasLensPanel = contentPlan.useLensExecutivePanel;
     const vizInsightsFollow = Boolean(
       execBrief || hasExecFacts || hasLensPanel
     );
 
-    const estimateVizInsightsBlockMm = () => {
-      if (!execBrief && !hasExecFacts && !hasLensPanel) return 0;
-      let h = 6;
-      if (hasLensPanel) {
-        h +=
-          contentPlan.lensSections.length *
-          (PDF_SPACING.insightLineGap * 2 + 8);
-      }
-      if (execBrief) {
-        const wrap = doc.splitTextToSize(execBrief, contentWidth - 10);
-        const lineCap = execBriefNumbered
-          ? Math.min(8, wrap.length)
-          : Math.min(2, wrap.length);
-        h += lineCap * PDF_SPACING.insightLineGap + 3;
-      }
-      if (hasExecFacts) {
-        const gridRows = Math.ceil(factSlice.length / 3);
-        h += 5 + gridRows * 17;
-      }
-      return h + 2;
+    const drawMutedMetaLine = (label: string, value: string) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(PDF_TYPE.label);
+      doc.setTextColor(theme.muted[0], theme.muted[1], theme.muted[2]);
+      doc.text(label, margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(PDF_TYPE.bodySmall);
+      doc.setTextColor(theme.ink[0], theme.ink[1], theme.ink[2]);
+      doc.text(value, margin + 50, y);
+      y += pdfLineHeight(PDF_TYPE.bodySmall) + PDF_SPACING.blockTight;
+      doc.setTextColor(0, 0, 0);
     };
+
+    if (ch.data.length > 0) {
+      const metaBlockH = estimatePdfVizAnalysisContextHeight(metaRows.length);
+      ensurePageSpace(metaBlockH);
+      pdfDrawPanelKicker(doc, margin, y, "Analysis context", theme.muted, theme.accent);
+      y += 5.5;
+      metaRows.forEach(([label, value]) => {
+        drawMutedMetaLine(label, value);
+      });
+      y += PDF_SPACING.blockTight;
+    }
 
     const embedCenteredChartImage = async (
       candidate: Exclude<PdfChartImageCandidate, { source: "empty" }>
@@ -4130,21 +4419,21 @@ export async function runExecutivePdfExport(
           ? ch.chartArtifact?.presentationProfile?.pdfEmbed
           : null;
       let maxImgH = Math.min(
-        pdfEmbed?.maxHeightMm ?? 158,
+        pdfEmbed?.maxHeightMm ?? PDF_VIZ_EMBED_DEFAULT_MAX_HEIGHT_MM,
         Math.max(
-          88,
+          PDF_VIZ_EMBED_MIN_HEIGHT_MM,
           availableMm > 48 ? availableMm : Math.max(72, footerY - y - 12)
         )
       );
-      if (shouldStartPdfChartOnFreshPage(ch.presentationKind, maxImgH)) {
+      if (shouldStartPdfChartOnFreshPage(ch.presentationKind, availableMm)) {
         doc.addPage();
         y = contentTop0;
         insightsReserve = estimateVizInsightsBlockMm();
         availableMm = footerY - y - insightsReserve - 5;
         maxImgH = Math.min(
-          pdfEmbed?.maxHeightMm ?? 158,
+          pdfEmbed?.maxHeightMm ?? PDF_VIZ_EMBED_DEFAULT_MAX_HEIGHT_MM,
           Math.max(
-            88,
+            PDF_VIZ_EMBED_MIN_HEIGHT_MM,
             availableMm > 48 ? availableMm : Math.max(72, footerY - y - 12)
           )
         );
@@ -4156,7 +4445,7 @@ export async function runExecutivePdfExport(
           pxH,
           contentWidth,
           maxImgH,
-          pdfEmbed?.minWidthRatio ?? 0.74,
+          pdfEmbed?.minWidthRatio ?? PDF_VIZ_EMBED_DEFAULT_MIN_WIDTH_RATIO,
           {
             minAspectRatio: pdfEmbed?.minAspectRatio,
             maxAspectRatio: pdfEmbed?.maxAspectRatio,
@@ -4393,6 +4682,8 @@ export async function runExecutivePdfExport(
     doc.setTextColor(0, 0, 0);
   }
 
+  drawDataPreviewSection();
+
   /* -------- Data quality -------- */
   if (input.includes.includeDataQuality) {
     breakBeforeMajorSection(92);
@@ -4417,16 +4708,20 @@ export async function runExecutivePdfExport(
         "Data quality: No quality profile available."
       );
     } else {
-      const { duplicates, note } = input.previewDuplicates();
+      const { duplicates, note, label } = input.previewDuplicates();
+      bodyText(
+        "File-wide metrics below reflect the loaded dataset. Duplicate detection applies to the preview excerpt only.",
+        PDF_TYPE.bodySmall
+      );
       const summaryRows: string[][] = [
-        ["Total rows", input.dataset.rows.toLocaleString()],
-        ["Total columns", String(input.dataset.colCount)],
+        ["Total rows (file-wide)", input.dataset.rows.toLocaleString()],
+        ["Total columns (file-wide)", String(input.dataset.colCount)],
         ["Missing cells (all columns)", totalMissing.toLocaleString()],
       ];
       if (pctMissing !== null) {
         summaryRows.push(["Estimated missing rate", `${pctMissing}% of cells`]);
       }
-      summaryRows.push(["Duplicate-like rows (sample)", String(duplicates)]);
+      summaryRows.push([label, String(duplicates)]);
       drawDataTable(["Metric", "Value"], summaryRows, {
         fontSize: 8.5,
         maxCols: 2,
@@ -4511,25 +4806,24 @@ export async function runExecutivePdfExport(
         Boolean(chAp?.chartAttribution?.trim()) ||
         Boolean(chAp?.alignedMetric) ||
         Boolean(chAp?.aggregation));
+    const chartEmbedded =
+      input.includes.includeChart && Boolean(chAp) && hasSeries;
     const appendixHasContent =
       hasChartMeta ||
       thumbsAp.length > 0 ||
       Boolean(provNotesAp) ||
       Boolean(input.provenance);
-    doc.addPage();
-    y = contentTop0;
-    sectionTitle("Technical appendix");
-    bodyText(
-      analystPdf
-        ? "Reference metadata for audit and data-team handoff. Omit this section for executive-only distribution."
-        : "Reference metadata for audit, routing, and calculation context.",
-      PDF_TYPE.bodySmall
-    );
+    if (shouldStartTechnicalAppendixOnNewPage(y, footerY, PDF_SPACING.pageSafe)) {
+      doc.addPage();
+      y = contentTop0;
+    }
+    sectionTitle(PDF_TECHNICAL_APPENDIX_SECTION_TITLE);
+    bodyText(pdfTechnicalAppendixIntro(analystPdf), PDF_TYPE.bodySmall);
     y += PDF_SPACING.subsectionBefore;
     if (!appendixHasContent) {
       drawPremiumEmptyState(
         PDF_EMPTY_STATES.appendix.title,
-        "Technical appendix: No technical metadata available."
+        pdfTechnicalAppendixEmptyBody()
       );
     } else if (
       hasChartMeta ||
@@ -4584,17 +4878,23 @@ export async function runExecutivePdfExport(
       if (chAp?.chartAttribution?.trim()) {
         appendixSubheading("Visualization source");
         drawAppendixNotePanel(
-          "Source",
-          polishPdfBusinessCopy(chAp.chartAttribution!.trim())
+          polishPdfBusinessCopy(chAp.chartAttribution!.trim()),
+          pdfTechnicalAppendixVisualizationKicker()
         );
       }
 
       if (provNotesAp) {
         appendixSubheading("Provenance notes");
-        drawAppendixNotePanel("Notes", polishPdfBusinessCopy(provNotesAp));
+        drawAppendixNotePanel(polishPdfBusinessCopy(provNotesAp));
       }
 
-      if (thumbsAp.length >= 1) {
+      if (
+        shouldRenderPdfTechnicalAppendixThumbnails({
+          analystPdf,
+          chartEmbedded,
+          thumbCount: thumbsAp.length,
+        })
+      ) {
         appendixSubheading("Session chart thumbnails");
         const rowH = 16;
         const headerH = 6;
@@ -4654,15 +4954,20 @@ export async function runExecutivePdfExport(
           label,
           value,
         }));
-        const seriesTableH = measureMonolithicTableStackMm(
-          doc,
-          contentWidth,
-          seriesHeads,
-          seriesRows,
-          7.5,
-          2.25,
-          5
-        );
+        const showSeriesTable = shouldRenderPdfTechnicalAppendixSeriesTable({
+          analystPdf,
+        });
+        const seriesTableH = showSeriesTable
+          ? measureMonolithicTableStackMm(
+              doc,
+              contentWidth,
+              seriesHeads,
+              seriesRows,
+              7.5,
+              2.25,
+              5
+            )
+          : 8;
         const specGridRows = Math.ceil(specItems.length / 2);
         const blockH =
           specGridRows * 15.5 +
@@ -4673,17 +4978,27 @@ export async function runExecutivePdfExport(
         ensurePageSpace(blockH);
         appendixSubheading("Chart specification");
         drawAppendixFactGrid(specItems, specItems.length >= 4 ? 3 : 2);
-        appendixSubheading("Series sample");
-        drawDataTable(seriesHeads, seriesRows, {
-          variant: "appendix",
-          fontSize: 7.5,
-          maxCols: 2,
-          maxRows: 20,
-          suppressRowPageBreaks: true,
-        });
-        if (chAp.data.length > 20) {
+        if (showSeriesTable) {
+          appendixSubheading("Series sample");
+          drawDataTable(seriesHeads, seriesRows, {
+            variant: "appendix",
+            fontSize: 7.5,
+            maxCols: 2,
+            maxRows: 20,
+            suppressRowPageBreaks: true,
+          });
+          if (chAp.data.length > 20) {
+            bodyText(
+              `Showing first 20 of ${chAp.data.length} series points.`,
+              PDF_TYPE.caption
+            );
+          }
+        } else {
           bodyText(
-            `Showing first 20 of ${chAp.data.length} series points.`,
+            pdfTechnicalAppendixSeriesSampleCaption(
+              chAp.data.length,
+              chartEmbedded
+            ),
             PDF_TYPE.caption
           );
         }
@@ -4692,6 +5007,10 @@ export async function runExecutivePdfExport(
   }
 
   /* -------- Running header / footer every page -------- */
+  const pdfFooter = resolvePdfExportFooter({
+    reportCompanyName: input.branding.companyName,
+    globalBranding: BRANDING,
+  });
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -4707,8 +5026,8 @@ export async function runExecutivePdfExport(
       company,
       reportTitle: PDF_REPORT_TITLE,
       sourceLabel: sourceShort,
-      generatedByLine: buildPdfFooterCenterLine(BRANDING),
-      supportLine: buildPdfSupportLine(BRANDING.supportEmail),
+      generatedByLine: pdfFooter.generatedByLine,
+      supportLine: pdfFooter.supportLine,
       accent: theme.accent,
       ink: theme.ink,
       muted: theme.muted,

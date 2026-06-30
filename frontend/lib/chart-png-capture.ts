@@ -313,6 +313,24 @@ type ExportLegendEntry = {
   color: string;
 };
 
+function extractRadialExportLegendEntries(root: HTMLElement): ExportLegendEntry[] {
+  const host = root.querySelector("[data-radial-legend-export]");
+  const raw = host?.getAttribute("data-radial-legend-export");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as ExportLegendEntry[];
+    return parsed.filter((entry) => entry.label?.trim() && entry.color);
+  } catch {
+    return [];
+  }
+}
+
+function extractLegendEntriesForExport(root: HTMLElement): ExportLegendEntry[] {
+  const radial = extractRadialExportLegendEntries(root);
+  if (radial.length > 0) return radial;
+  return extractRechartsLegendEntries(root);
+}
+
 function extractRechartsLegendEntries(root: HTMLElement): ExportLegendEntry[] {
   const wrapper = root.querySelector(".recharts-legend-wrapper");
   if (!wrapper) return [];
@@ -1386,7 +1404,7 @@ export async function captureElementToPng(
 
   let legend: { dataUrl: string; width: number; height: number } | null = null;
   try {
-    const entries = extractRechartsLegendEntries(sourceRoot);
+    const entries = extractLegendEntriesForExport(sourceRoot);
     legend = renderLegendChromeToPng(entries, exportWidth, scale, palette);
   } catch (err) {
     console.warn("Chart legend PNG capture skipped:", err);

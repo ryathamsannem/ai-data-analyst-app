@@ -30,7 +30,9 @@ import {
 import {
   alternateNumericMetricLabels,
   buildAiFollowUpQuestionChips,
+  filterFollowUpsAgainstPriorQuestions,
   filterMeaningfulFollowUpChips,
+  followUpOverlapsPriorQuestion,
   isInvalidMetricCompareChip,
   isLowQualityFollowUpChip,
   buildProfitMarginFollowUpChips,
@@ -83,7 +85,11 @@ import {
   sortChartRowsChronologically,
   TREND_X_AXIS_ANGLE_DEG,
 } from "@/lib/chart-time-x-axis";
-import { chartLayoutWidthKey } from "@/lib/chart-axis-theme";
+import {
+  CHART_BAR_INLAY_LABEL_CSS,
+  CHART_BAR_VALUE_LABEL_CSS,
+  chartLayoutWidthKey,
+} from "@/lib/chart-axis-theme";
 import {
   presentationCapturePlotStyle,
 } from "@/lib/chart-png-export-layout";
@@ -99,6 +105,9 @@ import {
   OVERVIEW_HISTOGRAM_LIVE_MAX_BAR_SIZE,
   OVERVIEW_PNG_EXPORT_HISTOGRAM_MAX_SIZE,
   shouldShowOverviewBarValueLabels,
+  shouldShowHBarValueLabels,
+  formatOverviewBarTopValueLabel,
+  formatExecutiveInsightMetricValue,
 } from "@/lib/overview-dashboard-export";
 import {
   cartesianUsesHorizontalPlot,
@@ -156,7 +165,6 @@ import type {
   ChartPngCaptureRequest,
 } from "@/lib/chart-platform/chart-artifact";
 import {
-  formatExecutiveMetricValue,
   formatMetricSpreadGap,
   metricFormatUsesPercent,
   type MetricFormatContext,
@@ -184,6 +192,7 @@ import {
   getSharedDetailLayoutMetrics,
   resolveSharedDetailPlotHeight,
   timelineTypeToChartKind,
+  VBAR_TOP_LABEL_HEADROOM_PX,
 } from "@/lib/chart-layout-config";
 import {
   chartsTabDesc,
@@ -269,6 +278,7 @@ import {
 import {
   chartSnapshotMatchesAnalysis,
   shouldPreservePinnedInsightChart,
+  type ChartAnalysisAlignmentParsed,
 } from "@/lib/insight-chart-alignment";
 import {
   buildFollowupQuestion,
@@ -463,6 +473,11 @@ import {
 } from "@/lib/export-tab-ui";
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
+import { HBarValueLabelListContent } from "./components/home/hbar-value-label-list";
+import {
+  computeHBarOutsideLabelReservePx,
+  resolveOverviewInlineHBarPlacementMode,
+} from "@/lib/hbar-value-label-placement";
 import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
 import { DataPreviewQualitySummary } from "./components/home/data-preview-quality-summary";
 import { DataPreviewDatasetInsightsSummary } from "./components/home/data-preview-dataset-insights-summary";
@@ -566,6 +581,7 @@ import {
   ovChartCellSoloRow,
   ovChartGrid,
   ovChartInner,
+  ovChartInnerSolo,
   ovChartsWrap,
   ovDashChartCard,
   ovDashChartActionAskAi,
@@ -734,12 +750,21 @@ import {
 } from "@/lib/chart-insight-answers";
 import {
   appendInsightSavedResult,
+  buildInsightConversationThread,
   buildInsightRestorePayload,
   chartExistsInHistory,
   clearInsightResultHistory,
   createInsightSavedResult,
+  resolveLiveInsightAnswerText,
   type InsightSavedResult,
 } from "@/lib/insight-result-history";
+import {
+  alignLiveInsightPresentation,
+  buildLiveInsightChartPrep,
+} from "@/lib/live-insight-narrative-alignment";
+import {
+  chartRowsToRankedSignals,
+} from "@/lib/insight-chart-narrative-alignment";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   datasetKindLabel,
@@ -748,6 +773,7 @@ import {
   type ReportBranding,
 } from "./pdf-report";
 import {
+  applyPdfExportPreset,
   buildExecutivePdfExportInput,
   computePdfRankedSignalsFromChartRows,
   insightAnswerSummaryForDisplay,
@@ -2665,23 +2691,32 @@ function zipStoredVisualizationPairs(
   viz: StoredVisualization
 ): VizInsightDatum[] {
   const n = Math.min(viz.labels.length, viz.values.length);
+  const chartRows: ChartRow[] = [];
+  for (let i = 0; i < n; i++) {
+    const v = Number(viz.values[i]);
+    if (!Number.isFinite(v)) continue;
+    chartRows.push({ name: String(viz.labels[i] ?? ""), value: v });
+  }
+  const presentationKind =
+    viz.roundingHint === "pct_1" ? ("pie" as const) : ("bar" as const);
+  const metricCtx: MetricFormatContext = {
+    metricLabel: viz.title,
+    chartTitle: viz.title,
+    roundingHint: viz.roundingHint,
+    presentationKind,
+    chartRows,
+  };
   const out: VizInsightDatum[] = [];
   for (let i = 0; i < n; i++) {
     const v = Number(viz.values[i]);
     if (!Number.isFinite(v)) continue;
-    const metricCtx: MetricFormatContext = {
-      metricLabel: viz.title,
-      chartTitle: viz.title,
-      roundingHint: viz.roundingHint,
-      presentationKind: viz.roundingHint === "pct_1" ? "pie" : "bar",
-    };
     const preformatted = viz.formattedValues?.[i]?.trim();
     const rowForFmt: ChartRow = { name: String(viz.labels[i] ?? ""), value: v };
     let fmt: string;
     if (preformatted && !metricFormatUsesPercent(metricCtx)) {
       fmt = preformatted;
     } else {
-      fmt = formatExecutiveMetricValue(rowForFmt, metricCtx);
+      fmt = formatExecutiveInsightMetricValue(rowForFmt, metricCtx);
     }
     const xv = viz.scatterXValues?.[i];
     const xNum = typeof xv === "number" && Number.isFinite(xv) ? xv : undefined;
@@ -4231,7 +4266,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     };
     const withDisplay = mapped.map((r) => ({
       ...r,
-      displayValue: formatExecutiveMetricValue(r, metricCtxWithRows),
+      displayValue: formatExecutiveInsightMetricValue(r, metricCtxWithRows),
     }));
     if (displayKind === "line" || displayKind === "area") {
       return sortChartRowsChronologically(withDisplay);
@@ -4405,6 +4440,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chartRows, overviewMetricCtx]
   );
 
+  const barTopLabelFormatter = useCallback(
+    (value: number) =>
+      formatOverviewBarTopValueLabel(value, chartRows, overviewMetricCtx),
+    [chartRows, overviewMetricCtx]
+  );
+
   const overviewVerticalBarAxisProps = useMemo(
     () =>
       displayKind === "bar" || displayKind === "histogram"
@@ -4516,10 +4557,6 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     const exportGridOpacity = pngCapture
       ? Math.min(0.55, dashGrid.opacity + 0.18)
       : dashGrid.opacity;
-    const showBarEndLabels = shouldShowOverviewBarValueLabels(
-      chartRows,
-      barValueTickFormatter
-    );
     const localCategoryPlan = computeOverviewMiniCategoryPlan(
       displayKind,
       chartRows,
@@ -4530,6 +4567,13 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     const plotHorizontal = pngCapture
       ? renderBarAsHorizontal
       : cartesianUsesHorizontalPlot(displayKind, localCategoryPlan);
+    const showBarEndLabels = plotHorizontal
+      ? shouldShowHBarValueLabels(chartRows, barValueTickFormatter, {
+          metricCtx: overviewMetricCtx,
+        })
+      : shouldShowOverviewBarValueLabels(chartRows, barTopLabelFormatter, {
+          metricCtx: overviewMetricCtx,
+        });
     const effectivePlotH =
       pngCapture
         ? plotH
@@ -4765,8 +4809,18 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         metricLabel: overviewMetricLabel,
         context: { pipeline: "overview", capture: pngCapture },
       });
+      const hBarLabelFontSize = 13;
+      const hBarPlacementMode = resolveOverviewInlineHBarPlacementMode(pngCapture);
+      const hBarOutsideReserve =
+        showBarEndLabels
+          ? computeHBarOutsideLabelReservePx(
+              chartRows.map((r) => r.value),
+              (v) => barValueTickFormatter(v),
+              hBarLabelFontSize
+            )
+          : 0;
       const hBarRightMargin = showBarEndLabels
-        ? Math.max(hbBalanced.marginRight, 52)
+        ? Math.max(hbBalanced.marginRight, 52) + hBarOutsideReserve
         : hbBalanced.marginRight;
       const hBarLiveMargins = pngCapture
         ? { top: plotMarginTop, bottom: OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR }
@@ -4853,13 +4907,22 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               {showBarEndLabels ? (
                 <LabelList
                   dataKey="value"
-                  position="insideRight"
-                  formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
-                  style={{
-                    fill: "#e2e8f0",
-                    fontSize: 13,
-                    fontWeight: 500,
-                  }}
+                  content={(labelProps) => (
+                    <HBarValueLabelListContent
+                      x={labelProps.x}
+                      y={labelProps.y}
+                      width={labelProps.width}
+                      height={labelProps.height}
+                      value={labelProps.value}
+                      viewBox={labelProps.viewBox}
+                      formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                      fontSize={hBarLabelFontSize}
+                      inlayFill={CHART_BAR_INLAY_LABEL_CSS}
+                      outsideFill={CHART_BAR_VALUE_LABEL_CSS}
+                      placementMode={hBarPlacementMode}
+                      outsideLabelReservePx={hBarOutsideReserve}
+                    />
+                  )}
                 />
               ) : null}
             </Bar>
@@ -5115,8 +5178,15 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         vBarLiveOuter && showBarEndLabels
           ? Math.max(vBarLiveOuter.marginRight, 52)
           : vBarLiveOuter?.marginRight;
+      const vBarTopLabelHeadroom =
+        showBarEndLabels && !isHist
+          ? VBAR_TOP_LABEL_HEADROOM_PX
+          : 0;
       const plotMargin = {
-        top: vBarLiveMargins?.top ?? plotMarginTop,
+        top: Math.max(
+          vBarLiveMargins?.top ?? plotMarginTop,
+          vBarTopLabelHeadroom
+        ),
         right: pngCapture
           ? showBarEndLabels
             ? 48
@@ -5226,11 +5296,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                 <LabelList
                   dataKey="value"
                   position="top"
-                  formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                  className="chart-bar-value-label"
+                  formatter={(v) => barTopLabelFormatter(Number(v ?? 0))}
                   style={{
-                    fill: "#e2e8f0",
+                    fill: CHART_BAR_VALUE_LABEL_CSS,
                     fontSize: 13,
-                    fontWeight: 500,
+                    fontWeight: 600,
                   }}
                 />
               ) : null}
@@ -5597,6 +5668,10 @@ type ExportOptions = {
   chartScope?: "insight" | "session";
   /** Default executive — analyst mode enables technical appendix + metadata sections. */
   pdfMode?: "executive" | "analyst";
+  /** Slim AI Insights preset vs Export-tab full selection. */
+  reportPreset?: "insight" | "full";
+  /** Saved insight result id — export that answer (follow-up or restored), not root bundle fallback. */
+  exportInsightResultId?: string | null;
 };
 
 function inferSalesColumn(
@@ -9186,7 +9261,20 @@ function HomeInner() {
 
   const questionAlignedForExport = useMemo(() => {
     const q = question.trim();
-    if (lastAskedQuestion.trim() === q) return true;
+    const asked = lastAskedQuestion.trim();
+    if (asked && asked === q) return true;
+    if (activeInsightResultId) {
+      const active = insightResultHistory.find(
+        (r) => r.id === activeInsightResultId
+      );
+      if (
+        active?.hasValidAIAnswer &&
+        active.question.trim() === asked &&
+        active.answer.trim()
+      ) {
+        return true;
+      }
+    }
     const stored = getChartInsightAnswer(aiAnswerByChartId, insightChartId);
     return Boolean(
       stored?.hasValidAIAnswer && stored.lastAskedQuestion.trim() === q
@@ -9194,6 +9282,8 @@ function HomeInner() {
   }, [
     question,
     lastAskedQuestion,
+    activeInsightResultId,
+    insightResultHistory,
     aiAnswerByChartId,
     insightChartId,
   ]);
@@ -9281,6 +9371,34 @@ function HomeInner() {
     aiConversationState.turnId,
     alignedAnalysis,
   ]);
+
+  const activeInsightSavedResult = useMemo(() => {
+    if (!activeInsightResultId) return null;
+    return (
+      insightResultHistory.find((r) => r.id === activeInsightResultId) ?? null
+    );
+  }, [activeInsightResultId, insightResultHistory]);
+
+  const insightFollowUpInheritsChart = useMemo(() => {
+    if (!activeInsightSavedResult?.isFollowUp || !insightSnapshot) return false;
+    if (!activeInsightSavedResult.hasValidAIAnswer) return false;
+    if (
+      activeInsightSavedResult.chartId &&
+      activeInsightSavedResult.chartId !== insightChartId
+    ) {
+      return false;
+    }
+    const analysis =
+      activeInsightSavedResult.alignedAnalysis as ChartAnalysisAlignmentParsed | null;
+    if (!analysis) return false;
+    return chartSnapshotMatchesAnalysis(insightSnapshot, analysis);
+  }, [activeInsightSavedResult, insightSnapshot, insightChartId]);
+
+  const insightChartAlignedForExport = useMemo(
+    () =>
+      insightChartMatchesCurrentQuestion || insightFollowUpInheritsChart,
+    [insightChartMatchesCurrentQuestion, insightFollowUpInheritsChart]
+  );
 
   const insightUnsupportedDecline = useMemo(
     () =>
@@ -9374,7 +9492,7 @@ function HomeInner() {
     if (insightUnsupportedDecline) return false;
     if (insightUnsupportedMultiMetric) return false;
     if (!insightSnapshot) return false;
-    if (!insightChartMatchesCurrentQuestion) return false;
+    if (!insightChartAlignedForExport) return false;
     if (
       insightSnapshot.source !== "ai" &&
       insightSnapshot.source !== "auto_dashboard"
@@ -9391,7 +9509,7 @@ function HomeInner() {
     return true;
   }, [
     insightSnapshot,
-    insightChartMatchesCurrentQuestion,
+    insightChartAlignedForExport,
     insightUnsupportedTrend,
     insightUnsupportedGrowth,
     insightUnsupportedDecline,
@@ -10259,7 +10377,13 @@ function HomeInner() {
         alignedAnalysis?.executiveLens ?? null
       ),
       routingIntent: alignedAnalysis?.routingPlan?.intent ?? null,
+      columnTypes: profile?.column_types,
     });
+
+    const priorFollowUpQuestions = [
+      ...visibleSuggestedQuestions,
+      lastAskedQuestion.trim(),
+    ].filter(Boolean);
 
     const seeds = dualMetricCompare
       ? []
@@ -10293,6 +10417,7 @@ function HomeInner() {
       const t = c.replace(/\s+/g, " ").trim();
       const k = t.toLowerCase();
       if (t.length < 6 || seen.has(k)) continue;
+      if (followUpOverlapsPriorQuestion(t, priorFollowUpQuestions)) continue;
       if (isInvalidMetricCompareChip(t, axisMet)) continue;
       if (isLowQualityFollowUpChip(t, followUpQuality)) continue;
       seen.add(k);
@@ -10300,7 +10425,10 @@ function HomeInner() {
       if (merged.length >= 5) break;
     }
     return filterMeaningfulFollowUpChips(
-      appendThreadMetaFollowUpChips(merged, 5),
+      filterFollowUpsAgainstPriorQuestions(
+        appendThreadMetaFollowUpChips(merged, 5),
+        priorFollowUpQuestions
+      ),
       axisMet,
       followUpQuality
     ).slice(0, 5);
@@ -10308,6 +10436,7 @@ function HomeInner() {
     hasValidAIAnswer,
     answer,
     lastAskedQuestion,
+    visibleSuggestedQuestions,
     insightUnsupportedGrowth,
     insightUnsupportedTrend,
     insightUnsupportedDecline,
@@ -10426,7 +10555,7 @@ function HomeInner() {
     lastAskedQuestion,
   ]);
 
-  const insightExecutiveVizInsights = useMemo((): ExecutiveVizInsightCard[] => {
+  const insightExecutiveVizInsightsBuilt = useMemo((): ExecutiveVizInsightCard[] => {
     if (insightUnsupportedGrowth) {
       return buildUnsupportedGrowthExecutiveCards(insightUnsupportedGrowth);
     }
@@ -10721,12 +10850,12 @@ function HomeInner() {
 
   const dualMetricRoasLead = useMemo((): DualMetricRoasLead | null => {
     if (insightVisualization?.multiSeries?.layout !== "grouped_bar") return null;
-    const card = insightExecutiveVizInsights.find((c) => c.key === "dual-roas");
+    const card = insightExecutiveVizInsightsBuilt.find((c) => c.key === "dual-roas");
     if (!card?.value?.trim() || !card.hint?.trim()) return null;
     return { campaign: card.value.trim(), roas: card.hint.trim() };
   }, [
     insightVisualization?.multiSeries?.layout,
-    insightExecutiveVizInsights,
+    insightExecutiveVizInsightsBuilt,
   ]);
 
   const insightNumberedExecutiveBrief = useMemo((): string | null => {
@@ -10806,12 +10935,30 @@ function HomeInner() {
     insightRelationshipEnriched,
   ]);
 
-  const parsedInsightAnswer = useMemo(() => {
+  const insightAnswerTextForDisplay = useMemo(
+    () =>
+      resolveLiveInsightAnswerText({
+        question,
+        lastAskedQuestion,
+        liveAnswer: answer,
+        activeResultId: activeInsightResultId,
+        history: insightResultHistory,
+      }),
+    [
+      question,
+      lastAskedQuestion,
+      answer,
+      activeInsightResultId,
+      insightResultHistory,
+    ]
+  );
+
+  const rawParsedInsightAnswer = useMemo(() => {
     if (insightUnsupportedMultiMetric) {
       return buildUnsupportedMultiMetricParsedSections(insightUnsupportedMultiMetric);
     }
     const parsed = parseAnswerIntoSections(
-      answer,
+      insightAnswerTextForDisplay,
       alignedAnalysis?.insightSummary ?? undefined,
       { reasoningBlockClaim: insightReasoningBlocks[0]?.claim }
     );
@@ -10900,7 +11047,7 @@ function HomeInner() {
         summaryText = `${lead} ${summaryText}`.trim();
       }
     }
-    return {
+    const softened = {
       ...parsed,
       summary: summaryText,
       statistical: softenDetail(parsed.statistical),
@@ -10909,8 +11056,9 @@ function HomeInner() {
       methodology: softenDetail(parsed.methodology),
       moreDetail: softenDetail(parsed.moreDetail),
     };
+    return softened;
   }, [
-    answer,
+    insightAnswerTextForDisplay,
     alignedAnalysis?.insightSummary,
     insightSnapshot?.contract,
     insightNarrativeTone,
@@ -10929,7 +11077,7 @@ function HomeInner() {
     insightReasoningBlocks,
   ]);
 
-  const insightExecutiveBrief = useMemo(() => {
+  const insightExecutiveBriefBeforeAlign = useMemo(() => {
     if (insightUnsupportedMultiMetric) {
       return insightUnsupportedMultiMetric.leadSentence;
     }
@@ -10942,7 +11090,7 @@ function HomeInner() {
       return polishInsightNarrativeText(brief, { dualMetricRoasLead });
     }
     const s = sanitizeNarrativeForTrendContract(
-      parsedInsightAnswer.summary?.trim() ?? "",
+      rawParsedInsightAnswer.summary?.trim() ?? "",
       insightSnapshot?.contract
     );
     if (!s) return "";
@@ -10974,7 +11122,7 @@ function HomeInner() {
     return brief;
   }, [
     insightNumberedExecutiveBrief,
-    parsedInsightAnswer.summary,
+    rawParsedInsightAnswer.summary,
     insightSnapshot?.contract,
     insightNarrativeTone,
     dualMetricRoasLead,
@@ -10985,9 +11133,48 @@ function HomeInner() {
     insightProfitMarginLead,
   ]);
 
+  const alignedInsightPresentation = useMemo(
+    () =>
+      alignLiveInsightPresentation(
+        {
+          parsedInsightAnswer: rawParsedInsightAnswer,
+          insightExecutiveBrief: insightExecutiveBriefBeforeAlign,
+          insightExecutiveVizInsights: insightExecutiveVizInsightsBuilt,
+          insightSummary: alignedAnalysis?.insightSummary ?? null,
+          reasoningBlocks: insightReasoningBlocks,
+          rankedSignals: chartRowsToRankedSignals(sortedInsightChartData),
+        },
+        buildLiveInsightChartPrep(insightSnapshot, {
+          category: insightChartAxisLabels.categoryAxis,
+          value: insightChartAxisLabels.valueAxis,
+        })
+      ),
+    [
+      rawParsedInsightAnswer,
+      insightExecutiveBriefBeforeAlign,
+      insightExecutiveVizInsightsBuilt,
+      sortedInsightChartData,
+      insightSnapshot,
+      insightChartAxisLabels.categoryAxis,
+      insightChartAxisLabels.valueAxis,
+      alignedAnalysis?.insightSummary,
+      insightReasoningBlocks,
+    ]
+  );
+
+  const parsedInsightAnswer = alignedInsightPresentation.parsedInsightAnswer;
+  const insightExecutiveBrief = alignedInsightPresentation.insightExecutiveBrief;
+  const insightExecutiveVizInsights =
+    alignedInsightPresentation.insightExecutiveVizInsights;
+  const insightReasoningBlocksForDisplay =
+    alignedInsightPresentation.reasoningBlocks;
+
   const pdfInsightExportSidecarRef = useRef({
     insightExecutiveVizInsights: [] as ExecutiveVizInsightCard[],
     insightExecutiveBrief: "",
+    insightPresentation: null as ReturnType<
+      typeof alignLiveInsightPresentation
+    >["insightPresentation"] | null,
     insightSmartChartIntel: null as SmartChartIntel | null,
     insightChartInsightBadge: null as string | null,
     insightRenderedChartKind: "" as ChartKind,
@@ -10997,6 +11184,7 @@ function HomeInner() {
     pdfInsightExportSidecarRef.current = {
       insightExecutiveVizInsights,
       insightExecutiveBrief,
+      insightPresentation: alignedInsightPresentation.insightPresentation,
       insightSmartChartIntel,
       insightChartInsightBadge,
       insightRenderedChartKind,
@@ -11004,6 +11192,7 @@ function HomeInner() {
   }, [
     insightExecutiveVizInsights,
     insightExecutiveBrief,
+    alignedInsightPresentation.insightPresentation,
     insightSmartChartIntel,
     insightChartInsightBadge,
     insightRenderedChartKind,
@@ -11173,10 +11362,14 @@ function HomeInner() {
           setError(msg);
           return;
         }
-        const resolved: ExportOptions = {
-        ...exportOptions,
-        ...options,
-      };
+        const callOptions = options ?? {};
+        const resolved: ExportOptions = applyPdfExportPreset(
+          {
+            ...exportOptions,
+            ...callOptions,
+          },
+          callOptions
+        );
       const pdfExportCtx = resolvePdfExportContext({
         options: resolved,
         chartHistory,
@@ -11188,8 +11381,12 @@ function HomeInner() {
         question,
         liveAnswer: answer,
         liveAlignedAnalysis: alignedAnalysis,
-        insightChartMatchesCurrentQuestion,
+        insightChartMatchesCurrentQuestion:
+          insightChartAlignedForExport,
         insightChartDataLength: insightChartData.length,
+        insightResultHistory,
+        exportInsightResultId:
+          callOptions.exportInsightResultId ?? activeInsightResultId,
       });
       const chartScope = pdfExportCtx.chartScope;
       const pdfAlignedAnalysis =
@@ -11209,8 +11406,11 @@ function HomeInner() {
         });
       }
       const pdfInsightSidecar = pdfInsightExportSidecarRef.current;
-      const pdfParsedInsightAnswer =
-        chartScope === "insight"
+      const insightExportMatchesLive =
+        chartScope === "insight" && pdfSnap?.id === insightChartId;
+      const pdfParsedInsightAnswer = insightExportMatchesLive
+        ? parsedInsightAnswer
+        : chartScope === "insight"
           ? parseAnswerIntoSections(
               pdfInsightAnswer,
               pdfAlignedAnalysis?.insightSummary ?? undefined
@@ -11431,6 +11631,23 @@ function HomeInner() {
 
       const conversationAppendix = includeConvPdf
         ? (() => {
+            const exportResultId =
+              callOptions.exportInsightResultId ??
+              activeInsightResultIdRef.current;
+            if (exportResultId) {
+              const thread = buildInsightConversationThread(
+                insightResultHistoryRef.current,
+                exportResultId
+              );
+              if (thread.length > 0) {
+                return {
+                  questionThread: thread,
+                  inheritedFilters: [...aiConversationState.activeFilters],
+                  activeDrillPath: [...aiConversationState.activeDrillPath],
+                  inheritedAssumptionNote: followUpAssumption || null,
+                };
+              }
+            }
             const chainBase =
               aiConversationState.followUpChain.length > 0
                 ? [...aiConversationState.followUpChain]
@@ -11738,6 +11955,8 @@ function HomeInner() {
         selectedSheet: selectedSheet || undefined,
         uploadFileName: uploadMeta?.name,
         datasetKind: datasetKind || "generic",
+        typeLabel: autoDashboard?.type_label ?? null,
+        mappingDomain: mappingMetadata?.domain ?? null,
         profile,
         preview: dataPreviewSortedRows.slice(
           0,
@@ -11748,7 +11967,9 @@ function HomeInner() {
         pdfAlignedAnalysis,
         question,
         lastAskedQuestion: pdfExportLastAskedQuestion,
-        pdfInsightAnswer,
+        pdfInsightAnswer: insightExportMatchesLive
+          ? alignedInsightPresentation.pdfInsightAnswer
+          : pdfInsightAnswer,
         parsedInsightAnswer: pdfParsedInsightAnswer,
         insightExecutiveBrief:
           chartScope === "insight"
@@ -11758,6 +11979,9 @@ function HomeInner() {
           chartScope === "insight"
             ? pdfInsightSidecar.insightExecutiveVizInsights
             : insightExecutiveVizInsights,
+        insightReasoningBlocks: insightExportMatchesLive
+          ? alignedInsightPresentation.reasoningBlocks
+          : (pdfAlignedAnalysis?.reasoningBlocks ?? []),
         executiveVizInsights,
         insightSmartChartIntel:
           chartScope === "insight"
@@ -11863,9 +12087,12 @@ function HomeInner() {
         detailViewLayout={detailViewLayout}
         pngCaptureMode={pngCaptureMode}
         chartRows={insightMode ? sortedInsightChartData : sortedChartData}
-        visualization={
-          (insightMode ? insightVisualization : visualization) as ChartRendererViz
-        }
+        visualization={{
+          ...((insightMode ? insightVisualization : visualization) as ChartRendererViz),
+          chartTitle: insightMode
+            ? (insightVisualization?.title ?? chartTitle)
+            : (visualization?.title ?? chartTitle),
+        }}
         presentationKind={renderedKind}
         axes={insightMode ? insightChartAxisLabels : chartAxisLabels}
         viewportW={layoutViewportW}
@@ -12625,7 +12852,11 @@ function HomeInner() {
                             }
                             style={overviewChartGridSoloRowStyle(idx, chartCount)}
                           >
-                            <div className={ovChartInner}>
+                            <div
+                              className={
+                                isSoloLastRow ? ovChartInnerSolo : ovChartInner
+                              }
+                            >
                               <OverviewDashboardChartSlot
                                 chart={c}
                                 canonicalTitle={canonicalTitle}
@@ -13295,9 +13526,10 @@ function HomeInner() {
                                 detailViewLayout
                                 pngCaptureMode
                                 chartRows={sortedChartData}
-                                visualization={
-                                  visualization as ChartRendererViz
-                                }
+                                visualization={{
+                                  ...(visualization as ChartRendererViz),
+                                  chartTitle: visualization?.title ?? chartTitle,
+                                }}
                                 presentationKind={
                                   chartsTabPngCaptureRequest!.kind ||
                                   sessionRenderedChartKind ||
@@ -13645,22 +13877,17 @@ function HomeInner() {
                       <div className={aiInsightsAnswerSummaryPanel}>
                         <p className={aiInsightsAnswerSummary}>
                           {formatInsightSummary(
-                            insightAnswerSummaryForDisplay(parsedInsightAnswer, {
-                              insightSummary:
-                                alignedAnalysis?.insightSummary ?? undefined,
-                              reasoningBlockClaim:
-                                insightReasoningBlocks[0]?.claim,
-                            })
+                            insightAnswerSummaryForDisplay(parsedInsightAnswer)
                           )}
                         </p>
                       </div>
-                      {insightReasoningBlocks.length > 0 ? (
+                      {insightReasoningBlocksForDisplay.length > 0 ? (
                         <div className={aiInsightsAnswerDetailsGroup}>
                           <p className={aiInsightsAnswerDetailsLabel}>
                             Why this matters
                           </p>
                           <ul className={aiInsightsReasoningList}>
-                            {insightReasoningBlocks.map((block, idx) => (
+                            {insightReasoningBlocksForDisplay.map((block, idx) => (
                               <li
                                 key={`${block.type}-${idx}-${block.claim.slice(0, 32)}`}
                                 className={aiInsightsReasoningItem}
@@ -14533,13 +14760,9 @@ function HomeInner() {
                       disabled={pdfExportBusy}
                       onClick={() =>
                         downloadReport({
-                          includeKPIs: true,
-                          includeAIInsight: true,
-                          includeChart: true,
-                          includeDataPreview: true,
-                          includeDataQuality: true,
-                          includeConversationContext: true,
+                          reportPreset: "insight",
                           chartScope: "insight",
+                          exportInsightResultId: activeInsightResultId,
                         })
                       }
                       className={`${aiInsightsBtnExport} disabled:cursor-not-allowed disabled:opacity-50`}

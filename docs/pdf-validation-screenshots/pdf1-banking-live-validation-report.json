@@ -1,0 +1,35 @@
+{
+  "csv": "D:\\Projects\\AI-Data-Analyst-App\\test-fixtures\\domain_upload_1k\\banking_financial_1k.csv",
+  "question": "Spend Amount by Product Type",
+  "insightPreset": {
+    "pdf": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf1-banking-live-insight-preset.pdf",
+    "download_ms": 3133,
+    "analysis": {
+      "file": "pdf1-banking-live-insight-preset.pdf",
+      "pages": 3,
+      "imagesPerPage": [
+        1,
+        1,
+        1
+      ],
+      "totalImages": 3,
+      "hasChartCaptureUnavailable": false,
+      "hasCategoryCategory": false,
+      "hasProductTypeChip": true,
+      "segmentTermsInPdf": [],
+      "productTermsInPdf": [
+        "Credit Card",
+        "Term Deposit",
+        "Personal Loan",
+        "Product Type"
+      ],
+      "sectionOrder": [
+        "Executive summary",
+        "AI insight",
+        "Visualization"
+      ],
+      "vizPage": 2,
+      "vizScreenshot": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf1-banking-live-viz-page-2.png"
+    }
+  }
+}

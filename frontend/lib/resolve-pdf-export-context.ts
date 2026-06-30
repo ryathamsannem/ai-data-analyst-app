@@ -9,6 +9,11 @@ import {
   type ChartInsightAnswerStore,
 } from "@/lib/chart-insight-answers";
 import type { ExecutivePdfExportOptions } from "@/lib/build-executive-pdf-input";
+import {
+  findInsightSavedResultById,
+  findInsightSavedResultByQuestion,
+  type InsightSavedResult,
+} from "@/lib/insight-result-history";
 
 export type PdfAlignedAnalysisLike = Record<string, unknown> | null;
 
@@ -57,6 +62,10 @@ export type ResolvePdfExportContextInput = {
   liveAlignedAnalysis: PdfAlignedAnalysisLike;
   insightChartMatchesCurrentQuestion: boolean;
   insightChartDataLength: number;
+  /** Saved insight results — authoritative for follow-up Q/A when chart bundle is shared. */
+  insightResultHistory?: InsightSavedResult[];
+  /** Explicit saved result to export (active follow-up or restored answer). */
+  exportInsightResultId?: string | null;
 };
 
 export type ResolvedPdfExportContext = {
@@ -91,6 +100,22 @@ export function resolvePdfExportContext(
 
   const questionForLookup =
     input.lastAskedQuestion.trim() || question.trim();
+  const history = input.insightResultHistory ?? [];
+  const savedFromId = findInsightSavedResultById(
+    history,
+    input.exportInsightResultId
+  );
+  const savedFromQuestion =
+    !savedFromId && includeAI
+      ? findInsightSavedResultByQuestion(history, questionForLookup)
+      : null;
+  const savedResult = savedFromId ?? savedFromQuestion;
+  const savedChartId =
+    savedResult?.chartId &&
+    chartHistory.some((h) => h.id === savedResult.chartId)
+      ? savedResult.chartId
+      : null;
+
   const chartIdFromQuestion = includeAI
     ? findChartIdForExportQuestion(aiAnswerByChartId, questionForLookup)
     : null;
@@ -107,6 +132,9 @@ export function resolvePdfExportContext(
   );
 
   const hasAnyInsightExport =
+    Boolean(
+      savedResult?.hasValidAIAnswer && savedResult.answer.trim()
+    ) ||
     Boolean(chartIdFromQuestion) ||
     pinnedExportable ||
     insightExportable ||
@@ -130,6 +158,7 @@ export function resolvePdfExportContext(
   let chartId: string | null = null;
   if (chartScope === "insight") {
     chartId =
+      savedChartId ??
       chartIdFromQuestion ??
       (pinnedExportable ? pinnedId : null) ??
       (insightExportable ? insightChartId : null) ??
@@ -158,20 +187,32 @@ export function resolvePdfExportContext(
     const bundle = resolvedChartId
       ? getChartInsightAnswer(aiAnswerByChartId, resolvedChartId)
       : null;
-    insightAnswer =
-      bundle?.answer?.trim() ||
-      (resolvedChartId === insightChartId ? liveAnswer.trim() : "") ||
-      liveAnswer;
-    alignedAnalysis =
-      (resolvedChartId === insightChartId && liveAlignedAnalysis
-        ? liveAlignedAnalysis
-        : null) ??
-      (bundle?.alignedAnalysis as PdfAlignedAnalysisLike) ??
-      liveAlignedAnalysis;
-    exportQuestion =
-      bundle?.lastAskedQuestion?.trim() ||
-      input.lastAskedQuestion.trim() ||
-      question.trim();
+    const savedExportable = Boolean(
+      savedResult?.hasValidAIAnswer && savedResult.answer.trim()
+    );
+    if (savedExportable && savedResult) {
+      insightAnswer = savedResult.answer.trim();
+      alignedAnalysis =
+        (savedResult.alignedAnalysis as PdfAlignedAnalysisLike) ??
+        (bundle?.alignedAnalysis as PdfAlignedAnalysisLike) ??
+        liveAlignedAnalysis;
+      exportQuestion = savedResult.question.trim();
+    } else {
+      insightAnswer =
+        bundle?.answer?.trim() ||
+        (resolvedChartId === insightChartId ? liveAnswer.trim() : "") ||
+        liveAnswer;
+      alignedAnalysis =
+        (resolvedChartId === insightChartId && liveAlignedAnalysis
+          ? liveAlignedAnalysis
+          : null) ??
+        (bundle?.alignedAnalysis as PdfAlignedAnalysisLike) ??
+        liveAlignedAnalysis;
+      exportQuestion =
+        bundle?.lastAskedQuestion?.trim() ||
+        input.lastAskedQuestion.trim() ||
+        question.trim();
+    }
   } else {
     const sessionBundle = activeChartId
       ? getChartInsightAnswer(aiAnswerByChartId, activeChartId)

@@ -92,7 +92,7 @@ export const PDF_EMPTY_STATES = {
     body: "Load a dataset in the app to include a structured sample table in this export.",
   },
   appendix: {
-    title: "Technical appendix not populated",
+    title: "Technical details not populated",
     body: "Include a chart with series data, provenance metadata, or session thumbnails to populate audit tables in this section.",
   },
   narrative: {
@@ -188,6 +188,11 @@ export const PDF_ENTERPRISE_COLORS = {
 export function pdfLineHeight(fontSize: number, factor = 0.44): number {
   return fontSize * factor + 1.55;
 }
+
+/** PDF Visualization section embed defaults (renderer-only; not live chart sizing). */
+export const PDF_VIZ_EMBED_DEFAULT_MAX_HEIGHT_MM = 172;
+export const PDF_VIZ_EMBED_MIN_HEIGHT_MM = 96;
+export const PDF_VIZ_EMBED_DEFAULT_MIN_WIDTH_RATIO = 0.82;
 
 /** Proportional chart embed size — avoids stretch, clip, and extreme aspect ratios. */
 export function computePdfChartEmbedDimensions(
@@ -401,7 +406,7 @@ export function pdfDrawEnterpriseRunningChrome(
     reportTitle: string;
     sourceLabel: string;
     generatedByLine: string;
-    supportLine: string;
+    supportLine: string | null;
     accent: Rgb;
     ink: Rgb;
     muted: Rgb;
@@ -468,10 +473,12 @@ export function pdfDrawEnterpriseRunningChrome(
     align: "center",
     maxWidth: contentWidth * 0.55,
   });
-  doc.text(supportLine, pageWidth / 2, footerBaseline + 1.8, {
-    align: "center",
-    maxWidth: contentWidth * 0.55,
-  });
+  if (supportLine?.trim()) {
+    doc.text(supportLine, pageWidth / 2, footerBaseline + 1.8, {
+      align: "center",
+      maxWidth: contentWidth * 0.55,
+    });
+  }
 
   doc.setFont("helvetica", "normal");
   doc.text(

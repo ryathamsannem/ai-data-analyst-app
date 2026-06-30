@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   OVERVIEW_MINI_RADIAL_SIZE_SCALE,
+  OVERVIEW_MINI_RADIAL_SLICE_STROKE_WIDTH,
   scaleOverviewMiniRadialRadii,
   tightenOverviewMiniRadialMargins,
 } from "@/lib/overview-mini-radial-polish";
@@ -15,6 +16,10 @@ describe("overview mini radial polish", () => {
     expect(scaled.cy).toBe("50%");
     expect(scaled.innerRadius).toBe(Math.round(52 * OVERVIEW_MINI_RADIAL_SIZE_SCALE));
     expect(scaled.outerRadius).toBe(Math.round(84 * OVERVIEW_MINI_RADIAL_SIZE_SCALE));
+  });
+
+  it("uses stronger slice separator stroke for dark overview cards", () => {
+    expect(OVERVIEW_MINI_RADIAL_SLICE_STROKE_WIDTH).toBe(1.25);
   });
 
   it("tightens top and bottom margins for legend proximity", () => {

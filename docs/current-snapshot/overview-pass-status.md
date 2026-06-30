@@ -1,6 +1,6 @@
 # Overview Pass Status (5A → 5C.5)
 
-Snapshot: June 27, 2026 · Branch `DEV` · Passes 5B/5C in working tree (parity **frozen** after 5C.5).
+Snapshot: June 28, 2026 · Branch `DEV` · commit `61d0145` · Passes 5B/5C committed; parity **frozen** after 5C.5; full backend **478/478** green.
 
 All passes followed the same constraints: **incremental fixes only**, no AI Insights routing changes,
 no chart-rendering architecture rewrite, no export behavior changes except where shared visual constants
@@ -199,7 +199,7 @@ domainMax = max(existingDomainMax, maxRaw / 0.85)
 - `frontend/lib/overview-bar-value-domain.ts` — `OVERVIEW_HBAR_TARGET_MAX_UTILIZATION = 0.85`, `resolveOverviewHBarUtilizationDomainMax`.
 - `frontend/lib/cartesian-chart-decisions.ts`, `overview-dashboard-export.ts` — `overviewHorizontalBarHeadroom: true`.
 
-**Tests:** 722 vitest pass; build clean.
+**Tests:** 743 vitest pass; build clean.
 
 **Status:** ✅ **Frozen — P0 H-Bar/V-Bar parity closed.**
 

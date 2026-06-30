@@ -255,6 +255,27 @@ describe("formatOverviewMiniInsightChips trend wording", () => {
     expect(chips[2]?.text).toBe("Gap: 0.03");
   });
 
+  it("formats focused defect-rate breakdown chips with V-Bar label precision", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "Night", value: 0.0252 },
+        { name: "Day", value: 0.0247 },
+        { name: "Swing", value: 0.0235 },
+      ],
+      {
+        chartTitle: "Defect Rate by Shift",
+        presentationKind: "bar",
+      }
+    );
+    expect(chips[0]?.text).toBe("Top: Night (2.52%)");
+    expect(chips[1]?.text).toBe("Lowest: Swing (2.35%)");
+    expect(chips[0]?.text).not.toContain("2.5%");
+    expect(chips[1]?.text).not.toContain("2.3%");
+    const gapChip = chips.find((c) => c.key === "gap");
+    expect(gapChip?.text).toBe("Gap: 0.17 pp");
+    expect(gapChip?.text).not.toBe("Gap: 0.2 pp");
+  });
+
   it("formats small-spread rate breakdown chips as percent with a pp gap", () => {
     const chips = formatOverviewMiniInsightChips(
       [

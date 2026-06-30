@@ -18,6 +18,19 @@ describe("mappingConfidenceFromRoleMetadata", () => {
       })
     ).toBe("high");
   });
+
+  it("ignores selected optional customer with medium confidence in aggregate", () => {
+    expect(
+      mappingConfidenceFromRoleMetadata({
+        sales: { confidence: "high", selected: "claim_amount" },
+        product: { confidence: "high", selected: "department" },
+        date: { confidence: "high", selected: "visit_date" },
+        profit: { confidence: "high", selected: "wait_time_minutes" },
+        region: { confidence: "low", selected: null },
+        customer: { confidence: "medium", selected: "patient_segment" },
+      })
+    ).toBe("high");
+  });
 });
 
 describe("resolveNarrativeTone", () => {

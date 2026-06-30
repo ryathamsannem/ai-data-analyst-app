@@ -1,0 +1,13 @@
+{
+  "pdf": "D:\\Projects\\AI-Data-Analyst-App\\docs\\pdf-validation-screenshots\\pdf1-banking-export-full.pdf",
+  "download_ms": 4729,
+  "pdf2b": {
+    "file": "pdf1-banking-export-full.pdf",
+    "hasAccId": true,
+    "hasBadAccountDate": false,
+    "hasReportMonth": true,
+    "hasPreviewDuplicateLabel": true,
+    "hasPreviewDuplicateNote": true,
+    "hasFileWideRows": true
+  }
+}

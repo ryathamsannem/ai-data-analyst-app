@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChartRow } from "@/app/chart-types";
 import {
+  chooseFocusedTrendAxisStep,
   formatOverviewBarValueAxisTick,
   formatOverviewLineYAxisTick,
   formatOverviewScatterAxisTick,
@@ -17,6 +18,12 @@ import {
   sessionLineAreaDetailBottomMargin,
   sessionTrendDetailPlotMargins,
 } from "./overview-premium-axis-domain";
+
+describe("chooseFocusedTrendAxisStep", () => {
+  it("uses 10k steps for weekly-units cluster instead of unit steps", () => {
+    expect(chooseFocusedTrendAxisStep(28_000, 1_054_638)).toBe(10_000);
+  });
+});
 
 describe("formatOverviewBarValueAxisTick", () => {
   const loanRows: ChartRow[] = [
@@ -173,6 +180,18 @@ describe("formatOverviewLineYAxisTick", () => {
     expect(formatOverviewLineYAxisTick(850_000)).toBe("850K");
   });
 
+  it("formats focused megabyte trend ticks with sub-million precision", () => {
+    expect(formatOverviewLineYAxisTick(1_020_000)).toBe("1.02M");
+    expect(formatOverviewLineYAxisTick(1_030_000)).toBe("1.03M");
+    expect(formatOverviewLineYAxisTick(1_040_000)).toBe("1.04M");
+    expect(formatOverviewLineYAxisTick(1_050_000)).toBe("1.05M");
+    const labels = [1_020_000, 1_030_000, 1_040_000, 1_050_000].map((t) =>
+      formatOverviewLineYAxisTick(t)
+    );
+    expect(new Set(labels).size).toBe(4);
+    expect(labels.every((l) => l !== "1M")).toBe(true);
+  });
+
   it("keeps percent metrics readable", () => {
     expect(formatOverviewLineYAxisTick(4.5, { metricLabel: "conversion rate" })).toBe(
       "4.5%"
@@ -243,6 +262,39 @@ describe("resolveTrendValueAxisProps", () => {
     const sessionSpan = session!.domain[1] - session!.domain[0];
     expect(overviewSpan).toBeLessThan(legacySpan);
     expect(sessionSpan).toBeLessThanOrEqual(overviewSpan);
+  });
+
+  it("focuses low-variance weekly units produced trend near the data cluster", () => {
+    const values = [1_026_677, 1_030_000, 1_032_000, 1_054_638];
+    const props = resolveTrendValueAxisProps({
+      chartKind: "line",
+      values,
+      surface: "overview",
+    });
+    expect(props).not.toBeNull();
+    expect(props!.domain[0]).toBeGreaterThanOrEqual(1_020_000);
+    expect(props!.domain[0]).toBeLessThan(1_030_000);
+    expect(props!.domain[1]).toBeGreaterThan(1_050_000);
+    expect(props!.domain[1]).toBeLessThanOrEqual(1_070_000);
+    const span = props!.domain[1] - props!.domain[0];
+    expect(span).toBeLessThan(100_000);
+    expect(props!.domain[0]).toBeGreaterThanOrEqual(0);
+    expect(props!.ticks.length).toBeLessThanOrEqual(7);
+    const labels = props!.ticks.map((t) => formatOverviewLineYAxisTick(t));
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels.every((l) => l !== "1M")).toBe(true);
+    expect(labels.some((l) => l.startsWith("1.0"))).toBe(true);
+  });
+
+  it("keeps wide-spread revenue trend on a broader domain", () => {
+    const values = [120_000, 240_000, 310_000, 420_000];
+    const props = resolveTrendValueAxisProps({
+      chartKind: "line",
+      values,
+    });
+    expect(props).not.toBeNull();
+    expect(props!.domain[0]).toBe(0);
+    expect(props!.domain[1]).toBeGreaterThan(420_000);
   });
 
   it("returns Overview-aligned premium domain for Area", () => {

@@ -6,6 +6,8 @@ import {
   buildPdfGeneratedByLine,
   buildPdfSupportLine,
   getBrandInitials,
+  isPlaceholderSupportEmail,
+  resolvePdfExportFooter,
   sanitizeExportFilePrefix,
 } from "@/lib/branding-config";
 
@@ -40,5 +42,32 @@ describe("branding-config", () => {
         pdfFooterText: "Confidential — internal use only",
       })
     ).toBe("Confidential — internal use only");
+  });
+
+  it("detects placeholder support emails", () => {
+    expect(isPlaceholderSupportEmail("support@example.com")).toBe(true);
+    expect(isPlaceholderSupportEmail("help@acme.com")).toBe(false);
+  });
+
+  it("hides placeholder support in PDF footer", () => {
+    const footer = resolvePdfExportFooter({
+      reportCompanyName: "",
+      globalBranding: BRANDING,
+    });
+    expect(footer.generatedByLine).toBe("Prepared with AI Data Analyst");
+    expect(footer.supportLine).toBeNull();
+  });
+
+  it("keeps custom branding and real support email", () => {
+    const footer = resolvePdfExportFooter({
+      reportCompanyName: "Acme Analytics",
+      globalBranding: {
+        ...BRANDING,
+        pdfFooterText: "Confidential — internal use only",
+        supportEmail: "help@acme.com",
+      },
+    });
+    expect(footer.generatedByLine).toBe("Confidential — internal use only");
+    expect(footer.supportLine).toBe("Support: help@acme.com");
   });
 });

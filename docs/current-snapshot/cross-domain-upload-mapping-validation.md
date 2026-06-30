@@ -1,13 +1,17 @@
 # Cross-Domain 1k Upload & Mapping Confidence Validation
 
-**Date:** 2026-06-27  
-**Fixtures:** `test-fixtures/domain_upload_1k/`  
+**Date:** 2026-06-28 (final snapshot — 15 domains validated; mapping confidence calibrated)  
+**Fixtures:** `test-fixtures/domain_upload_1k/` (15 CSVs)  
 **Generator:** `test-fixtures/domain_upload_1k/generate_domain_1k_fixtures.py`  
-**Tests:** `backend/tests/test_cross_domain_upload_1k.py`
+**Tests:** `backend/tests/test_cross_domain_upload_1k.py`, `backend/tests/test_cross_domain_15_overview_validation.py`
 
 ## Summary
 
-Nine ~1,000-row domain CSV fixtures were generated and validated for upload parsing, semantic mapping, mapping confidence, executive domain labels, KPI cards, and default Overview charts. All fixtures pass backend validation. HR mapping confidence was **Low** before fixes; it is now **High** for both `hr_workforce_1k.csv` and `hr_gold_5000.csv`.
+Fifteen ~1,000-row domain CSV fixtures are generated and validated for upload parsing, semantic mapping, mapping confidence, executive domain labels, KPI cards, and default Overview charts. All fixtures pass backend validation.
+
+**15-domain result (final snapshot):** **14 High**, **1 justified Medium** (banking only), **0 Low**. See [`final-overview-15-domain-validation.md`](./final-overview-15-domain-validation.md) for the full matrix.
+
+**Follow-ups complete:** Healthcare and SaaS distinct secondary metrics + exec labels (`e353dee`); marketing revenue confidence; default scatter demotion; showcase/banking backend fixes (`61d0145`).
 
 ## HR Low-confidence root cause (fixed)
 
@@ -36,20 +40,22 @@ Nine ~1,000-row domain CSV fixtures were generated and validated for upload pars
 | `retail_ecommerce_1k.csv` | 1000/9 | sales | ecommerce | Sales | **High** | sales_amount | profit | order_date | product_category | Monthly Sales Amount Trend; Sales Amount by Customer Segment; Region Profit Share | PASS |
 | `banking_financial_1k.csv` | 1000/9 | banking | banking | Banking / Financial Services | **Medium** | spend_amount | credit_utilization | report_month | product_type | Monthly Spend Amount Trend; Spend Amount by Product Type | PASS |
 | `hr_workforce_1k.csv` | 1000/9 | hr | hr | HR / Employee | **High** | salary | performance_rating | hire_date | department | Monthly Salary Trend; Salary by Department | PASS |
-| `healthcare_patient_1k.csv` | 1000/9 | generic | healthcare | Generic | **Medium** | claim_amount | claim_amount | visit_date | department | Monthly Claim Amount Trend; Claim Amount by Department | PASS |
+| `healthcare_patient_1k.csv` | 1000/9 | healthcare | healthcare | Healthcare | **High** | claim_amount | wait_time_minutes | visit_date | department | Monthly Claim Amount Trend; Claim Amount by Department | PASS |
 | `manufacturing_quality_1k.csv` | 1000/9 | operations | manufacturing | Operations | **High** | units_produced | defect_rate | production_date | product_line | Monthly Units Produced Trend; Units Produced by Product Line | PASS |
 | `marketing_campaign_1k.csv` | 1000/10 | marketing | marketing | Marketing | **High** | revenue | conversion_rate | campaign_date | campaign_name | Monthly Revenue Trend; Revenue by Region | PASS |
-| `saas_subscription_1k.csv` | 1000/9 | generic | saas | Generic | **Medium** | mrr | mrr | month | plan_type | Monthly Mrr Trend; Mrr by Plan Type | PASS |
-| `supply_chain_logistics_1k.csv` | 1000/9 | generic | supply_chain | Generic | **High** | freight_cost | freight_cost | ship_date | carrier | Monthly Freight Cost Trend; Freight Cost by Carrier | PASS |
+| `saas_subscription_1k.csv` | 1000/9 | saas | saas | SaaS / Subscription | **High** | mrr | churn_rate | month | plan_type | Monthly Mrr Trend; Mrr by Plan Type | PASS |
+| `supply_chain_logistics_1k.csv` | 1000/9 | generic | supply_chain | Generic | **High** | freight_cost | on_time_rate | ship_date | carrier | Monthly Freight Cost Trend; Freight Cost by Carrier | PASS |
 | `education_student_1k.csv` | 1000/9 | generic | education | Generic | **High** | enrollment_count | pass_rate | term_date | grade_level | Monthly Enrollment Count Trend; Enrollment Count by School Region | PASS |
 
-### Medium confidence cases (acceptable)
+### Medium confidence (justified)
 
-| Fixture | Why Medium |
-|---------|------------|
-| Banking | No geographic region column; profit role gap between utilization vs loan balance is narrow |
-| Healthcare / SaaS | Primary and secondary map to same metric (claim_amount / mrr) — valid but reduces profit-role gap |
-| SaaS | Executive domain remains `generic` (no dedicated SaaS executive taxonomy yet) — deferred |
+| Fixture | Why Medium | Status |
+|---------|------------|--------|
+| Banking | No geographic region column; narrow profit-role gap (utilization vs delinquency tie) | **Justified** — accepted for snapshot |
+
+~~Healthcare / SaaS / supply chain Medium~~ — **Resolved** — now **High** in 15-domain validation.
+
+~~Healthcare / SaaS duplicate primary-secondary~~ — **Fixed** (`e353dee`).
 
 ### Checklist results (all fixtures)
 
@@ -82,15 +88,16 @@ Nine ~1,000-row domain CSV fixtures were generated and validated for upload pars
 - Chart renderability
 - HR KPI cards include salary
 
-## Test status
+## Test status (June 28, 2026)
 
 | Suite | Result |
 |-------|--------|
-| `tests/test_cross_domain_upload_1k.py` | 10/10 passed |
-| `tests/test_cross_domain_mapping_qa.py` | 4/4 passed |
-| `tests/test_upload_mapping_edge_cases.py` | 13/13 passed |
-| `tests/test_overview_hr_gold_dashboard.py` | 5/5 passed |
-| Full `tests/` | **449 passed, 6 failed** (pre-existing, unchanged) |
+| `tests/test_cross_domain_upload_1k.py` | PASS (included in 35) |
+| `tests/test_cross_domain_mapping_qa.py` | PASS |
+| `tests/test_upload_mapping_edge_cases.py` | PASS |
+| `tests/test_overview_hr_gold_dashboard.py` | PASS |
+| Combined targeted | **35/35 passed** |
+| Full `tests/` | **452 passed, 6 failed** (pre-existing, unchanged) |
 
 ## Regenerate fixtures
 
@@ -100,6 +107,7 @@ python test-fixtures/domain_upload_1k/generate_domain_1k_fixtures.py
 
 ## Deferred / out of scope
 
-- Executive domain labels for healthcare, SaaS, supply chain, education (remain `generic` where no taxonomy exists)
+- Executive domain labels for supply chain, education (remain `generic` where no taxonomy exists) — healthcare/SaaS now have exec domains
+- **Mapping confidence calibration** for four Medium fixtures — **next P1 task**
 - PNG export visual smoke (frontend/export architecture frozen)
 - Chart visual polish, H-Bar/V-Bar constants, AI routing

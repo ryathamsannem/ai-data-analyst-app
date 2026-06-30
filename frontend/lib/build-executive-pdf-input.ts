@@ -29,6 +29,9 @@ import {
 } from "@/lib/insight-narrative-tone";
 import type { RoutingPlanPayload } from "@/lib/routing-plan";
 import type { SmartChartIntel } from "@/lib/smart-chart-intelligence";
+import { alignPdfNarrativeToChart } from "@/lib/pdf-narrative-alignment";
+import type { ReasoningBlock } from "@/lib/reasoning-blocks";
+import { resolveOverviewDatasetTypeLabel } from "@/lib/resolved-dataset-type-label";
 import {
   datasetKindLabel,
   type ExecutivePdfExportInput,
@@ -44,6 +47,8 @@ import {
 
 export type PdfExportMode = "executive" | "analyst";
 
+export type PdfExportReportPreset = "insight" | "full";
+
 export type ExecutivePdfExportOptions = {
   includeKPIs: boolean;
   includeAIInsight: boolean;
@@ -55,7 +60,32 @@ export type ExecutivePdfExportOptions = {
   chartScope?: "insight" | "session";
   /** Default: executive (story-first). Analyst adds technical appendix + metadata sections. */
   pdfMode?: PdfExportMode;
+  /** Slim AI Insights export vs Export-tab full selection. */
+  reportPreset?: PdfExportReportPreset;
 };
+
+/** Insight preset defaults: story + chart first; appendix sections opt-in only from the call partial. */
+export function applyPdfExportPreset(
+  merged: ExecutivePdfExportOptions,
+  call?: Partial<ExecutivePdfExportOptions>
+): ExecutivePdfExportOptions {
+  if (merged.reportPreset !== "insight") {
+    return merged;
+  }
+  const explicit = call ?? {};
+  return {
+    ...merged,
+    pdfMode: merged.pdfMode ?? "executive",
+    includeKPIs: merged.includeKPIs ?? true,
+    includeAIInsight: merged.includeAIInsight ?? true,
+    includeChart: merged.includeChart ?? true,
+    includeDataPreview: explicit.includeDataPreview === true,
+    includeDataQuality: explicit.includeDataQuality === true,
+    includeConversationContext: explicit.includeConversationContext === true,
+    includeTechnicalAppendix: explicit.includeTechnicalAppendix === true,
+    chartScope: merged.chartScope ?? "insight",
+  };
+}
 
 function resolvePdfIncludes(
   options: ExecutivePdfExportOptions
@@ -287,6 +317,7 @@ export type PdfAlignedAnalysisSlice = {
   insightConfidenceLevel?: string;
   insightConfidenceRationale?: string;
   routingPlan?: RoutingPlanPayload | null;
+  reasoningBlocks?: ReasoningBlock[];
 };
 
 /** Chart + provenance resolved by page before export (capture refs stay in React). */
@@ -325,6 +356,8 @@ export type BuildExecutivePdfInputParams = {
   selectedSheet?: string;
   uploadFileName?: string;
   datasetKind: string;
+  typeLabel?: string | null;
+  mappingDomain?: string | null;
   profile: PdfDatasetProfile;
   preview: Record<string, unknown>[];
   kpis: PdfKpisSnapshot | null;
@@ -336,6 +369,7 @@ export type BuildExecutivePdfInputParams = {
   parsedInsightAnswer: ParsedAnswerSections;
   insightExecutiveBrief: string;
   insightExecutiveVizInsights: ExecutiveVizInsightCard[];
+  insightReasoningBlocks?: ReasoningBlock[];
   executiveVizInsights: ExecutiveVizInsightCard[];
   insightSmartChartIntel: SmartChartIntel | null;
   sessionSmartChartIntel: SmartChartIntel | null;
@@ -764,14 +798,19 @@ export function chartIntelSliceFromSmartChart(
 }
 
 export function routingPlanSliceForPdf(
-  plan: RoutingPlanPayload | null | undefined
+  plan: RoutingPlanPayload | null | undefined,
+  chartContract?: VisualizationContract | null
 ): PdfRoutingPlanSlice | undefined {
   if (!plan?.intent?.trim()) return undefined;
+  const chartDimension =
+    chartContract?.dimension?.trim() ||
+    chartContract?.semanticContext?.dimensionLabel?.trim() ||
+    null;
   return {
     intent: plan.intent.trim(),
     executiveLens: plan.executiveLens ?? null,
     metricColumn: plan.metricColumn ?? null,
-    dimensionColumn: plan.dimensionColumn ?? null,
+    dimensionColumn: chartDimension ?? plan.dimensionColumn ?? null,
     chartType: plan.chartType ?? null,
     unsupportedReason: plan.unsupportedReason ?? null,
   };
@@ -787,6 +826,8 @@ function buildExecutiveSummaryLines(
     rows,
     columns,
     datasetKind,
+    typeLabel,
+    mappingDomain,
     kpis,
     question,
     lastAskedQuestion,
@@ -802,7 +843,11 @@ function buildExecutiveSummaryLines(
   const lines: string[] = [];
   const rowCount = kpis?.total_rows ?? rows;
   const colCount = kpis?.total_columns ?? columns.length;
-  const domainLabel = datasetKindLabel(datasetKind || "generic");
+  const domainLabel = resolveOverviewDatasetTypeLabel({
+    datasetKind: datasetKind || "generic",
+    typeLabel,
+    mappingDomain,
+  });
 
   lines.push(
     `The dataset contains ${Number(rowCount).toLocaleString()} rows and ${colCount} columns (${domainLabel} profile).`
@@ -829,16 +874,18 @@ function buildExecutiveSummaryLines(
       if (sem) return wrap(buildChartNarrative(sem));
       return "";
     }
+    const fromParsed = params.parsedInsightAnswer.summary?.trim();
+    if (fromParsed) return wrap(fromParsed);
     const fromAligned = pdfAlignedAnalysis?.insightSummary?.trim();
     if (fromAligned) return wrap(fromAligned);
-    const fromParsed =
+    const fromRaw =
       chartScope === "insight"
         ? parseAnswerIntoSections(
             pdfInsightAnswer,
             pdfAlignedAnalysis?.insightSummary ?? undefined
           ).summary?.trim()
         : parsedInsightAnswer.summary?.trim();
-    if (fromParsed) return wrap(fromParsed);
+    if (fromRaw) return wrap(fromRaw);
     return "";
   })();
 
@@ -863,44 +910,26 @@ function buildExecutiveSummaryLines(
 function buildInsightSectionsForPdf(
   params: BuildExecutivePdfInputParams
 ): PdfInsightSections | null {
-  const {
-    options,
-    chartScope,
-    pdfInsightAnswer,
-    parsedInsightAnswer,
-    pdfAlignedAnalysis,
-    chartPrep,
-  } = params;
-  if (!options.includeAIInsight) return null;
+  if (!params.options.includeAIInsight) return null;
 
-  const pdfContract = chartPrep?.contract;
-  const _pdfTrendMode = chartPrep?.trendMode ?? false;
+  const parsed = params.parsedInsightAnswer;
+  const pdfContract = params.chartPrep?.contract;
 
-  const parsed =
-    chartScope === "insight"
-      ? (() => {
-          const p = parseAnswerIntoSections(
-            pdfInsightAnswer,
-            pdfAlignedAnalysis?.insightSummary ?? undefined
-          );
-          if (!isTrendMode(pdfContract)) return p;
-          const sanitize = (t?: string) =>
-            t?.trim()
-              ? sanitizeNarrativeForTrendContract(t, pdfContract)
-              : t;
-          return {
-            ...p,
-            summary: sanitize(p.summary) ?? "",
-            statistical: sanitize(p.statistical),
-            hypotheses: sanitize(p.hypotheses),
-            recommendations: sanitize(p.recommendations),
-            methodology: sanitize(p.methodology),
-            moreDetail: sanitize(p.moreDetail),
-          };
-        })()
-      : parsedInsightAnswer;
+  if (!isTrendMode(pdfContract)) {
+    return mergeParsedSectionsForPdfExport(parsed);
+  }
 
-  return mergeParsedSectionsForPdfExport(parsed);
+  const sanitize = (t?: string) =>
+    t?.trim() ? sanitizeNarrativeForTrendContract(t, pdfContract) : t;
+  return mergeParsedSectionsForPdfExport({
+    ...parsed,
+    summary: sanitize(parsed.summary) ?? "",
+    statistical: sanitize(parsed.statistical),
+    hypotheses: sanitize(parsed.hypotheses),
+    recommendations: sanitize(parsed.recommendations),
+    methodology: sanitize(parsed.methodology),
+    moreDetail: sanitize(parsed.moreDetail),
+  });
 }
 
 function buildChartThumbnails(chartHistory: ChartSnapshot[]) {
@@ -924,12 +953,21 @@ function buildChartThumbnails(chartHistory: ChartSnapshot[]) {
     .filter((t) => t.values.length > 1);
 }
 
-function previewDuplicates(
+export const PDF_PREVIEW_DUPLICATE_METRIC_LABEL =
+  "Sample duplicate-like rows (preview check)";
+
+export function previewDuplicatesForPdf(
   preview: Record<string, unknown>[],
-  columns: string[]
-): { duplicates: number; note: string } {
+  columns: string[],
+  totalRows: number
+): { duplicates: number; note: string; label: string } {
+  const label = PDF_PREVIEW_DUPLICATE_METRIC_LABEL;
   if (!preview.length || !columns.length) {
-    return { duplicates: 0, note: "Preview sample not available." };
+    return {
+      duplicates: 0,
+      label,
+      note: "Preview duplicate check not available — no preview rows loaded.",
+    };
   }
   const sigs = preview.map((row) =>
     columns.map((c) => String(row[c] ?? "")).join("\u001f")
@@ -940,9 +978,12 @@ function previewDuplicates(
   tally.forEach((n) => {
     if (n > 1) dupExtra += n - 1;
   });
+  const totalLabel =
+    totalRows > 0 ? `${totalRows.toLocaleString()} file rows` : "the full dataset";
   return {
     duplicates: dupExtra,
-    note: `Estimated from the first ${preview.length} preview rows (not necessarily the entire file).`,
+    label,
+    note: `Preview duplicate check only — scans ${preview.length.toLocaleString()} loaded preview row${preview.length === 1 ? "" : "s"}, not all ${totalLabel}. This is not a full-file duplicate audit.`,
   };
 }
 
@@ -961,6 +1002,8 @@ export function buildExecutivePdfExportInput(
     selectedSheet,
     uploadFileName,
     datasetKind,
+    typeLabel,
+    mappingDomain,
     profile,
     preview,
     pdfAlignedAnalysis,
@@ -969,6 +1012,7 @@ export function buildExecutivePdfExportInput(
     pdfInsightAnswer,
     insightExecutiveBrief,
     insightExecutiveVizInsights,
+    insightReasoningBlocks,
     executiveVizInsights,
     insightSmartChartIntel,
     sessionSmartChartIntel,
@@ -976,13 +1020,59 @@ export function buildExecutivePdfExportInput(
     chartHistory,
   } = params;
 
-  const resolved = resolvePdfIncludes(options);
+  const resolved = resolvePdfIncludes(applyPdfExportPreset(options));
   const cardsPdf = resolvePdfKpiCards(params);
-  const pdfExecutiveVizInsights =
-    chartScope === "insight" ? insightExecutiveVizInsights : executiveVizInsights;
   const pdfRankedSignals = chartPrep?.rankedSignals ?? null;
   const pdfContract = chartPrep?.contract;
   const pdfTrendMode = chartPrep?.trendMode ?? false;
+
+  const alignedNarrative =
+    chartScope === "insight" && chartPrep
+      ? alignPdfNarrativeToChart({
+          chartPrep,
+          pdfInsightAnswer,
+          insightExecutiveBrief,
+          insightExecutiveVizInsights,
+          parsedInsightAnswer: params.parsedInsightAnswer,
+          alignedInsightSummary: pdfAlignedAnalysis?.insightSummary,
+          insightSummary: pdfAlignedAnalysis?.insightSummary ?? null,
+          reasoningBlocks: insightReasoningBlocks ?? [],
+          rankedSignals: pdfRankedSignals,
+        })
+      : null;
+
+  const effectivePdfInsightAnswer =
+    alignedNarrative?.pdfInsightAnswer ?? pdfInsightAnswer;
+  const effectiveInsightBrief =
+    alignedNarrative?.insightExecutiveBrief ?? insightExecutiveBrief;
+  const effectiveInsightVizInsights =
+    alignedNarrative?.insightExecutiveVizInsights ??
+    insightExecutiveVizInsights;
+  const effectiveParsedInsightAnswer =
+    alignedNarrative?.parsedInsightAnswer ?? params.parsedInsightAnswer;
+  const effectiveInsightPresentation =
+    alignedNarrative?.insightPresentation ?? null;
+  const effectivePdfAlignedAnalysis =
+    alignedNarrative?.alignedInsightSummary != null && pdfAlignedAnalysis
+      ? {
+          ...pdfAlignedAnalysis,
+          insightSummary: alignedNarrative.alignedInsightSummary,
+        }
+      : pdfAlignedAnalysis;
+
+  const narrativeParams: BuildExecutivePdfInputParams = {
+    ...params,
+    pdfInsightAnswer: effectivePdfInsightAnswer,
+    insightExecutiveBrief: effectiveInsightBrief,
+    insightExecutiveVizInsights: effectiveInsightVizInsights,
+    parsedInsightAnswer: effectiveParsedInsightAnswer,
+    pdfAlignedAnalysis: effectivePdfAlignedAnalysis,
+  };
+
+  const pdfExecutiveVizInsights =
+    chartScope === "insight"
+      ? effectiveInsightVizInsights
+      : executiveVizInsights;
 
   const exportQuestion =
     chartScope === "insight"
@@ -991,6 +1081,12 @@ export function buildExecutivePdfExportInput(
 
   const smartIntel =
     chartScope === "insight" ? insightSmartChartIntel : sessionSmartChartIntel;
+
+  const profileLabel = resolveOverviewDatasetTypeLabel({
+    datasetKind: datasetKind || "generic",
+    typeLabel,
+    mappingDomain,
+  });
 
   const input: ExecutivePdfExportInput = {
     includes: {
@@ -1002,6 +1098,7 @@ export function buildExecutivePdfExportInput(
       includeConversationContext: resolved.includeConversationContext === true,
       includeTechnicalAppendix: resolved.includeTechnicalAppendix === true,
       pdfMode: resolved.pdfMode,
+      reportPreset: resolved.reportPreset,
     },
     branding: reportBranding,
     dataset: {
@@ -1010,10 +1107,15 @@ export function buildExecutivePdfExportInput(
       sheet: selectedSheet || undefined,
       fileName: uploadFileName?.trim() || "No file name supplied.",
       datasetKind: datasetKind || "generic",
+      profileLabel,
     },
     generatedAt: new Date(),
     mappingConfidence,
-    execSummaryLines: buildExecutiveSummaryLines(params, cardsPdf, pdfRankedSignals),
+    execSummaryLines: buildExecutiveSummaryLines(
+      narrativeParams,
+      cardsPdf,
+      pdfRankedSignals
+    ),
     kpiSectionTitle: params.alignedAnalysis?.focusKpis?.length
       ? "KPI dashboard (aligned with your question)"
       : "KPI dashboard",
@@ -1021,25 +1123,32 @@ export function buildExecutivePdfExportInput(
     question: exportQuestion,
     answer:
       pdfTrendMode && pdfContract
-        ? sanitizeNarrativeForTrendContract(pdfInsightAnswer, pdfContract)
-        : pdfInsightAnswer,
-    insightSections: buildInsightSectionsForPdf(params),
+        ? sanitizeNarrativeForTrendContract(
+            effectivePdfInsightAnswer,
+            pdfContract
+          )
+        : effectivePdfInsightAnswer,
+    insightSections: buildInsightSectionsForPdf(narrativeParams),
+    insightPresentation: effectiveInsightPresentation,
     insightSummary:
       pdfTrendMode && pdfContract
         ? sanitizeNarrativeForTrendContract(
             narrativeCopyForContract(pdfContract) ||
-              pdfAlignedAnalysis?.insightSummary?.trim() ||
+              effectivePdfAlignedAnalysis?.insightSummary?.trim() ||
               "",
             pdfContract
           )
         : sanitizeNarrativeForTrendContract(
-            pdfAlignedAnalysis?.insightSummary?.trim() ?? "",
+            effectivePdfAlignedAnalysis?.insightSummary?.trim() ?? "",
             pdfContract
-          ) || pdfAlignedAnalysis?.insightSummary?.trim(),
+          ) || effectivePdfAlignedAnalysis?.insightSummary?.trim(),
     insightConfidenceLevel: pdfAlignedAnalysis?.insightConfidenceLevel,
     insightConfidenceRationale:
       pdfAlignedAnalysis?.insightConfidenceRationale?.trim() || undefined,
-    routingPlan: routingPlanSliceForPdf(pdfAlignedAnalysis?.routingPlan),
+    routingPlan: routingPlanSliceForPdf(
+      effectivePdfAlignedAnalysis?.routingPlan,
+      pdfContract
+    ),
     chartIntel: chartIntelSliceFromSmartChart(smartIntel),
     chartInsightBadge: chartPrep?.chartInsightBadge ?? null,
     pdfRankedSignals:
@@ -1050,11 +1159,11 @@ export function buildExecutivePdfExportInput(
     executiveInsightsBrief:
       resolved.includeAIInsight &&
       (chartScope === "insight"
-        ? insightExecutiveBrief.trim()
-        : params.parsedInsightAnswer.summary?.trim() ?? "")
+        ? effectiveInsightBrief.trim()
+        : effectiveParsedInsightAnswer.summary?.trim() ?? "")
         ? chartScope === "insight"
-          ? insightExecutiveBrief.trim()
-          : params.parsedInsightAnswer.summary?.trim()
+          ? effectiveInsightBrief.trim()
+          : effectiveParsedInsightAnswer.summary?.trim()
         : undefined,
     provenance: chartPrep?.provenanceSlice ?? null,
     chart:
@@ -1082,7 +1191,7 @@ export function buildExecutivePdfExportInput(
     chartThumbnails: buildChartThumbnails(chartHistory),
     preview: { rows: preview, columns },
     profile: profile ? { null_counts: profile.null_counts || {} } : null,
-    previewDuplicates: () => previewDuplicates(preview, columns),
+    previewDuplicates: () => previewDuplicatesForPdf(preview, columns, rows),
     conversationAppendix,
   };
 

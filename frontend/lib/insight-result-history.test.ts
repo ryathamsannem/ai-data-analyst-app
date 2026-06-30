@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   appendInsightSavedResult,
+  buildInsightConversationThread,
   buildInsightRestorePayload,
   chartExistsInHistory,
   clearInsightResultHistory,
   createInsightSavedResult,
+  findInsightSavedResultByQuestion,
   MAX_INSIGHT_SAVED_RESULTS,
   newInsightResultId,
+  resolveLiveInsightAnswerText,
   resolveParentResultIdForFollowUp,
 } from "@/lib/insight-result-history";
 
@@ -152,6 +155,86 @@ describe("insight-result-history", () => {
 
   it("newInsightResultId returns unique ids", () => {
     expect(newInsightResultId()).not.toBe(newInsightResultId());
+  });
+
+  it("buildInsightConversationThread walks parent chain to root", () => {
+    const main = sampleResult({ question: "Spend by product type" });
+    const follow = createInsightSavedResult(
+      {
+        question: "Why is Credit Card highest?",
+        answer: "Because it leads spend.",
+        hasValidAIAnswer: true,
+        alignedAnalysis: null,
+        chartId: "chart-1",
+        isFollowUp: true,
+        parentResultId: "result-1",
+        lastAskVisualizationHydrated: true,
+      },
+      () => "result-2"
+    );
+    const history = [follow, main];
+    expect(buildInsightConversationThread(history, "result-2")).toEqual([
+      "Spend by product type",
+      "Why is Credit Card highest?",
+    ]);
+  });
+
+  it("findInsightSavedResultByQuestion prefers newest match", () => {
+    const older = sampleResult({ question: "Same question?" });
+    const newer = createInsightSavedResult(
+      {
+        question: "Same question?",
+        answer: "Newer answer",
+        hasValidAIAnswer: true,
+        alignedAnalysis: null,
+        chartId: "chart-2",
+        isFollowUp: false,
+        parentResultId: null,
+        lastAskVisualizationHydrated: true,
+        savedAt: 500,
+      },
+      () => "result-new"
+    );
+    const history = appendInsightSavedResult(
+      appendInsightSavedResult([], { ...older, savedAt: 100 }),
+      newer
+    );
+    expect(findInsightSavedResultByQuestion(history, "same question?")?.answer).toBe(
+      "Newer answer"
+    );
+  });
+
+  it("prefers active saved result answer for the matching question", () => {
+    const root = sampleResult({
+      question: "Spend Amount by Product Type",
+      answer: "Credit Card leads by Product Type.",
+    });
+    const followUp = createInsightSavedResult(
+      {
+        question: "Why is Credit Card highest?",
+        answer: "Premium and SME customer segments drive spend.",
+        hasValidAIAnswer: true,
+        alignedAnalysis: null,
+        chartId: "chart-1",
+        isFollowUp: true,
+        parentResultId: "result-1",
+        lastAskVisualizationHydrated: true,
+      },
+      () => "result-2"
+    );
+    const history = appendInsightSavedResult(
+      appendInsightSavedResult([], root),
+      followUp
+    );
+    expect(
+      resolveLiveInsightAnswerText({
+        question: "Spend Amount by Product Type",
+        lastAskedQuestion: "Spend Amount by Product Type",
+        liveAnswer: "Premium and SME customer segments drive spend.",
+        activeResultId: "result-1",
+        history,
+      })
+    ).toBe("Credit Card leads by Product Type.");
   });
 });
 

@@ -73,6 +73,36 @@ export function buildPdfFooterCenterLine(
   return buildPdfGeneratedByLine(branding.appName);
 }
 
+const PLACEHOLDER_SUPPORT_EMAIL_RE =
+  /^(?:support@example\.(?:com|org|net)|.*@example\.(?:com|org|net)|test@|noreply@)/i;
+
+/** True when support email is empty or a dev/placeholder address. */
+export function isPlaceholderSupportEmail(email: string): boolean {
+  const e = email.trim();
+  if (!e) return true;
+  return PLACEHOLDER_SUPPORT_EMAIL_RE.test(e);
+}
+
+export type PdfExportFooterLines = {
+  generatedByLine: string;
+  supportLine: string | null;
+};
+
+/** PDF running-footer copy — merges per-report branding with global config. */
+export function resolvePdfExportFooter(args: {
+  reportCompanyName?: string;
+  globalBranding?: BrandingConfig;
+}): PdfExportFooterLines {
+  const g = args.globalBranding ?? BRANDING;
+  const company = (args.reportCompanyName ?? "").trim() || g.appName;
+  const custom = g.pdfFooterText.trim();
+  const generatedByLine = custom || `Prepared with ${company}`;
+  const supportLine = isPlaceholderSupportEmail(g.supportEmail)
+    ? null
+    : buildPdfSupportLine(g.supportEmail);
+  return { generatedByLine, supportLine };
+}
+
 export function brandingCssVariables(
   branding: BrandingConfig = BRANDING
 ): Record<string, string> {

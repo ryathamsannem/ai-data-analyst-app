@@ -453,6 +453,298 @@ def generate_supply_chain(n: int = TARGET_ROWS) -> tuple[list[str], list[dict]]:
     return fields, _fill_to_target(rows, n)
 
 
+def generate_insurance(n: int = TARGET_ROWS) -> tuple[list[str], list[dict]]:
+    claim_types = ["Auto", "Home", "Life", "Health", "Commercial"]
+    policy_types = ["Standard", "Premium", "Basic", "Enterprise", "Family"]
+    regions = ["North", "South", "East", "West", "Central"]
+    months = month_starts(date(2024, 1, 1), 10)
+    rows: list[dict] = []
+    idx = 0
+    for d in months:
+        for claim_type in claim_types:
+            for policy in policy_types:
+                if len(rows) >= n:
+                    break
+                idx += 1
+                region = random.choice(regions)
+                claim_amt = _jitter(random.uniform(2500, 85000), 0.3)
+                loss_ratio = round(random.uniform(0.35, 0.92), 4)
+                settlement = round(_jitter(18, 0.4), 1)
+                fraud = 1 if random.random() < 0.04 else 0
+                rows.append(
+                    {
+                        "claim_id": f"CLM-{idx:06d}",
+                        "claim_date": d.isoformat(),
+                        "claim_type": claim_type,
+                        "policy_type": policy,
+                        "region": region,
+                        "claim_amount": round(claim_amt, 2),
+                        "loss_ratio": loss_ratio,
+                        "settlement_days": settlement,
+                        "fraud_flag": fraud,
+                    }
+                )
+            if len(rows) >= n:
+                break
+        if len(rows) >= n:
+            break
+    fields = [
+        "claim_id",
+        "claim_date",
+        "claim_type",
+        "policy_type",
+        "region",
+        "claim_amount",
+        "loss_ratio",
+        "settlement_days",
+        "fraud_flag",
+    ]
+    return fields, _fill_to_target(rows, n)
+
+
+def generate_real_estate(n: int = TARGET_ROWS) -> tuple[list[str], list[dict]]:
+    property_types = ["Single Family", "Condo", "Townhouse", "Multi-Family", "Commercial"]
+    markets = ["Urban Core", "Suburban North", "Suburban South", "Coastal", "Inland"]
+    statuses = ["Active", "Pending", "Sold", "Withdrawn"]
+    months = month_starts(date(2024, 1, 1), 10)
+    rows: list[dict] = []
+    idx = 0
+    for d in months:
+        for prop_type in property_types:
+            for market in markets:
+                if len(rows) >= n:
+                    break
+                idx += 1
+                status = random.choice(statuses)
+                price = _jitter(random.uniform(185000, 1250000), 0.28)
+                dom = max(5, int(_jitter(42, 0.45)))
+                sqft = max(600, int(_jitter(1850, 0.35)))
+                cap = round(random.uniform(0.035, 0.095), 4)
+                rows.append(
+                    {
+                        "property_id": f"PROP-{idx:06d}",
+                        "list_date": d.isoformat(),
+                        "property_type": prop_type,
+                        "market_region": market,
+                        "listing_status": status,
+                        "sale_price": round(price, 2),
+                        "days_on_market": dom,
+                        "sqft": sqft,
+                        "cap_rate": cap,
+                    }
+                )
+            if len(rows) >= n:
+                break
+        if len(rows) >= n:
+            break
+    fields = [
+        "property_id",
+        "list_date",
+        "property_type",
+        "market_region",
+        "listing_status",
+        "sale_price",
+        "days_on_market",
+        "sqft",
+        "cap_rate",
+    ]
+    return fields, _fill_to_target(rows, n)
+
+
+def generate_telecom(n: int = TARGET_ROWS) -> tuple[list[str], list[dict]]:
+    plans = ["Basic", "Plus", "Unlimited", "Family", "Business"]
+    regions = ["Metro A", "Metro B", "Metro C", "Rural North", "Rural South"]
+    months = month_starts(date(2024, 1, 1), 12)
+    rows: list[dict] = []
+    idx = 0
+    for d in months:
+        for plan in plans:
+            for region in regions:
+                if len(rows) >= n:
+                    break
+                idx += 1
+                usage = round(_jitter(random.uniform(8, 95), 0.3), 1)
+                revenue = _jitter(random.uniform(45, 220), 0.22)
+                churn = round(random.uniform(0.01, 0.08), 4)
+                calls = max(0, int(_jitter(random.uniform(0.5, 4.2), 0.5)))
+                rows.append(
+                    {
+                        "subscriber_id": f"SUB-{idx:06d}",
+                        "billing_month": d.isoformat(),
+                        "plan_tier": plan,
+                        "market_region": region,
+                        "data_usage_gb": usage,
+                        "monthly_revenue": round(revenue, 2),
+                        "churn_rate": churn,
+                        "support_calls": calls,
+                    }
+                )
+            if len(rows) >= n:
+                break
+        if len(rows) >= n:
+            break
+    fields = [
+        "subscriber_id",
+        "billing_month",
+        "plan_tier",
+        "market_region",
+        "data_usage_gb",
+        "monthly_revenue",
+        "churn_rate",
+        "support_calls",
+    ]
+    return fields, _fill_to_target(rows, n)
+
+
+def generate_hospitality(n: int = TARGET_ROWS) -> tuple[list[str], list[dict]]:
+    brands = ["Grand Plaza", "Harbor Inn", "Summit Lodge", "City Suites", "Coastal Resort"]
+    room_types = ["Standard", "Deluxe", "Suite", "Executive", "Family"]
+    markets = ["Downtown", "Airport", "Beach", "Business District", "Suburban"]
+    months = month_starts(date(2024, 1, 1), 10)
+    rows: list[dict] = []
+    idx = 0
+    for d in months:
+        for brand in brands:
+            for room in room_types:
+                if len(rows) >= n:
+                    break
+                idx += 1
+                market = random.choice(markets)
+                revenue = _jitter(random.uniform(12000, 98000), 0.25)
+                occupancy = round(random.uniform(0.52, 0.94), 4)
+                adr = round(_jitter(145, 0.3), 2)
+                rating = round(random.uniform(3.2, 4.9), 1)
+                rows.append(
+                    {
+                        "booking_id": f"BKG-{idx:06d}",
+                        "check_in_date": d.isoformat(),
+                        "hotel_brand": brand,
+                        "room_type": room,
+                        "market": market,
+                        "room_revenue": round(revenue, 2),
+                        "occupancy_rate": occupancy,
+                        "avg_daily_rate": adr,
+                        "guest_rating": rating,
+                    }
+                )
+            if len(rows) >= n:
+                break
+        if len(rows) >= n:
+            break
+    fields = [
+        "booking_id",
+        "check_in_date",
+        "hotel_brand",
+        "room_type",
+        "market",
+        "room_revenue",
+        "occupancy_rate",
+        "avg_daily_rate",
+        "guest_rating",
+    ]
+    return fields, _fill_to_target(rows, n)
+
+
+def generate_energy(n: int = TARGET_ROWS) -> tuple[list[str], list[dict]]:
+    facility_types = ["Office", "Warehouse", "Factory", "Campus", "Retail"]
+    grid_regions = ["North Grid", "South Grid", "East Grid", "West Grid"]
+    months = month_starts(date(2024, 1, 1), 12)
+    rows: list[dict] = []
+    idx = 0
+    for d in months:
+        for facility in facility_types:
+            for grid in grid_regions:
+                if len(rows) >= n:
+                    break
+                idx += 1
+                kwh = _jitter(random.uniform(12000, 185000), 0.28)
+                peak = round(_jitter(kwh / random.uniform(180, 320), 0.25), 1)
+                cost = kwh * random.uniform(0.08, 0.14)
+                efficiency = round(random.uniform(0.62, 0.96), 4)
+                rows.append(
+                    {
+                        "meter_id": f"MTR-{idx:06d}",
+                        "reading_date": d.isoformat(),
+                        "facility_type": facility,
+                        "grid_region": grid,
+                        "energy_kwh": round(kwh, 2),
+                        "peak_demand_kw": peak,
+                        "utility_cost": round(cost, 2),
+                        "efficiency_score": efficiency,
+                    }
+                )
+            if len(rows) >= n:
+                break
+        if len(rows) >= n:
+            break
+    fields = [
+        "meter_id",
+        "reading_date",
+        "facility_type",
+        "grid_region",
+        "energy_kwh",
+        "peak_demand_kw",
+        "utility_cost",
+        "efficiency_score",
+    ]
+    return fields, _fill_to_target(rows, n)
+
+
+def generate_support_tickets(n: int = TARGET_ROWS) -> tuple[list[str], list[dict]]:
+    categories = ["Billing", "Technical", "Account", "Shipping", "Product"]
+    priorities = ["Low", "Medium", "High", "Critical"]
+    regions = ["North", "South", "East", "West", "EMEA"]
+    months = month_starts(date(2024, 1, 1), 10)
+    rows: list[dict] = []
+    idx = 0
+    for d in months:
+        for category in categories:
+            for priority in priorities:
+                if len(rows) >= n:
+                    break
+                idx += 1
+                region = random.choice(regions)
+                resolution = round(_jitter(random.uniform(2, 48), 0.35), 1)
+                tickets_opened = max(1, int(_jitter(random.uniform(18, 120), 0.35)))
+                tickets_resolved = max(0, int(tickets_opened * random.uniform(0.72, 0.98)))
+                escalations = max(0, int(random.uniform(0, 6)))
+                csat = round(random.uniform(2.8, 4.9), 1)
+                sla_breach = round(random.uniform(0.01, 0.12), 4)
+                rows.append(
+                    {
+                        "ticket_id": f"TKT-{idx:06d}",
+                        "opened_date": d.isoformat(),
+                        "ticket_category": category,
+                        "priority": priority,
+                        "region": region,
+                        "tickets_opened": tickets_opened,
+                        "tickets_resolved": tickets_resolved,
+                        "resolution_hours": resolution,
+                        "escalations": escalations,
+                        "csat_score": csat,
+                        "sla_breach_rate": sla_breach,
+                    }
+                )
+            if len(rows) >= n:
+                break
+        if len(rows) >= n:
+            break
+    fields = [
+        "ticket_id",
+        "opened_date",
+        "ticket_category",
+        "priority",
+        "region",
+        "tickets_opened",
+        "tickets_resolved",
+        "resolution_hours",
+        "escalations",
+        "csat_score",
+        "sla_breach_rate",
+    ]
+    return fields, _fill_to_target(rows, n)
+
+
 def generate_education(n: int = TARGET_ROWS) -> tuple[list[str], list[dict]]:
     grades = ["Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11", "Grade 12"]
     subjects = ["Math", "Science", "English", "History", "Arts"]
@@ -512,6 +804,12 @@ GENERATORS = [
     ("saas_1k", "saas_subscription_1k.csv", generate_saas),
     ("supply_chain_1k", "supply_chain_logistics_1k.csv", generate_supply_chain),
     ("education_1k", "education_student_1k.csv", generate_education),
+    ("insurance_1k", "insurance_claims_1k.csv", generate_insurance),
+    ("real_estate_1k", "real_estate_property_1k.csv", generate_real_estate),
+    ("telecom_1k", "telecom_usage_1k.csv", generate_telecom),
+    ("hospitality_1k", "hospitality_bookings_1k.csv", generate_hospitality),
+    ("energy_1k", "energy_utilization_1k.csv", generate_energy),
+    ("support_1k", "support_tickets_1k.csv", generate_support_tickets),
 ]
 
 

@@ -67,9 +67,41 @@ export function metricLabelImpliesPercent(metricLabel: string | null | undefined
   if (!t) return false;
   // Part-to-whole composition titles (e.g. "Profit share by region") — not rate metrics.
   if (/\b\w[\w\s]*\s+share\s+by\s+/i.test(t)) return false;
+  // Donut/pie composition titles (e.g. "Downtime Minutes Share") — share is slice-of-total, not a rate.
+  if (/\bshare$/i.test(t)) return false;
   const n = t.toLowerCase().replace(/\s+/g, "_");
   if (/\bprofit\s+margin\b/i.test(t) || /\bmargin\s*%/.test(t)) return true;
   return PERCENT_METRIC_RE.test(n) || /\bpercent\b/i.test(t);
+}
+
+/** Short unit suffix inferred from metric label / chart title (e.g. minutes → " min"). */
+export function inferMetricUnitSuffix(
+  metricLabel?: string | null,
+  chartTitle?: string | null
+): string | null {
+  const t = `${metricLabel ?? ""} ${chartTitle ?? ""}`.trim().toLowerCase();
+  if (!t) return null;
+  if (/\b(minutes?|mins?)\b/.test(t) || /\bdowntime\b/.test(t)) return " min";
+  if (/\b(hours?|hrs?)\b/.test(t) && !/\b(minutes?|mins?)\b/.test(t)) return " h";
+  if (
+    /\b(seconds?|secs?)\b/.test(t) &&
+    !/\b(minutes?|mins?|hours?|hrs?)\b/.test(t)
+  ) {
+    return " s";
+  }
+  return null;
+}
+
+export function appendMetricUnitSuffix(
+  formatted: string,
+  metricLabel?: string | null,
+  chartTitle?: string | null
+): string {
+  const suffix = inferMetricUnitSuffix(metricLabel, chartTitle);
+  if (!suffix || formatted === "—" || formatted.endsWith("%")) return formatted;
+  const trimmed = suffix.trim();
+  if (formatted.endsWith(trimmed)) return formatted;
+  return `${formatted}${suffix}`;
 }
 
 /** Downtime, counts, units, incidents — never currency even when API sends `money_0`. */
@@ -172,9 +204,8 @@ export function resolveMetricValueFormat(ctx: MetricFormatContext): MetricValueF
   const metricType = (ctx.metricType ?? "").trim().toLowerCase();
 
   if (hint === "pct_1") return "percent";
-  if (metricLabelImpliesPercent(label)) return "percent";
-
   if (metricLabelImpliesOperationalMetric(label)) return "number";
+  if (metricLabelImpliesPercent(label)) return "percent";
 
   if (metricType === "currency" || metricType === "money") {
     return metricLabelImpliesCurrency(label) ? "currency" : "number";
@@ -270,7 +301,7 @@ export function formatExecutivePercentValue(value: number): string {
 /** Percentage-point spread for rate metrics — always 1 decimal + pp suffix. */
 export function formatExecutivePercentPointGap(
   gap: number,
-  options?: { skipFractionScale?: boolean }
+  options?: { skipFractionScale?: boolean; decimals?: number }
 ): string {
   if (!Number.isFinite(gap)) return "—";
   let n = gap;
@@ -282,7 +313,8 @@ export function formatExecutivePercentPointGap(
     n = n * 100;
   }
   const abs = Math.abs(n);
-  const decimals = abs > 0 && abs < 0.05 ? 2 : 1;
+  const decimals =
+    options?.decimals ?? (abs > 0 && abs < 0.05 ? 2 : 1);
   const rounded = Number(n.toFixed(decimals));
   if (rounded === 0 && abs > 0) {
     return `${n.toLocaleString(undefined, {
