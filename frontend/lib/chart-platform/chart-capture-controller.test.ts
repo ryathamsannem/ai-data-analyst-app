@@ -6,7 +6,9 @@ import {
   pdfChartUsesContentTightComposite,
 } from "@/lib/chart-platform/chart-capture-controller";
 import {
+  PRESENTATION_EXPORT_COMPACT_WIDTH_PX,
   PRESENTATION_EXPORT_WIDTH_PX,
+  STANDALONE_PNG_TREND_WIDTH_SPARSE_PX,
   STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX,
 } from "@/lib/chart-png-export-layout";
 
@@ -70,5 +72,52 @@ describe("createChartPngCaptureRequest", () => {
       filename: "chart.png",
     });
     expect(request.layout.width).toBe(PRESENTATION_EXPORT_WIDTH_PX);
+  });
+
+  it("uses category-aware width for chartsPng line exports", () => {
+    const lineContract = buildChartPresentationContract({
+      chartId: "line-1",
+      source: "charts",
+      apiChartType: "line",
+      resolvedKind: "line",
+      title: "Monthly Enrollment Count Trend",
+      rows: Array.from({ length: 6 }, (_, i) => ({
+        name: `M${i + 1}`,
+        value: 10 + i,
+      })),
+    });
+    const request = createChartPngCaptureRequest({
+      contract: lineContract,
+      profile: "chartsPng",
+      sourceSurface: "charts",
+      kind: "line",
+      categoryCount: 6,
+      filename: "trend.png",
+    });
+    expect(request.layout.width).toBe(STANDALONE_PNG_TREND_WIDTH_SPARSE_PX);
+    expect(request.layout.width).toBeLessThan(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+  });
+
+  it("keeps pdfChart line export width unchanged", () => {
+    const lineContract = buildChartPresentationContract({
+      chartId: "line-1",
+      source: "charts",
+      apiChartType: "line",
+      resolvedKind: "line",
+      title: "Monthly Enrollment Count Trend",
+      rows: Array.from({ length: 6 }, (_, i) => ({
+        name: `M${i + 1}`,
+        value: 10 + i,
+      })),
+    });
+    const request = createChartPngCaptureRequest({
+      contract: lineContract,
+      profile: "pdfChart",
+      sourceSurface: "pdf",
+      kind: "line",
+      categoryCount: 6,
+      filename: "trend.png",
+    });
+    expect(request.layout.width).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
   });
 });

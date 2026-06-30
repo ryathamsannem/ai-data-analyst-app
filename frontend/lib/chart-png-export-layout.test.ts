@@ -8,6 +8,12 @@ import {
   PRESENTATION_EXPORT_LINE_HEIGHT_PX,
   PRESENTATION_EXPORT_WIDTH_PX,
   STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX,
+  STANDALONE_PNG_HISTOGRAM_WIDTH_DENSE_PX,
+  STANDALONE_PNG_HISTOGRAM_WIDTH_MODERATE_PX,
+  STANDALONE_PNG_HISTOGRAM_WIDTH_SPARSE_PX,
+  STANDALONE_PNG_TREND_WIDTH_DENSE_PX,
+  STANDALONE_PNG_TREND_WIDTH_MODERATE_PX,
+  STANDALONE_PNG_TREND_WIDTH_SPARSE_PX,
   STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX,
   buildPresentationCaptureLayout,
   buildPresentationExportSpec,
@@ -17,6 +23,8 @@ import {
   resolvePresentationExportCanvasWidth,
   resolvePresentationExportPlotHeight,
   resolveStandalonePngBarCanvasWidth,
+  resolveStandalonePngHistogramCanvasWidth,
+  resolveStandalonePngTrendCanvasWidth,
 } from "@/lib/chart-png-export-layout";
 
 describe("chart PNG export layout", () => {
@@ -87,19 +95,105 @@ describe("chart PNG export layout", () => {
     ).toBe(PRESENTATION_EXPORT_HORIZONTAL_WIDE_WIDTH_PX);
   });
 
-  it("leaves line, area, and histogram widths unchanged for standalone PNG profiles", () => {
-    for (const kind of ["line", "area", "histogram"] as const) {
-      expect(
-        resolvePresentationExportCanvasWidth(kind, {
-          categoryCount: 5,
-          exportProfile: "chartsPng",
-        })
-      ).toBe(
-        kind === "histogram"
-          ? PRESENTATION_EXPORT_WIDTH_PX
-          : PRESENTATION_EXPORT_COMPACT_WIDTH_PX
-      );
-    }
+  it("narrows standalone PNG line exports by point count", () => {
+    expect(
+      resolvePresentationExportCanvasWidth("line", {
+        categoryCount: 6,
+        exportProfile: "chartsPng",
+      })
+    ).toBe(STANDALONE_PNG_TREND_WIDTH_SPARSE_PX);
+    expect(STANDALONE_PNG_TREND_WIDTH_SPARSE_PX).toBeLessThan(
+      PRESENTATION_EXPORT_COMPACT_WIDTH_PX
+    );
+    expect(
+      resolvePresentationExportCanvasWidth("line", {
+        categoryCount: 12,
+        exportProfile: "overviewPng",
+      })
+    ).toBe(STANDALONE_PNG_TREND_WIDTH_MODERATE_PX);
+    expect(
+      resolvePresentationExportCanvasWidth("line", {
+        categoryCount: 25,
+        exportProfile: "chartsPng",
+      })
+    ).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+    expect(resolveStandalonePngTrendCanvasWidth("line", 6)).toBe(860);
+    expect(resolveStandalonePngTrendCanvasWidth("area", 12)).toBe(1000);
+  });
+
+  it("narrows standalone PNG area exports by point count", () => {
+    expect(
+      resolvePresentationExportCanvasWidth("area", {
+        categoryCount: 6,
+        exportProfile: "chartsPng",
+      })
+    ).toBe(STANDALONE_PNG_TREND_WIDTH_SPARSE_PX);
+    expect(
+      resolvePresentationExportCanvasWidth("area", {
+        categoryCount: 12,
+        exportProfile: "overviewPng",
+      })
+    ).toBe(STANDALONE_PNG_TREND_WIDTH_MODERATE_PX);
+    expect(
+      resolvePresentationExportCanvasWidth("area", {
+        categoryCount: 30,
+        exportProfile: "chartsPng",
+      })
+    ).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+  });
+
+  it("narrows standalone PNG histogram exports by bucket count", () => {
+    expect(
+      resolvePresentationExportCanvasWidth("histogram", {
+        categoryCount: 6,
+        exportProfile: "chartsPng",
+      })
+    ).toBe(STANDALONE_PNG_HISTOGRAM_WIDTH_SPARSE_PX);
+    expect(STANDALONE_PNG_HISTOGRAM_WIDTH_SPARSE_PX).toBeLessThan(
+      PRESENTATION_EXPORT_WIDTH_PX
+    );
+    expect(
+      resolvePresentationExportCanvasWidth("histogram", {
+        categoryCount: 10,
+        exportProfile: "overviewPng",
+      })
+    ).toBe(STANDALONE_PNG_HISTOGRAM_WIDTH_MODERATE_PX);
+    expect(
+      resolvePresentationExportCanvasWidth("histogram", {
+        categoryCount: 17,
+        exportProfile: "chartsPng",
+      })
+    ).toBe(PRESENTATION_EXPORT_WIDTH_PX);
+    expect(resolveStandalonePngHistogramCanvasWidth(16)).toBe(
+      STANDALONE_PNG_HISTOGRAM_WIDTH_DENSE_PX
+    );
+  });
+
+  it("leaves scatter width unchanged for standalone PNG profiles", () => {
+    expect(
+      resolvePresentationExportCanvasWidth("scatter", {
+        categoryCount: 5,
+        exportProfile: "chartsPng",
+      })
+    ).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+  });
+
+  it("keeps pdfChart and legacy trend/histogram widths without exportProfile", () => {
+    expect(
+      resolvePresentationExportCanvasWidth("line", { categoryCount: 6 })
+    ).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+    expect(
+      resolvePresentationExportCanvasWidth("line", {
+        categoryCount: 6,
+        exportProfile: "pdfChart",
+      })
+    ).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+    expect(
+      resolvePresentationExportCanvasWidth("histogram", { categoryCount: 6 })
+    ).toBe(PRESENTATION_EXPORT_WIDTH_PX);
+    expect(
+      buildPresentationExportSpec("area", { categoryCount: 12 }).canvasWidth
+    ).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
   });
 
   it("keeps pdfChart and legacy bar widths without exportProfile", () => {

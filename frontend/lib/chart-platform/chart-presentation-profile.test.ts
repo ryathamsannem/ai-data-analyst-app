@@ -5,7 +5,7 @@ import {
   formatChartPresentationProfileSummary,
   resolvePdfChartEmbedPolicy,
 } from "@/lib/chart-platform/chart-presentation-profile";
-import { buildPresentationExportSpec, PRESENTATION_EXPORT_WIDTH_PX } from "@/lib/chart-png-export-layout";
+import { buildPresentationExportSpec, PRESENTATION_EXPORT_COMPACT_WIDTH_PX, PRESENTATION_EXPORT_WIDTH_PX } from "@/lib/chart-png-export-layout";
 
 const contract = buildChartPresentationContract({
   chartId: "chart-1",
@@ -72,6 +72,37 @@ describe("ChartPresentationProfile", () => {
     });
     expect(pdfProfile.canvasWidth).toBe(PRESENTATION_EXPORT_WIDTH_PX);
     expect(pdfProfile.pdfEmbed).toEqual(resolvePdfChartEmbedPolicy("bar"));
+  });
+
+  it("keeps pdfChart export widths unchanged for line, area, and histogram", () => {
+    expect(
+      buildPresentationExportSpec("line", { categoryCount: 6 }).canvasWidth
+    ).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+    expect(
+      buildPresentationExportSpec("area", { categoryCount: 12 }).canvasWidth
+    ).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+    expect(
+      buildPresentationExportSpec("histogram", { categoryCount: 6 }).canvasWidth
+    ).toBe(PRESENTATION_EXPORT_WIDTH_PX);
+
+    const pdfLine = buildChartPresentationProfile({
+      id: "pdfChart",
+      contract: buildChartPresentationContract({
+        chartId: "line-1",
+        source: "charts",
+        apiChartType: "line",
+        resolvedKind: "line",
+        title: "Trend",
+        rows: Array.from({ length: 6 }, (_, i) => ({
+          name: `M${i + 1}`,
+          value: i,
+        })),
+      }),
+      kind: "line",
+      categoryCount: 6,
+    });
+    expect(pdfLine.canvasWidth).toBe(PRESENTATION_EXPORT_COMPACT_WIDTH_PX);
+    expect(pdfLine.pdfEmbed).toEqual(resolvePdfChartEmbedPolicy("line"));
   });
 
   it("captures known profile mismatches as read-only diagnostics data", () => {
