@@ -85,10 +85,13 @@ import {
 } from "@/lib/overview-dashboard-plot-layout";
 import { PIE_COLORS } from "@/lib/chart-palette";
 import {
-  formatRadialLegendEntry,
+  buildRadialLegendPayload,
+  formatRadialTooltipValue,
+  formatRadialVisibleLegendLines,
   orderRadialShareDisplayRows,
-  radialSliceStableColorIndex,
+  resolveRadialSliceFill,
   resolveRadialPieEdgeProps,
+  truncateRadialLegendLine,
 } from "@/lib/radial-chart-format";
 import { shouldShowOverviewBarValueLabels, shouldShowHBarValueLabels, formatOverviewBarTopValueLabel } from "@/lib/overview-dashboard-export";
 import {
@@ -982,7 +985,27 @@ function ChartRendererInner({
       ...metricTooltipCtx,
       chartRows: rData,
     };
+    const radialLegendPayload = buildRadialLegendPayload(
+      radialDisplayRows,
+      rData
+    );
+    const radialVisibleLegendLines = formatRadialVisibleLegendLines(
+      radialDisplayRows,
+      rData,
+      radialMetricCtx
+    );
+    const radialLegendMaxChars = polishOverviewMini ? 40 : compact ? 44 : 56;
+    const radialLegendExportJson = JSON.stringify(
+      radialLegendPayload.map((item, i) => ({
+        label: radialVisibleLegendLines[i] ?? item.value,
+        color: item.color,
+      }))
+    );
     return (
+      <div
+        className="h-full w-full min-h-0 min-w-0"
+        data-radial-legend-export={radialLegendExportJson}
+      >
       <ResponsiveContainer
         key={rechartsContainerKey(rKind, viewportW, chartHeight, pngCaptureMode)}
         width="100%"
@@ -1020,12 +1043,7 @@ function ChartRendererInner({
             {radialDisplayRows.map((row, i) => (
               <Cell
                 key={`cell-${String(row.name ?? i)}`}
-                fill={
-                  PIE_COLORS[
-                    radialSliceStableColorIndex(rData, String(row.name ?? "")) %
-                      PIE_COLORS.length
-                  ]
-                }
+                fill={resolveRadialSliceFill(rData, String(row.name ?? ""))}
               />
             ))}
           </Pie>
@@ -1034,21 +1052,61 @@ function ChartRendererInner({
             formatter={(v, _n, item) => {
               const p = item?.payload as ChartRow;
               const name = String(p?.name ?? "");
-              return [formatRadialLegendEntry(rData, name, radialMetricCtx), ""];
+              return [formatRadialTooltipValue(rData, p, v, radialMetricCtx), ""];
             }}
             labelFormatter={() => ""}
           />
           <Legend
-            itemSorter={null}
             wrapperStyle={{ fontSize: legendFontSize, paddingTop: legendPaddingTop }}
-            iconSize={legendIconSize}
-            iconType="circle"
-            formatter={(v) =>
-              tickTruncate(formatRadialLegendEntry(rData, String(v ?? ""), radialMetricCtx))
-            }
+            content={() => (
+              <ul
+                style={{
+                  padding: 0,
+                  margin: 0,
+                  listStyle: "none",
+                  textAlign: "center",
+                  fontSize: legendFontSize,
+                  paddingTop: legendPaddingTop,
+                  lineHeight: 1.35,
+                }}
+              >
+                {radialLegendPayload.map((item, index) => (
+                  <li
+                    key={item.id}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      marginRight: 10,
+                      marginBottom: 2,
+                    }}
+                  >
+                    <svg
+                      width={legendIconSize}
+                      height={legendIconSize}
+                      aria-hidden
+                      style={{ marginRight: 4, flexShrink: 0 }}
+                    >
+                      <circle
+                        cx={legendIconSize / 2}
+                        cy={legendIconSize / 2}
+                        r={legendIconSize / 2}
+                        fill={item.color}
+                      />
+                    </svg>
+                    <span className="recharts-legend-item-text">
+                      {truncateRadialLegendLine(
+                        radialVisibleLegendLines[index] ?? item.value,
+                        radialLegendMaxChars
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           />
         </PieChart>
       </ResponsiveContainer>
+      </div>
     );
   }
 

@@ -2466,9 +2466,10 @@ body {
   width: 100%;
   min-width: 0;
   max-width: 100%;
+  --overview-chart-grid-gap: 24px;
   grid-template-columns: minmax(0, 1fr);
   grid-auto-flow: row;
-  gap: 24px;
+  gap: var(--overview-chart-grid-gap);
   align-items: stretch;
 }
 
@@ -2498,15 +2499,15 @@ body {
 }
 
 /*
- * Lone card in the last row (3, 5, 7, …): always span full width when class is set.
- * Inline styles in page.tsx mirror this; keep CSS for :last-child fallback.
+ * Lone card in the last row (3, 5, 7, …): span the row but center at one-column width.
+ * Inline styles in page.tsx mirror grid placement; inner --solo constrains card width.
  */
 .overview-chart-grid__cell--solo-row,
 .overview-chart-grid__cell:last-child:nth-child(odd):not(:only-child) {
   grid-column: 1 / -1;
+  justify-content: center;
   width: 100%;
   max-width: 100%;
-  justify-self: stretch;
 }
 
 .overview-chart-grid__cell:only-child {
@@ -2520,6 +2521,20 @@ body {
   width: 100%;
   min-width: 0;
   max-width: 100%;
+}
+
+/* Odd last card: one normal column width on 2-col desktop; full width on single-col. */
+.overview-chart-grid__inner--solo {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@container overview-charts (min-width: 1000px) {
+  .overview-chart-grid__inner--solo {
+    width: calc((100% - var(--overview-chart-grid-gap)) / 2);
+    max-width: calc((100% - var(--overview-chart-grid-gap)) / 2);
+  }
 }
 
 .overview-dash-chart-card {

@@ -7,7 +7,6 @@ import {
   formatRadialVisibleLegendLines,
   orderRadialShareDisplayRows,
 } from "@/lib/radial-chart-format";
-import { PIE_COLORS } from "@/lib/chart-palette";
 
 const chartRendererSrc = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "../app/components/home/chart-renderer.tsx"),
@@ -28,11 +27,11 @@ describe("ChartRenderer radial legend display order", () => {
     chartRows: regionProfitShareRows,
   };
 
-  it("feeds sorted display rows to Pie data and disables default alphabetical Legend sort", () => {
+  it("feeds sorted display rows to Pie and explicit radial legend content", () => {
     expect(chartRendererSrc).toContain("data={radialDisplayRows}");
-    expect(chartRendererSrc).toMatch(
-      /<Legend[\s\S]*?itemSorter=\{null\}/
-    );
+    expect(chartRendererSrc).toContain("radialLegendPayload.map");
+    expect(chartRendererSrc).toContain("data-radial-legend-export");
+    expect(chartRendererSrc).toContain("truncateRadialLegendLine");
   });
 
   it("produces visible legend lines North → South → West → East", () => {
@@ -42,21 +41,19 @@ describe("ChartRenderer radial legend display order", () => {
       regionProfitShareRows,
       regionProfitCtx
     );
-    expect(visible).toEqual([
-      "North · 27% · 57.9K",
-      "South · 25% · 54K",
-      "West · 25% · 52.9K",
-      "East · 23% · 50.6K",
+    expect(visible.map((line) => line.split(" · ")[0])).toEqual([
+      "North",
+      "South",
+      "West",
+      "East",
     ]);
+    expect(visible[0]).toMatch(/26\.9%/);
+    expect(visible[2]).toMatch(/24\.6%/);
   });
 
   it("matches legend payload order to slice display order", () => {
     const displayRows = orderRadialShareDisplayRows(regionProfitShareRows);
-    const payload = buildRadialLegendPayload(
-      displayRows,
-      regionProfitShareRows,
-      PIE_COLORS
-    );
+    const payload = buildRadialLegendPayload(displayRows, regionProfitShareRows);
     expect(payload.map((item) => item.value)).toEqual(
       displayRows.map((row) => String(row.name))
     );

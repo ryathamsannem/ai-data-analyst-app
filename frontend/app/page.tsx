@@ -581,6 +581,7 @@ import {
   ovChartCellSoloRow,
   ovChartGrid,
   ovChartInner,
+  ovChartInnerSolo,
   ovChartsWrap,
   ovDashChartCard,
   ovDashChartActionAskAi,
@@ -12851,7 +12852,11 @@ function HomeInner() {
                             }
                             style={overviewChartGridSoloRowStyle(idx, chartCount)}
                           >
-                            <div className={ovChartInner}>
+                            <div
+                              className={
+                                isSoloLastRow ? ovChartInnerSolo : ovChartInner
+                              }
+                            >
                               <OverviewDashboardChartSlot
                                 chart={c}
                                 canonicalTitle={canonicalTitle}

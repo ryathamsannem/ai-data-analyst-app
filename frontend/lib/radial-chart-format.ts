@@ -1,4 +1,5 @@
 import type { ChartRow } from "@/app/chart-types";
+import { resolveRadialPalette } from "@/lib/chart-palette";
 import { shareCompositionAllowed } from "@/lib/final-chart-presentation";
 import {
   appendMetricUnitSuffix,
@@ -156,10 +157,62 @@ function formatRadialContributionValue(
   );
 }
 
-function formatRadialSharePercentRounded(value: number, total: number): string | null {
+function formatRadialSharePercentDisplay(
+  value: number,
+  total: number,
+  rows: readonly ChartRow[]
+): string | null {
   const share = radialSharePercent(value, total);
   if (share == null) return null;
-  return `${Math.round(share)}%`;
+  const decimals = resolveRadialSharePercentDecimals(rows, total);
+  if (decimals === 0) return `${Math.round(share)}%`;
+  const text = share.toFixed(1);
+  return `${text.endsWith(".0") ? text.slice(0, -2) : text}%`;
+}
+
+/**
+ * Decimal places for radial share labels — 1 when rounded integers would collide
+ * or when adjacent shares are very close.
+ */
+export function resolveRadialSharePercentDecimals(
+  rows: readonly ChartRow[],
+  total: number
+): number {
+  if (!radialShouldUseSharePercentDisplay(rows) || total <= 0) return 0;
+  const shares = rows
+    .map((row) => radialSharePercent(row.value, total))
+    .filter((share): share is number => share != null);
+  if (shares.length < 2) return 0;
+
+  const rounded0 = shares.map((share) => Math.round(share));
+  if (new Set(rounded0).size < rounded0.length) return 1;
+
+  const sorted = [...shares].sort((a, b) => b - a);
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i]! - sorted[i + 1]! < 1) return 1;
+  }
+  return 0;
+}
+
+/** Truncate radial legend line — preserve share/value tail after middle dot. */
+export function truncateRadialLegendLine(
+  line: string,
+  maxChars: number
+): string {
+  if (line.length <= maxChars) return line;
+  const sepIdx = line.indexOf(RADIAL_LEGEND_SEP);
+  if (sepIdx === -1) {
+    return line.length > maxChars ? `${line.slice(0, maxChars - 1)}…` : line;
+  }
+  const tail = line.slice(sepIdx);
+  if (tail.length >= maxChars) {
+    return tail.length > maxChars ? `${tail.slice(0, maxChars - 1)}…` : tail;
+  }
+  const name = line.slice(0, sepIdx);
+  const nameBudget = maxChars - tail.length - 1;
+  if (name.length <= nameBudget) return line;
+  if (nameBudget <= 1) return `…${tail}`;
+  return `${name.slice(0, nameBudget - 1)}…${tail}`;
 }
 
 /** Legend / footer line: Category · 54% · 4.27M */
@@ -179,7 +232,7 @@ export function formatRadialLegendEntry(
     return `${name}${RADIAL_LEGEND_SEP}${formatRadialContributionValue(row, ctx)}`;
   }
 
-  const shareText = formatRadialSharePercentRounded(row.value, total) ?? "—";
+  const shareText = formatRadialSharePercentDisplay(row.value, total, rows) ?? "—";
   if (radialRawValuesSumTo100Percent(rows)) {
     return `${name}${RADIAL_LEGEND_SEP}${shareText}`;
   }
@@ -247,6 +300,16 @@ export function orderRadialShareDisplayRows(rows: readonly ChartRow[]): ChartRow
   return sortRadialDisplayRows(rows);
 }
 
+/** Stable slice fill — small-count palette for 2–4 slices; full palette otherwise. */
+export function resolveRadialSliceFill(
+  sourceRows: readonly ChartRow[],
+  categoryName: string
+): string {
+  const palette = resolveRadialPalette(sourceRows.length);
+  const colorIndex = radialSliceStableColorIndex(sourceRows, categoryName);
+  return palette[colorIndex % palette.length] ?? palette[0] ?? "#6366f1";
+}
+
 /** Stable palette index from pre-sort row order (category name → original index). */
 export function radialSliceStableColorIndex(
   sourceRows: readonly ChartRow[],
@@ -272,19 +335,36 @@ export type RadialLegendPayloadItem = {
  */
 export function buildRadialLegendPayload(
   displayRows: readonly ChartRow[],
-  sourceRows: readonly ChartRow[],
-  colors: readonly string[]
+  sourceRows: readonly ChartRow[]
 ): RadialLegendPayloadItem[] {
   return displayRows.map((row, i) => {
     const name = String(row.name ?? "");
-    const colorIndex = radialSliceStableColorIndex(sourceRows, name);
     return {
       value: name,
       type: "circle",
-      color: colors[colorIndex % colors.length] ?? colors[0] ?? "#6366f1",
+      color: resolveRadialSliceFill(sourceRows, name),
       id: `radial-legend-${name || i}`,
     };
   });
+}
+
+export type RadialExportLegendEntry = {
+  label: string;
+  color: string;
+};
+
+/** Ordered legend lines + colors for PNG/PDF composite (matches live ChartRenderer). */
+export function buildRadialExportLegendEntries(
+  displayRows: readonly ChartRow[],
+  sourceRows: readonly ChartRow[],
+  ctx?: MetricFormatContext
+): RadialExportLegendEntry[] {
+  const payload = buildRadialLegendPayload(displayRows, sourceRows);
+  const lines = formatRadialVisibleLegendLines(displayRows, sourceRows, ctx);
+  return payload.map((item, i) => ({
+    label: lines[i] ?? item.value,
+    color: item.color,
+  }));
 }
 
 /** Visible legend label lines in slice/display order (feeds Recharts Legend formatter). */
@@ -327,7 +407,7 @@ export function formatRadialTooltipValue(
   }
 
   const total = radialSliceTotal(rows);
-  const shareText = formatRadialSharePercentRounded(num, total);
+  const shareText = formatRadialSharePercentDisplay(num, total, rows);
   if (shareText == null) return valueText;
 
   if (radialRawValuesSumTo100Percent(rows)) {
