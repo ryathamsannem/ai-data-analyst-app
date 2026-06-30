@@ -209,6 +209,9 @@ describe("AxisPresentationPlan", () => {
       }),
     });
 
+    expect(plan.valueAxis.tickValues).toBeDefined();
+    expect(plan.valueAxis.tickValues!.length).toBeGreaterThanOrEqual(3);
+
     expect(
       resolveHBarValueAxisProps({
         plan,
@@ -220,6 +223,7 @@ describe("AxisPresentationPlan", () => {
     ).toEqual({
       allowDataOverflow: true,
       domain: [4.0275, 4.2225],
+      ticks: plan.valueAxis.tickValues,
     });
     expect(
       resolveHBarValueAxisProps({
@@ -374,6 +378,126 @@ describe("AxisPresentationPlan", () => {
     });
     expect(plan.valueAxis.domain![0]).toBe(0);
     expect(plan.valueAxis.domain![1]).toBeGreaterThan(0.44);
+  });
+
+  it("export plan V-Bar defect rate carries explicit focused rate ticks", () => {
+    const defectRows = [
+      { name: "Night", value: 0.023 },
+      { name: "Day", value: 0.025 },
+      { name: "Swing", value: 0.025 },
+    ];
+    const contract = buildChartPresentationContract({
+      chartId: "defect-bar",
+      source: "charts",
+      apiChartType: "bar",
+      resolvedKind: "bar",
+      title: "Defect Rate by Shift",
+      rows: defectRows,
+      metricLabel: "Defect Rate",
+      categoryLabel: "Shift",
+    });
+    const plan = resolveAxisPresentationPlan({
+      profileId: "chartsPng",
+      contract,
+      kind: "bar",
+      spec: buildPresentationExportSpec("bar", { categoryCount: defectRows.length }),
+    });
+
+    expect(plan.valueAxis.domain![0]).toBeGreaterThan(0);
+    expect(plan.valueAxis.tickValues).toBeDefined();
+    expect(plan.valueAxis.tickValues!.length).toBeGreaterThanOrEqual(3);
+    expect(
+      resolveVerticalBarValueAxisProps({
+        plan,
+        chartKind: "bar",
+        rows: contract.data.rows,
+        chartTitle: "Defect Rate by Shift",
+        metricLabel: "Defect Rate",
+      })
+    ).toEqual({
+      allowDataOverflow: false,
+      domain: plan.valueAxis.domain,
+      ticks: plan.valueAxis.tickValues,
+    });
+  });
+
+  it("export plan V-Bar satisfaction score carries explicit bounded ticks", () => {
+    const satisfactionRows = [
+      { name: "Sales", value: 4.06 },
+      { name: "Marketing", value: 4.12 },
+      { name: "Finance", value: 4.19 },
+    ];
+    const contract = buildChartPresentationContract({
+      chartId: "sat-bar",
+      source: "charts",
+      apiChartType: "bar",
+      resolvedKind: "bar",
+      title: "Satisfaction Score by Department",
+      rows: satisfactionRows,
+      metricLabel: "Satisfaction Score",
+      categoryLabel: "Department",
+    });
+    const plan = resolveAxisPresentationPlan({
+      profileId: "chartsPng",
+      contract,
+      kind: "bar",
+      spec: buildPresentationExportSpec("bar", {
+        categoryCount: satisfactionRows.length,
+      }),
+    });
+
+    expect(plan.valueAxis.tickValues).toBeDefined();
+    expect(plan.valueAxis.tickValues!.length).toBeGreaterThanOrEqual(3);
+    expect(
+      resolveVerticalBarValueAxisProps({
+        plan,
+        chartKind: "bar",
+        rows: contract.data.rows,
+        chartTitle: "Satisfaction Score by Department",
+        metricLabel: "Satisfaction Score",
+      })?.ticks
+    ).toEqual(plan.valueAxis.tickValues);
+  });
+
+  it("export plan H-Bar performance rating carries explicit bounded ticks", () => {
+    const ratingRows = [
+      { name: "Eng", value: 3.41 },
+      { name: "Sales", value: 3.48 },
+      { name: "HR", value: 3.49 },
+      { name: "Ops", value: 3.5 },
+      { name: "Fin", value: 3.52 },
+      { name: "Legal", value: 3.53 },
+    ];
+    const contract = buildChartPresentationContract({
+      chartId: "rating-hbar",
+      source: "charts",
+      apiChartType: "horizontalBar",
+      resolvedKind: "bar_horizontal",
+      title: "Performance Rating by Department",
+      rows: ratingRows,
+      metricLabel: "Performance Rating",
+      categoryLabel: "Department",
+    });
+    const plan = resolveAxisPresentationPlan({
+      profileId: "chartsPng",
+      contract,
+      kind: "bar_horizontal",
+      spec: buildPresentationExportSpec("bar_horizontal", {
+        categoryCount: ratingRows.length,
+      }),
+    });
+
+    expect(plan.valueAxis.tickValues).toBeDefined();
+    expect(plan.valueAxis.tickValues!.length).toBeGreaterThanOrEqual(3);
+    expect(
+      resolveHBarValueAxisProps({
+        plan,
+        chartKind: "bar_horizontal",
+        rows: contract.data.rows,
+        chartTitle: "Performance Rating by Department",
+        metricLabel: "Performance Rating",
+      })?.ticks
+    ).toEqual(plan.valueAxis.tickValues);
   });
 });
 
