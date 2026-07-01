@@ -296,8 +296,9 @@ function ChartRendererInner({
       metricLabel: rAxes.valueAxis,
       chartTitle: rViz?.chartTitle?.trim() || rAxes.valueAxis,
       presentationKind: rKind,
+      chartRows: rData,
     }),
-    [rAxes.valueAxis, rViz?.chartTitle, rKind]
+    [rAxes.valueAxis, rViz?.chartTitle, rKind, rData]
   );
 
   // Metric-aware bar value ticks: currency/large numbers compact to K/M and

@@ -16,6 +16,8 @@ import {
   shouldShowAreaPointLabels,
   shouldShowLinePointLabels,
 } from "@/lib/line-value-labels";
+import { formatChartTooltipValueLine } from "@/lib/chart-tooltip-format";
+import { coercePercentDisplayNumber } from "@/lib/metric-value-format";
 import { sessionTrendDetailPlotMargins } from "@/lib/overview-premium-axis-domain";
 
 const chartRendererSrc = readFileSync(
@@ -66,6 +68,31 @@ describe("ChartRenderer line value labels", () => {
   it("formats weekly unit labels compactly", () => {
     expect(formatLineValueLabel(1_020_000, unitsCtx)).toBe("1.02M");
     expect(formatLineValueLabel(1_050_000, unitsCtx)).toBe("1.05M");
+  });
+
+  it("line percent point label and tooltip share the same percent scale", () => {
+    const rows = [
+      { name: "Jan", value: 0.538 },
+      { name: "Feb", value: 0.542 },
+    ];
+    const rateCtx = {
+      metricLabel: "Attrition Rate",
+      chartTitle: "Monthly Attrition Rate Trend",
+      presentationKind: "line" as const,
+      chartRows: rows,
+    };
+    const label = formatLineValueLabel(0.538, rateCtx);
+    const [tooltipValue] = formatChartTooltipValueLine(
+      { name: "Jan", value: 0.538 },
+      "Attrition Rate",
+      rateCtx
+    );
+    const display = coercePercentDisplayNumber(0.538, undefined, 0.542);
+    expect(label).toContain("%");
+    expect(tooltipValue).toContain("%");
+    expect(label).not.toBe("0.54%");
+    expect(parseFloat(label)).toBeCloseTo(display, 0);
+    expect(parseFloat(tooltipValue)).toBeCloseTo(display, 0);
   });
 
   it("passes lineTopLabels into cartesian margins when labels are shown", () => {

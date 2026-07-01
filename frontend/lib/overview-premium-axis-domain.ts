@@ -380,7 +380,14 @@ export function formatOverviewLineYAxisTick(
 
   const format = resolveMetricValueFormat(ctx);
   if (format === "percent") {
-    return formatMetricNumber(tick, "percent");
+    const rows = ctx.chartRows ?? [];
+    const values = rows
+      .map((r) => readChartRowRawValue(r))
+      .filter((v) => Number.isFinite(v))
+      .map((v) => Math.abs(v));
+    const maxAbs = values.length ? Math.max(...values) : Math.abs(tick);
+    const display = maxAbs <= 1.05 ? tick * 100 : tick;
+    return formatMetricNumber(display, "percent");
   }
 
   const abs = Math.abs(tick);

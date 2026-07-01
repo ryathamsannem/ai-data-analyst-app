@@ -4510,7 +4510,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       buildChartCartesianTooltipHandlers(
         categoryAxisLabel,
         overviewMetricLabel,
-        overviewMetricCtx,
+        { ...overviewMetricCtx, chartRows },
         displayKind === "line" || displayKind === "area"
           ? {
               categoryFormatter: (v) => {
@@ -4525,6 +4525,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       categoryAxisLabel,
       overviewMetricLabel,
       overviewMetricCtx,
+      chartRows,
       displayKind,
       viewportWidthPx,
     ]

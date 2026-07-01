@@ -434,4 +434,15 @@ describe("formatLineValueLabel", () => {
     };
     expect(formatLineValueLabel(2.4, rateCtx)).toBe("2.4%");
   });
+
+  it("coerces fraction-scale percent rows for line point labels", () => {
+    const rows = [{ name: "Jan", value: 0.0054 }];
+    const rateCtx = {
+      metricLabel: "Defect Rate",
+      chartTitle: "Defect Rate Trend",
+      presentationKind: "line" as const,
+      chartRows: rows,
+    };
+    expect(formatLineValueLabel(0.0054, rateCtx)).toBe("0.54%");
+  });
 });

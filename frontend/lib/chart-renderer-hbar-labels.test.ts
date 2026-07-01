@@ -6,6 +6,7 @@ import {
   shouldShowHBarValueLabels,
 } from "@/lib/overview-dashboard-export";
 import { formatOverviewBarValueAxisTick } from "@/lib/overview-premium-axis-domain";
+import { formatChartTooltipValueLine } from "@/lib/chart-tooltip-format";
 
 const chartRendererSrc = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "../app/components/home/chart-renderer.tsx"),
@@ -58,6 +59,27 @@ describe("shouldShowHBarValueLabels", () => {
     expect(
       shouldShowHBarValueLabels(salaryRows, salaryTick, { metricCtx: salaryCtx })
     ).toBe(true);
+  });
+
+  it("keeps compact H-Bar end labels while tooltip stays exact for large currency", () => {
+    const rows = [
+      { name: "Active", value: 7_317_710 },
+      { name: "Terminated", value: 5_200_000 },
+    ];
+    const ctx = {
+      metricLabel: "Bonus",
+      chartTitle: "Bonus by Employee Status",
+      presentationKind: "bar_horizontal" as const,
+      chartRows: rows,
+    };
+    const endLabel = formatOverviewBarValueAxisTick(7_317_710, rows, ctx);
+    const [tooltipValue] = formatChartTooltipValueLine(
+      { name: "Active", value: 7_317_710 },
+      "Bonus",
+      ctx
+    );
+    expect(endLabel).toMatch(/7\.3M|M/);
+    expect(tooltipValue).toContain("7,317,710");
   });
 });
 
