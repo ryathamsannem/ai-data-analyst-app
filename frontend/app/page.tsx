@@ -4965,13 +4965,15 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         surface: lineLabelSurface,
         plotWidthPx: viewW,
         fontSizePx: lineLabelFontSize,
-        formatLabel: (v: number) => formatLineValueLabel(v, overviewMetricCtx),
+        formatLabel: (v: number) =>
+          formatLineValueLabel(v, { ...overviewMetricCtx, chartRows }),
       };
       const areaLabelOptions = {
         surface: lineLabelSurface,
         plotWidthPx: viewW,
         fontSizePx: lineLabelFontSize,
-        formatLabel: (v: number) => formatLineValueLabel(v, overviewMetricCtx),
+        formatLabel: (v: number) =>
+          formatLineValueLabel(v, { ...overviewMetricCtx, chartRows }),
       };
       const showLineValueLabels =
         displayKind === "line" &&
@@ -5183,7 +5185,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                         }
                         chartKind="area"
                         formatter={(v) =>
-                          formatLineValueLabel(v, overviewMetricCtx)
+                          formatLineValueLabel(v, { ...overviewMetricCtx, chartRows })
                         }
                         fontSize={lineLabelFontSize}
                         fill={CHART_BAR_VALUE_LABEL_CSS}
@@ -5239,7 +5241,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                           }
                         }
                         formatter={(v) =>
-                          formatLineValueLabel(v, overviewMetricCtx)
+                          formatLineValueLabel(v, { ...overviewMetricCtx, chartRows })
                         }
                         fontSize={lineLabelFontSize}
                         fill={CHART_BAR_VALUE_LABEL_CSS}

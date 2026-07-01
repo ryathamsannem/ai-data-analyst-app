@@ -1,5 +1,10 @@
 import type { MetricFormatContext } from "@/lib/metric-value-format";
-import { formatOverviewLineYAxisTick } from "@/lib/overview-premium-axis-domain";
+import { readChartRowRawValue } from "@/lib/metric-value-format";
+import {
+  formatOverviewLineFocusedMegaPointLabel,
+  formatOverviewLineYAxisTick,
+  trendValueSpanUsesFocusedMegaTicks,
+} from "@/lib/overview-premium-axis-domain";
 
 export type LineValueLabelSurface = "live" | "export";
 
@@ -329,11 +334,26 @@ export function resolveAreaPointLabelPlacement(args: {
   return resolveLinePointLabelPlacement(args);
 }
 
-/** Line point labels — same metric-aware compact formatting as line Y-axis ticks. */
+/** Line point labels — axis-aligned compact formatting; extra M precision in tight mega trends. */
 export function formatLineValueLabel(
   value: number,
   ctx: MetricFormatContext = {}
 ): string {
+  if (!Number.isFinite(value)) return String(value);
+
+  const rows = ctx.chartRows ?? [];
+  if (rows.length >= 2) {
+    const vals = rows
+      .map((row) => readChartRowRawValue(row))
+      .filter((v) => Number.isFinite(v));
+    if (
+      trendValueSpanUsesFocusedMegaTicks(vals) &&
+      Math.abs(value) >= 1_000_000
+    ) {
+      return formatOverviewLineFocusedMegaPointLabel(value);
+    }
+  }
+
   return formatOverviewLineYAxisTick(value, ctx);
 }
 

@@ -156,6 +156,24 @@ export function chooseFocusedTrendAxisStep(span: number, maxAbs: number): number
   return inferDomainTickStep(span, maxAbs);
 }
 
+/** True when line/area values sit in a tight million-scale band (matches focused axis ticks). */
+export function trendValueSpanUsesFocusedMegaTicks(
+  values: readonly number[]
+): boolean {
+  const nums = values.filter((v) => Number.isFinite(v));
+  if (nums.length < 2) return false;
+  const span = Math.max(...nums) - Math.min(...nums);
+  const maxAbs = Math.max(...nums.map((v) => Math.abs(v)));
+  return maxAbs > 100_000 && span <= 100_000;
+}
+
+/** Point-label M suffix with two-decimal precision — mirrors focused axis tick style. */
+export function formatOverviewLineFocusedMegaPointLabel(value: number): string {
+  const m = value / 1_000_000;
+  const label = m.toFixed(2).replace(/\.?0+$/, "");
+  return `${label}M`;
+}
+
 const PREMIUM_AXIS_MAX_TICK_COUNT = 7;
 
 function capPremiumAxisTicks(

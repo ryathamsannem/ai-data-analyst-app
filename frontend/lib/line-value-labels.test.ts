@@ -416,6 +416,26 @@ describe("formatLineValueLabel", () => {
     expect(formatLineValueLabel(1_050_000, unitsCtx)).toBe("1.05M");
   });
 
+  it("uses two-decimal M for point labels in tight million-scale trends", () => {
+    const weeklyUnitsRows = [
+      { name: "W1", value: 1_020_000 },
+      { name: "W2", value: 1_030_000 },
+      { name: "W3", value: 1_040_000 },
+      { name: "W4", value: 1_054_638 },
+    ];
+    const ctx = {
+      ...unitsCtx,
+      chartRows: weeklyUnitsRows,
+    };
+    expect(formatLineValueLabel(1_054_638, ctx)).toBe("1.05M");
+    expect(formatLineValueLabel(1_026_677, ctx)).toBe("1.03M");
+    expect(formatLineValueLabel(1_054_638, ctx)).not.toBe("1.1M");
+  });
+
+  it("leaves sub-compact values unchanged", () => {
+    expect(formatLineValueLabel(850, unitsCtx)).toContain("850");
+  });
+
   it("formats currency values with $ when metric implies currency", () => {
     const revenueCtx = {
       metricLabel: "Revenue",

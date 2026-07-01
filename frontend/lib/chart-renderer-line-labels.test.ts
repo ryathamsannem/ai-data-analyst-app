@@ -70,6 +70,38 @@ describe("ChartRenderer line value labels", () => {
     expect(formatLineValueLabel(1_050_000, unitsCtx)).toBe("1.05M");
   });
 
+  it("aligns tight mega point labels with axis precision", () => {
+    const rows = [
+      { name: "W1", value: 1_020_000 },
+      { name: "W2", value: 1_030_000 },
+      { name: "W3", value: 1_040_000 },
+      { name: "W4", value: 1_054_638 },
+    ];
+    const ctx = {
+      ...unitsCtx,
+      chartRows: rows,
+    };
+    expect(formatLineValueLabel(1_054_638, ctx)).toBe("1.05M");
+    expect(formatLineValueLabel(1_026_677, ctx)).toBe("1.03M");
+  });
+
+  it("keeps tooltip exact while point labels stay compact", () => {
+    const rows = [{ name: "W4", value: 1_054_638 }];
+    const ctx = {
+      metricLabel: "Units Produced",
+      chartTitle: "Weekly Units Produced Trend",
+      presentationKind: "line" as const,
+      chartRows: rows,
+    };
+    const [tooltipValue] = formatChartTooltipValueLine(
+      { name: "W4", value: 1_054_638 },
+      "Units Produced",
+      ctx
+    );
+    expect(tooltipValue).toContain("1,054,638");
+    expect(tooltipValue).not.toBe("1.05M");
+  });
+
   it("line percent point label and tooltip share the same percent scale", () => {
     const rows = [
       { name: "Jan", value: 0.538 },
