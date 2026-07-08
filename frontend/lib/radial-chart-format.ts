@@ -4,7 +4,9 @@ import { shareCompositionAllowed } from "@/lib/final-chart-presentation";
 import {
   appendMetricUnitSuffix,
   formatExecutiveMetricValue,
+  formatExecutivePercentPointGap,
   formatMetricNumber,
+  formatMetricSpreadGap,
   readChartRowRawValue,
   resolveMetricValueFormat,
   type MetricFormatContext,
@@ -41,6 +43,37 @@ export function radialSharePercents(rows: readonly ChartRow[]): number[] {
 /** Sum of computed share_pct values (should be ~100 for valid composition). */
 export function radialSharePercentSum(rows: readonly ChartRow[]): number {
   return radialSharePercents(rows).reduce((sum, pct) => sum + pct, 0);
+}
+
+/**
+ * Gap label for donut/pie executive signal cards — share charts use percentage-point
+ * spread (largest share minus smallest share); non-share radials use raw metric gap.
+ */
+export function formatRadialShareGapDisplay(
+  rows: readonly ChartRow[],
+  maxValue: number,
+  minValue: number,
+  ctx: MetricFormatContext = {}
+): string {
+  if (!Number.isFinite(maxValue) || !Number.isFinite(minValue)) return "—";
+
+  const total = radialSliceTotal(rows);
+  if (total <= 0) return "—";
+
+  if (radialShouldUseSharePercentDisplay(rows)) {
+    const maxPct = radialSharePercent(maxValue, total);
+    const minPct = radialSharePercent(minValue, total);
+    if (maxPct != null && minPct != null) {
+      const gapPp = maxPct - minPct;
+      return formatExecutivePercentPointGap(gapPp, {
+        skipFractionScale: true,
+        decimals: 2,
+      });
+    }
+  }
+
+  const gap = maxValue - minValue;
+  return formatMetricSpreadGap(gap, { ...ctx, chartRows: [...rows] });
 }
 
 function radialNumericValues(rows: readonly ChartRow[]): number[] {

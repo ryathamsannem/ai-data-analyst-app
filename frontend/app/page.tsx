@@ -178,7 +178,7 @@ import {
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
 import { buildChartCartesianTooltipHandlers } from "@/lib/chart-tooltip-format";
-import { radialShareDisplayAllowed } from "@/lib/radial-chart-format";
+import { formatRadialShareGapDisplay, radialShareDisplayAllowed } from "@/lib/radial-chart-format";
 import {
   percentGapChipAriaLabel,
   resolveRateExceeds100Warning,
@@ -2910,7 +2910,18 @@ function buildExecutiveVizInsights(
     });
     const maxR = rows[iMax];
     const minR = rows[iMin];
-    const gap = maxR.value - minR.value;
+    const shareRows = rows.map((r) => ({ name: r.label, value: r.value }));
+    const gapDisp = formatRadialShareGapDisplay(
+      shareRows,
+      maxR.value,
+      minR.value,
+      {
+        metricLabel: measure,
+        chartTitle: measureCtx?.chartTitle,
+        presentationKind: kind,
+        roundingHint,
+      }
+    );
     const sliceCount = rows.length;
     const out: ExecutiveVizInsightCard[] = [
       {
@@ -2930,7 +2941,7 @@ function buildExecutiveVizInsights(
       {
         key: "pie-gap",
         title: buildInsightCardTitle(measure, "gap"),
-        value: `${formatDerivedInsightNumber(gap, roundingHint ?? "pct_1", true)} (spread)`,
+        value: `${gapDisp} (spread)`,
         dotClass: nextDot(),
       },
       {
