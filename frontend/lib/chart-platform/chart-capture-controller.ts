@@ -53,7 +53,9 @@ export function createChartPngCaptureRequest({
   scale = 2,
   spec,
 }: CreateChartPngCaptureRequestArgs): ChartPngCaptureRequest {
-  const exportSpec = spec ?? buildPresentationExportSpec(kind, { categoryCount });
+  const exportSpec =
+    spec ??
+    buildPresentationExportSpec(kind, { categoryCount, exportProfile: profile });
   const presentationProfile = buildChartPresentationProfile({
     id: profile,
     contract,

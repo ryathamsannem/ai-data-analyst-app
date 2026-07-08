@@ -4,6 +4,7 @@ import {
   buildRadialExportLegendEntries,
   buildRadialLegendPayload,
   formatRadialLegendEntry,
+  formatRadialShareGapDisplay,
   formatRadialSliceTotalLabel,
   formatRadialTooltipValue,
   formatRadialVisibleLegendLines,
@@ -37,6 +38,73 @@ describe("radialSharePercent", () => {
       { name: "C", value: 25000 },
     ];
     expect(radialSharePercentSum(rows)).toBeCloseTo(100, 5);
+  });
+});
+
+describe("formatRadialShareGapDisplay", () => {
+  const regionAdSpendRows: ChartRow[] = [
+    { name: "East", value: 79_531.88 },
+    { name: "West", value: 98_000 },
+    { name: "South", value: 96_555.01 },
+    { name: "Central", value: 49_858.51 },
+  ];
+
+  it("does not format raw currency gap as a percent for share donuts", () => {
+    const gap = formatRadialShareGapDisplay(
+      regionAdSpendRows,
+      79_531.88,
+      49_858.51,
+      {
+        metricLabel: "Region Ad Spend Share",
+        chartTitle: "Region Ad Spend Share",
+        presentationKind: "donut",
+      }
+    );
+    expect(gap).not.toContain("29673");
+    expect(gap).not.toMatch(/%$/);
+    expect(gap).toMatch(/pp$/);
+  });
+
+  it("shows share gap in percentage points for Region Ad Spend Share", () => {
+    const gap = formatRadialShareGapDisplay(
+      regionAdSpendRows,
+      79_531.88,
+      49_858.51,
+      {
+        metricLabel: "Region Ad Spend Share",
+        chartTitle: "Region Ad Spend Share",
+        presentationKind: "donut",
+      }
+    );
+    expect(gap).toBe("9.16 pp");
+  });
+
+  it("formats raw metric gap for non-share radial metrics", () => {
+    const rateRows: ChartRow[] = [
+      { name: "A", value: 52, displayValue: "52.0%" },
+      { name: "B", value: 45, displayValue: "45.0%" },
+      { name: "C", value: 38, displayValue: "38.0%" },
+    ];
+    const gap = formatRadialShareGapDisplay(rateRows, 52, 38, {
+      metricLabel: "Conversion Rate",
+      chartTitle: "Conversion Rate by Channel",
+      presentationKind: "donut",
+    });
+    expect(gap).toBe("14.0 pp");
+    expect(gap).not.toBe("14.0%");
+  });
+
+  it("keeps largest and smallest segment totals on raw metric formatting", () => {
+    const ctx = {
+      metricLabel: "Region Ad Spend Share",
+      chartTitle: "Region Ad Spend Share",
+      presentationKind: "donut" as const,
+      chartRows: regionAdSpendRows,
+    };
+    const east = formatRadialLegendEntry(regionAdSpendRows, "East", ctx);
+    const central = formatRadialLegendEntry(regionAdSpendRows, "Central", ctx);
+    expect(east).toMatch(/79\.5K|79,532|79532/i);
+    expect(central).toMatch(/49\.9K|49,859|49859/i);
   });
 });
 

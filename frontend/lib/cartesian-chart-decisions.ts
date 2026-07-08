@@ -10,11 +10,15 @@ import {
 import {
   coercePercentDisplayNumber,
   metricFormatUsesPercent,
+  metricLabelImpliesScoreLike,
   readChartRowRawValue,
   resolveMetricValueFormat,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
 import {
+  inferBoundedMetricBounds,
+  isLowVarianceOnBoundedScale,
+  resolveFocusedBoundedBarValueAxisTicks,
   resolveFocusedRateBarValueAxisTicks,
   resolveOverviewBarValueDomain,
 } from "@/lib/overview-bar-value-domain";
@@ -87,19 +91,54 @@ function attachOverviewBarValueAxisTicks(
   const withCount = attachOverviewCountBarTicks(props, ctx, chartKind);
   if (withCount.ticks) return withCount;
 
-  if (chartKind !== "bar" || !metricFormatUsesPercent(ctx)) return props;
-
   const rawVals = rows
     .map((row) => readChartRowRawValue(row))
     .filter((v) => Number.isFinite(v));
-  if (rawVals.length < 2 || domain[0] <= 0) return props;
 
-  const maxRaw = Math.max(...rawVals);
-  const displayVals = rawVals.map((v) => coercePercentDisplayNumber(v));
-  const maxDisplay = Math.max(...displayVals);
-  const ticks = resolveFocusedRateBarValueAxisTicks(domain, maxRaw, maxDisplay);
-  if (!ticks) return props;
-  return { ...props, ticks };
+  if (chartKind === "bar" && metricFormatUsesPercent(ctx) && domain[0] > 0) {
+    if (rawVals.length >= 2) {
+      const maxRaw = Math.max(...rawVals);
+      const displayVals = rawVals.map((v) => coercePercentDisplayNumber(v));
+      const maxDisplay = Math.max(...displayVals);
+      const ticks = resolveFocusedRateBarValueAxisTicks(domain, maxRaw, maxDisplay);
+      if (ticks) return { ...withCount, ticks };
+    }
+  }
+
+  if (domain[0] > 0 && rawVals.length >= 2) {
+    const isPercent = metricFormatUsesPercent(ctx);
+    const maxRawAbs = Math.max(...rawVals.map((v) => Math.abs(v)));
+    const displayVals = isPercent
+      ? rawVals.map((v) => coercePercentDisplayNumber(v, undefined, maxRawAbs))
+      : rawVals;
+    const minDisplay = Math.min(...displayVals);
+    const maxDisplay = Math.max(...displayVals);
+    const boundedBounds = inferBoundedMetricBounds({
+      values: displayVals,
+      metricLabel: ctx.metricLabel,
+      chartTitle: ctx.chartTitle,
+      isPercent,
+    });
+    const scoreLike = metricLabelImpliesScoreLike(
+      ctx.metricLabel,
+      ctx.chartTitle
+    );
+    const scaleMax = boundedBounds?.max ?? maxDisplay;
+    if (
+      scoreLike ||
+      (boundedBounds &&
+        isLowVarianceOnBoundedScale(
+          maxDisplay - minDisplay,
+          boundedBounds,
+          rawVals.length
+        ))
+    ) {
+      const ticks = resolveFocusedBoundedBarValueAxisTicks(domain, scaleMax);
+      if (ticks) return { ...withCount, ticks };
+    }
+  }
+
+  return withCount;
 }
 
 export function resolveCartesianBarValueAxisProps(args: {
@@ -182,7 +221,7 @@ export function resolveCartesianBarValueAxisProps(args: {
         rows
       );
     }
-    return resolveHBarValueAxisProps({
+    const props = resolveHBarValueAxisProps({
       plan: context.capture ? (context.exportAxisPlan ?? null) : null,
       chartKind: "bar_horizontal",
       rows,
@@ -190,6 +229,20 @@ export function resolveCartesianBarValueAxisProps(args: {
       metricLabel,
       executiveRounding: context.capture,
     });
+    if (!props?.domain) return props;
+    const ctx: MetricFormatContext = {
+      chartTitle: chartTitle ?? undefined,
+      metricLabel: metricLabel ?? undefined,
+      presentationKind: chartKind,
+      chartRows: rows as ChartRow[],
+    };
+    return attachOverviewBarValueAxisTicks(
+      props,
+      ctx,
+      chartKind,
+      props.domain,
+      rows
+    );
   }
 
   return null;

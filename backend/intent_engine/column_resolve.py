@@ -450,6 +450,100 @@ _RATE_PCT_SUBSTRINGS: Tuple[str, ...] = (
     "conversion",
 )
 
+_TYPED_MARGIN_KINDS: Tuple[str, ...] = ("gross", "net", "operating")
+
+_PROFIT_MARGIN_COLUMN_PREFERENCES: Tuple[str, ...] = (
+    "profit margin pct",
+    "profit_margin_pct",
+    "profit margin percent",
+    "profit_margin_percent",
+    "profit margin",
+    "profit_margin",
+    "margin pct",
+    "margin_pct",
+    "margin percent",
+    "margin_percent",
+)
+
+
+def _margin_kind_from_question(question: str) -> Optional[str]:
+    ql = str(question or "").lower()
+    if re.search(r"\bgross\s+margin\b", ql):
+        return "gross"
+    if re.search(r"\bnet\s+margin\b", ql):
+        return "net"
+    if re.search(r"\boperating\s+margin\b", ql):
+        return "operating"
+    return None
+
+
+def _typed_margin_kind_in_column(cn: str) -> Optional[str]:
+    for kind in _TYPED_MARGIN_KINDS:
+        if kind in cn and "margin" in cn:
+            return kind
+    return None
+
+
+def is_existing_margin_metric_column(col_name: Optional[str]) -> bool:
+    """True when a column name denotes an existing margin-percent style measure."""
+    if not col_name or not str(col_name).strip():
+        return False
+    cn = _norm_col(str(col_name))
+    if "margin" not in cn:
+        return False
+    if any(h in cn for h in _RATE_PCT_SUBSTRINGS):
+        return True
+    if cn in _PROFIT_MARGIN_COLUMN_PREFERENCES:
+        return True
+    if re.search(r"\bmargin\b", cn) and re.search(
+        r"\b(pct|percent|percentage|rate)\b", cn
+    ):
+        return True
+    return cn.endswith(" margin")
+
+
+def find_existing_margin_percent_column(
+    columns: List[str],
+    profile: Dict[str, Any],
+    question: str = "",
+) -> Optional[str]:
+    """
+    Resolve an existing numeric margin column (profit_margin_pct, gross_margin_pct, …).
+    Prefers typed margins when the question names gross/net/operating margin.
+    """
+    nums = numeric_columns(columns, profile)
+    if not nums:
+        return None
+    margin_kind = _margin_kind_from_question(question)
+    best: Optional[str] = None
+    best_score = 0
+    for col in nums:
+        cn = _norm_col(str(col))
+        if not is_existing_margin_metric_column(str(col)):
+            continue
+        typed = _typed_margin_kind_in_column(cn)
+        if margin_kind:
+            if typed != margin_kind:
+                continue
+        elif typed is not None:
+            continue
+        score = 40
+        if margin_kind and typed == margin_kind:
+            score += 120
+        for idx, pref in enumerate(_PROFIT_MARGIN_COLUMN_PREFERENCES):
+            if cn == _norm_col(pref):
+                score += 200 - idx
+                break
+        if "profit" in cn and "margin" in cn:
+            score += 60
+        if any(h in cn for h in _RATE_PCT_SUBSTRINGS):
+            score += 30
+        score += min(len(cn), 30)
+        if score > best_score:
+            best_score = score
+            best = str(col)
+    return best if best_score >= 40 else None
+
 
 def resolve_synonym_metric_column(
     question: str,
@@ -481,6 +575,8 @@ def column_prefers_mean_aggregation(col_name: Optional[str]) -> bool:
     if not col_name:
         return False
     cn = _norm_col(str(col_name))
+    if is_existing_margin_metric_column(str(col_name)):
+        return True
     if any(k in cn for k in ("revenue", "sales", "cost", "spend", "profit", "units")):
         if not any(
             k in cn

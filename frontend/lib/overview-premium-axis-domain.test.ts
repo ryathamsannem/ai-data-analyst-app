@@ -3,6 +3,7 @@ import type { ChartRow } from "@/app/chart-types";
 import {
   chooseFocusedTrendAxisStep,
   formatOverviewBarValueAxisTick,
+  formatOverviewLineFocusedMegaPointLabel,
   formatOverviewLineYAxisTick,
   formatOverviewScatterAxisTick,
   OVERVIEW_LINE_PREMIUM_PAD_RATIO,
@@ -13,6 +14,7 @@ import {
   resolveOverviewScatterPremiumAxisScale,
   resolveScatterValueAxisProps,
   resolveSessionPremiumTrendAxisScale,
+  trendValueSpanUsesFocusedMegaTicks,
   resolveTrendValueAxisProps,
   SESSION_DETAIL_TREND_PREMIUM_PAD_RATIO,
   sessionLineAreaDetailBottomMargin,
@@ -190,6 +192,16 @@ describe("formatOverviewLineYAxisTick", () => {
     );
     expect(new Set(labels).size).toBe(4);
     expect(labels.every((l) => l !== "1M")).toBe(true);
+  });
+
+  it("focused mega point labels use two-decimal M in tight million-scale ranges", () => {
+    const tightRange = [
+      1_020_000, 1_030_000, 1_040_000, 1_050_000, 1_054_638,
+    ];
+    expect(trendValueSpanUsesFocusedMegaTicks(tightRange)).toBe(true);
+    expect(formatOverviewLineFocusedMegaPointLabel(1_054_638)).toBe("1.05M");
+    expect(formatOverviewLineFocusedMegaPointLabel(1_026_677)).toBe("1.03M");
+    expect(formatOverviewLineYAxisTick(1_054_638)).toBe("1.1M");
   });
 
   it("keeps percent metrics readable", () => {

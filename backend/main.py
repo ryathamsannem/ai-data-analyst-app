@@ -7125,6 +7125,15 @@ def _describe_aggregate_intent(question_str: str, df, profile) -> Optional[Dict[
         agg_label, agg_key = "ROI", "mean"
     elif metric_spec and metric_spec.get("entity_record_count"):
         agg_label, agg_key = "Count", "count"
+    elif metric_spec and (
+        metric_spec.get("existing_margin_metric")
+        or (
+            metric_spec.get("explicit_metric")
+            and ncol
+            and _is_existing_margin_metric_column(str(ncol))
+        )
+    ):
+        agg_label, agg_key = "Profit margin", "mean"
     else:
         agg_label, agg_key = _resolve_agg_label_and_key(
             ql,
@@ -7424,6 +7433,15 @@ _DERIVED_ROI_METRIC_KEY = "__derived_roi__"
 _DERIVED_PROFIT_MARGIN_METRIC_KEY = "__derived_profit_margin__"
 
 
+def _is_existing_margin_metric_column(col_name: Optional[str]) -> bool:
+    try:
+        from intent_engine.column_resolve import is_existing_margin_metric_column
+
+        return is_existing_margin_metric_column(col_name)
+    except Exception:
+        return False
+
+
 def _question_requests_profit_margin(q: str) -> bool:
     ql = _norm_metric_phrase_for_match(q)
     if re.search(r"\bprofit\s+margin\b", ql):
@@ -7521,6 +7539,8 @@ def _find_profit_and_revenue_columns(
     )
     if profit and profit not in numeric_cols:
         profit = None
+    if profit and "margin" in _norm_header_token(str(profit)):
+        profit = None
     if not profit:
         for c in numeric_cols:
             cn = _norm_header_token(str(c))
@@ -7532,19 +7552,24 @@ def _find_profit_and_revenue_columns(
         [
             "sales",
             "revenue",
-            "amount",
-            "total",
-            "value",
             "total_revenue",
             "gross_revenue",
         ],
     )
     if revenue and revenue not in numeric_cols:
         revenue = None
+    if revenue:
+        rev_cn = _norm_header_token(str(revenue))
+        if "margin" in rev_cn or (
+            "return" in rev_cn and "amount" in rev_cn
+        ):
+            revenue = None
     if not revenue:
         for c in numeric_cols:
             cn = _norm_header_token(str(c))
             if any(k in cn for k in ("revenue", "sales", "gross")) and "profit" not in cn:
+                if "return" in cn and "amount" in cn:
+                    continue
                 revenue = str(c)
                 break
     if profit and revenue and str(profit).lower() == str(revenue).lower():
@@ -7571,6 +7596,22 @@ def _resolve_question_metric_spec(
     numeric_cols = [c for c in columns if ct.get(c) == "number"]
 
     if _question_requests_profit_margin(question):
+        try:
+            from intent_engine.column_resolve import find_existing_margin_percent_column
+
+            margin_col = find_existing_margin_percent_column(
+                columns, profile, question
+            )
+        except Exception:
+            margin_col = None
+        if margin_col and margin_col in df_in.columns:
+            return {
+                "value_col": margin_col,
+                "metric_display": _pretty_label_text(margin_col),
+                "requested_metric_token": "profit_margin",
+                "explicit_metric": True,
+                "existing_margin_metric": True,
+            }
         profit_col, rev_col = _find_profit_and_revenue_columns(columns, numeric_cols)
         if (
             profit_col
@@ -14000,7 +14041,16 @@ def _build_unified_analysis_payload(
     if intent_debug and intent_debug.get("derived_profit_margin"):
         out["derivedProfitMargin"] = True
     elif _question_requests_profit_margin(question) and not (
-        intent_debug and intent_debug.get("derived_profit_margin")
+        intent_debug
+        and (
+            intent_debug.get("derived_profit_margin")
+            or (
+                intent_debug.get("explicit_metric")
+                and _is_existing_margin_metric_column(
+                    str(intent_debug.get("value_col") or "")
+                )
+            )
+        )
     ):
         out["profitMarginUnavailable"] = True
     try:

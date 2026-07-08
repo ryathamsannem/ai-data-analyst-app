@@ -1,11 +1,11 @@
 # LATEST_STABLE_UI_SNAPSHOT.md
 
 **Canonical continuation snapshot** for the AI Data Analyst SaaS application.  
-**As of:** May 2026 · reflects **current working UI only** (not historical experiments).
+**As of:** June 29, 2026 · reflects **current working UI** including completed chart polish pass and final consistency audit.
 
-**Also read:** [`AGENTS.md`](AGENTS.md) · [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) · [`DATA_PREVIEW_STABLE_SUMMARY.md`](DATA_PREVIEW_STABLE_SUMMARY.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md)
+**Also read:** [`AGENTS.md`](AGENTS.md) · [`UI_BASELINE_RULES.md`](UI_BASELINE_RULES.md) · [`PROJECT_ARCHITECTURE_SUMMARY.md`](PROJECT_ARCHITECTURE_SUMMARY.md) · [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) · [`DATA_PREVIEW_STABLE_SUMMARY.md`](DATA_PREVIEW_STABLE_SUMMARY.md) · [`AI_INSIGHTS_STABLE_SUMMARY.md`](AI_INSIGHTS_STABLE_SUMMARY.md) · [`UI_ARCHITECTURE_SNAPSHOT.md`](UI_ARCHITECTURE_SNAPSHOT.md) · [`AI_VISUALIZATION_BEHAVIOR.md`](AI_VISUALIZATION_BEHAVIOR.md) · [`docs/current-snapshot/chart-polish-final-snapshot.md`](docs/current-snapshot/chart-polish-final-snapshot.md)
 
-**Recovery point:** May 2026 — all UI refinements through Data Preview metadata polish; **Export/PDF not finalized**.
+**Recovery point:** June 2026 — chart polish complete at `DEV` / `16526f0`; PDF/AI alignment complete; optional export-contract hardening only.
 
 ---
 
@@ -52,7 +52,7 @@ Visually approved / stabilized (fix bugs in place only):
 | **Interactive filters** | Shared `FilterPanel` with `appearance="dashboard"` on Overview **and** AI Insights; 52px control height |
 | **Dataset summary** | **Overview:** full card + Replace file · **Data Preview:** `DataPreviewDatasetContext` · **Insights/Charts:** no duplicate card (header badge) |
 | **Data Preview** | Table, deferred search, quality chips, extension-preserving filename — [`DATA_PREVIEW_STABLE_SUMMARY.md`](DATA_PREVIEW_STABLE_SUMMARY.md) |
-| **Charts tab** | Timeline + preview, Why-this-chart, tight plot spacing — [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) |
+| **Charts tab** | Timeline + preview, labels/axes polish, PNG density, signed bars — [`CHARTS_STABLE_SUMMARY.md`](CHARTS_STABLE_SUMMARY.md) |
 | **AI Insights shell** | Outer gradient card + two-column grid (Suggested Questions \| Ask AI column) |
 | **Suggested Questions** | Unified question cards, hover-only lift, thin hover scrollbar on left panel |
 | **Ask AI** | Compact composer, premium submit hover, Reset aligned with header |
@@ -61,7 +61,7 @@ Visually approved / stabilized (fix bugs in place only):
 | **Dark / light mode** | `class="dark"` on `<html>` via `frontend/lib/theme.ts` + `ThemeScript` |
 | **Responsive** | Single column on mobile; `lg:` grid splits; filters wrap; chart grids 1→2 cols |
 | **Sidebar / nav** | Collapsible `AppSidebar`, icon rail, `MainNavTabs` pill bar |
-| **Export / PDF** | Functional (`pdf-report.ts`) — **not finalized**; next product phase |
+| **Export / PDF** | Functional + AI/chart aligned — chart embed matches on-screen styling; optional contract hardening only |
 
 ---
 
@@ -129,6 +129,7 @@ Visually approved / stabilized (fix bugs in place only):
 
 - Recharts; shared `ChartRenderer`, `chart-layout-config`, `ChartInsightViewportWrapper`, `AiInsightChartShell`
 - Centered plots; axis tokens `--chart-axis-tick`, `--chart-axis-line` (dark overridden under `.ai-insights-page`)
+- **Chart polish (June 2026):** V/H-Bar labels, donut sorting, line/area labels, PNG density tiers, signed bars, close-value axes — all surfaces pass final audit ([`chart-polish-final-snapshot.md`](docs/current-snapshot/chart-polish-final-snapshot.md))
 
 ---
 

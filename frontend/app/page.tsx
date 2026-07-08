@@ -148,6 +148,14 @@ import {
   OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX,
 } from "@/lib/overview-premium-axis-domain";
 import {
+  buildAreaValueLabelIndexSet,
+  buildLineValueLabelIndexSet,
+  formatLineValueLabel,
+  shouldShowAreaPointLabels,
+  shouldShowLinePointLabels,
+  type LineValueLabelSurface,
+} from "@/lib/line-value-labels";
+import {
   HORIZONTAL_BAR_END_RADIUS,
   resolveHorizontalBarCategoryGap,
   resolveOverviewHorizontalBarMaxSize,
@@ -170,7 +178,7 @@ import {
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
 import { buildChartCartesianTooltipHandlers } from "@/lib/chart-tooltip-format";
-import { radialShareDisplayAllowed } from "@/lib/radial-chart-format";
+import { formatRadialShareGapDisplay, radialShareDisplayAllowed } from "@/lib/radial-chart-format";
 import {
   percentGapChipAriaLabel,
   resolveRateExceeds100Warning,
@@ -192,6 +200,8 @@ import {
   getSharedDetailLayoutMetrics,
   resolveSharedDetailPlotHeight,
   timelineTypeToChartKind,
+  LINE_BOTTOM_LABEL_HEADROOM_PX,
+  LINE_TOP_LABEL_HEADROOM_PX,
   VBAR_TOP_LABEL_HEADROOM_PX,
 } from "@/lib/chart-layout-config";
 import {
@@ -474,10 +484,12 @@ import {
 import { AiInsightChartShell } from "./components/ai-insight-chart-shell";
 import { ChartRenderer, type ChartRendererViz } from "./components/home/chart-renderer";
 import { HBarValueLabelListContent } from "./components/home/hbar-value-label-list";
+import { LineValueLabelListContent } from "./components/home/line-value-label-list";
 import {
-  computeHBarOutsideLabelReservePx,
+  computeHBarSignedOutsideLabelReservesPx,
   resolveOverviewInlineHBarPlacementMode,
 } from "@/lib/hbar-value-label-placement";
+import { barChartRowsHaveNegativeValues } from "@/lib/overview-bar-value-domain";
 import { DataPreviewDatasetContext } from "./components/home/data-preview-dataset-context";
 import { DataPreviewQualitySummary } from "./components/home/data-preview-quality-summary";
 import { DataPreviewDatasetInsightsSummary } from "./components/home/data-preview-dataset-insights-summary";
@@ -814,6 +826,7 @@ import {
   CartesianGrid,
   ScatterChart,
   Scatter,
+  ReferenceLine,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -2897,7 +2910,18 @@ function buildExecutiveVizInsights(
     });
     const maxR = rows[iMax];
     const minR = rows[iMin];
-    const gap = maxR.value - minR.value;
+    const shareRows = rows.map((r) => ({ name: r.label, value: r.value }));
+    const gapDisp = formatRadialShareGapDisplay(
+      shareRows,
+      maxR.value,
+      minR.value,
+      {
+        metricLabel: measure,
+        chartTitle: measureCtx?.chartTitle,
+        presentationKind: kind,
+        roundingHint,
+      }
+    );
     const sliceCount = rows.length;
     const out: ExecutiveVizInsightCard[] = [
       {
@@ -2917,7 +2941,7 @@ function buildExecutiveVizInsights(
       {
         key: "pie-gap",
         title: buildInsightCardTitle(measure, "gap"),
-        value: `${formatDerivedInsightNumber(gap, roundingHint ?? "pct_1", true)} (spread)`,
+        value: `${gapDisp} (spread)`,
         dotClass: nextDot(),
       },
       {
@@ -4497,7 +4521,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       buildChartCartesianTooltipHandlers(
         categoryAxisLabel,
         overviewMetricLabel,
-        overviewMetricCtx,
+        { ...overviewMetricCtx, chartRows },
         displayKind === "line" || displayKind === "area"
           ? {
               categoryFormatter: (v) => {
@@ -4512,6 +4536,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       categoryAxisLabel,
       overviewMetricLabel,
       overviewMetricCtx,
+      chartRows,
       displayKind,
       viewportWidthPx,
     ]
@@ -4811,17 +4836,19 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
       });
       const hBarLabelFontSize = 13;
       const hBarPlacementMode = resolveOverviewInlineHBarPlacementMode(pngCapture);
-      const hBarOutsideReserve =
+      const hBarOutsideReserves =
         showBarEndLabels
-          ? computeHBarOutsideLabelReservePx(
+          ? computeHBarSignedOutsideLabelReservesPx(
               chartRows.map((r) => r.value),
               (v) => barValueTickFormatter(v),
               hBarLabelFontSize
             )
-          : 0;
+          : { left: 0, right: 0 };
       const hBarRightMargin = showBarEndLabels
-        ? Math.max(hbBalanced.marginRight, 52) + hBarOutsideReserve
+        ? Math.max(hbBalanced.marginRight, 52) + hBarOutsideReserves.right
         : hbBalanced.marginRight;
+      const hBarLeftMargin = hbBalanced.marginLeft + hBarOutsideReserves.left;
+      const hBarSigned = barChartRowsHaveNegativeValues(chartRows);
       const hBarLiveMargins = pngCapture
         ? { top: plotMarginTop, bottom: OVERVIEW_PNG_EXPORT_MARGIN_BOTTOM_HBAR }
         : computeOverviewHBarLiveMargins(chartRows.length);
@@ -4840,7 +4867,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               categoryCount: chartRows.length,
             })}
             margin={{
-              left: hbBalanced.marginLeft,
+              left: hBarLeftMargin,
               right: hBarRightMargin,
               top: hBarLiveMargins.top,
               bottom: hBarLiveMargins.bottom,
@@ -4853,6 +4880,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
               strokeOpacity={pngCapture ? exportGridOpacity : dashGrid.opacity}
             />
+            {hBarSigned ? (
+              <ReferenceLine
+                x={0}
+                stroke={OV_AXIS_LINE}
+                strokeOpacity={0.72}
+                strokeWidth={1.25}
+              />
+            ) : null}
             <XAxis
               type="number"
               {...(hBarValueAxisProps ?? {})}
@@ -4920,7 +4955,8 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                       inlayFill={CHART_BAR_INLAY_LABEL_CSS}
                       outsideFill={CHART_BAR_VALUE_LABEL_CSS}
                       placementMode={hBarPlacementMode}
-                      outsideLabelReservePx={hBarOutsideReserve}
+                      outsideLabelReservePx={hBarOutsideReserves.right}
+                      outsideLabelReserveLeftPx={hBarOutsideReserves.left}
                     />
                   )}
                 />
@@ -4932,6 +4968,44 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     }
 
     if (displayKind === "line" || displayKind === "area") {
+      const lineLabelSurface: LineValueLabelSurface = pngCapture
+        ? "export"
+        : "live";
+      const lineLabelFontSize = pngCapture ? 11 : 10;
+      const lineLabelOptions = {
+        surface: lineLabelSurface,
+        plotWidthPx: viewW,
+        fontSizePx: lineLabelFontSize,
+        formatLabel: (v: number) =>
+          formatLineValueLabel(v, { ...overviewMetricCtx, chartRows }),
+      };
+      const areaLabelOptions = {
+        surface: lineLabelSurface,
+        plotWidthPx: viewW,
+        fontSizePx: lineLabelFontSize,
+        formatLabel: (v: number) =>
+          formatLineValueLabel(v, { ...overviewMetricCtx, chartRows }),
+      };
+      const showLineValueLabels =
+        displayKind === "line" &&
+        shouldShowLinePointLabels(chartRows, lineLabelOptions);
+      const showAreaValueLabels =
+        displayKind === "area" &&
+        shouldShowAreaPointLabels(chartRows, areaLabelOptions);
+      const lineValueLabelIndices = showLineValueLabels
+        ? buildLineValueLabelIndexSet(chartRows, lineLabelOptions)
+        : null;
+      const areaValueLabelIndices = showAreaValueLabels
+        ? buildAreaValueLabelIndexSet(chartRows, areaLabelOptions)
+        : null;
+      const lineValueSeries = chartRows.map((row) => row.value);
+      const showTrendValueLabels = showLineValueLabels || showAreaValueLabels;
+      const lineTopLabelHeadroom = showTrendValueLabels
+        ? LINE_TOP_LABEL_HEADROOM_PX
+        : 0;
+      const lineBottomLabelHeadroom = showTrendValueLabels
+        ? LINE_BOTTOM_LABEL_HEADROOM_PX
+        : 0;
       const trendValueAxisProps = resolveTrendValueAxisProps({
         chartKind: displayKind,
         values: chartRows.map((r) => r.value),
@@ -5013,9 +5087,9 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           ? dashGrid.opacity
           : dashGrid.opacity * 0.72;
       const plotMargin = {
-        top: trendLiveMargins.top,
+        top: Math.max(trendLiveMargins.top, lineTopLabelHeadroom),
         right: pngCapture ? plotMarginSide : trendSideLive!.marginRight,
-        bottom: trendLiveMargins.bottom,
+        bottom: trendLiveMargins.bottom + lineBottomLabelHeadroom,
         left: pngCapture ? plotMarginSide : trendSideLive!.marginLeft,
       };
       return (
@@ -5100,7 +5174,37 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                         fill: "#4f46e5",
                       }
                 }
-              />
+              >
+                {showAreaValueLabels && areaValueLabelIndices ? (
+                  <LabelList
+                    dataKey="value"
+                    content={(labelProps) => (
+                      <LineValueLabelListContent
+                        x={labelProps.x}
+                        y={labelProps.y}
+                        value={labelProps.value}
+                        index={labelProps.index}
+                        labelIndices={areaValueLabelIndices}
+                        lineValues={lineValueSeries}
+                        viewBox={
+                          labelProps.viewBox as {
+                            x?: number;
+                            y?: number;
+                            width?: number;
+                            height?: number;
+                          }
+                        }
+                        chartKind="area"
+                        formatter={(v) =>
+                          formatLineValueLabel(v, { ...overviewMetricCtx, chartRows })
+                        }
+                        fontSize={lineLabelFontSize}
+                        fill={CHART_BAR_VALUE_LABEL_CSS}
+                      />
+                    )}
+                  />
+                ) : null}
+              </Area>
             ) : (
               <Line
                 type="monotone"
@@ -5127,7 +5231,36 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                         fill: "#4f46e5",
                       }
                 }
-              />
+              >
+                {showLineValueLabels && lineValueLabelIndices ? (
+                  <LabelList
+                    dataKey="value"
+                    content={(labelProps) => (
+                      <LineValueLabelListContent
+                        x={labelProps.x}
+                        y={labelProps.y}
+                        value={labelProps.value}
+                        index={labelProps.index}
+                        labelIndices={lineValueLabelIndices}
+                        lineValues={lineValueSeries}
+                        viewBox={
+                          labelProps.viewBox as {
+                            x?: number;
+                            y?: number;
+                            width?: number;
+                            height?: number;
+                          }
+                        }
+                        formatter={(v) =>
+                          formatLineValueLabel(v, { ...overviewMetricCtx, chartRows })
+                        }
+                        fontSize={lineLabelFontSize}
+                        fill={CHART_BAR_VALUE_LABEL_CSS}
+                      />
+                    )}
+                  />
+                ) : null}
+              </Line>
             )}
           </ChartWrap>
         </ResponsiveContainer>
@@ -5208,6 +5341,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
           : chartRows.length <= 8
             ? "16%"
             : undefined;
+      const vBarSigned = barChartRowsHaveNegativeValues(chartRows);
       return (
         <ResponsiveContainer
           key={`ov-bar-${chartLayoutWidthKey(viewW)}-${pngCapture ? "cap" : "live"}`}
@@ -5228,6 +5362,14 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
               strokeDasharray={OV_DASH_GRID_DASHARRAY}
               strokeOpacity={pngCapture ? exportGridOpacity : dashGrid.opacity}
             />
+            {vBarSigned ? (
+              <ReferenceLine
+                y={0}
+                stroke={OV_AXIS_LINE}
+                strokeOpacity={0.72}
+                strokeWidth={1.25}
+              />
+            ) : null}
             <XAxis
               dataKey="name"
               tick={{
@@ -14152,7 +14294,8 @@ function HomeInner() {
                 ) : null}
 
                 {hasValidAIAnswer &&
-                insightExecutiveVizInsights.length > 0 &&
+                (insightExecutiveVizInsights.length > 0 ||
+                  insightExecutiveBrief.trim()) &&
                 (insightVisualization ||
                   insightUnsupportedGrowth ||
                   insightUnsupportedTrend ||
@@ -14161,6 +14304,12 @@ function HomeInner() {
                   <AiExecutiveInsightsPanel
                     cards={insightExecutiveVizInsights}
                     narrativeBrief={insightExecutiveBrief}
+                    suppressSignalCards={
+                      insightChartMatchesCurrentQuestion &&
+                      Boolean(insightSmartChartIntel?.active) &&
+                      !insightExecutiveSummaryMode &&
+                      insightExecutiveVizInsights.length > 0
+                    }
                   />
                 ) : null}
 

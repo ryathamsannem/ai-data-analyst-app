@@ -103,22 +103,45 @@ def validate_analysis_support(
         if intent_debug and intent_debug.get("derived_profit_margin"):
             margin_meta = {"available": True}
         elif df is not None and profile is not None:
-            profit_c, rev_c = legacy.find_profit_and_revenue_columns(
-                df.columns.tolist(),
-                [
-                    c
-                    for c in df.columns
-                    if profile.get("column_types", {}).get(c) == "number"
-                ],
+            value_col = (
+                str(intent_debug.get("value_col") or "").strip()
+                if intent_debug
+                else ""
             )
-            if profit_c and not rev_c:
-                margin_meta = {
-                    "available": False,
-                    "unavailableReason": "missing_revenue_column",
-                }
-                if primary_goal == "derived_metric":
-                    supported = False
-                    reason_codes.append("margin_no_revenue")
+            existing_margin = False
+            try:
+                from intent_engine.column_resolve import (
+                    find_existing_margin_percent_column,
+                    is_existing_margin_metric_column,
+                )
+
+                existing_margin = bool(
+                    (value_col and is_existing_margin_metric_column(value_col))
+                    or find_existing_margin_percent_column(
+                        df.columns.tolist(), profile, question
+                    )
+                )
+            except Exception:
+                existing_margin = False
+            if existing_margin:
+                margin_meta = {"available": True}
+            else:
+                profit_c, rev_c = legacy.find_profit_and_revenue_columns(
+                    df.columns.tolist(),
+                    [
+                        c
+                        for c in df.columns
+                        if profile.get("column_types", {}).get(c) == "number"
+                    ],
+                )
+                if profit_c and not rev_c:
+                    margin_meta = {
+                        "available": False,
+                        "unavailableReason": "missing_revenue_column",
+                    }
+                    if primary_goal == "derived_metric":
+                        supported = False
+                        reason_codes.append("margin_no_revenue")
         else:
             margin_meta = {"available": False, "unavailableReason": "no_cohort"}
 

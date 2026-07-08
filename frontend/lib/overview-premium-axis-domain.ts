@@ -1,4 +1,5 @@
 import type { ChartRow } from "@/app/chart-types";
+import { LINE_BOTTOM_LABEL_HEADROOM_PX, LINE_TOP_LABEL_HEADROOM_PX } from "@/lib/chart-layout-config";
 import {
   formatMetricNumber,
   readChartRowRawValue,
@@ -153,6 +154,24 @@ export function chooseFocusedTrendAxisStep(span: number, maxAbs: number): number
     return 20_000;
   }
   return inferDomainTickStep(span, maxAbs);
+}
+
+/** True when line/area values sit in a tight million-scale band (matches focused axis ticks). */
+export function trendValueSpanUsesFocusedMegaTicks(
+  values: readonly number[]
+): boolean {
+  const nums = values.filter((v) => Number.isFinite(v));
+  if (nums.length < 2) return false;
+  const span = Math.max(...nums) - Math.min(...nums);
+  const maxAbs = Math.max(...nums.map((v) => Math.abs(v)));
+  return maxAbs > 100_000 && span <= 100_000;
+}
+
+/** Point-label M suffix with two-decimal precision — mirrors focused axis tick style. */
+export function formatOverviewLineFocusedMegaPointLabel(value: number): string {
+  const m = value / 1_000_000;
+  const label = m.toFixed(2).replace(/\.?0+$/, "");
+  return `${label}M`;
 }
 
 const PREMIUM_AXIS_MAX_TICK_COUNT = 7;
@@ -327,17 +346,28 @@ export function sessionTrendDetailPlotMargins(args: {
   yAxisWidth: number;
   pointCount?: number;
   lineChart?: boolean;
+  lineTopLabels?: boolean;
+  areaTopLabels?: boolean;
 }): { top: number; right: number; bottom: number; left: number } {
   const side = sessionTrendDetailSideMargins(args.yAxisWidth, {
     lineChart: args.lineChart,
     pointCount: args.pointCount,
   });
-  const bottom = Math.min(
+  let top = SESSION_DETAIL_TREND_MARGIN_TOP_PX;
+  let bottom = Math.min(
     sessionLineAreaDetailBottomMargin(args.computedBottom),
     SESSION_DETAIL_TREND_MARGIN_BOTTOM_CAP_PX
   );
+  if (args.lineTopLabels) {
+    top = Math.max(top, LINE_TOP_LABEL_HEADROOM_PX);
+    bottom += LINE_BOTTOM_LABEL_HEADROOM_PX;
+  }
+  if (args.areaTopLabels) {
+    top = Math.max(top, LINE_TOP_LABEL_HEADROOM_PX);
+    bottom += LINE_BOTTOM_LABEL_HEADROOM_PX;
+  }
   return {
-    top: SESSION_DETAIL_TREND_MARGIN_TOP_PX,
+    top,
     right: side.right,
     bottom,
     left: side.left,
@@ -368,7 +398,14 @@ export function formatOverviewLineYAxisTick(
 
   const format = resolveMetricValueFormat(ctx);
   if (format === "percent") {
-    return formatMetricNumber(tick, "percent");
+    const rows = ctx.chartRows ?? [];
+    const values = rows
+      .map((r) => readChartRowRawValue(r))
+      .filter((v) => Number.isFinite(v))
+      .map((v) => Math.abs(v));
+    const maxAbs = values.length ? Math.max(...values) : Math.abs(tick);
+    const display = maxAbs <= 1.05 ? tick * 100 : tick;
+    return formatMetricNumber(display, "percent");
   }
 
   const abs = Math.abs(tick);

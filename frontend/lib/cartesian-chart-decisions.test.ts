@@ -55,7 +55,7 @@ describe("cartesianUsesHorizontalPlot", () => {
 });
 
 describe("resolveCartesianBarValueAxisProps — vertical bar", () => {
-  it("Overview live matches legacy overview bar domain resolver", () => {
+  it("Overview live matches legacy overview bar domain with bounded ticks", () => {
     const legacy = resolveOverviewBarValueDomain(satisfactionRows, {
       chartTitle: "Satisfaction Score by Department",
       metricLabel: "Satisfaction Score",
@@ -69,10 +69,12 @@ describe("resolveCartesianBarValueAxisProps — vertical bar", () => {
       metricLabel: "Satisfaction Score",
       context: { pipeline: "overview", capture: false },
     });
-    expect(shared).toEqual({ domain: legacy, allowDataOverflow: false });
+    expect(shared?.domain).toEqual(legacy);
+    expect(shared?.ticks).toBeDefined();
+    expect(shared!.ticks!.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("session live matches resolveVerticalBarValueAxisProps", () => {
+  it("session live matches domain and attaches bounded ticks for score bars", () => {
     const session = resolveVerticalBarValueAxisProps({
       plan: null,
       chartKind: "bar",
@@ -87,7 +89,8 @@ describe("resolveCartesianBarValueAxisProps — vertical bar", () => {
       metricLabel: "Satisfaction Score",
       context: { pipeline: "session", capture: false },
     });
-    expect(shared).toEqual(session);
+    expect(shared?.domain).toEqual(session?.domain);
+    expect(shared?.ticks).toBeDefined();
   });
 });
 
@@ -147,7 +150,7 @@ describe("resolveCartesianBarValueAxisProps — horizontal bar", () => {
     expect(shared).toEqual({ domain: legacy, allowDataOverflow: false });
   });
 
-  it("session live matches resolveHBarValueAxisProps", () => {
+  it("session live matches domain and attaches ticks when applicable", () => {
     const session = resolveHBarValueAxisProps({
       plan: null,
       chartKind: "bar_horizontal",
@@ -163,7 +166,29 @@ describe("resolveCartesianBarValueAxisProps — horizontal bar", () => {
       metricLabel: "Revenue",
       context: { pipeline: "session", capture: false },
     });
-    expect(shared).toEqual(session);
+    expect(shared?.domain).toEqual(session?.domain);
+    expect(shared?.allowDataOverflow).toBe(session?.allowDataOverflow);
+  });
+
+  it("session H-Bar performance rating attaches bounded ticks", () => {
+    const rows = [
+      { name: "Eng", value: 3.41 },
+      { name: "Sales", value: 3.48 },
+      { name: "HR", value: 3.49 },
+      { name: "Ops", value: 3.5 },
+      { name: "Fin", value: 3.52 },
+      { name: "Legal", value: 3.53 },
+    ];
+    const shared = resolveCartesianBarValueAxisProps({
+      chartKind: "bar_horizontal",
+      rows,
+      chartTitle: "Performance Rating by Department",
+      metricLabel: "Performance Rating",
+      context: { pipeline: "session", capture: false },
+    });
+    expect(shared?.domain?.[0]).toBeGreaterThan(3.3);
+    expect(shared?.ticks).toBeDefined();
+    expect(shared!.ticks!.length).toBeGreaterThanOrEqual(3);
   });
 
   it("Overview count H-Bar attaches clean integer value-axis ticks", () => {

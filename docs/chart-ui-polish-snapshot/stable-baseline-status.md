@@ -1,26 +1,31 @@
-# Stable Baseline Status — Chart UI Polish Baseline
+# Stable Baseline Status — Chart UI Polish
 
-**Branch:** `chart-ui-polish-baseline`  
-**Stable commit:** `4247ef3` (`testing done. only bulk performnace pending`, 2026-06-15)  
-**Purpose:** What works on this branch before further chart visual fixes.
+**Branch:** `DEV`  
+**Stable commit:** `16526f0` (`fix(frontend): polish chart labels axes png density and signed bars`, 2026-06-29)  
+**Prior checkpoint:** `4247ef3` on `chart-ui-polish-baseline` (June 2026 pre-polish)  
+**Purpose:** Current chart visual baseline after major polish pass and final consistency audit.
+
+**Authoritative chart snapshot:** [`../current-snapshot/chart-polish-final-snapshot.md`](../current-snapshot/chart-polish-final-snapshot.md)
 
 ---
 
 ## 1. Branch summary
 
-This branch is a **clean checkpoint** at stable commit `4247ef3` — based on the May 2026 production snapshot (pre–Export/PDF finalization) with chart UI polish work validated through testing. **Bulk performance work is explicitly pending** per commit message; no application code changes are included in this documentation snapshot.
+`DEV` at `16526f0` is the **current chart polish baseline**. The major visual polish pass is **complete**:
 
-The branch preserves:
+- V-Bar / H-Bar labels, focused percent precision, signed bars
+- Donut/pie sorting, legend, small-slice readability
+- Line / area value labels
+- Standalone PNG density (bar, histogram, line, area)
+- Close-value axis readability (focused rates, bounded scores)
+- Odd auto-dashboard centering
+- Final cross-surface consistency audit: **no blocking regressions**
 
-- Modern SaaS dashboard UI (Overview, AI Insights, Charts, Export)
-- Dual chart pipelines (Overview mini vs shared session/insight)
-- Chart session timeline across tabs
-- PNG and PDF export paths
-- AI routing with frontend alignment gates
+Bulk performance work remains **pending** (unchanged from prior baseline).
 
 ---
 
-## 2. What works in this branch
+## 2. What works on this branch
 
 ### Application shell & navigation
 
@@ -39,21 +44,12 @@ The branch preserves:
 |------|--------|
 | Upload / replace file flow | Stable |
 | KPI cards | Stable |
-| Auto-dashboard chart grid | Stable |
+| Auto-dashboard chart grid (incl. odd-count centering) | Stable |
 | Filter refresh via `/filtered-dashboard` | Stable |
 | Drill-down from chart clicks | Stable |
 | View in Charts / Ask AI shortcuts | Stable |
-| Per-card PNG export | Stable |
+| Per-card PNG export (density tiers) | Stable |
 | AI summary panel | Stable |
-
-### Data Preview tab
-
-| Area | Status |
-|------|--------|
-| Paginated table, search, sort | Stable |
-| Column quality headers | Stable |
-| Copy cell values | Stable |
-| NULL pill rendering | Stable |
 
 ### Charts tab
 
@@ -64,7 +60,7 @@ The branch preserves:
 | Why this chart strip | Stable |
 | SmartChartInsightPanel | Stable |
 | Plot transition on selection change | Stable |
-| Download Chart PNG | Stable |
+| Download Chart PNG (density tiers) | Stable |
 
 ### AI Insights tab
 
@@ -78,15 +74,15 @@ The branch preserves:
 | SmartChartInsightPanel (gated) | Stable |
 | Export this insight (PDF) when aligned | Stable |
 
-### Export tab
+### Export / PDF
 
 | Area | Status |
 |------|--------|
 | Section toggles + branding | Stable |
 | Full executive PDF download | Stable |
+| Chart embed (aligned with on-screen styling) | Stable |
 | Native data preview table in PDF | Stable |
 | Appendix (metadata, thumbnails, spec) | Stable |
-| Print-safe light theme | Stable (by design) |
 
 ### Backend
 
@@ -96,193 +92,69 @@ The branch preserves:
 | Filtered dashboard | Stable |
 | `/ask` visualization + narrative | Stable |
 | Intent engine routing pack | Stable (regression tests) |
-| Health / ready endpoints | Stable |
 
 ---
 
-## 3. H-Bar status
+## 3. Chart family parity (June 29 audit)
 
-**Status: Reference premium layout — stable baseline**
+| Family | Overview | Charts | AI Insights | PNG | PDF | Notes |
+|--------|----------|--------|-------------|-----|-----|-------|
+| V-Bar | ✅ | ✅ | ✅ | ✅ | ✅ | Focused rate domains + safe labels |
+| H-Bar | ✅ | ✅ | ✅ | ✅ | ✅ | Outside labels; bounded score ticks |
+| Donut / pie | ✅ | ✅ | ✅ | ✅ | ✅ | Sorted slices, legend, palette |
+| Line | ✅ | ✅ | ✅ | ✅ | ✅ | Clutter-safe value labels |
+| Area | ✅ | ✅ | ✅ | ✅ | ✅ | Same label policy as line |
+| Histogram | ✅ | ✅ | ✅ | ✅ | ✅ | Shares V-Bar domain path |
+| Scatter | ✅ | ✅ | ✅ | ✅ | ✅ | Premium domain shared across surfaces |
+| KPI cards | ✅ | — | — | — | ✅ | Text cards only |
+
+---
+
+## 4. H-Bar status (reference premium layout — **stable**)
 
 | Surface | Status | Notes |
 |---------|--------|-------|
-| Charts tab | ✅ Stable | Category-scaled height; dedicated horizontal layout; intel strip + reason copy |
-| AI Insights | ✅ Stable | 900px plan viewport; symmetric margins; wrapped Y ticks |
-| Overview mini cards | ✅ Stable | Pipeline B resolves bar → horizontal where appropriate |
-| PNG export | ✅ Stable | Category-count canvas scaling; parity validation on Overview |
-| PDF export | ✅ Stable | Remains horizontal; centered embed |
-
-**Strengths:**
-
-- `computeHorizontalBarAxisLayout` + `WrappedCategoryYAxisTick` handle long labels.
-- Height scales with category count (not fixed vh band only).
-- Optical centering via balanced outer margins.
-- Used as the **visual reference** for premium chart layout in this branch.
+| Charts tab | ✅ Stable | Category-scaled height; signed bars; bounded score ticks |
+| AI Insights | ✅ Stable | 900px plan viewport; outside labels for small bars |
+| Overview mini cards | ✅ Stable | Pipeline B; PNG density tiers |
+| PNG export | ✅ Stable | `chartsPng` / `overviewPng` tiers |
+| PDF export | ✅ Stable | Horizontal; centered embed; zero baseline for signed values |
 
 ---
 
-## 4. Donut status
+## 5. Shared chart modules (post-polish)
 
-**Status: Stable — radial path mature**
-
-| Surface | Status | Notes |
-|---------|--------|-------|
-| Charts tab | ✅ Stable | Legend + share tooltips |
-| AI Insights | ✅ Stable | Radial margins via `radialChartOuterMargins` |
-| Overview | ✅ Stable | When auto-dashboard emits pie/donut |
-| PNG export | ✅ Stable | `radial-export-layout.ts` radii + legend row estimate |
-| PDF export | ✅ Stable | Proportional embed |
-
-**Strengths:**
-
-- Share % formatting via `formatRadialTooltipValue`.
-- Pie (≤5 groups) vs donut (>5) presentation rules in `smart-chart-intelligence.ts`.
-- Export-specific outer margins (`radialChartExportOuterMargins`).
+| Module | Path | Role |
+|--------|------|------|
+| Bar domain / ticks | `frontend/lib/overview-bar-value-domain.ts` | Focused rates, bounded scores, signed domains |
+| Cartesian decisions | `frontend/lib/cartesian-chart-decisions.ts` | Overview vs session pipeline; tick attach |
+| Premium line/area/scatter | `frontend/lib/overview-premium-axis-domain.ts` | Close-value trend domains |
+| Label safety | `frontend/lib/overview-dashboard-export.ts` | Bar end-label overlap gates |
+| PNG layout | `frontend/lib/chart-png-export-layout.ts` | Standalone density tiers |
+| Radial | `frontend/lib/radial-chart-format.ts` | Donut/pie sort, legend, palette |
+| Session renderer | `frontend/app/components/home/chart-renderer.tsx` | Recharts all kinds + capture mode |
+| Overview inline | `frontend/app/page.tsx` | Pipeline B mini charts + PNG capture |
+| Capture / PDF | `frontend/lib/chart-platform/*` | Profiles, axis plans, capture controller |
 
 ---
 
-## 5. Line / Area / Scatter current status
+## 6. Optional hardening (not required)
 
-**Status: Functional but visually behind H-Bar premium baseline**
+See [`../current-snapshot/chart-polish-final-snapshot.md`](../current-snapshot/chart-polish-final-snapshot.md) §5:
 
-| Kind | Charts tab | AI Insights | Overview | PNG | PDF |
-|------|------------|-------------|----------|-----|-----|
-| Line | ⚠️ Works | ⚠️ Works | ⚠️ Works | ✅ Works | ✅ Works |
-| Area | ⚠️ Works | ⚠️ Works | ⚠️ Works | ✅ Works | ✅ Works |
-| Scatter | ⚠️ Works | ⚠️ Works | ⚠️ Works | ✅ Works | ✅ Works |
-
-**What works:**
-
-- Correct chart type selection (trend → line/area; correlation → scatter).
-- Data renders; tooltips, axis labels, and drill-down (where enabled) function.
-- Shared vh height band (`clamp(460px, 52vh, 560px)`) applies consistently.
-- Trend X-axis: angled ticks, interval thinning, temporal label formatting.
-- Scatter: numeric X/Y axes with custom tooltip.
-
-**Known visual gaps (see `open-issues.md`):**
-
-- Plot framing does not match H-Bar premium feel (padding, vertical presence, axis/footer balance).
-- Line/area/scatter can appear **shorter or more compressed** relative to H-Bar in Charts tab and AI Insights.
-- Scatter uses simpler margin preset vs polished cartesian category plans.
+- Export axis plan explicit `tickValues`
+- Overview export parity validation for domain/ticks
+- Scatter close-cluster unit test
 
 ---
 
-## 6. PNG export status
+## 7. Test status
 
-**Status: Stable for all chart kinds**
-
-| Path | Status | Engine |
-|------|--------|--------|
-| Charts tab Download PNG | ✅ Stable | Canvg + canvas composite |
-| Overview card PNG | ✅ Stable | Offscreen portal + parity check |
-| All ChartKind branches | ✅ Covered | `buildPresentationExportSpec` per kind |
-
-**Features:**
-
-- SVG polish pre-capture (`chart-png-export-svg-polish.ts`).
-- Header/chips/footer drawn on canvas (avoids html2canvas Tailwind v4 issues).
-- Dark export palette when capturing from dark UI.
-- QA validation in dev (`chart-png-export-qa.ts`).
-
-**Limitation:** Export typography/spacing tuned for H-Bar and donut; line/area/scatter export matches on-screen layout (including current compression).
+| Suite | Result |
+|-------|--------|
+| Chart consistency vitest (15 files) | **289 passed** |
+| `npm run build` | **PASS** |
 
 ---
 
-## 7. PDF export status
-
-**Status: Phase 2 stable — not final product polish**
-
-| Feature | Status |
-|---------|--------|
-| Cover + executive snapshot | ✅ Stable |
-| KPI cards (2-column grid) | ✅ Stable |
-| AI insight narrative blocks | ✅ Stable |
-| Chart image embed (Canvg primary) | ✅ Stable |
-| Data preview native table | ✅ Stable |
-| Appendix (thumbnails, spec, series) | ✅ Stable |
-| Running header/footer | ✅ Stable |
-| Alignment gates before export | ✅ Stable |
-
-**Limitations (documented, not blocking):**
-
-- Print-light theme only (not app dark theme).
-- Preview table capped at 10×7.
-- Appendix thumbnails max 8 charts.
-- html2canvas fallback quality varies by browser.
-- Monolithic export assembly in `page.tsx`.
-
----
-
-## 8. AI routing status
-
-**Status: Stable with guards — residual risk documented**
-
-### Backend routing
-
-```
-POST /ask
-  → apply_dashboard_filters_to_df
-  → compute_visualization_for_question
-      → correlation routing pack (early)
-      → intent_engine modules (resolve, trend, correlation, outlier, …)
-      → analyze_data / build_smart_chart
-      → _deterministic_viz_last_resort (fallback)
-  → Claude narrative with grounding blocks
-```
-
-| Routing area | Status |
-|--------------|--------|
-| Correlation → scatter | ✅ Stable (regression tests) |
-| Trend → line/area | ✅ Stable |
-| Share → pie/donut | ✅ Stable |
-| Outlier → histogram / H-bar rank | ✅ Stable |
-| Rank / long labels → H-bar | ✅ Stable |
-| Fallback chain | ⚠️ Residual risk if guards bypassed |
-
-### Frontend alignment gates
-
-| Gate | Purpose | Status |
-|------|---------|--------|
-| `insightChartMatchesCurrentQuestion` | Question/turn/title match | ✅ Active |
-| `chartSnapshotMatchesQuestionIntent` | Blocks misleading department bars for outlier Qs | ✅ Active |
-| `showInsightExportButton` | Export only when answer + viz aligned | ✅ Active |
-| Charts tab Smart Read | No question gate (by design) | ✅ Active |
-
-### Narrative grounding
-
-- Prompt includes authoritative chart-values block.
-- Fallback when `ANTHROPIC_API_KEY` missing returns template text (known limitation C4).
-- Residual LLM drift risk on thin grounding (documented in bug inventory).
-
----
-
-## 9. Known limitations (branch-wide)
-
-| Limitation | Severity | Notes |
-|------------|----------|-------|
-| Single-process in-memory `df` | Critical for multi-user | One dataset per server process |
-| `/preview` not filter-aware | High | Data Preview vs Insights cohort mismatch |
-| Monolithic `page.tsx` / `main.py` | Medium | Maintainability |
-| Bulk performance pending | Medium | Per commit message at `4247ef3` |
-| Dual chart pipelines | Medium | Overview vs shared — drift risk |
-| Line/Area/Scatter visual parity | Medium | **Primary chart UI polish target** |
-| Charts/Insights continuous chart height feel | Medium | Shared vh band vs H-Bar category scaling |
-| Overview minor axis/footer alignment | Low | Mini-card layout |
-| No per-tab URLs | Low | By design |
-| Client-spoofable plan tier | High (prod) | Server-side billing not wired |
-
----
-
-## 10. Regression smoke test (recommended before fixes)
-
-1. Upload showcase CSV → Overview KPIs + auto-dashboard grid (H-Bar, line, donut if present).
-2. Apply filter → verify dashboard refresh.
-3. AI Insights: ask trend question → line chart; ask share question → donut; ask outlier → histogram/H-bar.
-4. Charts tab: select each timeline entry → verify metadata + Why strip.
-5. Download PNG from Charts tab (H-Bar + line).
-6. Export full PDF with chart section enabled.
-7. Toggle dark mode → confirm on-screen charts readable; PDF stays light.
-
----
-
-*Snapshot generated: 2026-06-16 — branch `chart-ui-polish-baseline` @ `4247ef3`.*
+*Updated: 2026-06-29 — `DEV` @ `16526f0`. Supersedes June 16 baseline on `chart-ui-polish-baseline` @ `4247ef3` for chart visual status.*

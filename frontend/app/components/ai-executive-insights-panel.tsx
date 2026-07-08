@@ -33,18 +33,46 @@ export type AiExecutiveInsightFact = {
 
 const BRIEF_COLLAPSE_CHARS = 280;
 
+export function resolveExecutiveInsightsPanelView(args: {
+  cards: readonly AiExecutiveInsightFact[];
+  narrativeBrief?: string;
+  suppressSignalCards?: boolean;
+}): {
+  showPanel: boolean;
+  showSignalCards: boolean;
+  showBrief: boolean;
+} {
+  const brief = args.narrativeBrief?.trim() ?? "";
+  const showSignalCards =
+    !args.suppressSignalCards && args.cards.length > 0;
+  const showBrief = brief.length > 0;
+  return {
+    showPanel: showSignalCards || showBrief,
+    showSignalCards,
+    showBrief,
+  };
+}
+
 /**
  * AI Insights — at-a-glance facts derived from the current visualization (not Overview).
  */
 export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
   cards,
   narrativeBrief,
+  suppressSignalCards = false,
 }: {
   cards: readonly AiExecutiveInsightFact[];
   narrativeBrief?: string;
+  suppressSignalCards?: boolean;
 }) {
   useDevRenderCount("AiExecutiveInsightsPanel");
   const [briefExpanded, setBriefExpanded] = useState(false);
+
+  const panelView = resolveExecutiveInsightsPanelView({
+    cards,
+    narrativeBrief,
+    suppressSignalCards,
+  });
 
   const briefRaw = narrativeBrief?.trim() ?? "";
   const briefIsNumbered = isNumberedExecutiveBrief(briefRaw);
@@ -53,7 +81,7 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
     : briefRaw.replace(/\s+/g, " ").trim();
 
   const { briefDisplay, briefCanExpand, briefPreLine } = useMemo(() => {
-    if (!cards.length || !brief) {
+    if (!panelView.showBrief || !brief) {
       return { briefDisplay: "", briefCanExpand: false, briefPreLine: false };
     }
     if (briefIsNumbered) {
@@ -80,22 +108,28 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
         ? `${slice.slice(0, sp).trim()}…`
         : `${slice.trim()}…`;
     return { briefDisplay: clipped, briefCanExpand: true, briefPreLine: false };
-  }, [brief, briefExpanded, briefIsNumbered, cards.length]);
+  }, [brief, briefExpanded, briefIsNumbered, panelView.showBrief]);
 
-  if (!cards.length) return null;
+  if (!panelView.showPanel) return null;
 
   return (
     <div className={aiInsightsExecutiveShell}>
       <div className="mb-3.5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <h3 className={aiInsightsExecutiveTitle}>Executive insights</h3>
-          <p className={aiInsightsExecutiveDesc}>
-            Key facts from this visualization — same signals used in export summaries.
-          </p>
+          {panelView.showSignalCards ? (
+            <p className={aiInsightsExecutiveDesc}>
+              Key facts from this visualization — same signals used in export summaries.
+            </p>
+          ) : (
+            <p className={aiInsightsExecutiveDesc}>
+              Executive takeaway for this visualization.
+            </p>
+          )}
         </div>
       </div>
 
-      {brief ? (
+      {panelView.showBrief ? (
         <div className="mb-3.5 min-w-0">
           <p
             className={`${aiInsightsExecutiveBrief} break-words ${
@@ -117,7 +151,8 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
         </div>
       ) : null}
 
-      <div className={aiInsightsExecutiveGrid}>
+      {panelView.showSignalCards ? (
+        <div className={aiInsightsExecutiveGrid}>
         {cards.map((c) => (
           <div
             key={c.key}
@@ -152,7 +187,8 @@ export const AiExecutiveInsightsPanel = memo(function AiExecutiveInsightsPanel({
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 });

@@ -130,6 +130,7 @@ _REQUESTED_METRIC_CHECKS: Tuple[Dict[str, Any], ...] = (
             or _has_typed_margin_column(df, "gross")
             or _has_typed_margin_column(df, "net")
             or _profit_margin_derivable(df, profile)
+            or _has_existing_margin_percent_column(df, profile)
         ),
         "label": "the requested margin-percent column",
     },
@@ -254,8 +255,29 @@ def _has_typed_margin_column(df: pd.DataFrame, margin_kind: str) -> bool:
     return False
 
 
+def _has_existing_margin_percent_column(
+    df: pd.DataFrame, profile: Optional[Dict[str, Any]]
+) -> bool:
+    try:
+        from intent_engine.column_resolve import find_existing_margin_percent_column
+
+        return bool(
+            find_existing_margin_percent_column(
+                df.columns.tolist(), profile or {}, ""
+            )
+        )
+    except Exception:
+        return False
+
+
 def _profit_margin_derivable(df: pd.DataFrame, profile: Optional[Dict[str, Any]]) -> bool:
     try:
+        from intent_engine.column_resolve import find_existing_margin_percent_column
+
+        if find_existing_margin_percent_column(
+            df.columns.tolist(), profile or {}, ""
+        ):
+            return True
         from intent_engine.legacy import find_profit_and_revenue_columns
 
         col_types = (profile or {}).get("column_types", {})

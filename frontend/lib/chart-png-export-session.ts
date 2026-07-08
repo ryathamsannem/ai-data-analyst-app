@@ -106,7 +106,10 @@ export async function runChartPngExport({
       filename,
       datasetName,
       scale,
-      spec: buildPresentationExportSpec(kind, { categoryCount }),
+      spec: buildPresentationExportSpec(kind, {
+        categoryCount,
+        exportProfile: "chartsPng",
+      }),
     });
   const artifact = await captureChartPngArtifact({
     request,

@@ -6,6 +6,7 @@ import {
   shouldShowHBarValueLabels,
 } from "@/lib/overview-dashboard-export";
 import { formatOverviewBarValueAxisTick } from "@/lib/overview-premium-axis-domain";
+import { formatChartTooltipValueLine } from "@/lib/chart-tooltip-format";
 
 const chartRendererSrc = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "../app/components/home/chart-renderer.tsx"),
@@ -59,6 +60,27 @@ describe("shouldShowHBarValueLabels", () => {
       shouldShowHBarValueLabels(salaryRows, salaryTick, { metricCtx: salaryCtx })
     ).toBe(true);
   });
+
+  it("keeps compact H-Bar end labels while tooltip stays exact for large currency", () => {
+    const rows = [
+      { name: "Active", value: 7_317_710 },
+      { name: "Terminated", value: 5_200_000 },
+    ];
+    const ctx = {
+      metricLabel: "Bonus",
+      chartTitle: "Bonus by Employee Status",
+      presentationKind: "bar_horizontal" as const,
+      chartRows: rows,
+    };
+    const endLabel = formatOverviewBarValueAxisTick(7_317_710, rows, ctx);
+    const [tooltipValue] = formatChartTooltipValueLine(
+      { name: "Active", value: 7_317_710 },
+      "Bonus",
+      ctx
+    );
+    expect(endLabel).toMatch(/7\.3M|M/);
+    expect(tooltipValue).toContain("7,317,710");
+  });
 });
 
 describe("ChartRenderer H-Bar inlay labels", () => {
@@ -99,7 +121,7 @@ describe("ChartRenderer H-Bar inlay labels", () => {
 
   it("applies Overview-aligned right margin when H-Bar labels are shown", () => {
     expect(chartRendererSrc).toMatch(
-      /const hBarRightMargin = showHBarEndLabels[\s\S]*?Math\.max\(hmBalanced\.marginRight, 52\)[\s\S]*?hBarOutsideLabelReserve/
+      /const hBarRightMargin = showHBarEndLabels[\s\S]*?Math\.max\(hmBalanced\.marginRight, 52\)[\s\S]*?hBarOutsideLabelReserves\.right/
     );
   });
 
@@ -109,18 +131,18 @@ describe("ChartRenderer H-Bar inlay labels", () => {
       /resolveHBarLabelPlacementMode\(\{[\s\S]*?detailLayout/
     );
     expect(chartRendererSrc).toMatch(
-      /hBarPlacementMode !== "overview-live"[\s\S]*?computeHBarOutsideLabelReservePx/
+      /hBarPlacementMode !== "overview-live"[\s\S]*?computeHBarSignedOutsideLabelReservesPx/
     );
     expect(chartRendererSrc).toMatch(
       /placementMode=\{hBarPlacementMode\}/
     );
     expect(chartRendererSrc).toMatch(
-      /outsideLabelReservePx=\{hBarOutsideLabelReserve\}/
+      /outsideLabelReservePx=\{hBarOutsideLabelReserves\.right\}/
     );
   });
 
   it("keeps export capture placement and reserve unchanged", () => {
-    expect(chartRendererSrc).toContain("computeHBarOutsideLabelReservePx");
+    expect(chartRendererSrc).toContain("computeHBarSignedOutsideLabelReservesPx");
     expect(chartRendererSrc).toMatch(
       /pngCapture: pngCaptureMode[\s\S]*?detailLayout/
     );
@@ -132,7 +154,7 @@ describe("ChartRenderer H-Bar inlay labels", () => {
       /hBarPlacementMode = resolveOverviewInlineHBarPlacementMode\(pngCapture\)/
     );
     expect(pageSrc).toMatch(
-      /showBarEndLabels[\s\S]*?computeHBarOutsideLabelReservePx/
+      /showBarEndLabels[\s\S]*?computeHBarSignedOutsideLabelReservesPx/
     );
     expect(pageSrc).not.toMatch(
       /placementMode=\{pngCapture \? "export" : "overview-live"\}/
@@ -141,7 +163,20 @@ describe("ChartRenderer H-Bar inlay labels", () => {
       /placementMode=\{hBarPlacementMode\}/
     );
     expect(pageSrc).toMatch(
-      /outsideLabelReservePx=\{hBarOutsideReserve\}/
+      /outsideLabelReservePx=\{hBarOutsideReserves\.right\}/
+    );
+    expect(pageSrc).toMatch(
+      /outsideLabelReserveLeftPx=\{hBarOutsideReserves\.left\}/
+    );
+  });
+
+  it("renders signed zero ReferenceLine for H-Bar and V-Bar when data is negative", () => {
+    expect(chartRendererSrc).toContain("barChartRowsHaveNegativeValues");
+    expect(chartRendererSrc).toMatch(
+      /hBarSigned \? \([\s\S]*?<ReferenceLine[\s\S]*?x=\{0\}/
+    );
+    expect(chartRendererSrc).toMatch(
+      /vBarSigned \? \([\s\S]*?<ReferenceLine[\s\S]*?y=\{0\}/
     );
   });
 

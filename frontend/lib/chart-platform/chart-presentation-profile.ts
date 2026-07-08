@@ -240,6 +240,8 @@ export function buildChartPresentationProfile({
 }: BuildChartPresentationProfileArgs): ChartPresentationProfile {
   const options: PresentationCaptureLayoutOptions = {
     categoryCount: categoryCount ?? contract.data.categoryCount,
+    exportProfile:
+      id === "overviewPng" || id === "chartsPng" ? id : undefined,
   };
   const exportSpec = spec ?? buildPresentationExportSpec(kind, options);
   const defaults =

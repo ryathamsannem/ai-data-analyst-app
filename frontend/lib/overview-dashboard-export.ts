@@ -12,6 +12,7 @@ import {
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
 import {
+  applySignedBarValueDomainPolicy,
   isFocusedVerticalBarRateChart,
   resolveOverviewBarValueDomain,
   roundExecutiveAxisMaximum,
@@ -105,7 +106,14 @@ function barValueLabelMinBarRatioOverlapRisk(
   if (values.length <= 1) return false;
   const maxV = Math.max(...values);
   const minV = Math.min(...values);
-  if (!Number.isFinite(maxV) || maxV <= 0) return true;
+  if (!Number.isFinite(maxV)) return true;
+  if (maxV <= 0) {
+    const magnitudes = values.map((v) => Math.abs(v)).filter((v) => v > 0);
+    if (magnitudes.length <= 1) return false;
+    const maxMag = Math.max(...magnitudes);
+    const minMag = Math.min(...magnitudes);
+    return minMag / maxMag < minRatio;
+  }
   return minV / maxV < minRatio;
 }
 
@@ -326,9 +334,16 @@ export function horizontalBarValueDomain(
   if (smart) return smart;
 
   const vals = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
-  const maxV = vals.length ? Math.max(0, ...vals) : 0;
-  if (maxV <= 0) return [0, 1];
-  const padded = maxV * (1 + rightPadRatio);
+  if (vals.length === 0) return [0, 1];
+  const minV = Math.min(...vals);
+  const maxV = Math.max(...vals);
+  const spanV = maxV - minV;
+  if (minV < 0) {
+    return applySignedBarValueDomainPolicy(0, 1, minV, maxV, spanV || 1);
+  }
+  const maxPos = Math.max(0, ...vals);
+  if (maxPos <= 0) return [0, 1];
+  const padded = maxPos * (1 + rightPadRatio);
   return [0, roundExecutiveAxisMaximum(padded)];
 }
 
@@ -364,10 +379,26 @@ export type OverviewDashboardExportParityInput = {
   theme?: "light" | "dark";
   /** When set, export root must include at least this many metadata chips. */
   expectedMetadataChipCount?: number;
+  /** Live Overview value-axis domain (bar family only; compared when export domain is also set). */
+  liveValueAxisDomain?: readonly [number, number] | null;
+  /** Export value-axis domain from axis plan / capture props. */
+  exportValueAxisDomain?: readonly [number, number] | null;
+  /** Live Overview explicit value-axis ticks when applicable. */
+  liveValueAxisTicks?: readonly number[] | null;
+  /** Export explicit value-axis ticks when applicable. */
+  exportValueAxisTicks?: readonly number[] | null;
 };
 
 export type OverviewDashboardExportParityCheck = {
-  id: "chartKind" | "orientation" | "colors" | "labels" | "theme" | "metadataChips";
+  id:
+    | "chartKind"
+    | "orientation"
+    | "colors"
+    | "labels"
+    | "theme"
+    | "metadataChips"
+    | "valueAxisDomain"
+    | "valueAxisTicks";
   ok: boolean;
   message?: string;
 };
@@ -395,6 +426,76 @@ function readPrimaryBarFill(root: HTMLElement | null | undefined): string | null
 
 function normalizeHexColor(color: string): string {
   return color.trim().toLowerCase().replace(/\s/g, "");
+}
+
+const AXIS_PARITY_COMPARE_DECIMALS = 6;
+
+function finiteAxisNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/** Normalize axis scalars for stable parity comparison (float formatting noise). */
+export function normalizeAxisParityScalar(value: number): number {
+  return Number(value.toFixed(AXIS_PARITY_COMPARE_DECIMALS));
+}
+
+export function normalizeAxisParityDomain(
+  domain: readonly [number, number]
+): [number, number] {
+  return [
+    normalizeAxisParityScalar(domain[0]),
+    normalizeAxisParityScalar(domain[1]),
+  ];
+}
+
+export function normalizeAxisParityTickValues(
+  ticks: readonly number[]
+): number[] {
+  return ticks.filter(finiteAxisNumber).map(normalizeAxisParityScalar);
+}
+
+export function axisParityDomainsEqual(
+  a: readonly [number, number],
+  b: readonly [number, number]
+): boolean {
+  const na = normalizeAxisParityDomain(a);
+  const nb = normalizeAxisParityDomain(b);
+  return na[0] === nb[0] && na[1] === nb[1];
+}
+
+export function axisParityTickValuesEqual(
+  a: readonly number[],
+  b: readonly number[]
+): boolean {
+  const na = normalizeAxisParityTickValues(a);
+  const nb = normalizeAxisParityTickValues(b);
+  if (na.length !== nb.length) return false;
+  return na.every((value, index) => value === nb[index]);
+}
+
+function isBarFamilyValueAxisParityKind(kind: ChartKind): boolean {
+  return kind === "bar" || kind === "bar_horizontal" || kind === "histogram";
+}
+
+function hasComparableValueAxisDomain(
+  domain: readonly [number, number] | null | undefined
+): domain is readonly [number, number] {
+  return (
+    Array.isArray(domain) &&
+    domain.length === 2 &&
+    finiteAxisNumber(domain[0]) &&
+    finiteAxisNumber(domain[1])
+  );
+}
+
+function hasComparableValueAxisTicks(
+  ticks: readonly number[] | null | undefined
+): ticks is readonly number[] {
+  return (
+    Array.isArray(ticks) &&
+    ticks.length > 0 &&
+    ticks.every(finiteAxisNumber)
+  );
 }
 
 /** Validate dashboard ↔ PNG export parity before/after offscreen capture. */
@@ -482,6 +583,50 @@ export function validateOverviewDashboardExportParity(
       ? undefined
       : `export metadata chips ${actualChipCount} < expected ${expectedChipCount}`,
   });
+
+  if (isBarFamilyValueAxisParityKind(expectedKind)) {
+    if (
+      hasComparableValueAxisDomain(input.liveValueAxisDomain) &&
+      hasComparableValueAxisDomain(input.exportValueAxisDomain)
+    ) {
+      const domainOk = axisParityDomainsEqual(
+        input.liveValueAxisDomain,
+        input.exportValueAxisDomain
+      );
+      checks.push({
+        id: "valueAxisDomain",
+        ok: domainOk,
+        message: domainOk
+          ? undefined
+          : `export value domain ${JSON.stringify(
+              normalizeAxisParityDomain(input.exportValueAxisDomain)
+            )} !== live ${JSON.stringify(
+              normalizeAxisParityDomain(input.liveValueAxisDomain)
+            )}`,
+      });
+    }
+
+    if (
+      hasComparableValueAxisTicks(input.liveValueAxisTicks) &&
+      hasComparableValueAxisTicks(input.exportValueAxisTicks)
+    ) {
+      const ticksOk = axisParityTickValuesEqual(
+        input.liveValueAxisTicks,
+        input.exportValueAxisTicks
+      );
+      checks.push({
+        id: "valueAxisTicks",
+        ok: ticksOk,
+        message: ticksOk
+          ? undefined
+          : `export value ticks ${JSON.stringify(
+              normalizeAxisParityTickValues(input.exportValueAxisTicks)
+            )} !== live ${JSON.stringify(
+              normalizeAxisParityTickValues(input.liveValueAxisTicks)
+            )}`,
+      });
+    }
+  }
 
   return {
     ok: checks.every((c) => c.ok),
