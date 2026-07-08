@@ -14294,7 +14294,8 @@ function HomeInner() {
                 ) : null}
 
                 {hasValidAIAnswer &&
-                insightExecutiveVizInsights.length > 0 &&
+                (insightExecutiveVizInsights.length > 0 ||
+                  insightExecutiveBrief.trim()) &&
                 (insightVisualization ||
                   insightUnsupportedGrowth ||
                   insightUnsupportedTrend ||
@@ -14303,6 +14304,12 @@ function HomeInner() {
                   <AiExecutiveInsightsPanel
                     cards={insightExecutiveVizInsights}
                     narrativeBrief={insightExecutiveBrief}
+                    suppressSignalCards={
+                      insightChartMatchesCurrentQuestion &&
+                      Boolean(insightSmartChartIntel?.active) &&
+                      !insightExecutiveSummaryMode &&
+                      insightExecutiveVizInsights.length > 0
+                    }
                   />
                 ) : null}
 
