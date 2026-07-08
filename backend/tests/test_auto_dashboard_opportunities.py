@@ -345,5 +345,213 @@ class TestChartVisualQuality(unittest.TestCase):
         )
 
 
+class TestDiscoverRequestLocalCaches(unittest.TestCase):
+    """Output-equivalent caches used by discover_chart_opportunities."""
+
+    def test_cardinality_memo_matches_direct(self) -> None:
+        from services.auto_dashboard_opportunities import (
+            _dimension_cardinality,
+            _unique_count_for_column,
+        )
+
+        df = pd.read_csv(RETAIL_FIXTURE)
+        profile = main.build_profile(df)
+        memo: dict[str, int] = {}
+        for col in ("region", "product_category", "city"):
+            if col not in df.columns:
+                continue
+            direct = _unique_count_for_column(
+                df, col, profile, string_normalized=True
+            )
+            via_memo = _dimension_cardinality(df, col, profile, memo=memo)
+            again = _dimension_cardinality(df, col, profile, memo=memo)
+            self.assertEqual(direct, via_memo)
+            self.assertEqual(via_memo, again)
+
+    def test_agg_dim_metric_series_memo_matches_groupby(self) -> None:
+        from services.auto_dashboard_opportunities import _agg_dim_metric_series
+
+        df = pd.read_csv(RETAIL_FIXTURE)
+        main.df = df
+        main.dataset_profile = main.build_profile(df)
+        try:
+            memo: dict = {}
+            cached = _agg_dim_metric_series(
+                df,
+                "region",
+                "revenue",
+                "sum",
+                main.numeric_series,
+                aggregate_memo=memo,
+            )
+            again = _agg_dim_metric_series(
+                df,
+                "region",
+                "revenue",
+                "sum",
+                main.numeric_series,
+                aggregate_memo=memo,
+            )
+            sub = df[["region", "revenue"]].copy()
+            sub["_v"] = main.numeric_series("revenue")
+            sub = sub.dropna(subset=["region", "_v"])
+            direct = sub.groupby("region")["_v"].sum()
+            self.assertIsNotNone(cached)
+            assert cached is not None
+            pd.testing.assert_series_equal(
+                cached.sort_index(), direct.sort_index(), check_names=False
+            )
+            pd.testing.assert_series_equal(
+                again.sort_index(), direct.sort_index(), check_names=False
+            )
+        finally:
+            main.df = None
+            main.dataset_profile = None
+
+    def test_adaptive_time_series_optional_series_match(self) -> None:
+        df = pd.read_csv(RETAIL_FIXTURE)
+        if "order_date" not in df.columns or "revenue" not in df.columns:
+            self.skipTest("retail fixture missing order_date/revenue")
+        main.df = df
+        try:
+            dt = pd.to_datetime(df["order_date"], errors="coerce")
+            nums = main.numeric_series("revenue")
+            baseline, meta_a = main._adaptive_time_series_grouped(
+                df, "order_date", "revenue", agg_key="sum"
+            )
+            reused, meta_b = main._adaptive_time_series_grouped(
+                df,
+                "order_date",
+                "revenue",
+                agg_key="sum",
+                datetime_values=dt,
+                numeric_values=nums,
+            )
+            self.assertIsNotNone(baseline)
+            self.assertIsNotNone(reused)
+            assert baseline is not None and reused is not None
+            pd.testing.assert_series_equal(baseline, reused, check_names=False)
+            self.assertEqual(meta_a.get("timeBucket"), meta_b.get("timeBucket"))
+        finally:
+            main.df = None
+
+    def test_small_dataset_discover_families_and_titles_stable(self) -> None:
+        from services.auto_dashboard_opportunities import (
+            _bind_deps_to_dataframe,
+            classify_columns,
+            discover_chart_opportunities,
+        )
+
+        df = pd.read_csv(RETAIL_FIXTURE)
+        profile = main.build_profile(df)
+        main.df = df
+        main.dataset_profile = profile
+        try:
+            bound = _bind_deps_to_dataframe(df, _deps())
+            inv = classify_columns(df, profile, id_like_fn=main._id_like_column_name)
+            disc = discover_chart_opportunities(df, profile, "sales", bound, inv=inv)
+            types = {str(c.get("chartType", "")).lower() for c in disc}
+            self.assertTrue(types & {"line", "area"}, f"trend missing: {types}")
+            self.assertTrue(
+                types & {"donut", "pie"} or types & {"horizontalbar", "bar"},
+                f"breakdown/composition missing: {types}",
+            )
+            titles = [str(c.get("title") or "") for c in disc]
+            self.assertEqual(len(titles), len(set(titles)))
+            self.assertGreaterEqual(len(disc), 3)
+        finally:
+            main.df = None
+            main.dataset_profile = None
+
+    def test_100k_fixture_selected_chart_fingerprint_stable(self) -> None:
+        from services.auto_dashboard_opportunities import (
+            _bind_deps_to_dataframe,
+            classify_columns,
+            discover_chart_opportunities,
+            extract_kpi_chart_context,
+            select_diverse_charts,
+            target_chart_count,
+        )
+        from services.executive_kpi_cards import (
+            build_executive_kpi_cards,
+            infer_executive_domain,
+        )
+
+        retail_100k = (
+            BACKEND_ROOT.parent / "test-fixtures" / "large-dataset" / "retail_100k.csv"
+        )
+        if not retail_100k.is_file():
+            self.skipTest("retail_100k fixture not present")
+        raw, _ = main.load_dataframe_from_upload(
+            retail_100k.read_bytes(), retail_100k.name
+        )
+        df = main.clean_dataframe(raw)
+        profile = main.build_profile(df)
+        main.df = df
+        main.dataset_profile = profile
+        main.column_mapping = {k: None for k in main.column_mapping}
+        main.apply_semantic_column_mapping(main.df, profile)
+        try:
+            bound = _bind_deps_to_dataframe(df, _deps())
+            inv = classify_columns(df, profile, id_like_fn=main._id_like_column_name)
+            disc = discover_chart_opportunities(df, profile, "sales", bound, inv=inv)
+            self.assertEqual(len(disc), 14)
+            self.assertTrue(
+                any(str(c.get("chartType", "")).lower() in ("donut", "pie") for c in disc)
+            )
+            self.assertTrue(
+                any(str(c.get("chartType", "")).lower() == "scatter" for c in disc)
+            )
+            kp = main.calculate_kpis()
+            cards = build_executive_kpi_cards(
+                infer_executive_domain(df.columns.tolist()),
+                main._kpi_build_context(profile, kp),
+            )
+            selected = select_diverse_charts(
+                list(disc),
+                kind="sales",
+                max_charts=target_chart_count(inv, len(df)),
+                deps=bound,
+                kpi_context=extract_kpi_chart_context(cards),
+                discovered_count=len(disc),
+            )
+            fingerprint = [
+                (
+                    str(c.get("title") or ""),
+                    str(c.get("chartType") or ""),
+                    str(c.get("metricColumn") or ""),
+                    str(c.get("dimensionColumn") or ""),
+                )
+                for c in selected
+            ]
+            self.assertEqual(len(selected), 5)
+            self.assertEqual(
+                [t[0] for t in fingerprint],
+                [
+                    "Monthly Revenue Trend",
+                    "Profit by City",
+                    "Revenue by City",
+                    "Monthly Profit Trend",
+                    "Monthly Customers Trend",
+                ],
+            )
+            self.assertEqual(
+                [t[1] for t in fingerprint],
+                ["line", "horizontalBar", "horizontalBar", "area", "area"],
+            )
+            self.assertEqual(
+                [t[2] for t in fingerprint],
+                ["revenue", "profit", "revenue", "profit", "customers"],
+            )
+            self.assertEqual(fingerprint[1][3], "city")
+            self.assertEqual(fingerprint[2][3], "city")
+            self.assertEqual(fingerprint[0][3], "")
+            self.assertEqual(fingerprint[3][3], "")
+            self.assertEqual(fingerprint[4][3], "")
+        finally:
+            main.df = None
+            main.dataset_profile = None
+
+
 if __name__ == "__main__":
     unittest.main()

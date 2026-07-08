@@ -1,7 +1,7 @@
 # Latest Working Snapshot
 
-**Snapshot date:** June 29, 2026  
-**Purpose:** Current release snapshot — PDF/AI alignment complete; **major chart polish pass complete**; final chart consistency audit clean  
+**Snapshot date:** July 8, 2026  
+**Purpose:** Post-performance-fix stable snapshot — large dataset upload/dashboard performance restored; PDF/AI/chart polish baseline preserved  
 **Branch:** `DEV`
 
 **Chart polish detail:** [`chart-polish-final-snapshot.md`](./chart-polish-final-snapshot.md)
@@ -13,14 +13,40 @@
 | Item | Value |
 |------|-------|
 | **Branch** | `DEV` |
-| **HEAD** | `16526f0` — `fix(frontend): polish chart labels axes png density and signed bars` |
-| **Remote** | Ahead of `origin/DEV` by 1 commit (at snapshot time) |
-| **Working tree** | **Clean** |
-| **Recent commits (newest first)** | `16526f0` chart polish (labels/axes/png/signed) · `4f7e3c2`/`6c3e3b3` bar PNG density · `f494876` donut + odd centering · `3e1634e` V/H-Bar labels · `b66d5d1` PDF label cleanup · `cdb1f6d` aligned insight model · `042db37` live/PDF narrative alignment |
+| **HEAD** | `a9e1e85` — `done charts & Ai Insights, Only performance was pending` |
+| **Remote** | `DEV...origin/DEV` (status at snapshot time) |
+| **Working tree** | **Modified with completed performance fixes + this docs snapshot** |
+| **Performance files changed** | `backend/main.py`, `backend/services/auto_dashboard_opportunities.py`, `backend/tests/test_auto_dashboard_opportunities.py`, `frontend/lib/overview-premium-axis-domain.ts`, `frontend/lib/overview-premium-axis-domain.test.ts` |
+| **Docs changed in snapshot pass** | `docs/current-snapshot/latest-working-snapshot.md`, `current-status.md`, `validation-results.md`, `open-items.md` |
 
 ---
 
 ## Completed work (full arc)
+
+### Large dataset upload/dashboard performance (July 2026 — **restored**)
+
+**Summary:** Large dataset upload/dashboard performance restored. **100k upload now responds quickly and auto-dashboard appears immediately** after the upload response. No lazy rendering or staged dashboard rendering was used.
+
+| Area | Summary |
+|------|---------|
+| Root cause | Frontend Overview trend axis tick generation could materialize huge tick arrays for large-magnitude, low-variance line/area charts (for example monthly revenue around 1.2B–1.3B). |
+| Backend fix | Request-local memoization/reuse in auto-dashboard discovery reduced repeated DataFrame scans without output drift. |
+| Frontend fix | Bounded tick generation in `overview-premium-axis-domain.ts` prevents UI freeze by estimating tick count before materializing arrays and adding a defensive tick cap. |
+| Output safety | Backend golden output matched for 10k / 50k / 75k / 100k; chart selection/scoring/titles/response shape were not intentionally changed. |
+| UX result | 10k, 50k, and 100k uploads respond quickly; KPIs and auto-dashboard charts appear immediately after response. |
+
+### Performance validation (recorded July 8, 2026)
+
+| Check | Result |
+|-------|--------|
+| Backend auto-dashboard discovery tests | **PASS** (`tests/test_auto_dashboard_opportunities.py`) |
+| Frontend axis/domain tests | **PASS** (`lib/overview-premium-axis-domain.test.ts`) |
+| Related chart label/domain tests | **PASS** (`chart-renderer-line-labels`, `line-value-labels`, `cartesian-chart-decisions`) |
+| `npm run build` | **PASS** |
+| Manual upload validation | **PASS** for 10k, 50k, and 100k uploads |
+| Duplicate `/filtered-dashboard` after upload | **Not observed** |
+
+Recorded 50k timing after bounded tick fix: JSON parse → all Recharts wrappers ~338ms (before fix: ~74s). 10k timing after fix: JSON parse → all Recharts wrappers ~342ms.
 
 ### Chart polish (June 2026 — **complete**)
 
@@ -85,6 +111,8 @@ Detail: [`suggested-questions-15-domain-quality.md`](./suggested-questions-15-do
 | Optional chart hardening | Export axis plan tick contract; parity validation for domain/ticks — **low risk, not required** |
 | Final release-readiness validation | Optional browser spot-check per chart family |
 | Platform production | Auth, durable storage, metering, optional E2E suite |
+| Donut/scatter auto-dashboard selection | Separate product-selection topic; not part of the performance fix |
+| Monthly revenue flatness | 1.2B–1.3B tight ranges can look visually flat and are mathematically expected unless a future smart variance view is chosen |
 
 **No blocking chart polish or PDF-2 backlog remains.**
 
@@ -96,6 +124,10 @@ Detail: [`suggested-questions-15-domain-quality.md`](./suggested-questions-15-do
 2. **H-Bar / V-Bar policy asymmetry** — focused V-Bar rates vs zero-baseline H-Bar wide rates is intentional.
 3. **Suggested questions / follow-up chips / PDF narrative** — frozen unless new proven issue.
 4. **Future changes** — audit-first, small scoped fixes, test-backed.
+5. **Performance baseline** — do not reintroduce lazy/staged dashboard rendering for this issue.
+6. **Chart selection** — do not change chart selection just for performance without golden-output validation.
+7. **Visual parity** — do not reopen chart visual parity unless screenshot/test proves regression.
+8. **Donut/scatter selection** — treat as product-selection work, not a performance regression.
 
 ---
 
