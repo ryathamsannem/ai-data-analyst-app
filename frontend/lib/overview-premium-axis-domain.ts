@@ -112,12 +112,89 @@ function chooseOverviewPremiumStep(
   return base;
 }
 
-function buildTicks(lo: number, hi: number, step: number): number[] {
+export const PREMIUM_AXIS_MAX_TICK_COUNT = 7;
+
+function estimateTickCount(lo: number, hi: number, step: number): number {
+  if (
+    !Number.isFinite(lo) ||
+    !Number.isFinite(hi) ||
+    !Number.isFinite(step) ||
+    step <= 0 ||
+    hi < lo
+  ) {
+    return 0;
+  }
+  if (hi === lo) return 1;
+  const count = Math.floor((hi - lo) / step + 1e-9) + 1;
+  return Number.isFinite(count) && count > 0 ? count : Number.POSITIVE_INFINITY;
+}
+
+export function normalizeTickStepForMaxCount(
+  lo: number,
+  hi: number,
+  step: number,
+  maxTicks: number = PREMIUM_AXIS_MAX_TICK_COUNT
+): number {
+  if (
+    !Number.isFinite(lo) ||
+    !Number.isFinite(hi) ||
+    !Number.isFinite(step) ||
+    !Number.isFinite(maxTicks) ||
+    step <= 0 ||
+    maxTicks < 2 ||
+    hi <= lo
+  ) {
+    return step;
+  }
+
+  const estimated = estimateTickCount(lo, hi, step);
+  if (estimated <= maxTicks) return step;
+
+  const span = hi - lo;
+  const minStep = span / Math.max(maxTicks - 1, 1);
+  const magnitude = 10 ** Math.floor(Math.log10(Math.max(minStep, 1e-12)));
+  const multipliers = [1, 2, 2.5, 5, 10];
+
+  for (let exp = 0; exp <= 12; exp += 1) {
+    const base = magnitude * 10 ** exp;
+    for (const multiplier of multipliers) {
+      const candidate = base * multiplier;
+      if (candidate < minStep || candidate < step) continue;
+      if (estimateTickCount(snapDown(lo, candidate), snapUp(hi, candidate), candidate) <= maxTicks) {
+        return candidate;
+      }
+    }
+  }
+
+  return Math.max(step, minStep);
+}
+
+function buildTicks(
+  lo: number,
+  hi: number,
+  step: number,
+  maxTicks: number = PREMIUM_AXIS_MAX_TICK_COUNT
+): number[] {
+  if (
+    !Number.isFinite(lo) ||
+    !Number.isFinite(hi) ||
+    !Number.isFinite(step) ||
+    step <= 0
+  ) {
+    return Number.isFinite(lo) && Number.isFinite(hi) && lo !== hi ? [lo, hi] : [];
+  }
+  if (hi < lo) return [hi, lo];
+  if (hi === lo) return [lo];
+
+  const safeStep = normalizeTickStepForMaxCount(lo, hi, step, maxTicks);
+  if (!Number.isFinite(safeStep) || safeStep <= 0) return [lo, hi];
+
   const ticks: number[] = [];
-  for (let t = lo; t <= hi + step * 1e-6; t += step) {
+  for (let t = lo; t <= hi + safeStep * 1e-6 && ticks.length < maxTicks; t += safeStep) {
     ticks.push(Number(t.toFixed(6)));
   }
-  return ticks.length >= 2 ? ticks : [lo, hi];
+  if (ticks.length >= 2) return ticks;
+  return lo !== hi ? [lo, hi] : [lo];
 }
 
 /**
@@ -174,23 +251,15 @@ export function formatOverviewLineFocusedMegaPointLabel(value: number): string {
   return `${label}M`;
 }
 
-const PREMIUM_AXIS_MAX_TICK_COUNT = 7;
-
 function capPremiumAxisTicks(
   lo: number,
   hi: number,
   step: number
 ): { ticks: number[]; step: number; lo: number; hi: number } {
-  let s = step;
-  let domainLo = lo;
-  let domainHi = hi;
-  let ticks = buildTicks(domainLo, domainHi, s);
-  while (ticks.length > PREMIUM_AXIS_MAX_TICK_COUNT && s < domainHi - domainLo) {
-    s *= 2;
-    domainLo = snapDown(lo, s);
-    domainHi = snapUp(hi, s);
-    ticks = buildTicks(domainLo, domainHi, s);
-  }
+  const s = normalizeTickStepForMaxCount(lo, hi, step, PREMIUM_AXIS_MAX_TICK_COUNT);
+  const domainLo = snapDown(lo, s);
+  const domainHi = snapUp(hi, s);
+  const ticks = buildTicks(domainLo, domainHi, s, PREMIUM_AXIS_MAX_TICK_COUNT);
   return { ticks, step: s, lo: domainLo, hi: domainHi };
 }
 

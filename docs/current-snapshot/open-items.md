@@ -1,6 +1,6 @@
 # Open Items (Prioritized)
 
-**Snapshot:** June 29, 2026 (final release) · Branch `DEV` · HEAD `b66d5d1`.
+**Snapshot:** July 8, 2026 (post-performance-fix stable snapshot) · Branch `DEV` · HEAD `a9e1e85`.
 
 Frozen parity: [`chart-visual-parity-open-items.md`](./chart-visual-parity-open-items.md).  
 PDF record: [`pdf-quality-audit.md`](./pdf-quality-audit.md).  
@@ -25,6 +25,15 @@ Latest git state: [`latest-working-snapshot.md`](./latest-working-snapshot.md).
 | 15-domain Overview validation | **Complete** | prior |
 | Export regression (PNG + Phase 7 matrix) | **Complete** | prior |
 | Final release snapshot (478/743 green) | **Complete** | prior |
+| Backend auto-dashboard discovery performance | **Complete** | uncommitted performance fix |
+| Frontend Overview tick-generation freeze | **Complete** | uncommitted performance fix |
+
+### Large dataset performance resolved (July 2026)
+
+- **Backend:** Request-local memoization/reuse in auto-dashboard discovery reduced repeated DataFrame scans without output drift.
+- **Frontend:** Bounded Overview trend axis tick generation prevents huge tick arrays for large-magnitude, low-variance line/area charts.
+- **Outcome:** 10k, 50k, and 100k uploads respond quickly; auto-dashboard charts appear immediately after upload response.
+- **Validation:** Backend discovery tests, frontend axis/domain tests, related chart label/domain tests, `npm run build`, and manual 10k/50k/100k uploads all passed.
 
 ### PDF quality resolved (PDF-1 → PDF-2 + alignment)
 
@@ -62,7 +71,9 @@ Latest git state: [`latest-working-snapshot.md`](./latest-working-snapshot.md).
 ## P2 — Nice to have
 
 - Histogram premium review (no dedicated pass)
-- Large dataset optimization (100k+ fixtures)
+- 100k+ sustained/concurrency profiling (optional; current single-session upload/dashboard performance is restored)
+- Donut/scatter auto-dashboard selection review (product-selection topic only; not part of the performance fix)
+- Smart variance view for tight 1.2B–1.3B monthly revenue ranges (optional product decision; current flatness is mathematically expected)
 - Cosmetic chart tuning **only** with explicit product approval
 - Optional: per-row export on Recent Insights list
 
@@ -87,3 +98,6 @@ Latest git state: [`latest-working-snapshot.md`](./latest-working-snapshot.md).
 3. **Do not change suggested questions or follow-up chips** unless a new issue is proven.
 4. **Do not reopen PDF fixes** unless a generated PDF proves regression.
 5. **Future changes** — audit-first, small incremental fixes, test-backed.
+6. **Do not reintroduce lazy/staged dashboard rendering** for the resolved upload/dashboard delay.
+7. **Do not change chart selection for performance** without golden-output validation.
+8. **Donut/scatter auto-dashboard selection** is a separate product-selection topic, not a performance regression.

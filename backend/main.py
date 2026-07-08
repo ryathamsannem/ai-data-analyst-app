@@ -9142,12 +9142,18 @@ def _adaptive_time_series_grouped(
     value_col: str,
     agg_key: str = "sum",
     force_freq: Optional[str] = None,
+    *,
+    datetime_values: Optional[pd.Series] = None,
+    numeric_values: Optional[pd.Series] = None,
 ) -> Tuple[Optional[pd.Series], Dict[str, Any]]:
     """
     Group (date, value) into adaptive time buckets; widen/narrow buckets to avoid
     degenerate single-point series when possible.
 
     Returns (aggregated series indexed by bucket label, meta) or (None, meta).
+
+    Optional datetime_values / numeric_values skip re-parsing when the caller already
+    has aligned Series (same index length as df_in) from a request-local cache.
     """
     meta: Dict[str, Any] = {
         "timeBucket": None,
@@ -9156,13 +9162,34 @@ def _adaptive_time_series_grouped(
         "selectionReason": "",
         "granularityFallbackChain": [],
     }
-    try:
-        tmp = df_in[[date_col, value_col]].copy()
-    except Exception:
-        return None, {**meta, "reason": "missing_columns"}
+    if (
+        datetime_values is not None
+        and numeric_values is not None
+        and len(datetime_values) == len(df_in)
+        and len(numeric_values) == len(df_in)
+    ):
+        # Caller-supplied aligned series — skip re-parse and avoid copying raw cols.
+        tmp = pd.DataFrame(
+            {
+                "_dt": datetime_values.to_numpy(),
+                "_v": numeric_values.to_numpy(),
+            },
+            index=df_in.index,
+        )
+    else:
+        try:
+            tmp = df_in[[date_col, value_col]].copy()
+        except Exception:
+            return None, {**meta, "reason": "missing_columns"}
 
-    tmp["_dt"] = pd.to_datetime(tmp[date_col], errors="coerce")
-    tmp["_v"] = numeric_series(value_col)
+        if datetime_values is not None and len(datetime_values) == len(df_in):
+            tmp["_dt"] = pd.Series(datetime_values.to_numpy(), index=tmp.index)
+        else:
+            tmp["_dt"] = pd.to_datetime(tmp[date_col], errors="coerce")
+        if numeric_values is not None and len(numeric_values) == len(df_in):
+            tmp["_v"] = pd.Series(numeric_values.to_numpy(), index=tmp.index)
+        else:
+            tmp["_v"] = numeric_series(value_col)
     tmp = tmp.dropna(subset=["_dt", "_v"])
     n_in = int(len(tmp))
     if n_in < 2:

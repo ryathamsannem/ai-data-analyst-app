@@ -2118,6 +2118,49 @@ def _pick_numeric(
     return ordered
 
 
+def _agg_dim_metric_series(
+    df: pd.DataFrame,
+    dim_c: str,
+    num_c: str,
+    agg: str,
+    numeric_series_fn: Callable[[str], pd.Series],
+    *,
+    aggregate_memo: Optional[Dict[Tuple[str, str, str], Optional[pd.Series]]] = None,
+) -> Optional[pd.Series]:
+    """
+    Request-local memo for dimension×metric groupby aggregates.
+    Returns a copy so callers can sort/head/filter without mutating the cache.
+    """
+    key = (str(dim_c), str(num_c), str(agg or "sum"))
+    if aggregate_memo is not None and key in aggregate_memo:
+        cached = aggregate_memo[key]
+        return None if cached is None else cached.copy()
+    try:
+        dim = df[dim_c]
+        vals = numeric_series_fn(num_c)
+        mask = dim.notna() & vals.notna()
+        if not bool(mask.any()):
+            result: Optional[pd.Series] = None
+        else:
+            # Default groupby sort=True matches prior df.groupby(dim) behavior.
+            gb = vals[mask].groupby(dim[mask])
+            if agg == "mean":
+                result = gb.mean()
+            elif agg == "min":
+                result = gb.min()
+            elif agg == "max":
+                result = gb.max()
+            else:
+                result = gb.sum()
+            if result is not None and result.empty:
+                result = None
+    except Exception:
+        result = None
+    if aggregate_memo is not None:
+        aggregate_memo[key] = None if result is None else result.copy()
+    return None if result is None else result.copy()
+
+
 def discover_chart_opportunities(
     df: pd.DataFrame,
     profile: Dict[str, Any],
@@ -2129,15 +2172,70 @@ def discover_chart_opportunities(
     """Generate scored chart candidates from column inventory."""
     cardinality_memo: Dict[str, int] = {}
     numeric_memo: Dict[str, pd.Series] = {}
+    # Per-call caches: avoid re-parsing dates / re-grouping the same dim×metric.
+    datetime_memo: Dict[str, pd.Series] = {}
+    aggregate_memo: Dict[Tuple[str, str, str], Optional[pd.Series]] = {}
+    time_series_memo: Dict[
+        Tuple[str, str, str, Optional[str]],
+        Tuple[Optional[pd.Series], Dict[str, Any]],
+    ] = {}
 
     def memo_numeric(col: str) -> pd.Series:
         if col not in numeric_memo:
             numeric_memo[col] = deps.numeric_series(col)
         return numeric_memo[col]
 
+    def memo_datetime(col: str) -> pd.Series:
+        if col not in datetime_memo:
+            datetime_memo[col] = pd.to_datetime(df[col], errors="coerce")
+        return datetime_memo[col]
+
+    def memo_time_series_grouped(
+        df_in: pd.DataFrame,
+        date_col: str,
+        value_col: str,
+        agg_key: str = "sum",
+        force_freq: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Tuple[Optional[pd.Series], Dict[str, Any]]:
+        # Prefer request-local datetime + numeric Series so adaptive bucketing
+        # does not re-parse the same columns on every trend candidate.
+        ts_key = (str(date_col), str(value_col), str(agg_key or "sum"), force_freq)
+        if df_in is df and not kwargs and ts_key in time_series_memo:
+            cached_series, cached_meta = time_series_memo[ts_key]
+            return (
+                None if cached_series is None else cached_series.copy(),
+                dict(cached_meta),
+            )
+        call_kwargs = dict(kwargs)
+        if "datetime_values" not in call_kwargs and df_in is df:
+            try:
+                call_kwargs["datetime_values"] = memo_datetime(str(date_col))
+            except Exception:
+                pass
+        if "numeric_values" not in call_kwargs and df_in is df:
+            try:
+                call_kwargs["numeric_values"] = memo_numeric(str(value_col))
+            except Exception:
+                pass
+        series_out, meta_out = deps.time_series_grouped(
+            df_in,
+            date_col,
+            value_col,
+            agg_key=agg_key,
+            force_freq=force_freq,
+            **call_kwargs,
+        )
+        if df_in is df and not kwargs:
+            time_series_memo[ts_key] = (
+                None if series_out is None else series_out.copy(),
+                dict(meta_out),
+            )
+        return series_out, meta_out
+
     discover_deps = DashboardDeps(
         numeric_series=memo_numeric,
-        time_series_grouped=deps.time_series_grouped,
+        time_series_grouped=memo_time_series_grouped,
         series_payload=deps.series_payload,
         pretty_label=deps.pretty_label,
         chart_title_by_dimension=deps.chart_title_by_dimension,
@@ -2204,7 +2302,7 @@ def discover_chart_opportunities(
         for mi, num_c in enumerate(trend_metrics):
             try:
                 agg = _metric_agg_key(num_c, inv)
-                g_series, tsm = deps.time_series_grouped(
+                g_series, tsm = memo_time_series_grouped(
                     df, str(date_c), str(num_c), agg_key=agg
                 )
                 if g_series is None or len(g_series) < 2:
@@ -2242,13 +2340,20 @@ def discover_chart_opportunities(
             continue
         try:
             agg = _metric_agg_key(num_c, inv)
-            sub = df[[dim_c, num_c]].copy()
-            sub["_v"] = discover_deps.numeric_series(num_c)
-            sub = sub.dropna(subset=[dim_c, "_v"])
             nu = _dimension_cardinality(df, dim_c, profile, memo=cardinality_memo)
-            if sub.empty or nu < 3 or nu > 20:
+            if nu < 3 or nu > 20:
                 continue
-            g = sub.groupby(dim_c)["_v"].agg(agg).sort_values(ascending=False).head(10)
+            g = _agg_dim_metric_series(
+                df,
+                dim_c,
+                num_c,
+                agg,
+                memo_numeric,
+                aggregate_memo=aggregate_memo,
+            )
+            if g is None or g.empty:
+                continue
+            g = g.sort_values(ascending=False).head(10)
             g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
             if g.empty:
                 continue
@@ -2283,20 +2388,22 @@ def discover_chart_opportunities(
                     continue
                 try:
                     agg = _metric_agg_key(num_c, inv)
-                    sub = df[[dim_c, num_c]].copy()
-                    sub["_v"] = discover_deps.numeric_series(num_c)
-                    sub = sub.dropna(subset=[dim_c, "_v"])
                     nu = _dimension_cardinality(
                         df, dim_c, profile, memo=cardinality_memo
                     )
-                    if sub.empty or nu < 2 or nu > 20:
+                    if nu < 2 or nu > 20:
                         continue
-                    g = (
-                        sub.groupby(dim_c)["_v"]
-                        .agg(agg)
-                        .sort_values(ascending=False)
-                        .head(10)
+                    g = _agg_dim_metric_series(
+                        df,
+                        dim_c,
+                        num_c,
+                        agg,
+                        memo_numeric,
+                        aggregate_memo=aggregate_memo,
                     )
+                    if g is None or g.empty:
+                        continue
+                    g = g.sort_values(ascending=False).head(10)
                     g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
                     if g.empty:
                         continue
@@ -2333,10 +2440,17 @@ def discover_chart_opportunities(
             if pair_key in used_pairs:
                 continue
             try:
-                sub = df[[dim_c, num_c]].copy()
-                sub["_v"] = discover_deps.numeric_series(num_c)
-                sub = sub.dropna(subset=[dim_c, "_v"])
-                g = sub.groupby(dim_c)["_v"].sum().sort_values(ascending=False).head(8)
+                g = _agg_dim_metric_series(
+                    df,
+                    dim_c,
+                    num_c,
+                    "sum",
+                    memo_numeric,
+                    aggregate_memo=aggregate_memo,
+                )
+                if g is None or g.empty:
+                    continue
+                g = g.sort_values(ascending=False).head(8)
                 g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
                 if g.empty or len(g) < 2 or not _composition_shares_valid(g):
                     continue
@@ -2389,14 +2503,20 @@ def discover_chart_opportunities(
         if pair_key in used_pairs:
             continue
         try:
-            sub = df[[dim_c, num_c]].copy()
-            sub["_v"] = discover_deps.numeric_series(num_c)
-            sub = sub.dropna(subset=[dim_c, "_v"])
             nu = _dimension_cardinality(df, dim_c, profile, memo=cardinality_memo)
-            if sub.empty or nu < 2 or nu > 18:
+            if nu < 2 or nu > 18:
                 continue
             agg = _metric_agg_key(num_c, inv)
-            g = sub.groupby(dim_c)["_v"].agg(agg)
+            g = _agg_dim_metric_series(
+                df,
+                dim_c,
+                num_c,
+                agg,
+                memo_numeric,
+                aggregate_memo=aggregate_memo,
+            )
+            if g is None or g.empty:
+                continue
             g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
             if g.empty:
                 continue
