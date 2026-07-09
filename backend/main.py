@@ -558,6 +558,37 @@ def _norm_header_token(col: str) -> str:
     return re.sub(r"[\s\-]+", "_", str(col).strip().lower())
 
 
+_COVID_PUBLIC_HEALTH_DOMAIN_KEYWORDS = (
+    "covid",
+    "new_cases",
+    "active_cases",
+    "total_cases",
+    "variant",
+    "vaccination",
+    "vaccine",
+    "vaccinated",
+    "positivity",
+    "icu_patient",
+    "hospital_admission",
+    "hospitalization",
+    "deaths",
+    "cases",
+    "tests_conducted",
+    "report_date",
+    "age_group",
+)
+
+
+def _covid_public_health_signal_score(columns: List[str]) -> int:
+    joined = " ".join(_norm_header_token(c) for c in columns)
+    return sum(1 for k in _COVID_PUBLIC_HEALTH_DOMAIN_KEYWORDS if k in joined)
+
+
+def _is_covid_public_health_dataset(columns: List[str]) -> bool:
+    """COVID / epidemiological surveillance style public-health datasets."""
+    return _covid_public_health_signal_score(columns) >= 3
+
+
 def _infer_business_domain(columns: List[str]) -> str:
     """Lightweight domain hint for mapping weights (ecommerce / manufacturing / generic)."""
     joined = " ".join(_norm_header_token(c) for c in columns)
@@ -572,6 +603,9 @@ def _infer_business_domain(columns: List[str]) -> str:
     healthcare_kw = (
         "patient_id", "visit_date", "claim_amount", "readmission", "payer_type",
         "patient_segment", "visit_count",
+        "new_cases", "active_cases", "total_cases", "variant", "vaccination",
+        "vaccine", "vaccinated", "positivity", "icu_patient", "hospital_admission",
+        "hospitalization", "covid", "tests_conducted", "deaths", "report_date",
     )
     saas_kw = ("mrr", "churn_rate", "active_users", "new_signups", "expansion_revenue", "plan_type")
     supply_kw = (
@@ -727,6 +761,13 @@ def _customer_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("customer_name", 44),
         ("client_name", 34),
         ("customer_id", 36),
+        ("account_id", 36),
+        ("member_id", 34),
+        ("patient_id", 34),
+        ("user_id", 32),
+        ("borrower_id", 34),
+        ("entity_id", 32),
+        ("order_id", 28),
         ("cust_id", 32),
         ("client_id", 28),
         ("customer_segment", 38),
@@ -815,7 +856,30 @@ def _product_role_keyword_score(col: str) -> Tuple[int, List[str]]:
     return score, reasons
 
 
-def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, List[str]]:
+def _healthcare_has_case_activity_columns(columns: List[str]) -> bool:
+    for col in columns or []:
+        n = _norm_header_token(col)
+        if n == "deaths" or n.endswith("_deaths"):
+            continue
+        if any(
+            k in n
+            for k in (
+                "new_cases",
+                "active_cases",
+                "total_cases",
+                "confirmed_cases",
+                "hospital_admissions",
+                "hospitalization",
+                "cases",
+            )
+        ):
+            return True
+    return False
+
+
+def _sales_role_keyword_score(
+    col: str, domain: str = "generic", columns: Optional[List[str]] = None
+) -> Tuple[int, List[str]]:
     """
     Business-keyword score for the sales / primary value metric role.
     Ecommerce: prioritize monetary columns; penalize operational KPIs (delivery time, ratings, counts).
@@ -896,6 +960,26 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         if kw in n:
             score += w
             reasons.append(f"biz_kw:{kw}+{w}")
+
+    if domain == "healthcare":
+        for kw, w in (
+            ("new_cases", 54),
+            ("active_cases", 52),
+            ("total_cases", 50),
+            ("confirmed_cases", 48),
+            ("hospital_admissions", 46),
+            ("hospitalization", 44),
+            ("icu_patients", 38),
+            ("tests_conducted", 32),
+            ("cases", 36),
+        ):
+            if kw in n:
+                score += w
+                reasons.append(f"healthcare_primary:{kw}+{w}")
+        if n == "deaths" or n.endswith("_deaths"):
+            if columns and _healthcare_has_case_activity_columns(columns):
+                score -= 24
+                reasons.append("healthcare:deaths_secondary_penalty(-24)")
 
     # Operational / secondary metrics — never preferred as primary "sales" value.
     operational_penalties = (
@@ -1287,6 +1371,55 @@ def _pick_region_column_from_candidates(
         col = str(row.get("column", "")).strip()
         score = float(row.get("score", 0) or 0)
         if _region_role_candidate_allowed(col, profile, score):
+            return col
+    return None
+
+
+def _customer_column_has_entity_semantics(col: str) -> bool:
+    n = _norm_header_token(col)
+    if re.search(
+        r"(customer|cust|client|buyer|shopper|member|patient|borrower|user|account|entity|vendor|supplier)_?(id|name|segment|type)$",
+        n,
+    ):
+        return True
+    if re.search(
+        r"(^|_)(customer|client|account|member|patient|borrower|user|entity)(_|$)",
+        n,
+    ):
+        return True
+    return False
+
+
+def _customer_role_candidate_allowed(
+    col: str,
+    profile: Optional[Dict[str, Any]],
+    row: Dict[str, Any],
+) -> bool:
+    if not col:
+        return False
+    if _column_is_temporal_for_mapping(col, profile):
+        return False
+    score = float(row.get("score", 0) or 0)
+    if score <= 0:
+        return False
+    bk = float((row.get("breakdown") or {}).get("business_keyword") or 0)
+    if bk > 0:
+        return True
+    return _customer_column_has_entity_semantics(col)
+
+
+def _pick_customer_column_from_candidates(
+    cands: List[Dict[str, Any]],
+    profile: Optional[Dict[str, Any]],
+    exclude: Optional[set] = None,
+) -> Optional[str]:
+    for row in cands or []:
+        col = str(row.get("column", "")).strip()
+        if not col:
+            continue
+        if exclude and col in exclude:
+            continue
+        if _customer_role_candidate_allowed(col, profile, row):
             return col
     return None
 
@@ -1698,6 +1831,18 @@ def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[
             pts += 10.0
             reasons.append("domain:banking_product(+10)")
     if domain == "healthcare":
+        if role == "sales" and any(
+            k in n
+            for k in (
+                "new_cases",
+                "active_cases",
+                "total_cases",
+                "hospital_admissions",
+                "hospitalization",
+            )
+        ):
+            pts += 12.0
+            reasons.append("domain:healthcare_covid_sales(+12)")
         if role == "sales" and any(k in n for k in ("claim_amount", "visit_count")):
             pts += 8.0
             reasons.append("domain:healthcare_sales(+8)")
@@ -1711,6 +1856,12 @@ def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[
             elif "wait_time" in n:
                 pts += 14.0
                 reasons.append("domain:healthcare_profit_wait_time(+14)")
+            elif "active_cases" in n:
+                pts += 14.0
+                reasons.append("domain:healthcare_profit_active_cases(+14)")
+            elif "deaths" in n:
+                pts += 12.0
+                reasons.append("domain:healthcare_profit_deaths(+12)")
             elif "visit_count" in n:
                 pts += 10.0
                 reasons.append("domain:healthcare_profit_visit_count(+10)")
@@ -2010,9 +2161,12 @@ def _score_role_candidates(
         if role == "region" and profile.get("column_types", {}).get(col) == "number":
             continue
         if role == "customer":
+            if _column_is_temporal_for_mapping(col, profile):
+                continue
             n = _norm_header_token(col)
             if _id_like_column_name(col) and not re.search(
-                r"(customer|cust|client|buyer|account)_?id$", n
+                r"(customer|cust|client|buyer|account|member|patient|user|borrower|entity)_?id$",
+                n,
             ):
                 continue
         if role in ("sales", "profit"):
@@ -2185,7 +2339,7 @@ def compute_semantic_column_mapping(
         profile,
         "sales",
         domain,
-        lambda c: _sales_role_keyword_score(c, domain),
+        lambda c: _sales_role_keyword_score(c, domain, columns),
         auxiliary_fn=lambda c: _sales_auxiliary_scores(frame, domain, c),
     )
     region_cands = _score_role_candidates(
@@ -2204,6 +2358,8 @@ def compute_semantic_column_mapping(
     def pick(cands: List[Dict[str, Any]], role_key: str) -> Optional[str]:
         if role_key == "region":
             return _pick_region_column_from_candidates(cands, profile)
+        if role_key == "customer":
+            return _pick_customer_column_from_candidates(cands, profile)
         if role_key == "date":
             return _pick_date_column_from_candidates(cands, frame, profile)
         if cands and float(cands[0].get("score", 0)) > 0:
@@ -2221,13 +2377,11 @@ def compute_semantic_column_mapping(
 
     # Avoid using the same column for unrelated roles (e.g. product == customer).
     if proposed.get("customer") and proposed["customer"] == proposed.get("product"):
-        alt = None
-        for row in customer_cands[1:]:
-            c = str(row["column"])
-            if c and c != proposed.get("product"):
-                alt = c
-                break
-        proposed["customer"] = alt
+        proposed["customer"] = _pick_customer_column_from_candidates(
+            customer_cands,
+            profile,
+            exclude={proposed.get("product")},
+        )
 
     if proposed.get("region") and proposed["region"] == proposed.get("product"):
         skip = {proposed.get("product"), proposed.get("customer")}
@@ -2237,13 +2391,16 @@ def compute_semantic_column_mapping(
         )
 
     if proposed.get("customer") and proposed["customer"] == proposed.get("region"):
-        alt = None
-        for row in customer_cands:
-            c = str(row["column"])
-            if c and c not in (proposed.get("region"), proposed.get("product")):
-                alt = c
-                break
-        proposed["customer"] = alt
+        proposed["customer"] = _pick_customer_column_from_candidates(
+            customer_cands,
+            profile,
+            exclude={proposed.get("region"), proposed.get("product")},
+        )
+
+    if proposed.get("customer") and _column_is_temporal_for_mapping(
+        str(proposed["customer"]), profile
+    ):
+        proposed["customer"] = None
 
     def _optional_role_is_weak_guess(cands: List[Dict[str, Any]]) -> bool:
         if not cands:
@@ -4457,6 +4614,8 @@ def build_auto_dashboard(
     )
     kind = executive_domain_to_auto_kind(exec_domain)
     label = EXECUTIVE_DASHBOARD_LABELS.get(exec_domain, AUTO_DASHBOARD_LABELS.get(kind, "Generic"))
+    if exec_domain == "healthcare" and _is_covid_public_health_dataset(columns):
+        label = "Healthcare / Public Health"
 
     out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": [], "charts": []}
 

@@ -149,6 +149,141 @@ class TestSemanticMappingEdgeCases(unittest.TestCase):
         self.assertNotIn("transaction id", lowered)
         self.assertNotIn("customer id", lowered)
 
+    def test_date_column_never_maps_as_customer(self) -> None:
+        df = pd.DataFrame(
+            {
+                "application_date": pd.to_datetime(
+                    ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"]
+                ),
+                "customer_segment": ["SMB", "Corporate", "Mass Market", "Affluent"],
+                "loan_amount": [1000.0, 2000.0, 1500.0, 1800.0],
+                "branch_region": ["North", "South", "East", "West"],
+            }
+        )
+        proposed, _meta, _dash = _bind(df)
+        self.assertEqual(proposed.get("date"), "application_date")
+        self.assertNotEqual(proposed.get("customer"), "application_date")
+
+    def test_entity_id_selected_when_present(self) -> None:
+        df = pd.DataFrame(
+            {
+                "account_id": [f"a{i}" for i in range(20)],
+                "customer_segment": ["SMB", "Corporate"] * 10,
+                "loan_amount": [float(i * 100) for i in range(20)],
+                "order_date": pd.to_datetime(["2024-01-01"] * 20),
+            }
+        )
+        proposed, _meta, _dash = _bind(df)
+        self.assertEqual(proposed.get("customer"), "account_id")
+        self.assertEqual(proposed.get("date"), "order_date")
+
+    def test_customer_unset_when_only_date_columns_exist(self) -> None:
+        df = pd.DataFrame(
+            {
+                "application_date": pd.to_datetime(
+                    ["2024-01-01", "2024-01-02", "2024-01-03"]
+                ),
+                "report_date": pd.to_datetime(
+                    ["2024-02-01", "2024-02-02", "2024-02-03"]
+                ),
+                "loan_amount": [1000.0, 2000.0, 1500.0],
+            }
+        )
+        proposed, _meta, _dash = _bind(df)
+        self.assertIn(proposed.get("date"), ("application_date", "report_date"))
+        self.assertIsNone(proposed.get("customer"))
+
+
+class TestCovidPublicHealthMapping(unittest.TestCase):
+    def tearDown(self) -> None:
+        main.df = None
+        main.dataset_profile = None
+        main.column_mapping = {k: None for k in main.column_mapping}
+
+    def _covid_style_frame(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "report_date": pd.to_datetime(
+                    ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"]
+                ),
+                "state": ["Illinois", "California", "Texas", "Florida"],
+                "variant": ["Omicron", "Delta", "Omicron", "Other"],
+                "age_group": ["18-29", "30-44", "45-59", "60+"],
+                "gender": ["Female", "Male", "Female", "Male"],
+                "new_cases": [71, 37, 107, 18],
+                "active_cases": [503, 320, 1510, 397],
+                "deaths": [0, 1, 1, 0],
+                "hospital_admissions": [5, 4, 13, 0],
+            }
+        )
+
+    def test_covid_columns_classify_as_healthcare_not_generic(self) -> None:
+        df = self._covid_style_frame()
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "healthcare")
+        self.assertEqual(meta.get("domain"), "healthcare")
+        self.assertEqual(dash.get("type_label"), "Healthcare / Public Health")
+
+    def test_covid_prefers_case_activity_metric_over_deaths(self) -> None:
+        df = self._covid_style_frame()
+        proposed, _meta, _dash = _bind(df)
+        self.assertIn(proposed.get("sales"), ("new_cases", "active_cases"))
+        self.assertNotEqual(proposed.get("sales"), "deaths")
+        self.assertIn(
+            proposed.get("profit"),
+            ("deaths", "active_cases", "hospital_admissions"),
+        )
+
+    def test_deaths_primary_when_only_mortality_metric(self) -> None:
+        df = pd.DataFrame(
+            {
+                "report_date": pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
+                "state": ["Illinois", "California", "Texas"],
+                "variant": ["Omicron", "Delta", "Other"],
+                "deaths": [12, 8, 5],
+            }
+        )
+        proposed, meta, _dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "healthcare")
+        self.assertEqual(proposed.get("sales"), "deaths")
+
+    def test_covid_mapping_roles_remain_correct(self) -> None:
+        df = self._covid_style_frame()
+        proposed, _meta, _dash = _bind(df)
+        self.assertEqual(proposed.get("date"), "report_date")
+        self.assertEqual(proposed.get("region"), "state")
+        self.assertIsNone(proposed.get("customer"))
+
+    def test_banking_classification_unchanged(self) -> None:
+        df = pd.DataFrame(
+            {
+                "account_id": ["a1", "a2", "a3", "a4"],
+                "report_month": pd.to_datetime(
+                    ["2024-01-01", "2024-02-01", "2024-03-01", "2024-04-01"]
+                ),
+                "loan_balance": [1000.0, 2000.0, 1500.0, 1800.0],
+                "deposit_balance": [500.0, 600.0, 700.0, 800.0],
+                "delinquency_rate": [0.1, 0.2, 0.05, 0.15],
+                "branch_region": ["North", "South", "East", "West"],
+            }
+        )
+        proposed, meta, _dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "banking")
+        self.assertIn(proposed.get("sales"), ("loan_balance", "deposit_balance"))
+
+    def test_generic_random_dataset_stays_generic(self) -> None:
+        df = pd.DataFrame(
+            {
+                "value": [1.0, 2.0, 3.0],
+                "type": ["a", "b", "c"],
+                "category": ["x", "y", "z"],
+                "status": ["ok", "ok", "fail"],
+            }
+        )
+        proposed, meta, _dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "generic")
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "generic")
+
 
 class TestDomainGoldFixturesEdgeCases(unittest.TestCase):
     def tearDown(self) -> None:

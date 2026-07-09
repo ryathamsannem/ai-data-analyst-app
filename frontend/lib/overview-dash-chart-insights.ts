@@ -25,6 +25,66 @@ export type OverviewMiniInsightChip = {
   title?: string;
 };
 
+const BINARY_CATEGORICAL_LABELS = new Set([
+  "y",
+  "n",
+  "yes",
+  "no",
+  "true",
+  "false",
+  "0",
+  "1",
+  "active",
+  "inactive",
+  "male",
+  "female",
+  "on",
+  "off",
+  "enabled",
+  "disabled",
+  "pass",
+  "fail",
+  "approved",
+  "denied",
+]);
+
+/** True when at least two axis labels parse as chronological buckets. */
+export function countTemporalAxisLabels(labels: string[]): number {
+  return labels.filter(
+    (label) => bucketLabelChronologicalSortKey(String(label ?? ""))[0] === 0
+  ).length;
+}
+
+/** Binary / flag-style category labels (Y/N, Yes/No, etc.) — not time periods. */
+export function isBinaryCategoricalComparisonLabels(labels: string[]): boolean {
+  if (labels.length < 2) return false;
+  const normalized = labels.map((label) => String(label ?? "").trim().toLowerCase());
+  if (normalized.some((label) => !label)) return false;
+  return normalized.every((label) => BINARY_CATEGORICAL_LABELS.has(label));
+}
+
+/** Trend footer chips only for true time-series / ordered temporal axes. */
+export function shouldUseTrendPeriodInsightChips(
+  rows: ChartRow[],
+  opts?: {
+    presentationKind?: ChartKind;
+    isTrendChart?: boolean;
+  }
+): boolean {
+  const kind = opts?.presentationKind;
+  if (kind === "line" || kind === "area") return true;
+
+  const labels = rows.map((row) => String(row.name ?? ""));
+  if (isBinaryCategoricalComparisonLabels(labels)) return false;
+
+  const temporalCount = countTemporalAxisLabels(labels);
+  if (kind === "bar" || kind === "histogram") {
+    return temporalCount >= 2;
+  }
+
+  return opts?.isTrendChart === true && temporalCount >= 2;
+}
+
 export function inferTrendPeriodLabelFromTitle(chartTitle?: string): string {
   const blob = String(chartTitle ?? "").toLowerCase();
   if (/\bweekly\b|\bweek\b/.test(blob)) return "Week";
@@ -350,10 +410,10 @@ export function formatOverviewMiniInsightChips(
   const hiDisp = formatBarInsightValue(hi);
   const loDisp = formatBarInsightValue(lo);
 
-  const isTrend =
-    opts?.isTrendChart === true ||
-    opts?.presentationKind === "line" ||
-    opts?.presentationKind === "area";
+  const isTrend = shouldUseTrendPeriodInsightChips(rows, {
+    presentationKind: opts?.presentationKind,
+    isTrendChart: opts?.isTrendChart,
+  });
 
   if (isTrend) {
     const labelNames = rows.map((r) => String(r.name ?? ""));
