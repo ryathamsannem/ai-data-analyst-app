@@ -216,6 +216,30 @@ const SALES_COLUMN_SIGNALS: RegExp[] = [
 
 const SMALL_TREND_BUCKET_MAX = 6;
 
+const COVID_PUBLIC_HEALTH_COLUMN_SIGNALS: RegExp[] = [
+  /\bnew[_\s]?cases\b/,
+  /\bactive[_\s]?cases\b/,
+  /\btotal[_\s]?cases\b/,
+  /\bvariant\b/,
+  /\bvaccination\b/,
+  /\bpositivity\b/,
+  /\bhospital[_\s]?admissions?\b/,
+  /\bicu[_\s]?patients?\b/,
+  /\bcovid\b/,
+  /\btests[_\s]?conducted\b/,
+  /\breport[_\s]?date\b/,
+];
+
+/** COVID / epidemiological surveillance datasets (column-name signals). */
+export function isCovidPublicHealthDataset(columns: readonly string[]): boolean {
+  const blob = columns.join(" ").toLowerCase().replace(/_/g, " ");
+  let hits = 0;
+  for (const re of COVID_PUBLIC_HEALTH_COLUMN_SIGNALS) {
+    if (re.test(blob)) hits += 1;
+  }
+  return hits >= 3;
+}
+
 const DOMAIN_FRAMES: Record<SummaryDomain, string> = {
   hr: "Workforce analytics snapshot — headcount, attrition, and personnel cost signals in this slice.",
   healthcare:
@@ -239,6 +263,25 @@ const DOMAIN_FRAMES: Record<SummaryDomain, string> = {
   generic:
     "Executive analytics snapshot — key metrics and breakdowns from your current dataset view.",
 };
+
+const PUBLIC_HEALTH_DOMAIN_FRAME =
+  "Healthcare / Public Health snapshot — cases, admissions, vaccination status, variants, and demographic trends.";
+
+/** Domain opening line for Overview AI Summary (healthcare/public-health aware). */
+export function resolveOverviewSummaryDomainFrame(
+  domain: SummaryDomain,
+  columns: readonly string[],
+  typeLabel?: string | null
+): string {
+  if (
+    domain === "healthcare" &&
+    (isCovidPublicHealthDataset(columns) ||
+      /\bpublic health\b/i.test(String(typeLabel ?? "")))
+  ) {
+    return PUBLIC_HEALTH_DOMAIN_FRAME;
+  }
+  return DOMAIN_FRAMES[domain];
+}
 
 function truncateOverviewPhrase(s: string, maxLen: number): string {
   const t = s.replace(/\s+/g, " ").trim();
@@ -1661,6 +1704,12 @@ export function inferOverviewSummaryDomain(args: {
   ) {
     return "hr";
   }
+  if (
+    isCovidPublicHealthDataset(args.columns) ||
+    /\bpublic health\b/i.test(String(args.autoDashboard?.type_label ?? ""))
+  ) {
+    return "healthcare";
+  }
   if (/\b(patient.volume|readmissions|length.of.stay|ward)\b/.test(blob)) {
     return "healthcare";
   }
@@ -1802,7 +1851,11 @@ export function computeOverviewAiSummaryBullets(
     scored.push({ ...insight, text: s });
   };
 
-  const frame = DOMAIN_FRAMES[domain];
+  const frame = resolveOverviewSummaryDomainFrame(
+    domain,
+    columns,
+    autoDashboard?.type_label
+  );
   if (frame) {
     pushInsight({ text: frame, score: 100, kind: "frame" });
   }

@@ -28,6 +28,7 @@ def _bind(df: pd.DataFrame) -> tuple[dict, dict, dict | None]:
     main.dataset_profile = profile
     main.column_mapping = {k: None for k in main.column_mapping}
     proposed, meta = main.compute_semantic_column_mapping(df, profile)
+    main.column_mapping_metadata = meta
     for key, val in proposed.items():
         main.column_mapping[key] = val
     dash = main.build_auto_dashboard() if not df.empty else None
@@ -283,6 +284,30 @@ class TestCovidPublicHealthMapping(unittest.TestCase):
         proposed, meta, _dash = _bind(df)
         self.assertEqual(meta.get("domain"), "generic")
         self.assertEqual(infer_executive_domain(df.columns.tolist()), "generic")
+
+    def test_covid_mapping_aggregate_confidence_not_low(self) -> None:
+        df = self._covid_style_frame()
+        proposed, meta, _dash = _bind(df)
+        self.assertIn(proposed.get("sales"), ("new_cases", "active_cases"))
+        self.assertIsNone(proposed.get("customer"))
+        sales_conf = (meta.get("roles") or {}).get("sales", {}).get("confidence")
+        self.assertIn(sales_conf, ("high", "medium"), msg=f"sales confidence={sales_conf}")
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertIn(agg, ("high", "medium"), msg=f"aggregate={agg}")
+
+    def test_generic_weak_mapping_stays_low_confidence(self) -> None:
+        df = pd.DataFrame(
+            {
+                "value": [1.0, 2.0, 3.0],
+                "type": ["a", "b", "c"],
+                "category": ["x", "y", "z"],
+            }
+        )
+        _proposed, meta, _dash = _bind(df)
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertEqual(agg, "low")
+        product_conf = (meta.get("roles") or {}).get("product", {}).get("confidence")
+        self.assertEqual(product_conf, "low")
 
 
 class TestDomainGoldFixturesEdgeCases(unittest.TestCase):

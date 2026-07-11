@@ -8,9 +8,11 @@ import {
   computeOverviewAiSummaryBullets,
   DURATION_LATENCY_METRIC_RE,
   inferOverviewSummaryDomain,
+  isCovidPublicHealthDataset,
   OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE,
   OVERVIEW_AI_SUMMARY_MAX_BULLETS,
   partitionOverviewAiSummaryBullets,
+  resolveOverviewSummaryDomainFrame,
   selectOverviewAiSummaryInsights,
   shouldIncludeLongTailProfileInsight,
   type ComputeOverviewAiSummaryArgs,
@@ -80,6 +82,106 @@ describe("inferOverviewSummaryDomain", () => {
       expect(inferred).toBe(EXPECTED_SUMMARY_DOMAIN[domain]);
     }
   );
+});
+
+const COVID_PUBLIC_HEALTH_COLUMNS = [
+  "report_date",
+  "state",
+  "variant",
+  "age_group",
+  "gender",
+  "vaccination_status",
+  "new_cases",
+  "active_cases",
+  "hospital_admissions",
+  "icu_patients",
+  "deaths",
+  "tests_conducted",
+  "positivity_pct",
+];
+
+describe("healthcare / public health AI summary", () => {
+  it("detects COVID-style columns as healthcare summary domain", () => {
+    expect(isCovidPublicHealthDataset(COVID_PUBLIC_HEALTH_COLUMNS)).toBe(true);
+    expect(
+      inferOverviewSummaryDomain({
+        columns: COVID_PUBLIC_HEALTH_COLUMNS,
+        autoDashboard: {
+          kind: "operations",
+          type_label: "Healthcare / Public Health",
+        },
+      })
+    ).toBe("healthcare");
+  });
+
+  it("uses public-health snapshot frame, not operations manufacturing copy", () => {
+    const frame = resolveOverviewSummaryDomainFrame(
+      "healthcare",
+      COVID_PUBLIC_HEALTH_COLUMNS,
+      "Healthcare / Public Health"
+    );
+    expect(frame).toMatch(/Healthcare \/ Public Health snapshot/i);
+    expect(frame).toMatch(/cases|admissions|vaccination|variants/i);
+    expect(frame).not.toMatch(/Operations snapshot/i);
+    expect(frame).not.toMatch(/production, downtime/i);
+  });
+
+  it("COVID dashboard bullets open with healthcare public-health framing", () => {
+    const bullets = computeOverviewAiSummaryBullets({
+      rows: 1000,
+      columns: COVID_PUBLIC_HEALTH_COLUMNS,
+      autoDashboard: {
+        kind: "operations",
+        type_label: "Healthcare / Public Health",
+        cards: [],
+        charts: [
+          {
+            title: "New Cases by Variant",
+            chartType: "bar",
+            labels: ["Omicron", "Delta", "Other"],
+            values: [1200, 800, 400],
+          },
+        ],
+      },
+      profile: {
+        column_types: { new_cases: "number", variant: "category", report_date: "date" },
+      },
+      primaryMetricColumn: "new_cases",
+      groupingColumn: "variant",
+      dateColumn: "report_date",
+    });
+    expect(bullets[0]).toMatch(/Healthcare \/ Public Health snapshot/i);
+    expect(bullets[0]).not.toMatch(/Operations snapshot/i);
+  });
+
+  it("operations incidents fixture still uses operations snapshot", () => {
+    const ops = DOMAIN_PAYLOADS.find((p) => p.domain === "operations")!;
+    const frame = resolveOverviewSummaryDomainFrame(
+      inferOverviewSummaryDomain({
+        columns: ops.columns,
+        autoDashboard: ops.auto_dashboard,
+      }),
+      ops.columns,
+      ops.auto_dashboard?.type_label
+    );
+    expect(frame).toMatch(/^Operations snapshot/i);
+    expect(frame).toMatch(/production, downtime/i);
+  });
+
+  it("banking fixture summary frame is unchanged", () => {
+    const banking = DOMAIN_PAYLOADS.find(
+      (p) => p.domain === "banking_financial_services"
+    )!;
+    const frame = resolveOverviewSummaryDomainFrame(
+      inferOverviewSummaryDomain({
+        columns: banking.columns,
+        autoDashboard: banking.auto_dashboard,
+      }),
+      banking.columns,
+      banking.auto_dashboard?.type_label
+    );
+    expect(frame).toMatch(/^Banking analytics snapshot/i);
+  });
 });
 
 describe("computeOverviewAiSummaryBullets per domain fixture", () => {

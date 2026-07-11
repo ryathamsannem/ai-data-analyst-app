@@ -2249,6 +2249,14 @@ def _calibrate_mapping_role_confidence(
 
     if role_key == "sales" and confidence in ("low", "medium"):
         bonus1 = _candidate_domain_role_bonus(top1)
+        bk1 = float((top1.get("breakdown") or {}).get("business_keyword") or 0)
+        col1 = _norm_header_token(str(top1.get("column") or ""))
+        if (
+            bonus1 >= 12.0
+            and bk1 >= 50.0
+            and any(k in col1 for k in ("new_cases", "active_cases", "total_cases", "confirmed_cases"))
+        ):
+            return "high"
         if bonus1 >= 14.0 and s1 >= 70.0 and gap >= 2.0:
             return "high"
         if bonus1 >= 10.0 and s1 >= 60.0 and gap >= 4.0 and confidence == "low":
