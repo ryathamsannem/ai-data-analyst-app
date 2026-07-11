@@ -78,6 +78,31 @@ def _score(blob: str, patterns: Tuple[str, ...]) -> int:
     return sum(1 for p in patterns if p in blob)
 
 
+# Order / ecommerce column signals — distinct from generic revenue+product sales cubes.
+_ECOMMERCE_RETAIL_PATTERNS: Tuple[str, ...] = (
+    "order id",
+    "order date",
+    "product category",
+    "product name",
+    "sku",
+    "units sold",
+    "net revenue",
+    "gross revenue",
+    "return flag",
+    "sales channel",
+    "marketing channel",
+    "shipping days",
+    "delivery days",
+    "basket size",
+    "refund",
+    "discount pct",
+)
+
+
+def _ecommerce_retail_score(blob: str) -> int:
+    return _score(blob, _ECOMMERCE_RETAIL_PATTERNS)
+
+
 def infer_executive_domain(columns: List[str]) -> ExecutiveDomain:
     """Schema-first executive domain for KPI card selection."""
     blob = _col_blob(columns)
@@ -190,6 +215,12 @@ def infer_executive_domain(columns: List[str]) -> ExecutiveDomain:
 
     if hr_score >= 3 or (hr_score >= 2 and hr_score > sales_score and not has_commercial_cube):
         return "hr"
+
+    ecommerce_score = _ecommerce_retail_score(blob)
+    if ecommerce_score >= 3 and (
+        "revenue" in blob or "sales" in blob or "profit" in blob
+    ):
+        return "retail"
 
     # Revenue + product cubes (showcase, retail, sales) before secondary banking/geo columns.
     if has_commercial_cube:

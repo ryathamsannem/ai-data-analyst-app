@@ -484,6 +484,113 @@ function parseMetricByDimensionTitle(
   return { metric: m[1].trim(), dimension: m[2].trim() };
 }
 
+/** Backend composition titles: "{Dimension} {Metric} Share". */
+function parseDimMetricShareTitle(
+  title: string
+): { dimension: string; metric: string } | null {
+  const m = title.match(/^(.+?)\s+share$/i);
+  if (!m) return null;
+  const body = m[1].trim();
+  if (!body) return null;
+
+  const flagDim = body.match(/^(.+?\b(?:flag|status))\s+(.+)$/i);
+  if (flagDim && isBinaryFlagDimensionName(flagDim[1])) {
+    return { dimension: flagDim[1].trim(), metric: flagDim[2].trim() };
+  }
+
+  const metricTail = body.match(
+    /^(.*?)\s+(profit|revenue|sales|units|margin|cost|volume|amount|value)$/i
+  );
+  if (metricTail) {
+    return { dimension: metricTail[1].trim(), metric: metricTail[2].trim() };
+  }
+
+  const parts = body.split(/\s+/);
+  if (parts.length < 2) return null;
+  return {
+    dimension: parts.slice(0, -1).join(" "),
+    metric: parts[parts.length - 1]!,
+  };
+}
+
+function isBinaryFlagDimensionName(dimension: string): boolean {
+  const norm = dimension.toLowerCase().replace(/_/g, " ").trim();
+  if (/\b(return|refund|cancel|cancellation|churn|default|delinquen)/.test(norm)) {
+    return true;
+  }
+  if (
+    /\b(return|refund|cancel|default|churn|delinquen).*\b(flag|status)\b/.test(norm)
+  ) {
+    return true;
+  }
+  return /\b(flag|status)\b.*\b(return|refund|cancel|default|churn|delinquen)/.test(
+    norm
+  );
+}
+
+function normalizeBinaryFlagCategory(value: string): "positive" | "negative" | null {
+  const v = value.trim().toLowerCase();
+  if (["n", "no", "false", "0"].includes(v)) return "positive";
+  if (["y", "yes", "true", "1"].includes(v)) return "negative";
+  if (/\b(not|non|no|without|unreturned|active|performing|retained|current|paid)\b/.test(v)) {
+    return "positive";
+  }
+  if (/\b(returned|refund|cancelled|canceled|defaulted|churned|delinquent)\b/.test(v)) {
+    return "negative";
+  }
+  return null;
+}
+
+function binaryFlagShareSemantics(dimension: string): {
+  positiveLabel: string;
+  negativeLabel: string;
+} | null {
+  const d = dimension.toLowerCase();
+  if (/return|refund/.test(d)) {
+    return {
+      positiveLabel: "Non-returned orders",
+      negativeLabel: "Returned orders",
+    };
+  }
+  if (/cancel/.test(d)) {
+    return {
+      positiveLabel: "Non-cancelled orders",
+      negativeLabel: "Cancelled orders",
+    };
+  }
+  if (/default|delinquen/.test(d)) {
+    return {
+      positiveLabel: "Performing accounts",
+      negativeLabel: "Defaulted accounts",
+    };
+  }
+  if (/churn/.test(d)) {
+    return {
+      positiveLabel: "Retained customers",
+      negativeLabel: "Churned customers",
+    };
+  }
+  return null;
+}
+
+/** Business-readable share insight for binary return/refund/cancel-style flags. */
+export function buildBinaryFlagShareInsightLine(args: {
+  chartTitle: string;
+  leaderName: string;
+}): string | null {
+  const parsed = parseDimMetricShareTitle(args.chartTitle);
+  if (!parsed || !isBinaryFlagDimensionName(parsed.dimension)) return null;
+  const semantics = binaryFlagShareSemantics(parsed.dimension);
+  if (!semantics) return null;
+  const polarity = normalizeBinaryFlagCategory(args.leaderName);
+  if (!polarity) return null;
+  const met = polishInsightPhrase(parsed.metric).toLowerCase();
+  if (polarity === "positive") {
+    return `${semantics.positiveLabel} account for most ${met}.`;
+  }
+  return `${semantics.negativeLabel} account for most ${met}.`;
+}
+
 /** Natural executive line for bar / ranking / share breakdown charts. */
 export function buildBreakdownInsightLine(args: {
   chartTitle: string;
@@ -551,6 +658,19 @@ export function buildBreakdownInsightLine(args: {
       return `${leader} ${verb} the largest share of ${met}.`;
     }
 
+    const dimMetricShare = parseDimMetricShareTitle(title);
+    if (dimMetricShare && isShareChartTitle(title, args.chartType)) {
+      const flagLine = buildBinaryFlagShareInsightLine({
+        chartTitle: title,
+        leaderName: args.leaderName,
+      });
+      if (flagLine) return flagLine;
+      const met = polishInsightPhrase(dimMetricShare.metric).toLowerCase();
+      const leader = formatLeaderForBreakdown(args.leaderName, dimMetricShare.dimension);
+      const verb = leaderVerb(leader);
+      return `${leader} ${verb} the largest share of ${met}.`;
+    }
+
     const byDim = parseMetricByDimensionTitle(title);
     if (byDim) {
       const met = polishInsightPhrase(byDim.metric);
@@ -584,6 +704,11 @@ export function buildBreakdownInsightLine(args: {
       domain: args.domain,
     });
   }
+  const flagLine = buildBinaryFlagShareInsightLine({
+    chartTitle: args.chartTitle,
+    leaderName: args.leaderName,
+  });
+  if (flagLine) return flagLine;
   return `${leader} has the highest ${metLc}.`;
 }
 
@@ -662,10 +787,21 @@ function buildConcentrationInsightLine(args: {
   }
 
   if (isShareChartTitle(args.chartTitle, args.chartType)) {
+    const flagLine = buildBinaryFlagShareInsightLine({
+      chartTitle: args.chartTitle,
+      leaderName: args.leaderName,
+    });
+    if (flagLine) {
+      const pct = Math.round(share * 100);
+      if (pct >= 50) return flagLine;
+    }
     const byDim = parseMetricByDimensionTitle(args.chartTitle);
+    const dimMetricShare = parseDimMetricShareTitle(args.chartTitle);
     const met = byDim
       ? polishInsightPhrase(byDim.metric).toLowerCase()
-      : polishInsightPhrase(args.chartTitle).toLowerCase();
+      : dimMetricShare
+        ? polishInsightPhrase(dimMetricShare.metric).toLowerCase()
+        : polishInsightPhrase(args.chartTitle).toLowerCase();
     return `${leader} represents about ${pct}% of ${met} in this slice.`;
   }
 

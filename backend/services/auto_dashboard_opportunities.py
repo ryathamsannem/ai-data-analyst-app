@@ -1778,6 +1778,79 @@ def _metric_dim_duplicate(
     return alt_dims >= max_alt
 
 
+_CROSS_BREAKDOWN_FAMILIES = frozenset({"composition", "ranking"})
+
+
+def _cross_family_breakdown_duplicate(
+    fam_c: str,
+    fam_e: str,
+    dim_c: Optional[str],
+    dim_e: Optional[str],
+    mk_c: str,
+    title_c: str,
+    mk_e: str,
+    title_e: str,
+) -> bool:
+    """Share/donut/pie vs bar/hbar telling the same dim×metric story."""
+    if not dim_c or not dim_e or dim_c.lower() != dim_e.lower():
+        return False
+    if fam_c not in _CROSS_BREAKDOWN_FAMILIES or fam_e not in _CROSS_BREAKDOWN_FAMILIES:
+        return False
+    if fam_c == fam_e:
+        return False
+    mk_c_norm = mk_c.strip().lower()
+    mk_e_norm = mk_e.strip().lower()
+    if mk_c_norm and mk_c_norm == mk_e_norm:
+        return True
+    s_a = _metric_semantic_strength(mk_c, title_c)
+    s_b = _metric_semantic_strength(mk_e, title_e)
+    return abs(s_a - s_b) <= 25
+
+
+def chart_breakdown_metric_dimension_pair(
+    chart: Dict[str, Any], record_key: str
+) -> Tuple[str, Optional[str]]:
+    """Normalized (metric, dimension) for breakdown diversity checks."""
+    return (_metric_key(chart, record_key), _dimension_key(chart))
+
+
+def has_composition_ranking_metric_dim_duplicate(
+    charts: List[Dict[str, Any]], record_key: str
+) -> bool:
+    """True when a composition and ranking chart share the same dim×metric story."""
+    seen: List[Dict[str, Any]] = []
+    for chart in charts:
+        mk = _metric_key(chart, record_key)
+        dim = _dimension_key(chart)
+        fam = _chart_story_family(
+            str(chart.get("chartType") or ""),
+            str(chart.get("_opportunityType") or chart.get("opportunityType") or ""),
+        )
+        if fam not in _CROSS_BREAKDOWN_FAMILIES or not dim:
+            continue
+        title = str(chart.get("title") or "")
+        for existing in seen:
+            mk_e = _metric_key(existing, record_key)
+            dim_e = _dimension_key(existing)
+            fam_e = _chart_story_family(
+                str(existing.get("chartType") or ""),
+                str(existing.get("_opportunityType") or existing.get("opportunityType") or ""),
+            )
+            if _cross_family_breakdown_duplicate(
+                fam,
+                fam_e,
+                dim,
+                dim_e,
+                mk,
+                title,
+                mk_e,
+                str(existing.get("title") or ""),
+            ):
+                return True
+        seen.append(chart)
+    return False
+
+
 def _metrics_comparable_for_story_dedup(
     mk_a: str, title_a: str, mk_b: str, title_b: str
 ) -> bool:
@@ -1812,6 +1885,17 @@ def _chart_story_blocked_by_selected(
                 str(existing.get("chartType") or ""),
                 str(existing.get("_opportunityType") or ""),
             )
+            if _cross_family_breakdown_duplicate(
+                fam_c,
+                fam_e,
+                dim_c,
+                dim_e,
+                mk_c,
+                title_c,
+                mk_e,
+                title_e,
+            ) and str_c <= str_e:
+                return True
             if (
                 fam_c == "ranking"
                 and fam_e == "ranking"

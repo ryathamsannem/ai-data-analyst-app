@@ -553,5 +553,141 @@ class TestDiscoverRequestLocalCaches(unittest.TestCase):
             main.dataset_profile = None
 
 
+ECOMMERCE_FIXTURE = (
+    BACKEND_ROOT.parent / "test-fixtures" / "domain_upload_1k" / "ecommerce_orders_10k.csv"
+)
+BANKING_FIXTURE = (
+    BACKEND_ROOT.parent / "test-fixtures" / "domain_upload_1k" / "banking_loans_10k.csv"
+)
+HEALTHCARE_FIXTURE = (
+    BACKEND_ROOT.parent / "test-fixtures" / "domain_upload_1k" / "covid_healthcare_10k.csv"
+)
+
+
+def _bind_fixture_csv(path: Path) -> list:
+    df = pd.read_csv(path)
+    for col in df.columns:
+        if "date" in str(col).lower():
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+    df = main.clean_dataframe(df)
+    profile = main.build_profile(df)
+    main.df = df
+    main.dataset_profile = profile
+    proposed, meta = main.compute_semantic_column_mapping(df, profile)
+    main.column_mapping_metadata = meta
+    for key, val in proposed.items():
+        main.column_mapping[key] = val
+    try:
+        dash = main.build_auto_dashboard()
+        return dash.get("charts") or []
+    finally:
+        main.df = None
+        main.dataset_profile = None
+        main.column_mapping_metadata = None
+        main.column_mapping = {k: None for k in main.column_mapping}
+
+
+class TestAutoDashboardChartDiversity(unittest.TestCase):
+    def test_ecommerce_no_composition_ranking_metric_dim_duplicate(self) -> None:
+        from services.auto_dashboard_opportunities import (
+            chart_breakdown_metric_dimension_pair,
+            has_composition_ranking_metric_dim_duplicate,
+        )
+
+        self.assertTrue(ECOMMERCE_FIXTURE.is_file())
+        charts = _bind_fixture_csv(ECOMMERCE_FIXTURE)
+        record_key = main._DASH_RECORD_METRIC_KEY
+        self.assertFalse(
+            has_composition_ranking_metric_dim_duplicate(charts, record_key)
+        )
+        return_flag_pairs = [
+            chart_breakdown_metric_dimension_pair(c, record_key)
+            for c in charts
+            if chart_breakdown_metric_dimension_pair(c, record_key)[1] == "return_flag"
+        ]
+        self.assertGreaterEqual(len(return_flag_pairs), 1)
+        profit_return = [
+            p for p in return_flag_pairs if p[0] == "profit"
+        ]
+        self.assertLessEqual(
+            len(profit_return),
+            1,
+            msg="profit × return_flag should appear at most once across chart families",
+        )
+        titles = {str(c.get("title") or "") for c in charts}
+        self.assertNotIn("Profit by Return Flag", titles)
+
+    def test_ecommerce_keeps_expected_chart_count(self) -> None:
+        charts = _bind_fixture_csv(ECOMMERCE_FIXTURE)
+        self.assertGreaterEqual(len(charts), 5)
+
+    def test_ecommerce_still_includes_composition_chart(self) -> None:
+        charts = _bind_fixture_csv(ECOMMERCE_FIXTURE)
+        types = {str(c.get("chartType") or "").lower() for c in charts}
+        titles = " ".join(str(c.get("title") or "").lower() for c in charts)
+        self.assertTrue(
+            types & {"pie", "donut"} or "share" in titles,
+            msg=f"expected a composition chart, got types={types}",
+        )
+
+    def test_banking_dashboard_not_degraded(self) -> None:
+        charts = _bind_fixture_csv(BANKING_FIXTURE)
+        self.assertGreaterEqual(len(charts), 4)
+        titles = " ".join(str(c.get("title") or "").lower() for c in charts)
+        self.assertTrue(
+            "loan" in titles or "delinquency" in titles or "utilization" in titles
+        )
+
+    def test_healthcare_dashboard_not_degraded(self) -> None:
+        charts = _bind_fixture_csv(HEALTHCARE_FIXTURE)
+        self.assertGreaterEqual(len(charts), 4)
+        titles = " ".join(str(c.get("title") or "").lower() for c in charts)
+        self.assertTrue(
+            "case" in titles or "variant" in titles or "admission" in titles
+        )
+
+    def test_chart_story_blocks_composition_ranking_same_metric_dim(self) -> None:
+        from services.auto_dashboard_opportunities import (
+            _chart_story_blocked_by_selected,
+            _prune_duplicate_chart_stories,
+            has_composition_ranking_metric_dim_duplicate,
+        )
+
+        record_key = main._DASH_RECORD_METRIC_KEY
+        pie = {
+            "title": "Return Flag Profit Share",
+            "chartType": "pie",
+            "metricColumn": "profit",
+            "dimensionColumn": "return_flag",
+            "labels": ["N", "Y"],
+            "values": [100.0, 200.0],
+            "_opportunityType": "composition",
+        }
+        bar = {
+            "title": "Profit by Return Flag",
+            "chartType": "bar",
+            "metricColumn": "profit",
+            "dimensionColumn": "return_flag",
+            "labels": ["N", "Y"],
+            "values": [100.0, 200.0],
+            "_opportunityType": "ranking",
+        }
+        category_bar = {
+            "title": "Profit by Product Category",
+            "chartType": "bar",
+            "metricColumn": "profit",
+            "dimensionColumn": "product_category",
+            "labels": ["A", "B", "C"],
+            "values": [50.0, 80.0, 120.0],
+            "_opportunityType": "ranking",
+        }
+        self.assertTrue(_chart_story_blocked_by_selected([pie], bar, record_key))
+        pruned = _prune_duplicate_chart_stories([pie, bar, category_bar], record_key)
+        self.assertFalse(
+            has_composition_ranking_metric_dim_duplicate(pruned, record_key)
+        )
+        self.assertEqual(len(pruned), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

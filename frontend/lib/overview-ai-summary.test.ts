@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  buildBinaryFlagShareInsightLine,
   buildBreakdownInsightLine,
   buildTrendInsightLine,
   computeOverviewAiSummaryBullets,
@@ -747,6 +748,69 @@ describe("executive wording helpers", () => {
     expect(out.some((b) => /\bage band\b/i.test(b))).toBe(false);
     expect(out.some((b) => /\bgender\b/i.test(b))).toBe(false);
     expect(out.some((b) => /\battrition\b/i.test(b))).toBe(true);
+  });
+});
+
+describe("binary return/refund flag AI summary wording", () => {
+  it("does not produce awkward return-flag leader phrasing", () => {
+    const line = buildBreakdownInsightLine({
+      chartTitle: "Return Flag Profit Share",
+      chartType: "pie",
+      leaderName: "N",
+      domain: "retail",
+    });
+    expect(line).not.toMatch(/N has the highest return flag profit share/i);
+    expect(line).toMatch(/Non-returned orders account for most profit/i);
+  });
+
+  it("buildBinaryFlagShareInsightLine handles N/Y return_flag", () => {
+    expect(
+      buildBinaryFlagShareInsightLine({
+        chartTitle: "Return Flag Profit Share",
+        leaderName: "N",
+      })
+    ).toBe("Non-returned orders account for most profit.");
+    expect(
+      buildBinaryFlagShareInsightLine({
+        chartTitle: "Return Flag Profit Share",
+        leaderName: "Y",
+      })
+    ).toBe("Returned orders account for most profit.");
+  });
+
+  it("does not rewrite unrelated binary gender fields", () => {
+    expect(
+      buildBinaryFlagShareInsightLine({
+        chartTitle: "Gender Revenue Share",
+        leaderName: "Female",
+      })
+    ).toBeNull();
+    expect(
+      buildBreakdownInsightLine({
+        chartTitle: "Gender Revenue Share",
+        chartType: "pie",
+        leaderName: "Female",
+        domain: "hr",
+      })
+    ).toMatch(/Female/i);
+    expect(
+      buildBreakdownInsightLine({
+        chartTitle: "Gender Revenue Share",
+        chartType: "pie",
+        leaderName: "Female",
+        domain: "hr",
+      })
+    ).not.toMatch(/Non-returned orders/i);
+  });
+
+  it("retail fixture bullets still include revenue/profit/category context", () => {
+    const retail = DOMAIN_PAYLOADS.find((p) => p.domain === "retail")!;
+    const bullets = bulletsFor(retail);
+    const joined = bullets.join(" ").toLowerCase();
+    expect(joined).toMatch(/revenue|profit|product|category|order/);
+    expect(bullets.some((b) => /N has the highest return flag profit share/i.test(b))).toBe(
+      false
+    );
   });
 });
 

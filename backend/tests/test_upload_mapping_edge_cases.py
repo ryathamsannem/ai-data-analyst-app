@@ -12,6 +12,8 @@ import pandas as pd
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
 GOLDEN = REPO_ROOT / "test-fixtures" / "golden-datasets"
+DOMAIN_UPLOAD = REPO_ROOT / "test-fixtures" / "domain_upload_1k"
+DOMAINS = REPO_ROOT / "test-fixtures" / "domains"
 
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
@@ -272,6 +274,31 @@ class TestCovidPublicHealthMapping(unittest.TestCase):
         self.assertEqual(meta.get("domain"), "banking")
         self.assertIn(proposed.get("sales"), ("loan_balance", "deposit_balance"))
 
+    def test_ecommerce_orders_classify_as_retail_ecommerce(self) -> None:
+        path = DOMAIN_UPLOAD / "ecommerce_orders_10k.csv"
+        df = pd.read_csv(path, nrows=200)
+        df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "retail")
+        self.assertEqual(dash.get("type_label"), "Retail / Ecommerce")
+        self.assertEqual(proposed.get("sales"), "net_revenue")
+        self.assertEqual(proposed.get("product"), "product_category")
+        self.assertEqual(proposed.get("date"), "order_date")
+
+    def test_generic_monthly_sales_stays_sales(self) -> None:
+        path = DOMAINS / "monthly_sales.csv"
+        df = pd.read_csv(path)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "sales")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(dash.get("type_label"), "Sales")
+
+    def test_healthcare_classification_unchanged(self) -> None:
+        df = self._covid_style_frame()
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "healthcare")
+        _proposed, meta, dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "healthcare")
+        self.assertEqual(dash.get("type_label"), "Healthcare / Public Health")
+
     def test_generic_random_dataset_stays_generic(self) -> None:
         df = pd.DataFrame(
             {
@@ -320,8 +347,9 @@ class TestDomainGoldFixturesEdgeCases(unittest.TestCase):
         df = pd.read_csv(GOLDEN / "retail_gold_10000.csv")
         df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
         proposed, meta, dash = _bind(df)
-        self.assertEqual(infer_executive_domain(df.columns.tolist()), "sales")
-        self.assertIn(meta.get("domain"), ("sales", "ecommerce"))
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "retail")
+        self.assertIn(meta.get("domain"), ("sales", "ecommerce", "retail"))
+        self.assertEqual(dash.get("type_label"), "Retail / Ecommerce")
         self.assertEqual(proposed.get("sales"), "sales_amount")
         self.assertEqual(proposed.get("date"), "order_date")
         self.assertGreaterEqual(len(dash.get("charts") or []), 3)
