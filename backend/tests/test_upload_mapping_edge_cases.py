@@ -336,6 +336,61 @@ class TestCovidPublicHealthMapping(unittest.TestCase):
         product_conf = (meta.get("roles") or {}).get("product", {}).get("confidence")
         self.assertEqual(product_conf, "low")
 
+    def test_manufacturing_quality_operations_mapping_not_low_confidence(self) -> None:
+        path = DOMAIN_UPLOAD / "manufacturing_quality_10k.csv"
+        df = pd.read_csv(path, nrows=500)
+        df["production_date"] = pd.to_datetime(df["production_date"], errors="coerce")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "operations")
+        self.assertEqual(meta.get("domain"), "manufacturing")
+        self.assertEqual(proposed.get("sales"), "units_produced")
+        self.assertEqual(proposed.get("date"), "production_date")
+        self.assertEqual(proposed.get("product"), "product_family")
+        self.assertEqual(proposed.get("region"), "plant")
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertIn(agg, ("high", "medium"), msg=f"aggregate={agg}")
+        product_conf = (meta.get("roles") or {}).get("product", {}).get("confidence")
+        self.assertIn(product_conf, ("high", "medium"), msg=f"product confidence={product_conf}")
+        self.assertEqual(dash.get("type_label"), "Manufacturing / Operations")
+
+    def test_manufacturing_quality_displays_manufacturing_operations_label(self) -> None:
+        path = DOMAIN_UPLOAD / "manufacturing_quality_10k.csv"
+        df = pd.read_csv(path, nrows=500)
+        df["production_date"] = pd.to_datetime(df["production_date"], errors="coerce")
+        _proposed, meta, dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "manufacturing")
+        self.assertEqual(dash.get("type_label"), "Manufacturing / Operations")
+
+    def test_generic_operations_incidents_stays_operations_label(self) -> None:
+        path = DOMAINS / "operations_incidents_chart_test.csv"
+        df = pd.read_csv(path)
+        for col in df.columns:
+            if "date" in str(col).lower():
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        _proposed, _meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "operations")
+        self.assertEqual(dash.get("type_label"), "Operations")
+        path = DOMAIN_UPLOAD / "ecommerce_orders_10k.csv"
+        df = pd.read_csv(path, nrows=200)
+        df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
+        proposed, meta, _dash = _bind(df)
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertEqual(agg, "high", msg=f"aggregate={agg}")
+        self.assertEqual(proposed.get("sales"), "net_revenue")
+
+    def test_banking_mapping_aggregate_confidence_unchanged(self) -> None:
+        path = DOMAINS / "banking_financial_services.csv"
+        df = pd.read_csv(path)
+        for col in df.columns:
+            if "date" in str(col).lower():
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "banking")
+        self.assertIn(proposed.get("sales"), ("spend_amount", "loan_balance"))
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertEqual(agg, "medium", msg=f"aggregate={agg}")
+        self.assertEqual(dash.get("type_label"), "Banking / Financial Services")
+
 
 class TestDomainGoldFixturesEdgeCases(unittest.TestCase):
     def tearDown(self) -> None:

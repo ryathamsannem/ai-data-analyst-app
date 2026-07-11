@@ -578,6 +578,40 @@ _COVID_PUBLIC_HEALTH_DOMAIN_KEYWORDS = (
     "age_group",
 )
 
+_MANUFACTURING_OPERATIONS_DOMAIN_KEYWORDS = (
+    "production_date",
+    "units_produced",
+    "downtime_minutes",
+    "downtime",
+    "defect_rate",
+    "defect_count",
+    "product_family",
+    "production_line",
+    "product_line",
+    "plant",
+    "facility",
+    "shift",
+    "machine",
+    "output",
+    "throughput",
+    "scrap",
+    "yield",
+    "quality",
+    "oee",
+    "work_order",
+    "cycle_time",
+)
+
+
+def _manufacturing_operations_signal_score(columns: List[str]) -> int:
+    joined = " ".join(_norm_header_token(c) for c in columns)
+    return sum(1 for k in _MANUFACTURING_OPERATIONS_DOMAIN_KEYWORDS if k in joined)
+
+
+def _is_manufacturing_operations_dataset(columns: List[str]) -> bool:
+    """Production / quality datasets with plant-line-family signals."""
+    return _manufacturing_operations_signal_score(columns) >= 4
+
 
 def _covid_public_health_signal_score(columns: List[str]) -> int:
     joined = " ".join(_norm_header_token(c) for c in columns)
@@ -643,7 +677,8 @@ def _infer_business_domain(columns: List[str]) -> str:
     mfg_kw = (
         "bom", "work_order", "routing", "batch", "lot", "plant", "assembly",
         "sku", "material", "warehouse", "inventory", "production", "defect_rate",
-        "units_produced", "scrap_cost", "product_line",
+        "units_produced", "scrap_cost", "product_line", "product_family",
+        "production_line", "downtime_minutes", "defect_count",
     )
     ecom_kw = (
         "order", "cart", "checkout", "sku", "product", "customer", "invoice",
@@ -1774,7 +1809,13 @@ def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[
             pts += 10.0
             reasons.append("domain:ecommerce_product(+10)")
     if domain == "manufacturing" and role == "product":
-        if any(k in n for k in ("material", "bom", "sku", "item", "part")):
+        if "product_family" in n:
+            pts += 14.0
+            reasons.append("domain:mfg_product_family(+14)")
+        elif "product_line" in n or "production_line" in n:
+            pts += 10.0
+            reasons.append("domain:mfg_product_line(+10)")
+        elif any(k in n for k in ("material", "bom", "sku", "item", "part")):
             pts += 12.0
             reasons.append("domain:mfg_product(+12)")
     if domain == "ecommerce" and role == "customer":
@@ -2260,6 +2301,28 @@ def _calibrate_mapping_role_confidence(
         if bonus1 >= 14.0 and s1 >= 70.0 and gap >= 2.0:
             return "high"
         if bonus1 >= 10.0 and s1 >= 60.0 and gap >= 4.0 and confidence == "low":
+            return "medium"
+
+    if role_key == "product" and confidence == "low":
+        n1 = _norm_header_token(str(top1.get("column") or ""))
+        n2 = _norm_header_token(str(top2.get("column") or ""))
+        mfg_dim_tokens = (
+            "product_family",
+            "product_line",
+            "production_line",
+            "material",
+            "bom",
+            "sku",
+            "part",
+            "item",
+        )
+        if (
+            s1 >= 55.0
+            and s2 >= 55.0
+            and any(t in n1 for t in mfg_dim_tokens)
+            and any(t in n2 for t in mfg_dim_tokens)
+            and gap <= 4.0
+        ):
             return "medium"
 
     if confidence != "medium":
@@ -3461,6 +3524,7 @@ EXECUTIVE_DASHBOARD_LABELS = {
     "healthcare": "Healthcare",
     "customer_support": "Customer Support",
     "operations": "Operations",
+    "manufacturing": "Manufacturing / Operations",
     "marketing": "Marketing",
     "finance_fpa": "Finance / FP&A",
     "geography": "Geographic Analytics",
@@ -4624,6 +4688,8 @@ def build_auto_dashboard(
     label = EXECUTIVE_DASHBOARD_LABELS.get(exec_domain, AUTO_DASHBOARD_LABELS.get(kind, "Generic"))
     if exec_domain == "healthcare" and _is_covid_public_health_dataset(columns):
         label = "Healthcare / Public Health"
+    if exec_domain == "operations" and _is_manufacturing_operations_dataset(columns):
+        label = "Manufacturing / Operations"
 
     out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": [], "charts": []}
 

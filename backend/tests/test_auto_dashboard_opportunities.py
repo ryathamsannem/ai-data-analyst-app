@@ -562,6 +562,12 @@ BANKING_FIXTURE = (
 HEALTHCARE_FIXTURE = (
     BACKEND_ROOT.parent / "test-fixtures" / "domain_upload_1k" / "covid_healthcare_10k.csv"
 )
+MANUFACTURING_FIXTURE = (
+    BACKEND_ROOT.parent / "test-fixtures" / "domain_upload_1k" / "manufacturing_quality_10k.csv"
+)
+OPERATIONS_INCIDENTS_FIXTURE = (
+    BACKEND_ROOT.parent / "test-fixtures" / "domains" / "operations_incidents_chart_test.csv"
+)
 
 
 def _bind_fixture_csv(path: Path) -> list:
@@ -687,6 +693,62 @@ class TestAutoDashboardChartDiversity(unittest.TestCase):
             has_composition_ranking_metric_dim_duplicate(pruned, record_key)
         )
         self.assertEqual(len(pruned), 2)
+
+
+class TestManufacturingOperationsChartSelection(unittest.TestCase):
+    def test_manufacturing_label_and_quality_focused_charts(self) -> None:
+        self.assertTrue(MANUFACTURING_FIXTURE.is_file())
+        df = pd.read_csv(MANUFACTURING_FIXTURE)
+        for col in df.columns:
+            if "date" in str(col).lower():
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        df = main.clean_dataframe(df)
+        main.df = df
+        main.dataset_profile = main.build_profile(df)
+        proposed, meta = main.compute_semantic_column_mapping(df, main.dataset_profile)
+        main.column_mapping_metadata = meta
+        for key, val in proposed.items():
+            main.column_mapping[key] = val
+        try:
+            dash = main.build_auto_dashboard()
+            self.assertEqual(dash.get("type_label"), "Manufacturing / Operations")
+            self.assertEqual(proposed.get("sales"), "units_produced")
+            self.assertEqual(proposed.get("date"), "production_date")
+            self.assertEqual(proposed.get("product"), "product_family")
+            self.assertEqual(proposed.get("region"), "plant")
+            titles = [str(c.get("title") or "") for c in dash.get("charts") or []]
+            joined = " | ".join(titles)
+            self.assertIn("Monthly Units Produced Trend", joined)
+            self.assertIn("Average Defect Rate by Product Family", joined)
+            self.assertIn("Monthly Defect Rate Trend", joined)
+            self.assertIn("Monthly Defect Count Trend", joined)
+            self.assertNotIn("Units Produced by Product Family", joined)
+            self.assertTrue(
+                any("downtime" in t.lower() for t in titles)
+                or any("defect count by" in t.lower() for t in titles)
+            )
+            self.assertGreaterEqual(len(titles), 5)
+        finally:
+            main.df = None
+            main.dataset_profile = None
+            main.column_mapping_metadata = None
+            main.column_mapping = {k: None for k in main.column_mapping}
+
+    def test_generic_operations_incidents_label_unchanged(self) -> None:
+        self.assertTrue(OPERATIONS_INCIDENTS_FIXTURE.is_file())
+        df = pd.read_csv(OPERATIONS_INCIDENTS_FIXTURE)
+        for col in df.columns:
+            if "date" in str(col).lower():
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        df = main.clean_dataframe(df)
+        main.df = df
+        main.dataset_profile = main.build_profile(df)
+        try:
+            dash = main.build_auto_dashboard()
+            self.assertEqual(dash.get("type_label"), "Operations")
+        finally:
+            main.df = None
+            main.dataset_profile = None
 
 
 if __name__ == "__main__":
