@@ -5,6 +5,7 @@ import {
 import {
   formatExecutiveMetricValue,
   formatExecutivePercentPointGap,
+  formatMetricNumber,
   formatMetricSpreadGap,
   metricLabelImpliesPrecisionBarLabels,
   readChartRowRawValue,
@@ -193,12 +194,10 @@ export function overviewBarLabelsNeedExtraPrecision(
   return barTopLabelsNeedExtraPrecision(rows, ctx);
 }
 
-function barTopLabelsNeedExtraPrecision(
+function barEndLabelsCollideFromDefaultTicks(
   rows: readonly ChartRow[],
   ctx: MetricFormatContext
 ): boolean {
-  if (!isFocusedVerticalBarRateChart(rows, ctx)) return false;
-
   const rawVals = rows
     .map((r) => readChartRowRawValue(r))
     .filter((v) => Number.isFinite(v));
@@ -215,6 +214,67 @@ function barTopLabelsNeedExtraPrecision(
     }
   }
   return false;
+}
+
+function barTopLabelsNeedExtraPrecision(
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): boolean {
+  if (!isFocusedVerticalBarRateChart(rows, ctx)) return false;
+  return barEndLabelsCollideFromDefaultTicks(rows, ctx);
+}
+
+function formatCompactMagnitudeBarEndLabel(
+  value: number,
+  decimals: number
+): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000) {
+    const text = (abs / 1_000_000).toFixed(decimals).replace(/\.?0+$/, "");
+    return `${sign}${text}M`;
+  }
+  if (abs >= 1_000) {
+    const text = (abs / 1_000).toFixed(decimals).replace(/\.?0+$/, "");
+    return `${sign}${text}K`;
+  }
+  return formatMetricNumber(value, "number");
+}
+
+function formatPercentBarEndLabelWithPrecision(
+  value: number,
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): string {
+  const rawVals = rows
+    .map((r) => readChartRowRawValue(r))
+    .filter((v) => Number.isFinite(v));
+  const maxAbs = rawVals.length
+    ? Math.max(...rawVals.map((v) => Math.abs(v)))
+    : Math.abs(value);
+  const display = maxAbs <= 1.05 ? value * 100 : value;
+
+  let decimals = 2;
+  while (decimals <= 3) {
+    const labels = rawVals.map((v) => {
+      const d = maxAbs <= 1.05 ? v * 100 : v;
+      return formatPercentBarTopLabelDisplay(d, decimals);
+    });
+    if (new Set(labels).size === labels.length) {
+      return formatPercentBarTopLabelDisplay(display, decimals);
+    }
+    decimals += 1;
+  }
+
+  return formatPercentBarTopLabelDisplay(display, 3);
+}
+
+/** True when default compact H-Bar end labels would hide distinct bar values. */
+export function hBarEndLabelsNeedExtraPrecision(
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): boolean {
+  return barEndLabelsCollideFromDefaultTicks(rows, ctx);
 }
 
 /**
@@ -256,6 +316,45 @@ export function formatOverviewBarTopValueLabel(
   }
 
   return formatPercentBarTopLabelDisplay(display, 3);
+}
+
+/**
+ * H-Bar bar-end value labels — may use extra compact precision when default
+ * axis-style rounding would collapse distinct values (e.g. 1.59M vs 1.60M → 1.6M).
+ * Axis tick formatting is unchanged; pass this only to H-Bar LabelList formatters.
+ */
+export function formatOverviewHBarEndValueLabel(
+  value: number,
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext = {}
+): string {
+  if (!Number.isFinite(value)) return String(value);
+
+  const defaultLabel = formatOverviewBarValueAxisTick(value, rows, ctx);
+  if (!barEndLabelsCollideFromDefaultTicks(rows, ctx)) return defaultLabel;
+
+  const format = resolveMetricValueFormat(ctx);
+  if (format === "percent") {
+    return formatPercentBarEndLabelWithPrecision(value, rows, ctx);
+  }
+
+  const rawVals = rows
+    .map((r) => readChartRowRawValue(r))
+    .filter((v) => Number.isFinite(v));
+  if (rawVals.length < 2) return defaultLabel;
+
+  const maxAbs = Math.max(...rawVals.map((v) => Math.abs(v)));
+  const startDecimals = maxAbs >= 1_000_000 ? 2 : 1;
+  for (let decimals = startDecimals; decimals <= 3; decimals++) {
+    const labels = rawVals.map((v) =>
+      formatCompactMagnitudeBarEndLabel(v, decimals)
+    );
+    if (new Set(labels).size === labels.length) {
+      return formatCompactMagnitudeBarEndLabel(value, decimals);
+    }
+  }
+
+  return formatCompactMagnitudeBarEndLabel(value, 3);
 }
 
 /**

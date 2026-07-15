@@ -93,7 +93,7 @@ import {
   resolveRadialPieEdgeProps,
   truncateRadialLegendLine,
 } from "@/lib/radial-chart-format";
-import { shouldShowOverviewBarValueLabels, shouldShowHBarValueLabels, formatOverviewBarTopValueLabel } from "@/lib/overview-dashboard-export";
+import { shouldShowOverviewBarValueLabels, shouldShowHBarValueLabels, formatOverviewBarTopValueLabel, formatOverviewHBarEndValueLabel } from "@/lib/overview-dashboard-export";
 import {
   HORIZONTAL_BAR_END_RADIUS,
   HORIZONTAL_BAR_STACKED_MAX_SIZE,
@@ -312,6 +312,12 @@ function ChartRendererInner({
   const barTopLabelFormatter = useMemo(
     () => (value: number) =>
       formatOverviewBarTopValueLabel(value, rData, metricTooltipCtx),
+    [rData, metricTooltipCtx]
+  );
+
+  const barHBarEndLabelFormatter = useMemo(
+    () => (value: number) =>
+      formatOverviewHBarEndValueLabel(value, rData, metricTooltipCtx),
     [rData, metricTooltipCtx]
   );
 
@@ -1187,7 +1193,7 @@ function ChartRendererInner({
       showHBarEndLabels && hBarPlacementMode !== "overview-live"
         ? computeHBarSignedOutsideLabelReservesPx(
             rData.map((r) => r.value),
-            (v) => barValueTickFormatter(v),
+            (v) => barHBarEndLabelFormatter(v),
             hBarLabelFontSize
           )
         : { left: 0, right: 0 };
@@ -1310,7 +1316,7 @@ function ChartRendererInner({
                     height={labelProps.height}
                     value={labelProps.value}
                     viewBox={labelProps.viewBox}
-                    formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                    formatter={(v) => barHBarEndLabelFormatter(Number(v ?? 0))}
                     fontSize={hBarLabelFontSize}
                     inlayFill={CHART_BAR_INLAY_LABEL_CSS}
                     outsideFill={CHART_BAR_VALUE_LABEL_CSS}

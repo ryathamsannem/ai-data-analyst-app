@@ -107,6 +107,7 @@ import {
   shouldShowOverviewBarValueLabels,
   shouldShowHBarValueLabels,
   formatOverviewBarTopValueLabel,
+  formatOverviewHBarEndValueLabel,
   formatExecutiveInsightMetricValue,
 } from "@/lib/overview-dashboard-export";
 import {
@@ -4470,6 +4471,12 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
     [chartRows, overviewMetricCtx]
   );
 
+  const barHBarEndLabelFormatter = useCallback(
+    (value: number) =>
+      formatOverviewHBarEndValueLabel(value, chartRows, overviewMetricCtx),
+    [chartRows, overviewMetricCtx]
+  );
+
   const overviewVerticalBarAxisProps = useMemo(
     () =>
       displayKind === "bar" || displayKind === "histogram"
@@ -4840,7 +4847,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
         showBarEndLabels
           ? computeHBarSignedOutsideLabelReservesPx(
               chartRows.map((r) => r.value),
-              (v) => barValueTickFormatter(v),
+              (v) => barHBarEndLabelFormatter(v),
               hBarLabelFontSize
             )
           : { left: 0, right: 0 };
@@ -4950,7 +4957,7 @@ const OverviewAutoDashboardChartCard = memo(function OverviewAutoDashboardChartC
                       height={labelProps.height}
                       value={labelProps.value}
                       viewBox={labelProps.viewBox}
-                      formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                      formatter={(v) => barHBarEndLabelFormatter(Number(v ?? 0))}
                       fontSize={hBarLabelFontSize}
                       inlayFill={CHART_BAR_INLAY_LABEL_CSS}
                       outsideFill={CHART_BAR_VALUE_LABEL_CSS}

@@ -2325,6 +2325,30 @@ def _calibrate_mapping_role_confidence(
         ):
             return "medium"
 
+    if role_key == "profit" and confidence == "low":
+        bonus1 = _candidate_domain_role_bonus(top1)
+        n1 = _norm_header_token(str(top1.get("column") or ""))
+        n2 = _norm_header_token(str(top2.get("column") or "")) if top2 else ""
+        mkt_profit_tokens = (
+            "ad_spend",
+            "spend",
+            "conversion",
+            "conversions",
+            "ctr",
+            "click",
+            "impression",
+            "roas",
+            "cpa",
+        )
+        if (
+            bonus1 >= 10.0
+            and s1 >= 58.0
+            and gap <= 4.0
+            and any(t in n1 for t in mkt_profit_tokens)
+            and (not n2 or any(t in n2 for t in mkt_profit_tokens))
+        ):
+            return "medium"
+
     if confidence != "medium":
         return confidence
 
@@ -3536,6 +3560,17 @@ EXECUTIVE_DASHBOARD_LABELS = {
 }
 
 
+def _resolve_kpi_card_exec_domain(exec_domain: str) -> str:
+    """KPI-only domain override from semantic mapping; dashboard kind stays unchanged."""
+    if exec_domain != "generic":
+        return exec_domain
+    meta = column_mapping_metadata if isinstance(column_mapping_metadata, dict) else {}
+    semantic_domain = str(meta.get("domain") or "").strip().lower()
+    if semantic_domain in ("education", "supply_chain"):
+        return semantic_domain
+    return exec_domain
+
+
 def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
     """UI + PDF KPI cards with human-facing labels."""
     global df, dataset_profile
@@ -3547,7 +3582,9 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
     columns = df.columns.tolist()
     exec_domain = infer_executive_domain(columns)
     domain = executive_domain_to_kpi_domain(exec_domain)
-    cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
+    cards = build_executive_kpi_cards(
+        _resolve_kpi_card_exec_domain(exec_domain), _kpi_build_context(profile, kp)
+    )
     return cards[:5], domain
 
 
@@ -4742,7 +4779,10 @@ def build_auto_dashboard(
     cards = (
         exec_cards
         if exec_cards is not None
-        else build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
+        else build_executive_kpi_cards(
+            _resolve_kpi_card_exec_domain(exec_domain),
+            _kpi_build_context(profile, kp),
+        )
     )
     out["cards"] = clamp_cards(cards)
     charts, coverage_telemetry = build_auto_dashboard_charts_bundle(
@@ -6024,7 +6064,9 @@ def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
     kp = calculate_kpis()
     columns = df.columns.tolist()
     exec_domain = infer_executive_domain(columns)
-    exec_cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(prof, kp))
+    exec_cards = build_executive_kpi_cards(
+        _resolve_kpi_card_exec_domain(exec_domain), _kpi_build_context(prof, kp)
+    )
     kpi_cards = exec_cards[:5]
     dataset_kind = executive_domain_to_kpi_domain(exec_domain)
     auto_dashboard = build_auto_dashboard(

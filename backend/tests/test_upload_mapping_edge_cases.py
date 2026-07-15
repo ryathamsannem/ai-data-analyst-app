@@ -391,6 +391,24 @@ class TestCovidPublicHealthMapping(unittest.TestCase):
         self.assertEqual(agg, "medium", msg=f"aggregate={agg}")
         self.assertEqual(dash.get("type_label"), "Banking / Financial Services")
 
+    def test_marketing_campaigns_mapping_not_low_confidence(self) -> None:
+        path = DOMAIN_UPLOAD / "marketing_campaigns_10k.csv"
+        df = pd.read_csv(path, nrows=500)
+        df["campaign_date"] = pd.to_datetime(df["campaign_date"], errors="coerce")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "marketing")
+        self.assertEqual(meta.get("domain"), "marketing")
+        self.assertEqual(proposed.get("sales"), "campaign_revenue")
+        self.assertEqual(proposed.get("date"), "campaign_date")
+        self.assertEqual(proposed.get("product"), "campaign_type")
+        self.assertEqual(proposed.get("region"), "region")
+        self.assertEqual(proposed.get("profit"), "ad_spend")
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertIn(agg, ("high", "medium"), msg=f"aggregate={agg}")
+        profit_conf = (meta.get("roles") or {}).get("profit", {}).get("confidence")
+        self.assertIn(profit_conf, ("high", "medium"), msg=f"profit confidence={profit_conf}")
+        self.assertEqual(dash.get("type_label"), "Marketing")
+
 
 class TestDomainGoldFixturesEdgeCases(unittest.TestCase):
     def tearDown(self) -> None:

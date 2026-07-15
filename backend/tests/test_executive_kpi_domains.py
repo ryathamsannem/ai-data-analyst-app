@@ -11,6 +11,7 @@ import pandas as pd
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
 FIX_DIR = REPO_ROOT / "test-fixtures" / "domains"
+DOMAIN_UPLOAD = REPO_ROOT / "test-fixtures" / "domain_upload_1k"
 
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
@@ -89,7 +90,23 @@ def _bind(path: Path) -> None:
     main.df = df
     main.dataset_profile = profile
     main.column_mapping = {k: None for k in main.column_mapping}
-    proposed, _ = main.compute_semantic_column_mapping(df, profile)
+    proposed, meta = main.compute_semantic_column_mapping(df, profile)
+    main.column_mapping_metadata = meta
+    for key, val in proposed.items():
+        main.column_mapping[key] = val
+
+
+def _bind_frame(df: pd.DataFrame) -> None:
+    for col in df.columns:
+        if "date" in str(col).lower():
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+            break
+    profile = main.build_profile(df)
+    main.df = df
+    main.dataset_profile = profile
+    main.column_mapping = {k: None for k in main.column_mapping}
+    proposed, meta = main.compute_semantic_column_mapping(df, profile)
+    main.column_mapping_metadata = meta
     for key, val in proposed.items():
         main.column_mapping[key] = val
 
@@ -109,6 +126,7 @@ class TestExecutiveKpiCardsPerFixture(unittest.TestCase):
     def tearDown(self) -> None:
         main.df = None
         main.dataset_profile = None
+        main.column_mapping_metadata = None
         main.column_mapping = {k: None for k in main.column_mapping}
 
     def _cards_for(self, name: str) -> list[dict]:
@@ -196,6 +214,120 @@ class TestExecutiveKpiCardsPerFixture(unittest.TestCase):
         titles = {str(c.get("title")) for c in cards}
         self.assertIn("Total Revenue", titles)
         self.assertIn("Total Profit", titles)
+
+    def test_domain_upload_10k_kpi_cards_are_business_rich(self) -> None:
+        cases = {
+            "banking_loans_10k.csv": (
+                "Banking / Financial Services",
+                {
+                    "Total Loan Amount",
+                    "Total Outstanding Balance",
+                    "Average Delinquency Rate",
+                    "Default Rate",
+                    "Average Interest Rate",
+                },
+            ),
+            "covid_healthcare_10k.csv": (
+                "Healthcare / Public Health",
+                {
+                    "Total New Cases",
+                    "Total Active Cases",
+                    "Total Hospital Admissions",
+                    "Total Deaths",
+                    "Average Positivity Rate",
+                },
+            ),
+            "ecommerce_orders_10k.csv": (
+                "Retail / Ecommerce",
+                {"Total Revenue", "Total Profit", "Average Revenue per Record"},
+            ),
+            "manufacturing_quality_10k.csv": (
+                "Manufacturing / Operations",
+                {"Total Units Produced", "Total Downtime Minutes", "Average Defect Rate"},
+            ),
+            "marketing_campaigns_10k.csv": (
+                "Marketing",
+                {"Total Spend", "Total Revenue", "ROAS", "Total Conversions", "Average CTR"},
+            ),
+        }
+        fallback = {"Records in view", "Attributes tracked", "Breakdown-style fields"}
+        for filename, (type_label, expected_titles) in cases.items():
+            _bind(DOMAIN_UPLOAD / filename)
+            dash = main.build_auto_dashboard()
+            cards = dash.get("cards") or []
+            titles = {str(c.get("title")) for c in cards[:5]}
+            self.assertEqual(dash.get("type_label"), type_label, msg=filename)
+            self.assertTrue(expected_titles <= titles, msg=f"{filename} titles={titles}")
+            self.assertGreaterEqual(len(titles - fallback), 4, msg=f"{filename} titles={titles}")
+
+    def test_semantic_education_and_supply_chain_get_business_kpis(self) -> None:
+        cases = {
+            "education_student_1k.csv": {
+                "Student Count",
+                "Average Score",
+                "Pass Rate",
+                "Attendance Rate",
+            },
+            "supply_chain_logistics_1k.csv": {
+                "Total Shipments",
+                "On-time Delivery Rate",
+                "Average Delivery Days",
+                "Total Freight Cost",
+            },
+            "saas_subscription_1k.csv": {
+                "Total MRR",
+                "Average Churn Rate",
+                "Total Active Users",
+                "Total New Signups",
+            },
+            "hr_workforce_1k.csv": {
+                "Total Employees",
+                "Average Salary",
+                "Average Bonus",
+                "Department Count",
+            },
+        }
+        fallback = {"Records in view", "Attributes tracked", "Breakdown-style fields"}
+        for filename, expected in cases.items():
+            _bind(DOMAIN_UPLOAD / filename)
+            cards = main.build_auto_dashboard().get("cards") or []
+            titles = {str(c.get("title")) for c in cards[:5]}
+            self.assertTrue(expected <= titles, msg=f"{filename} titles={titles}")
+            self.assertGreaterEqual(len(titles - fallback), 4, msg=f"{filename} titles={titles}")
+
+    def test_weak_generic_can_still_use_fallback_cards(self) -> None:
+        _bind_frame(
+            pd.DataFrame(
+                {
+                    "value": [1.0, 2.0, 3.0],
+                    "type": ["a", "b", "c"],
+                    "category": ["x", "y", "z"],
+                }
+            )
+        )
+        cards = main.build_auto_dashboard().get("cards") or []
+        titles = {str(c.get("title")) for c in cards}
+        self.assertIn("Records in view", titles)
+        self.assertIn("Attributes tracked", titles)
+
+    def test_kpi_card_titles_unique_and_shape_stable(self) -> None:
+        for filename in (
+            "banking_loans_10k.csv",
+            "covid_healthcare_10k.csv",
+            "ecommerce_orders_10k.csv",
+            "manufacturing_quality_10k.csv",
+            "marketing_campaigns_10k.csv",
+            "education_student_1k.csv",
+            "supply_chain_logistics_1k.csv",
+        ):
+            _bind(DOMAIN_UPLOAD / filename)
+            cards = main.build_auto_dashboard().get("cards") or []
+            titles = [str(c.get("title")) for c in cards]
+            self.assertEqual(len(titles), len(set(titles)), msg=filename)
+            for card in cards:
+                self.assertIn("title", card)
+                self.assertIn("value", card)
+                self.assertIn("subtitle", card)
 
 
 if __name__ == "__main__":
