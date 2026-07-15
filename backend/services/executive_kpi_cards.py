@@ -78,6 +78,31 @@ def _score(blob: str, patterns: Tuple[str, ...]) -> int:
     return sum(1 for p in patterns if p in blob)
 
 
+# Order / ecommerce column signals — distinct from generic revenue+product sales cubes.
+_ECOMMERCE_RETAIL_PATTERNS: Tuple[str, ...] = (
+    "order id",
+    "order date",
+    "product category",
+    "product name",
+    "sku",
+    "units sold",
+    "net revenue",
+    "gross revenue",
+    "return flag",
+    "sales channel",
+    "marketing channel",
+    "shipping days",
+    "delivery days",
+    "basket size",
+    "refund",
+    "discount pct",
+)
+
+
+def _ecommerce_retail_score(blob: str) -> int:
+    return _score(blob, _ECOMMERCE_RETAIL_PATTERNS)
+
+
 def infer_executive_domain(columns: List[str]) -> ExecutiveDomain:
     """Schema-first executive domain for KPI card selection."""
     blob = _col_blob(columns)
@@ -127,6 +152,20 @@ def infer_executive_domain(columns: List[str]) -> ExecutiveDomain:
             "admissions",
             "length of stay",
             "ward",
+            "new cases",
+            "active cases",
+            "total cases",
+            "variant",
+            "vaccination",
+            "vaccine",
+            "positivity",
+            "hospital admissions",
+            "icu patients",
+            "covid",
+            "tests conducted",
+            "age group",
+            "deaths",
+            "report date",
         ),
     )
     saas_score = _score(
@@ -176,6 +215,12 @@ def infer_executive_domain(columns: List[str]) -> ExecutiveDomain:
 
     if hr_score >= 3 or (hr_score >= 2 and hr_score > sales_score and not has_commercial_cube):
         return "hr"
+
+    ecommerce_score = _ecommerce_retail_score(blob)
+    if ecommerce_score >= 3 and (
+        "revenue" in blob or "sales" in blob or "profit" in blob
+    ):
+        return "retail"
 
     # Revenue + product cubes (showcase, retail, sales) before secondary banking/geo columns.
     if has_commercial_cube:
@@ -385,6 +430,79 @@ def _top_group_card(
         return
 
 
+def _append_sum_card(
+    ctx: KpiBuildContext,
+    cards: List[Dict[str, Any]],
+    col: Optional[str],
+    title: str,
+    *,
+    integer: bool = False,
+    metric_type: Optional[str] = None,
+) -> None:
+    if not col or col not in ctx.df.columns:
+        return
+    sv = ctx.numeric_series(col)
+    if not sv.notna().any():
+        return
+    value = float(sv.sum(skipna=True))
+    display = f"{int(value):,}" if integer else f"{value:,.0f}"
+    meta = {"metric_source": col, "aggregation": "sum"}
+    if metric_type:
+        meta["metric_type"] = metric_type
+    _append_card(cards, title, display, kpi_meta=meta)
+
+
+def _append_mean_card(
+    ctx: KpiBuildContext,
+    cards: List[Dict[str, Any]],
+    col: Optional[str],
+    title: str,
+    *,
+    percent: bool = False,
+    decimals: int = 1,
+) -> None:
+    if not col or col not in ctx.df.columns:
+        return
+    sv = ctx.numeric_series(col)
+    if not sv.notna().any():
+        return
+    value = float(sv.mean(skipna=True))
+    if percent:
+        if value <= 1.05:
+            value *= 100.0
+        display = f"{value:.{decimals}f}%"
+        metric_type = "rate"
+    else:
+        display = f"{value:,.{decimals}f}"
+        metric_type = "number"
+    _append_card(
+        cards,
+        title,
+        display,
+        kpi_meta={"metric_source": col, "aggregation": "mean", "metric_type": metric_type},
+    )
+
+
+def _append_binary_rate_card(
+    ctx: KpiBuildContext,
+    cards: List[Dict[str, Any]],
+    col: Optional[str],
+    title: str,
+) -> None:
+    if not col or col not in ctx.df.columns:
+        return
+    s = ctx.df[col].dropna()
+    total = int(len(s))
+    if total <= 0:
+        return
+    if pd.api.types.is_numeric_dtype(s):
+        positives = int((pd.to_numeric(s, errors="coerce").fillna(0) > 0).sum())
+    else:
+        lowered = s.astype(str).str.strip().str.lower()
+        positives = int(lowered.isin({"1", "true", "yes", "y", "default", "defaulted"}).sum())
+    _append_card(cards, title, f"{100.0 * positives / total:.1f}%", f"{positives:,} of {total:,} flagged")
+
+
 def _build_hr_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
     cards: List[Dict[str, Any]] = []
     cols = ctx.columns
@@ -484,11 +602,21 @@ def _build_banking_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
     cards: List[Dict[str, Any]] = []
     cols = ctx.columns
 
+    loan_amount_col = _find_col(cols, ("loan_amount", "loan amount"))
+    outstanding_col = _find_col(cols, ("outstanding_balance", "outstanding balance"))
     loan_col = _find_col(cols, ("loan_balance", "loan balance"))
     spend_col = _find_col(cols, ("spend_amount", "spend amount"))
     util_col = _find_col(cols, ("credit_utilization", "credit utilization"))
+    if not util_col:
+        util_col = _find_col(cols, ("utilization_rate", "utilization rate", "utilization_pct"))
+    interest_col = _find_col(cols, ("interest_rate_pct", "interest rate", "apr"))
+    default_col = _find_col(cols, ("default_flag", "default_status", "defaulted"))
     segment_col = _find_col(cols, ("customer_segment", "customer segment"))
+    loan_type_col = _find_col(cols, ("loan_type", "loan type", "product_type", "product type"))
     region_col = ctx.get_mapped_column("region", ["region", "state", "city", "branch"])
+
+    _append_sum_card(ctx, cards, loan_amount_col, "Total Loan Amount", metric_type="currency")
+    _append_sum_card(ctx, cards, outstanding_col, "Total Outstanding Balance", metric_type="currency")
 
     if loan_col:
         lv = ctx.numeric_series(loan_col)
@@ -501,14 +629,6 @@ def _build_banking_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
             _append_card(cards, "Total Spend Amount", f"{float(sv.sum(skipna=True)):,.0f}")
             _append_card(cards, "Average Spend Amount", f"{float(sv.mean(skipna=True)):,.0f}")
 
-    if util_col:
-        uv = ctx.numeric_series(util_col)
-        if uv.notna().any():
-            mean_u = float(uv.mean(skipna=True))
-            if mean_u <= 1.05:
-                mean_u *= 100.0
-            _append_card(cards, "Average Credit Utilization", f"{mean_u:.1f}%")
-
     delinq_col = _find_col(cols, ("delinquency_rate", "delinquency rate"))
     if delinq_col:
         dv = ctx.numeric_series(delinq_col)
@@ -518,13 +638,26 @@ def _build_banking_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
                 mean_d *= 100.0
             _append_card(cards, "Average Delinquency Rate", f"{mean_d:.2f}%")
 
-    if segment_col and loan_col:
+    _append_binary_rate_card(ctx, cards, default_col, "Default Rate")
+    _append_mean_card(ctx, cards, interest_col, "Average Interest Rate", percent=True, decimals=2)
+
+    if util_col:
+        uv = ctx.numeric_series(util_col)
+        if uv.notna().any():
+            mean_u = float(uv.mean(skipna=True))
+            if mean_u <= 1.05:
+                mean_u *= 100.0
+            _append_card(cards, "Average Credit Utilization", f"{mean_u:.1f}%")
+
+    balance_for_top = loan_amount_col or outstanding_col or loan_col or spend_col
+
+    if segment_col and balance_for_top:
         _top_group_card(
             ctx,
             cards,
             segment_col,
-            loan_col,
-            metric_phrase="loan balance",
+            balance_for_top,
+            metric_phrase=ctx.pretty_label(balance_for_top).lower(),
             title="Top Customer Segment",
         )
     elif segment_col and spend_col:
@@ -537,14 +670,24 @@ def _build_banking_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
             title="Top Customer Segment",
         )
 
-    if region_col and spend_col and ctx.region_usable(region_col, ctx.profile):
+    if region_col and balance_for_top and ctx.region_usable(region_col, ctx.profile):
         _top_group_card(
             ctx,
             cards,
             region_col,
-            spend_col,
-            metric_phrase="spend amount",
+            balance_for_top,
+            metric_phrase=ctx.pretty_label(balance_for_top).lower(),
             title="Top Region",
+        )
+
+    if loan_type_col and balance_for_top:
+        _top_group_card(
+            ctx,
+            cards,
+            loan_type_col,
+            balance_for_top,
+            metric_phrase=ctx.pretty_label(balance_for_top).lower(),
+            title="Top Loan Type",
         )
 
     return cards[:6]
@@ -553,6 +696,52 @@ def _build_banking_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
 def _build_healthcare_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
     cards: List[Dict[str, Any]] = []
     cols = ctx.columns
+
+    new_cases_col = _find_col(cols, ("new_cases", "new cases"))
+    active_cases_col = _find_col(cols, ("active_cases", "active cases"))
+    hospital_col = _find_col(cols, ("hospital_admissions", "hospital admissions", "admissions"))
+    deaths_col = _find_col(cols, ("deaths",))
+    positivity_col = _find_col(cols, ("positivity_pct", "positivity rate", "positivity"))
+    mortality_col = _find_col(cols, ("mortality_rate", "mortality rate"))
+    state_col = _find_col(cols, ("state", "region", "district"))
+    variant_col = _find_col(cols, ("variant",))
+    vaccination_col = _find_col(cols, ("vaccination_status", "vaccination status", "vaccine status"))
+
+    if new_cases_col or active_cases_col:
+        _append_sum_card(ctx, cards, new_cases_col, "Total New Cases", integer=True)
+        _append_sum_card(ctx, cards, active_cases_col, "Total Active Cases", integer=True)
+        _append_sum_card(ctx, cards, hospital_col, "Total Hospital Admissions", integer=True)
+        _append_sum_card(ctx, cards, deaths_col, "Total Deaths", integer=True)
+        _append_mean_card(ctx, cards, positivity_col, "Average Positivity Rate", percent=True, decimals=2)
+        _append_mean_card(ctx, cards, mortality_col, "Average Mortality Rate", percent=True, decimals=2)
+        if state_col and new_cases_col:
+            _top_group_card(
+                ctx,
+                cards,
+                state_col,
+                new_cases_col,
+                metric_phrase="new cases",
+                title="Top State",
+            )
+        if variant_col and active_cases_col:
+            _top_group_card(
+                ctx,
+                cards,
+                variant_col,
+                active_cases_col,
+                metric_phrase="active cases",
+                title="Leading Variant",
+            )
+        if vaccination_col:
+            try:
+                vc = ctx.df[vaccination_col].dropna().astype(str).value_counts()
+                picked = pick_valid_leader_from_groups(vc)
+                if picked:
+                    leader, count = picked
+                    _append_card(cards, "Top Vaccination Status", leader, f"{int(count):,} records")
+            except Exception:
+                pass
+        return cards[:6]
 
     patient_col = _find_col(cols, ("patient_volume", "patient volume"))
     admit_col = _find_col(cols, ("admissions",))
@@ -1120,6 +1309,74 @@ def _build_saas_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
     return cards[:6]
 
 
+def _build_education_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
+    cards: List[Dict[str, Any]] = []
+    cols = ctx.columns
+
+    student_col = _find_col(cols, ("student_id", "student id"))
+    enrollment_col = _find_col(cols, ("enrollment_count", "enrollment count", "student_count", "student count"))
+    score_col = _find_col(cols, ("test_score", "score", "grade"))
+    pass_col = _find_col(cols, ("pass_rate", "pass rate"))
+    attendance_col = _find_col(cols, ("attendance_rate", "attendance rate"))
+    course_col = _find_col(cols, ("course", "class", "subject", "grade_level", "grade level"))
+
+    if student_col:
+        _append_card(cards, "Student Count", f"{int(ctx.df[student_col].nunique(dropna=True)):,}")
+    else:
+        _append_sum_card(ctx, cards, enrollment_col, "Student Count", integer=True)
+
+    _append_mean_card(ctx, cards, score_col, "Average Score", decimals=1)
+    _append_mean_card(ctx, cards, pass_col, "Pass Rate", percent=True, decimals=1)
+    _append_mean_card(ctx, cards, attendance_col, "Attendance Rate", percent=True, decimals=1)
+
+    if course_col and score_col:
+        _top_group_card(
+            ctx,
+            cards,
+            course_col,
+            score_col,
+            agg="mean",
+            metric_phrase="score",
+            title=f"Top {_dim_label(course_col, ctx.pretty_label)}",
+        )
+
+    return cards[:6]
+
+
+def _build_supply_chain_kpi_cards(ctx: KpiBuildContext) -> List[Dict[str, Any]]:
+    cards: List[Dict[str, Any]] = []
+    cols = ctx.columns
+
+    shipment_id_col = _find_col(cols, ("shipment_id", "shipment id", "order_id", "order id"))
+    shipment_count_col = _find_col(cols, ("shipment_count", "shipment count", "orders"))
+    on_time_col = _find_col(cols, ("on_time_rate", "on time rate", "on_time_pct"))
+    delay_col = _find_col(cols, ("delivery_days", "delay_days", "delay", "transit_days"))
+    cost_col = _find_col(cols, ("freight_cost", "freight cost", "shipping_cost", "logistics_cost", "cost"))
+    carrier_col = _find_col(cols, ("carrier", "lane", "origin_region", "destination_region", "region"))
+
+    if shipment_id_col:
+        _append_card(cards, "Total Shipments", f"{int(ctx.df[shipment_id_col].nunique(dropna=True)):,}")
+    else:
+        _append_sum_card(ctx, cards, shipment_count_col, "Total Shipments", integer=True)
+
+    _append_mean_card(ctx, cards, on_time_col, "On-time Delivery Rate", percent=True, decimals=1)
+    _append_mean_card(ctx, cards, delay_col, "Average Delivery Days", decimals=1)
+    _append_sum_card(ctx, cards, cost_col, "Total Freight Cost", metric_type="currency")
+
+    metric_for_top = cost_col or shipment_count_col or delay_col
+    if carrier_col and metric_for_top:
+        _top_group_card(
+            ctx,
+            cards,
+            carrier_col,
+            metric_for_top,
+            metric_phrase=ctx.pretty_label(metric_for_top).lower(),
+            title=f"Top {_dim_label(carrier_col, ctx.pretty_label)}",
+        )
+
+    return cards[:6]
+
+
 def build_executive_kpi_cards(domain: ExecutiveDomain, ctx: KpiBuildContext) -> List[Dict[str, Any]]:
     builders = {
         "hr": _build_hr_kpi_cards,
@@ -1134,10 +1391,21 @@ def build_executive_kpi_cards(domain: ExecutiveDomain, ctx: KpiBuildContext) -> 
         "sales": lambda c: _build_sales_retail_kpi_cards(c, retail=False, domain="sales"),
         "ecommerce": lambda c: _build_sales_retail_kpi_cards(c, retail=True, domain="ecommerce"),
         "saas": _build_saas_kpi_cards,
+        "education": _build_education_kpi_cards,
+        "supply_chain": _build_supply_chain_kpi_cards,
         "generic": _build_generic_kpi_cards,
     }
     builder = builders.get(domain, _build_generic_kpi_cards)
     cards = builder(ctx)
+    deduped: List[Dict[str, Any]] = []
+    seen_titles: set = set()
+    for card in cards:
+        title = str(card.get("title") or "").strip()
+        if not title or title in seen_titles:
+            continue
+        seen_titles.add(title)
+        deduped.append(card)
+    cards = deduped
     cards = attach_kpi_subtitles(
         cards,
         df=ctx.df,

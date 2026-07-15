@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   shouldShowHBarValueLabels,
+  formatOverviewHBarEndValueLabel,
+  hBarEndLabelsNeedExtraPrecision,
 } from "@/lib/overview-dashboard-export";
 import { formatOverviewBarValueAxisTick } from "@/lib/overview-premium-axis-domain";
 import { formatChartTooltipValueLine } from "@/lib/chart-tooltip-format";
@@ -104,12 +106,12 @@ describe("ChartRenderer H-Bar inlay labels", () => {
     );
   });
 
-  it("H-Bar LabelList uses barValueTickFormatter via HBarValueLabelListContent", () => {
+  it("H-Bar LabelList uses barHBarEndLabelFormatter via HBarValueLabelListContent", () => {
     const hBarLabelList = chartRendererSrc.match(
       /showHBarEndLabels\s*\?\s*\([\s\S]*?<LabelList[\s\S]*?\/>/
     )?.[0];
     expect(hBarLabelList).toBeDefined();
-    expect(hBarLabelList).toMatch(/barValueTickFormatter/);
+    expect(hBarLabelList).toMatch(/barHBarEndLabelFormatter/);
     expect(hBarLabelList).not.toContain("barTopLabelFormatter");
   });
 
@@ -186,5 +188,95 @@ describe("ChartRenderer H-Bar inlay labels", () => {
     )?.[0];
     expect(gateBlock).toBeDefined();
     expect(gateBlock).not.toContain("pngCaptureMode");
+  });
+});
+
+describe("formatOverviewHBarEndValueLabel", () => {
+  const marketingCtx = {
+    metricLabel: "Ad Spend",
+    chartTitle: "Ad Spend by Audience Segment",
+    presentationKind: "bar_horizontal" as const,
+  };
+
+  it("increases M precision when close ad spend values would all read as 1.6M", () => {
+    const rows = [
+      { name: "Families", value: 1_599_301 },
+      { name: "Young Professionals", value: 1_598_200 },
+      { name: "Students", value: 1_597_100 },
+      { name: "Enterprise Buyers", value: 1_596_000 },
+      { name: "Retail", value: 1_590_000 },
+      { name: "Healthcare", value: 1_506_945 },
+    ];
+    const ctx = { ...marketingCtx, chartRows: rows };
+    expect(hBarEndLabelsNeedExtraPrecision(rows, ctx)).toBe(true);
+
+    const labels = rows.map((r) =>
+      formatOverviewHBarEndValueLabel(r.value, rows, ctx)
+    );
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels[0]).toMatch(/1\.599M|1\.60M/);
+    expect(labels[0]).not.toBe("1.6M");
+    expect(labels[4]).toMatch(/1\.59M/);
+    expect(labels[5]).toMatch(/1\.5\d+M/);
+  });
+
+  it("keeps simple compact labels when values are clearly distinct", () => {
+    const rows = [
+      { name: "A", value: 1_200_000 },
+      { name: "B", value: 2_500_000 },
+      { name: "C", value: 4_800_000 },
+    ];
+    const ctx = {
+      metricLabel: "Revenue",
+      chartTitle: "Revenue by Region",
+      presentationKind: "bar_horizontal" as const,
+      chartRows: rows,
+    };
+    expect(hBarEndLabelsNeedExtraPrecision(rows, ctx)).toBe(false);
+    expect(formatOverviewHBarEndValueLabel(1_200_000, rows, ctx)).toBe("1.2M");
+    expect(formatOverviewHBarEndValueLabel(4_800_000, rows, ctx)).toBe("4.8M");
+  });
+
+  it("increases K precision only when close K-scale values collide", () => {
+    const rows = [
+      { name: "A", value: 450_300 },
+      { name: "B", value: 450_800 },
+      { name: "C", value: 398_700 },
+    ];
+    const ctx = {
+      metricLabel: "Spend",
+      chartTitle: "Spend by Channel",
+      presentationKind: "bar_horizontal" as const,
+      chartRows: rows,
+    };
+    const labels = rows.map((r) =>
+      formatOverviewHBarEndValueLabel(r.value, rows, ctx)
+    );
+    expect(labels[0]).toMatch(/450\.\dK/);
+    expect(labels[1]).toMatch(/450\.\dK/);
+    expect(labels[0]).not.toBe(labels[1]);
+    expect(labels[2]).toMatch(/398\.\dK|399K/);
+  });
+
+  it("leaves axis tick formatting unchanged while tooltips stay exact", () => {
+    const rows = [
+      { name: "Families", value: 1_599_301 },
+      { name: "Young Professionals", value: 1_598_200 },
+      { name: "Students", value: 1_597_100 },
+      { name: "Enterprise Buyers", value: 1_596_000 },
+      { name: "Retail", value: 1_590_000 },
+      { name: "Healthcare", value: 1_506_945 },
+    ];
+    const ctx = { ...marketingCtx, chartRows: rows };
+    const axisTick = formatOverviewBarValueAxisTick(1_599_301, rows, ctx);
+    const endLabel = formatOverviewHBarEndValueLabel(1_599_301, rows, ctx);
+    const [tooltipValue] = formatChartTooltipValueLine(
+      { name: "Families", value: 1_599_301 },
+      "Ad Spend",
+      ctx
+    );
+    expect(axisTick).toBe("1.6M");
+    expect(endLabel).toBe("1.599M");
+    expect(tooltipValue).toContain("1,599,301");
   });
 });

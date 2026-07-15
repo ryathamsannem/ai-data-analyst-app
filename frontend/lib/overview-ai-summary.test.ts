@@ -3,14 +3,17 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  buildBinaryFlagShareInsightLine,
   buildBreakdownInsightLine,
   buildTrendInsightLine,
   computeOverviewAiSummaryBullets,
   DURATION_LATENCY_METRIC_RE,
   inferOverviewSummaryDomain,
+  isCovidPublicHealthDataset,
   OVERVIEW_AI_SUMMARY_INITIAL_VISIBLE,
   OVERVIEW_AI_SUMMARY_MAX_BULLETS,
   partitionOverviewAiSummaryBullets,
+  resolveOverviewSummaryDomainFrame,
   selectOverviewAiSummaryInsights,
   shouldIncludeLongTailProfileInsight,
   type ComputeOverviewAiSummaryArgs,
@@ -80,6 +83,106 @@ describe("inferOverviewSummaryDomain", () => {
       expect(inferred).toBe(EXPECTED_SUMMARY_DOMAIN[domain]);
     }
   );
+});
+
+const COVID_PUBLIC_HEALTH_COLUMNS = [
+  "report_date",
+  "state",
+  "variant",
+  "age_group",
+  "gender",
+  "vaccination_status",
+  "new_cases",
+  "active_cases",
+  "hospital_admissions",
+  "icu_patients",
+  "deaths",
+  "tests_conducted",
+  "positivity_pct",
+];
+
+describe("healthcare / public health AI summary", () => {
+  it("detects COVID-style columns as healthcare summary domain", () => {
+    expect(isCovidPublicHealthDataset(COVID_PUBLIC_HEALTH_COLUMNS)).toBe(true);
+    expect(
+      inferOverviewSummaryDomain({
+        columns: COVID_PUBLIC_HEALTH_COLUMNS,
+        autoDashboard: {
+          kind: "operations",
+          type_label: "Healthcare / Public Health",
+        },
+      })
+    ).toBe("healthcare");
+  });
+
+  it("uses public-health snapshot frame, not operations manufacturing copy", () => {
+    const frame = resolveOverviewSummaryDomainFrame(
+      "healthcare",
+      COVID_PUBLIC_HEALTH_COLUMNS,
+      "Healthcare / Public Health"
+    );
+    expect(frame).toMatch(/Healthcare \/ Public Health snapshot/i);
+    expect(frame).toMatch(/cases|admissions|vaccination|variants/i);
+    expect(frame).not.toMatch(/Operations snapshot/i);
+    expect(frame).not.toMatch(/production, downtime/i);
+  });
+
+  it("COVID dashboard bullets open with healthcare public-health framing", () => {
+    const bullets = computeOverviewAiSummaryBullets({
+      rows: 1000,
+      columns: COVID_PUBLIC_HEALTH_COLUMNS,
+      autoDashboard: {
+        kind: "operations",
+        type_label: "Healthcare / Public Health",
+        cards: [],
+        charts: [
+          {
+            title: "New Cases by Variant",
+            chartType: "bar",
+            labels: ["Omicron", "Delta", "Other"],
+            values: [1200, 800, 400],
+          },
+        ],
+      },
+      profile: {
+        column_types: { new_cases: "number", variant: "category", report_date: "date" },
+      },
+      primaryMetricColumn: "new_cases",
+      groupingColumn: "variant",
+      dateColumn: "report_date",
+    });
+    expect(bullets[0]).toMatch(/Healthcare \/ Public Health snapshot/i);
+    expect(bullets[0]).not.toMatch(/Operations snapshot/i);
+  });
+
+  it("operations incidents fixture still uses operations snapshot", () => {
+    const ops = DOMAIN_PAYLOADS.find((p) => p.domain === "operations")!;
+    const frame = resolveOverviewSummaryDomainFrame(
+      inferOverviewSummaryDomain({
+        columns: ops.columns,
+        autoDashboard: ops.auto_dashboard,
+      }),
+      ops.columns,
+      ops.auto_dashboard?.type_label
+    );
+    expect(frame).toMatch(/^Operations snapshot/i);
+    expect(frame).toMatch(/production, downtime/i);
+  });
+
+  it("banking fixture summary frame is unchanged", () => {
+    const banking = DOMAIN_PAYLOADS.find(
+      (p) => p.domain === "banking_financial_services"
+    )!;
+    const frame = resolveOverviewSummaryDomainFrame(
+      inferOverviewSummaryDomain({
+        columns: banking.columns,
+        autoDashboard: banking.auto_dashboard,
+      }),
+      banking.columns,
+      banking.auto_dashboard?.type_label
+    );
+    expect(frame).toMatch(/^Banking analytics snapshot/i);
+  });
 });
 
 describe("computeOverviewAiSummaryBullets per domain fixture", () => {
@@ -645,6 +748,69 @@ describe("executive wording helpers", () => {
     expect(out.some((b) => /\bage band\b/i.test(b))).toBe(false);
     expect(out.some((b) => /\bgender\b/i.test(b))).toBe(false);
     expect(out.some((b) => /\battrition\b/i.test(b))).toBe(true);
+  });
+});
+
+describe("binary return/refund flag AI summary wording", () => {
+  it("does not produce awkward return-flag leader phrasing", () => {
+    const line = buildBreakdownInsightLine({
+      chartTitle: "Return Flag Profit Share",
+      chartType: "pie",
+      leaderName: "N",
+      domain: "retail",
+    });
+    expect(line).not.toMatch(/N has the highest return flag profit share/i);
+    expect(line).toMatch(/Non-returned orders account for most profit/i);
+  });
+
+  it("buildBinaryFlagShareInsightLine handles N/Y return_flag", () => {
+    expect(
+      buildBinaryFlagShareInsightLine({
+        chartTitle: "Return Flag Profit Share",
+        leaderName: "N",
+      })
+    ).toBe("Non-returned orders account for most profit.");
+    expect(
+      buildBinaryFlagShareInsightLine({
+        chartTitle: "Return Flag Profit Share",
+        leaderName: "Y",
+      })
+    ).toBe("Returned orders account for most profit.");
+  });
+
+  it("does not rewrite unrelated binary gender fields", () => {
+    expect(
+      buildBinaryFlagShareInsightLine({
+        chartTitle: "Gender Revenue Share",
+        leaderName: "Female",
+      })
+    ).toBeNull();
+    expect(
+      buildBreakdownInsightLine({
+        chartTitle: "Gender Revenue Share",
+        chartType: "pie",
+        leaderName: "Female",
+        domain: "hr",
+      })
+    ).toMatch(/Female/i);
+    expect(
+      buildBreakdownInsightLine({
+        chartTitle: "Gender Revenue Share",
+        chartType: "pie",
+        leaderName: "Female",
+        domain: "hr",
+      })
+    ).not.toMatch(/Non-returned orders/i);
+  });
+
+  it("retail fixture bullets still include revenue/profit/category context", () => {
+    const retail = DOMAIN_PAYLOADS.find((p) => p.domain === "retail")!;
+    const bullets = bulletsFor(retail);
+    const joined = bullets.join(" ").toLowerCase();
+    expect(joined).toMatch(/revenue|profit|product|category|order/);
+    expect(bullets.some((b) => /N has the highest return flag profit share/i.test(b))).toBe(
+      false
+    );
   });
 });
 

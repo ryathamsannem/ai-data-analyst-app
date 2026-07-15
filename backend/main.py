@@ -558,6 +558,71 @@ def _norm_header_token(col: str) -> str:
     return re.sub(r"[\s\-]+", "_", str(col).strip().lower())
 
 
+_COVID_PUBLIC_HEALTH_DOMAIN_KEYWORDS = (
+    "covid",
+    "new_cases",
+    "active_cases",
+    "total_cases",
+    "variant",
+    "vaccination",
+    "vaccine",
+    "vaccinated",
+    "positivity",
+    "icu_patient",
+    "hospital_admission",
+    "hospitalization",
+    "deaths",
+    "cases",
+    "tests_conducted",
+    "report_date",
+    "age_group",
+)
+
+_MANUFACTURING_OPERATIONS_DOMAIN_KEYWORDS = (
+    "production_date",
+    "units_produced",
+    "downtime_minutes",
+    "downtime",
+    "defect_rate",
+    "defect_count",
+    "product_family",
+    "production_line",
+    "product_line",
+    "plant",
+    "facility",
+    "shift",
+    "machine",
+    "output",
+    "throughput",
+    "scrap",
+    "yield",
+    "quality",
+    "oee",
+    "work_order",
+    "cycle_time",
+)
+
+
+def _manufacturing_operations_signal_score(columns: List[str]) -> int:
+    joined = " ".join(_norm_header_token(c) for c in columns)
+    return sum(1 for k in _MANUFACTURING_OPERATIONS_DOMAIN_KEYWORDS if k in joined)
+
+
+def _is_manufacturing_operations_dataset(columns: List[str]) -> bool:
+    """Production / quality datasets with plant-line-family signals."""
+    return _manufacturing_operations_signal_score(columns) >= 4
+
+
+def _covid_public_health_signal_score(columns: List[str]) -> int:
+    joined = " ".join(_norm_header_token(c) for c in columns)
+    return sum(1 for k in _COVID_PUBLIC_HEALTH_DOMAIN_KEYWORDS if k in joined)
+
+
+def _is_covid_public_health_dataset(columns: List[str]) -> bool:
+    """COVID / epidemiological surveillance style public-health datasets."""
+    return _covid_public_health_signal_score(columns) >= 3
+
+
 def _infer_business_domain(columns: List[str]) -> str:
     """Lightweight domain hint for mapping weights (ecommerce / manufacturing / generic)."""
     joined = " ".join(_norm_header_token(c) for c in columns)
@@ -572,6 +637,9 @@ def _infer_business_domain(columns: List[str]) -> str:
     healthcare_kw = (
         "patient_id", "visit_date", "claim_amount", "readmission", "payer_type",
         "patient_segment", "visit_count",
+        "new_cases", "active_cases", "total_cases", "variant", "vaccination",
+        "vaccine", "vaccinated", "positivity", "icu_patient", "hospital_admission",
+        "hospitalization", "covid", "tests_conducted", "deaths", "report_date",
     )
     saas_kw = ("mrr", "churn_rate", "active_users", "new_signups", "expansion_revenue", "plan_type")
     supply_kw = (
@@ -609,7 +677,8 @@ def _infer_business_domain(columns: List[str]) -> str:
     mfg_kw = (
         "bom", "work_order", "routing", "batch", "lot", "plant", "assembly",
         "sku", "material", "warehouse", "inventory", "production", "defect_rate",
-        "units_produced", "scrap_cost", "product_line",
+        "units_produced", "scrap_cost", "product_line", "product_family",
+        "production_line", "downtime_minutes", "defect_count",
     )
     ecom_kw = (
         "order", "cart", "checkout", "sku", "product", "customer", "invoice",
@@ -727,6 +796,13 @@ def _customer_role_keyword_score(col: str) -> Tuple[int, List[str]]:
         ("customer_name", 44),
         ("client_name", 34),
         ("customer_id", 36),
+        ("account_id", 36),
+        ("member_id", 34),
+        ("patient_id", 34),
+        ("user_id", 32),
+        ("borrower_id", 34),
+        ("entity_id", 32),
+        ("order_id", 28),
         ("cust_id", 32),
         ("client_id", 28),
         ("customer_segment", 38),
@@ -815,7 +891,30 @@ def _product_role_keyword_score(col: str) -> Tuple[int, List[str]]:
     return score, reasons
 
 
-def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, List[str]]:
+def _healthcare_has_case_activity_columns(columns: List[str]) -> bool:
+    for col in columns or []:
+        n = _norm_header_token(col)
+        if n == "deaths" or n.endswith("_deaths"):
+            continue
+        if any(
+            k in n
+            for k in (
+                "new_cases",
+                "active_cases",
+                "total_cases",
+                "confirmed_cases",
+                "hospital_admissions",
+                "hospitalization",
+                "cases",
+            )
+        ):
+            return True
+    return False
+
+
+def _sales_role_keyword_score(
+    col: str, domain: str = "generic", columns: Optional[List[str]] = None
+) -> Tuple[int, List[str]]:
     """
     Business-keyword score for the sales / primary value metric role.
     Ecommerce: prioritize monetary columns; penalize operational KPIs (delivery time, ratings, counts).
@@ -896,6 +995,26 @@ def _sales_role_keyword_score(col: str, domain: str = "generic") -> Tuple[int, L
         if kw in n:
             score += w
             reasons.append(f"biz_kw:{kw}+{w}")
+
+    if domain == "healthcare":
+        for kw, w in (
+            ("new_cases", 54),
+            ("active_cases", 52),
+            ("total_cases", 50),
+            ("confirmed_cases", 48),
+            ("hospital_admissions", 46),
+            ("hospitalization", 44),
+            ("icu_patients", 38),
+            ("tests_conducted", 32),
+            ("cases", 36),
+        ):
+            if kw in n:
+                score += w
+                reasons.append(f"healthcare_primary:{kw}+{w}")
+        if n == "deaths" or n.endswith("_deaths"):
+            if columns and _healthcare_has_case_activity_columns(columns):
+                score -= 24
+                reasons.append("healthcare:deaths_secondary_penalty(-24)")
 
     # Operational / secondary metrics — never preferred as primary "sales" value.
     operational_penalties = (
@@ -1291,6 +1410,55 @@ def _pick_region_column_from_candidates(
     return None
 
 
+def _customer_column_has_entity_semantics(col: str) -> bool:
+    n = _norm_header_token(col)
+    if re.search(
+        r"(customer|cust|client|buyer|shopper|member|patient|borrower|user|account|entity|vendor|supplier)_?(id|name|segment|type)$",
+        n,
+    ):
+        return True
+    if re.search(
+        r"(^|_)(customer|client|account|member|patient|borrower|user|entity)(_|$)",
+        n,
+    ):
+        return True
+    return False
+
+
+def _customer_role_candidate_allowed(
+    col: str,
+    profile: Optional[Dict[str, Any]],
+    row: Dict[str, Any],
+) -> bool:
+    if not col:
+        return False
+    if _column_is_temporal_for_mapping(col, profile):
+        return False
+    score = float(row.get("score", 0) or 0)
+    if score <= 0:
+        return False
+    bk = float((row.get("breakdown") or {}).get("business_keyword") or 0)
+    if bk > 0:
+        return True
+    return _customer_column_has_entity_semantics(col)
+
+
+def _pick_customer_column_from_candidates(
+    cands: List[Dict[str, Any]],
+    profile: Optional[Dict[str, Any]],
+    exclude: Optional[set] = None,
+) -> Optional[str]:
+    for row in cands or []:
+        col = str(row.get("column", "")).strip()
+        if not col:
+            continue
+        if exclude and col in exclude:
+            continue
+        if _customer_role_candidate_allowed(col, profile, row):
+            return col
+    return None
+
+
 def _pick_date_column_from_candidates(
     cands: List[Dict[str, Any]],
     frame: pd.DataFrame,
@@ -1641,7 +1809,13 @@ def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[
             pts += 10.0
             reasons.append("domain:ecommerce_product(+10)")
     if domain == "manufacturing" and role == "product":
-        if any(k in n for k in ("material", "bom", "sku", "item", "part")):
+        if "product_family" in n:
+            pts += 14.0
+            reasons.append("domain:mfg_product_family(+14)")
+        elif "product_line" in n or "production_line" in n:
+            pts += 10.0
+            reasons.append("domain:mfg_product_line(+10)")
+        elif any(k in n for k in ("material", "bom", "sku", "item", "part")):
             pts += 12.0
             reasons.append("domain:mfg_product(+12)")
     if domain == "ecommerce" and role == "customer":
@@ -1698,6 +1872,18 @@ def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[
             pts += 10.0
             reasons.append("domain:banking_product(+10)")
     if domain == "healthcare":
+        if role == "sales" and any(
+            k in n
+            for k in (
+                "new_cases",
+                "active_cases",
+                "total_cases",
+                "hospital_admissions",
+                "hospitalization",
+            )
+        ):
+            pts += 12.0
+            reasons.append("domain:healthcare_covid_sales(+12)")
         if role == "sales" and any(k in n for k in ("claim_amount", "visit_count")):
             pts += 8.0
             reasons.append("domain:healthcare_sales(+8)")
@@ -1711,6 +1897,12 @@ def _domain_weight_bonus(domain: str, role: str, col: str) -> Tuple[float, List[
             elif "wait_time" in n:
                 pts += 14.0
                 reasons.append("domain:healthcare_profit_wait_time(+14)")
+            elif "active_cases" in n:
+                pts += 14.0
+                reasons.append("domain:healthcare_profit_active_cases(+14)")
+            elif "deaths" in n:
+                pts += 12.0
+                reasons.append("domain:healthcare_profit_deaths(+12)")
             elif "visit_count" in n:
                 pts += 10.0
                 reasons.append("domain:healthcare_profit_visit_count(+10)")
@@ -2010,9 +2202,12 @@ def _score_role_candidates(
         if role == "region" and profile.get("column_types", {}).get(col) == "number":
             continue
         if role == "customer":
+            if _column_is_temporal_for_mapping(col, profile):
+                continue
             n = _norm_header_token(col)
             if _id_like_column_name(col) and not re.search(
-                r"(customer|cust|client|buyer|account)_?id$", n
+                r"(customer|cust|client|buyer|account|member|patient|user|borrower|entity)_?id$",
+                n,
             ):
                 continue
         if role in ("sales", "profit"):
@@ -2095,9 +2290,63 @@ def _calibrate_mapping_role_confidence(
 
     if role_key == "sales" and confidence in ("low", "medium"):
         bonus1 = _candidate_domain_role_bonus(top1)
+        bk1 = float((top1.get("breakdown") or {}).get("business_keyword") or 0)
+        col1 = _norm_header_token(str(top1.get("column") or ""))
+        if (
+            bonus1 >= 12.0
+            and bk1 >= 50.0
+            and any(k in col1 for k in ("new_cases", "active_cases", "total_cases", "confirmed_cases"))
+        ):
+            return "high"
         if bonus1 >= 14.0 and s1 >= 70.0 and gap >= 2.0:
             return "high"
         if bonus1 >= 10.0 and s1 >= 60.0 and gap >= 4.0 and confidence == "low":
+            return "medium"
+
+    if role_key == "product" and confidence == "low":
+        n1 = _norm_header_token(str(top1.get("column") or ""))
+        n2 = _norm_header_token(str(top2.get("column") or ""))
+        mfg_dim_tokens = (
+            "product_family",
+            "product_line",
+            "production_line",
+            "material",
+            "bom",
+            "sku",
+            "part",
+            "item",
+        )
+        if (
+            s1 >= 55.0
+            and s2 >= 55.0
+            and any(t in n1 for t in mfg_dim_tokens)
+            and any(t in n2 for t in mfg_dim_tokens)
+            and gap <= 4.0
+        ):
+            return "medium"
+
+    if role_key == "profit" and confidence == "low":
+        bonus1 = _candidate_domain_role_bonus(top1)
+        n1 = _norm_header_token(str(top1.get("column") or ""))
+        n2 = _norm_header_token(str(top2.get("column") or "")) if top2 else ""
+        mkt_profit_tokens = (
+            "ad_spend",
+            "spend",
+            "conversion",
+            "conversions",
+            "ctr",
+            "click",
+            "impression",
+            "roas",
+            "cpa",
+        )
+        if (
+            bonus1 >= 10.0
+            and s1 >= 58.0
+            and gap <= 4.0
+            and any(t in n1 for t in mkt_profit_tokens)
+            and (not n2 or any(t in n2 for t in mkt_profit_tokens))
+        ):
             return "medium"
 
     if confidence != "medium":
@@ -2185,7 +2434,7 @@ def compute_semantic_column_mapping(
         profile,
         "sales",
         domain,
-        lambda c: _sales_role_keyword_score(c, domain),
+        lambda c: _sales_role_keyword_score(c, domain, columns),
         auxiliary_fn=lambda c: _sales_auxiliary_scores(frame, domain, c),
     )
     region_cands = _score_role_candidates(
@@ -2204,6 +2453,8 @@ def compute_semantic_column_mapping(
     def pick(cands: List[Dict[str, Any]], role_key: str) -> Optional[str]:
         if role_key == "region":
             return _pick_region_column_from_candidates(cands, profile)
+        if role_key == "customer":
+            return _pick_customer_column_from_candidates(cands, profile)
         if role_key == "date":
             return _pick_date_column_from_candidates(cands, frame, profile)
         if cands and float(cands[0].get("score", 0)) > 0:
@@ -2221,13 +2472,11 @@ def compute_semantic_column_mapping(
 
     # Avoid using the same column for unrelated roles (e.g. product == customer).
     if proposed.get("customer") and proposed["customer"] == proposed.get("product"):
-        alt = None
-        for row in customer_cands[1:]:
-            c = str(row["column"])
-            if c and c != proposed.get("product"):
-                alt = c
-                break
-        proposed["customer"] = alt
+        proposed["customer"] = _pick_customer_column_from_candidates(
+            customer_cands,
+            profile,
+            exclude={proposed.get("product")},
+        )
 
     if proposed.get("region") and proposed["region"] == proposed.get("product"):
         skip = {proposed.get("product"), proposed.get("customer")}
@@ -2237,13 +2486,16 @@ def compute_semantic_column_mapping(
         )
 
     if proposed.get("customer") and proposed["customer"] == proposed.get("region"):
-        alt = None
-        for row in customer_cands:
-            c = str(row["column"])
-            if c and c not in (proposed.get("region"), proposed.get("product")):
-                alt = c
-                break
-        proposed["customer"] = alt
+        proposed["customer"] = _pick_customer_column_from_candidates(
+            customer_cands,
+            profile,
+            exclude={proposed.get("region"), proposed.get("product")},
+        )
+
+    if proposed.get("customer") and _column_is_temporal_for_mapping(
+        str(proposed["customer"]), profile
+    ):
+        proposed["customer"] = None
 
     def _optional_role_is_weak_guess(cands: List[Dict[str, Any]]) -> bool:
         if not cands:
@@ -3296,6 +3548,7 @@ EXECUTIVE_DASHBOARD_LABELS = {
     "healthcare": "Healthcare",
     "customer_support": "Customer Support",
     "operations": "Operations",
+    "manufacturing": "Manufacturing / Operations",
     "marketing": "Marketing",
     "finance_fpa": "Finance / FP&A",
     "geography": "Geographic Analytics",
@@ -3305,6 +3558,17 @@ EXECUTIVE_DASHBOARD_LABELS = {
     "saas": "SaaS / Subscription",
     "generic": "Generic",
 }
+
+
+def _resolve_kpi_card_exec_domain(exec_domain: str) -> str:
+    """KPI-only domain override from semantic mapping; dashboard kind stays unchanged."""
+    if exec_domain != "generic":
+        return exec_domain
+    meta = column_mapping_metadata if isinstance(column_mapping_metadata, dict) else {}
+    semantic_domain = str(meta.get("domain") or "").strip().lower()
+    if semantic_domain in ("education", "supply_chain"):
+        return semantic_domain
+    return exec_domain
 
 
 def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
@@ -3318,7 +3582,9 @@ def build_kpi_cards() -> Tuple[List[Dict[str, Any]], str]:
     columns = df.columns.tolist()
     exec_domain = infer_executive_domain(columns)
     domain = executive_domain_to_kpi_domain(exec_domain)
-    cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
+    cards = build_executive_kpi_cards(
+        _resolve_kpi_card_exec_domain(exec_domain), _kpi_build_context(profile, kp)
+    )
     return cards[:5], domain
 
 
@@ -4457,6 +4723,10 @@ def build_auto_dashboard(
     )
     kind = executive_domain_to_auto_kind(exec_domain)
     label = EXECUTIVE_DASHBOARD_LABELS.get(exec_domain, AUTO_DASHBOARD_LABELS.get(kind, "Generic"))
+    if exec_domain == "healthcare" and _is_covid_public_health_dataset(columns):
+        label = "Healthcare / Public Health"
+    if exec_domain == "operations" and _is_manufacturing_operations_dataset(columns):
+        label = "Manufacturing / Operations"
 
     out: Dict[str, Any] = {"kind": kind, "type_label": label, "cards": [], "charts": []}
 
@@ -4509,7 +4779,10 @@ def build_auto_dashboard(
     cards = (
         exec_cards
         if exec_cards is not None
-        else build_executive_kpi_cards(exec_domain, _kpi_build_context(profile, kp))
+        else build_executive_kpi_cards(
+            _resolve_kpi_card_exec_domain(exec_domain),
+            _kpi_build_context(profile, kp),
+        )
     )
     out["cards"] = clamp_cards(cards)
     charts, coverage_telemetry = build_auto_dashboard_charts_bundle(
@@ -5791,7 +6064,9 @@ def _compose_upload_payload(sheet_names: List[str]) -> Dict[str, Any]:
     kp = calculate_kpis()
     columns = df.columns.tolist()
     exec_domain = infer_executive_domain(columns)
-    exec_cards = build_executive_kpi_cards(exec_domain, _kpi_build_context(prof, kp))
+    exec_cards = build_executive_kpi_cards(
+        _resolve_kpi_card_exec_domain(exec_domain), _kpi_build_context(prof, kp)
+    )
     kpi_cards = exec_cards[:5]
     dataset_kind = executive_domain_to_kpi_domain(exec_domain)
     auto_dashboard = build_auto_dashboard(

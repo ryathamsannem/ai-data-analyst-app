@@ -646,6 +646,161 @@ def _metric_semantic_strength(metric_key: str, title: str = "") -> int:
     return 30
 
 
+_MFG_QUALITY_METRIC_RE = re.compile(
+    r"\b(defect[_ ]?rate|defect[_ ]?count|downtime|scrap|yield|oee|quality|rework)\b",
+    re.I,
+)
+_MFG_VOLUME_METRIC_RE = re.compile(
+    r"\b(units[_ ]?produced|throughput|output)\b",
+    re.I,
+)
+
+
+def _is_manufacturing_quality_metric(metric_key: str, title: str = "") -> bool:
+    blob = f"{metric_key} {title}".lower().replace("_", " ")
+    return bool(_MFG_QUALITY_METRIC_RE.search(blob))
+
+
+def _is_manufacturing_volume_metric(metric_key: str, title: str = "") -> bool:
+    blob = f"{metric_key} {title}".lower().replace("_", " ")
+    return bool(_MFG_VOLUME_METRIC_RE.search(blob))
+
+
+def _is_weak_manufacturing_volume_breakdown(
+    chart: Dict[str, Any], record_key: str
+) -> bool:
+    ct = _norm_chart_type(chart.get("chartType"))
+    if ct not in _BREAKDOWN_TYPES or ct in _TEMPORAL_TYPES:
+        return False
+    mk = _metric_key(chart, record_key)
+    title = str(chart.get("title") or "")
+    if not _is_manufacturing_volume_metric(mk, title):
+        return False
+    return bool(evaluate_chart_visual_quality(chart).get("weak_differentiation"))
+
+
+def _is_manufacturing_low_insight_volume_chart(
+    chart: Dict[str, Any], record_key: str
+) -> bool:
+    """Category/share production volume views — prefer quality/downtime breakdowns."""
+    mk = _metric_key(chart, record_key)
+    title = str(chart.get("title") or "")
+    if not _is_manufacturing_volume_metric(mk, title):
+        return False
+    ct = _norm_chart_type(chart.get("chartType"))
+    if ct in _TEMPORAL_TYPES:
+        return False
+    return ct in _BREAKDOWN_TYPES or ct in _COMPOSITION_TYPES
+
+
+def _pool_has_manufacturing_quality_alternative(
+    charts: List[Dict[str, Any]],
+    record_key: str,
+    *,
+    exclude_title: Optional[str] = None,
+) -> bool:
+    for chart in charts:
+        title = str(chart.get("title") or "")
+        if exclude_title and title.lower() == exclude_title.lower():
+            continue
+        mk = _metric_key(chart, record_key)
+        if not _is_manufacturing_quality_metric(mk, title):
+            continue
+        ct = _norm_chart_type(chart.get("chartType"))
+        if ct in _TEMPORAL_TYPES:
+            continue
+        quality = evaluate_chart_visual_quality(chart)
+        if not quality.get("weak_differentiation"):
+            return True
+        if float(quality.get("spread_ratio") or 0) >= 0.06:
+            return True
+    return False
+
+
+def _manufacturing_duplicate_volume_trend(
+    chart: Dict[str, Any],
+    selected: List[Dict[str, Any]],
+    record_key: str,
+) -> bool:
+    ct = _norm_chart_type(chart.get("chartType"))
+    if ct not in _TEMPORAL_TYPES:
+        return False
+    mk = _metric_key(chart, record_key)
+    title = str(chart.get("title") or "")
+    if not _is_manufacturing_volume_metric(mk, title):
+        return False
+    for existing in selected:
+        if _norm_chart_type(existing.get("chartType")) not in _TEMPORAL_TYPES:
+            continue
+        if _is_manufacturing_volume_metric(
+            _metric_key(existing, record_key),
+            str(existing.get("title") or ""),
+        ):
+            return True
+    return False
+
+
+def _is_manufacturing_operations_schema(columns: List[str]) -> bool:
+    blob = " ".join(_norm_col(c) for c in columns)
+    signals = (
+        "units_produced",
+        "production_date",
+        "defect_rate",
+        "defect_count",
+        "downtime_minutes",
+        "downtime",
+        "product_family",
+        "production_line",
+        "plant",
+        "scrap",
+        "yield",
+    )
+    return sum(1 for s in signals if s in blob) >= 4
+
+
+def _manufacturing_preferred_dims(breakdown_dims: List[str]) -> List[str]:
+    hints = (
+        "product_family",
+        "production_line",
+        "product_line",
+        "plant",
+        "facility",
+        "shift",
+        "machine",
+    )
+    preferred: List[str] = []
+    for dim_c in breakdown_dims:
+        nd = _norm_col(dim_c)
+        if any(h in nd for h in hints):
+            preferred.append(dim_c)
+    for dim_c in breakdown_dims:
+        if dim_c not in preferred:
+            preferred.append(dim_c)
+    return preferred
+
+
+def _manufacturing_quality_metric_order(numerics: List[str]) -> List[str]:
+    rank = {
+        "defect_rate": 0,
+        "defect_count": 1,
+        "downtime_minutes": 2,
+        "downtime": 3,
+        "yield": 4,
+        "quality": 5,
+        "oee": 6,
+        "scrap_cost": 7,
+        "scrap": 8,
+    }
+    out = [
+        m
+        for m in numerics
+        if _is_manufacturing_quality_metric(m, m)
+        and not _is_manufacturing_volume_metric(m, m)
+    ]
+    out.sort(key=lambda m: rank.get(_norm_col(m), 99))
+    return out
+
+
 def _chart_story_family(chart_type: str, opp_type: str) -> str:
     ct = _norm_chart_type(chart_type)
     opp = str(opp_type or "").lower()
@@ -1139,7 +1294,7 @@ def _prune_inferior_metric_by_dimension(
 ) -> List[Dict[str, Any]]:
     """Drop low-priority metrics (e.g. quantity) when a stronger metric covers the same dimension."""
     commercial_kinds = frozenset(
-        {"sales", "retail", "ecommerce", "geography", "marketing", "finance"}
+        {"sales", "retail", "ecommerce", "geography", "marketing", "finance", "operations"}
     )
     if str(kind or "").lower() not in commercial_kinds:
         return charts
@@ -1181,6 +1336,14 @@ def _prune_inferior_metric_by_dimension(
             and strength <= 45
             and dim_best >= 80
             and _norm_col(mk).find("quantity") >= 0
+        ):
+            continue
+        if (
+            str(kind or "").lower() == "operations"
+            and _is_manufacturing_volume_metric(mk, str(chart.get("title") or ""))
+            and strength <= 45
+            and dim_best >= 60
+            and dim_best - strength >= 15
         ):
             continue
         out.append(chart)
@@ -1227,7 +1390,7 @@ def _prune_scatter_when_business_rich(
         1 for c in pool if _norm_chart_type(c.get("chartType")) != "scatter"
     )
     if pool_non_scatter >= min_non_scatter:
-        if str(kind).lower() in ("marketing", "finance"):
+        if str(kind).lower() in ("marketing", "finance", "operations"):
             return non_scatter
         showcase_rich = discovered_count >= 18
         relationship_scatter = [
@@ -1736,6 +1899,18 @@ def _score_candidate(
             base += 14
         if _is_hr_secondary_engagement_breakdown(chart, record_key):
             base -= 24
+    if str(kind or "").lower() == "operations":
+        title_l = str(chart.get("title") or "").lower().replace("_", " ")
+        if _is_manufacturing_quality_metric(mk, title_l) and ct in _BREAKDOWN_TYPES:
+            base += 22
+        if _is_manufacturing_volume_metric(mk, title_l) and ct in _BREAKDOWN_TYPES:
+            base -= 28
+            if quality["weak_differentiation"]:
+                base -= 20
+        if _is_manufacturing_volume_metric(mk, title_l) and ct in _COMPOSITION_TYPES:
+            base -= 38
+        if ct == "scatter":
+            base -= 32
     if strength <= 45 and primary and mk != str(primary).strip().lower():
         if secondary and mk != str(secondary).strip().lower():
             base -= 24
@@ -1778,6 +1953,79 @@ def _metric_dim_duplicate(
     return alt_dims >= max_alt
 
 
+_CROSS_BREAKDOWN_FAMILIES = frozenset({"composition", "ranking"})
+
+
+def _cross_family_breakdown_duplicate(
+    fam_c: str,
+    fam_e: str,
+    dim_c: Optional[str],
+    dim_e: Optional[str],
+    mk_c: str,
+    title_c: str,
+    mk_e: str,
+    title_e: str,
+) -> bool:
+    """Share/donut/pie vs bar/hbar telling the same dim×metric story."""
+    if not dim_c or not dim_e or dim_c.lower() != dim_e.lower():
+        return False
+    if fam_c not in _CROSS_BREAKDOWN_FAMILIES or fam_e not in _CROSS_BREAKDOWN_FAMILIES:
+        return False
+    if fam_c == fam_e:
+        return False
+    mk_c_norm = mk_c.strip().lower()
+    mk_e_norm = mk_e.strip().lower()
+    if mk_c_norm and mk_c_norm == mk_e_norm:
+        return True
+    s_a = _metric_semantic_strength(mk_c, title_c)
+    s_b = _metric_semantic_strength(mk_e, title_e)
+    return abs(s_a - s_b) <= 25
+
+
+def chart_breakdown_metric_dimension_pair(
+    chart: Dict[str, Any], record_key: str
+) -> Tuple[str, Optional[str]]:
+    """Normalized (metric, dimension) for breakdown diversity checks."""
+    return (_metric_key(chart, record_key), _dimension_key(chart))
+
+
+def has_composition_ranking_metric_dim_duplicate(
+    charts: List[Dict[str, Any]], record_key: str
+) -> bool:
+    """True when a composition and ranking chart share the same dim×metric story."""
+    seen: List[Dict[str, Any]] = []
+    for chart in charts:
+        mk = _metric_key(chart, record_key)
+        dim = _dimension_key(chart)
+        fam = _chart_story_family(
+            str(chart.get("chartType") or ""),
+            str(chart.get("_opportunityType") or chart.get("opportunityType") or ""),
+        )
+        if fam not in _CROSS_BREAKDOWN_FAMILIES or not dim:
+            continue
+        title = str(chart.get("title") or "")
+        for existing in seen:
+            mk_e = _metric_key(existing, record_key)
+            dim_e = _dimension_key(existing)
+            fam_e = _chart_story_family(
+                str(existing.get("chartType") or ""),
+                str(existing.get("_opportunityType") or existing.get("opportunityType") or ""),
+            )
+            if _cross_family_breakdown_duplicate(
+                fam,
+                fam_e,
+                dim,
+                dim_e,
+                mk,
+                title,
+                mk_e,
+                str(existing.get("title") or ""),
+            ):
+                return True
+        seen.append(chart)
+    return False
+
+
 def _metrics_comparable_for_story_dedup(
     mk_a: str, title_a: str, mk_b: str, title_b: str
 ) -> bool:
@@ -1812,6 +2060,17 @@ def _chart_story_blocked_by_selected(
                 str(existing.get("chartType") or ""),
                 str(existing.get("_opportunityType") or ""),
             )
+            if _cross_family_breakdown_duplicate(
+                fam_c,
+                fam_e,
+                dim_c,
+                dim_e,
+                mk_c,
+                title_c,
+                mk_e,
+                title_e,
+            ) and str_c <= str_e:
+                return True
             if (
                 fam_c == "ranking"
                 and fam_e == "ranking"
@@ -1864,6 +2123,21 @@ def _pick_best_candidate(
         if _chart_redundant_with_kpi(chart, kpi_context, record_key):
             continue
         if _chart_skip_due_to_weak_visual_quality(chart, kpi_context, record_key):
+            continue
+        if (
+            str(kind).lower() == "operations"
+            and _manufacturing_duplicate_volume_trend(chart, selected, record_key)
+        ):
+            continue
+        if (
+            str(kind).lower() == "operations"
+            and _is_manufacturing_low_insight_volume_chart(chart, record_key)
+            and _pool_has_manufacturing_quality_alternative(
+                remaining + selected,
+                record_key,
+                exclude_title=str(chart.get("title") or ""),
+            )
+        ):
             continue
         bucket = _coverage_bucket(chart)
         if prefer_bucket and bucket != prefer_bucket:
@@ -2373,6 +2647,56 @@ def discover_chart_opportunities(
             used_pairs.add(pair_key)
         except Exception:
             pass
+
+    # B3. Manufacturing / operations quality & downtime breakdowns (additive pairs).
+    is_operations = str(kind or "").lower() == "operations"
+    if is_operations and _is_manufacturing_operations_schema(df.columns.tolist()):
+        quality_metrics = _manufacturing_quality_metric_order(numerics)[:3]
+        mfg_dims = _manufacturing_preferred_dims(breakdown_dims)[:4]
+        for di, dim_c in enumerate(mfg_dims):
+            for ri, num_c in enumerate(quality_metrics):
+                pair_key = ("ranking", dim_c.lower(), num_c.lower())
+                if pair_key in used_pairs:
+                    continue
+                try:
+                    agg = _metric_agg_key(num_c, inv)
+                    nu = _dimension_cardinality(
+                        df, dim_c, profile, memo=cardinality_memo
+                    )
+                    if nu < 2 or nu > 20:
+                        continue
+                    g = _agg_dim_metric_series(
+                        df,
+                        dim_c,
+                        num_c,
+                        agg,
+                        memo_numeric,
+                        aggregate_memo=aggregate_memo,
+                    )
+                    if g is None or g.empty:
+                        continue
+                    g = g.sort_values(ascending=False).head(10)
+                    g = g[g.index.map(lambda x: is_valid_kpi_leader_value(str(x)))]
+                    if g.empty:
+                        continue
+                    tit = _executive_metric_by_dim_title(
+                        num_c, dim_c, agg, deps.pretty_label
+                    )
+                    add(
+                        deps.series_payload(
+                            tit,
+                            g,
+                            chart_type="horizontalBar",
+                            max_points=10,
+                            category_column=dim_c,
+                            metric_column=num_c,
+                        ),
+                        "ranking",
+                        87 - di * 2 - ri,
+                    )
+                    used_pairs.add(pair_key)
+                except Exception:
+                    pass
 
     # B2. Banking risk metrics on segment/product (avoid city for delinquency/utilization)
     if is_finance and has_business_dims:

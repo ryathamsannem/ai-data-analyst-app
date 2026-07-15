@@ -12,6 +12,8 @@ import pandas as pd
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
 GOLDEN = REPO_ROOT / "test-fixtures" / "golden-datasets"
+DOMAIN_UPLOAD = REPO_ROOT / "test-fixtures" / "domain_upload_1k"
+DOMAINS = REPO_ROOT / "test-fixtures" / "domains"
 
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
@@ -28,6 +30,7 @@ def _bind(df: pd.DataFrame) -> tuple[dict, dict, dict | None]:
     main.dataset_profile = profile
     main.column_mapping = {k: None for k in main.column_mapping}
     proposed, meta = main.compute_semantic_column_mapping(df, profile)
+    main.column_mapping_metadata = meta
     for key, val in proposed.items():
         main.column_mapping[key] = val
     dash = main.build_auto_dashboard() if not df.empty else None
@@ -149,6 +152,263 @@ class TestSemanticMappingEdgeCases(unittest.TestCase):
         self.assertNotIn("transaction id", lowered)
         self.assertNotIn("customer id", lowered)
 
+    def test_date_column_never_maps_as_customer(self) -> None:
+        df = pd.DataFrame(
+            {
+                "application_date": pd.to_datetime(
+                    ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"]
+                ),
+                "customer_segment": ["SMB", "Corporate", "Mass Market", "Affluent"],
+                "loan_amount": [1000.0, 2000.0, 1500.0, 1800.0],
+                "branch_region": ["North", "South", "East", "West"],
+            }
+        )
+        proposed, _meta, _dash = _bind(df)
+        self.assertEqual(proposed.get("date"), "application_date")
+        self.assertNotEqual(proposed.get("customer"), "application_date")
+
+    def test_entity_id_selected_when_present(self) -> None:
+        df = pd.DataFrame(
+            {
+                "account_id": [f"a{i}" for i in range(20)],
+                "customer_segment": ["SMB", "Corporate"] * 10,
+                "loan_amount": [float(i * 100) for i in range(20)],
+                "order_date": pd.to_datetime(["2024-01-01"] * 20),
+            }
+        )
+        proposed, _meta, _dash = _bind(df)
+        self.assertEqual(proposed.get("customer"), "account_id")
+        self.assertEqual(proposed.get("date"), "order_date")
+
+    def test_customer_unset_when_only_date_columns_exist(self) -> None:
+        df = pd.DataFrame(
+            {
+                "application_date": pd.to_datetime(
+                    ["2024-01-01", "2024-01-02", "2024-01-03"]
+                ),
+                "report_date": pd.to_datetime(
+                    ["2024-02-01", "2024-02-02", "2024-02-03"]
+                ),
+                "loan_amount": [1000.0, 2000.0, 1500.0],
+            }
+        )
+        proposed, _meta, _dash = _bind(df)
+        self.assertIn(proposed.get("date"), ("application_date", "report_date"))
+        self.assertIsNone(proposed.get("customer"))
+
+
+class TestCovidPublicHealthMapping(unittest.TestCase):
+    def tearDown(self) -> None:
+        main.df = None
+        main.dataset_profile = None
+        main.column_mapping = {k: None for k in main.column_mapping}
+
+    def _covid_style_frame(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "report_date": pd.to_datetime(
+                    ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"]
+                ),
+                "state": ["Illinois", "California", "Texas", "Florida"],
+                "variant": ["Omicron", "Delta", "Omicron", "Other"],
+                "age_group": ["18-29", "30-44", "45-59", "60+"],
+                "gender": ["Female", "Male", "Female", "Male"],
+                "new_cases": [71, 37, 107, 18],
+                "active_cases": [503, 320, 1510, 397],
+                "deaths": [0, 1, 1, 0],
+                "hospital_admissions": [5, 4, 13, 0],
+            }
+        )
+
+    def test_covid_columns_classify_as_healthcare_not_generic(self) -> None:
+        df = self._covid_style_frame()
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "healthcare")
+        self.assertEqual(meta.get("domain"), "healthcare")
+        self.assertEqual(dash.get("type_label"), "Healthcare / Public Health")
+
+    def test_covid_prefers_case_activity_metric_over_deaths(self) -> None:
+        df = self._covid_style_frame()
+        proposed, _meta, _dash = _bind(df)
+        self.assertIn(proposed.get("sales"), ("new_cases", "active_cases"))
+        self.assertNotEqual(proposed.get("sales"), "deaths")
+        self.assertIn(
+            proposed.get("profit"),
+            ("deaths", "active_cases", "hospital_admissions"),
+        )
+
+    def test_deaths_primary_when_only_mortality_metric(self) -> None:
+        df = pd.DataFrame(
+            {
+                "report_date": pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
+                "state": ["Illinois", "California", "Texas"],
+                "variant": ["Omicron", "Delta", "Other"],
+                "deaths": [12, 8, 5],
+            }
+        )
+        proposed, meta, _dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "healthcare")
+        self.assertEqual(proposed.get("sales"), "deaths")
+
+    def test_covid_mapping_roles_remain_correct(self) -> None:
+        df = self._covid_style_frame()
+        proposed, _meta, _dash = _bind(df)
+        self.assertEqual(proposed.get("date"), "report_date")
+        self.assertEqual(proposed.get("region"), "state")
+        self.assertIsNone(proposed.get("customer"))
+
+    def test_banking_classification_unchanged(self) -> None:
+        df = pd.DataFrame(
+            {
+                "account_id": ["a1", "a2", "a3", "a4"],
+                "report_month": pd.to_datetime(
+                    ["2024-01-01", "2024-02-01", "2024-03-01", "2024-04-01"]
+                ),
+                "loan_balance": [1000.0, 2000.0, 1500.0, 1800.0],
+                "deposit_balance": [500.0, 600.0, 700.0, 800.0],
+                "delinquency_rate": [0.1, 0.2, 0.05, 0.15],
+                "branch_region": ["North", "South", "East", "West"],
+            }
+        )
+        proposed, meta, _dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "banking")
+        self.assertIn(proposed.get("sales"), ("loan_balance", "deposit_balance"))
+
+    def test_ecommerce_orders_classify_as_retail_ecommerce(self) -> None:
+        path = DOMAIN_UPLOAD / "ecommerce_orders_10k.csv"
+        df = pd.read_csv(path, nrows=200)
+        df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "retail")
+        self.assertEqual(dash.get("type_label"), "Retail / Ecommerce")
+        self.assertEqual(proposed.get("sales"), "net_revenue")
+        self.assertEqual(proposed.get("product"), "product_category")
+        self.assertEqual(proposed.get("date"), "order_date")
+
+    def test_generic_monthly_sales_stays_sales(self) -> None:
+        path = DOMAINS / "monthly_sales.csv"
+        df = pd.read_csv(path)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "sales")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(dash.get("type_label"), "Sales")
+
+    def test_healthcare_classification_unchanged(self) -> None:
+        df = self._covid_style_frame()
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "healthcare")
+        _proposed, meta, dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "healthcare")
+        self.assertEqual(dash.get("type_label"), "Healthcare / Public Health")
+
+    def test_generic_random_dataset_stays_generic(self) -> None:
+        df = pd.DataFrame(
+            {
+                "value": [1.0, 2.0, 3.0],
+                "type": ["a", "b", "c"],
+                "category": ["x", "y", "z"],
+                "status": ["ok", "ok", "fail"],
+            }
+        )
+        proposed, meta, _dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "generic")
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "generic")
+
+    def test_covid_mapping_aggregate_confidence_not_low(self) -> None:
+        df = self._covid_style_frame()
+        proposed, meta, _dash = _bind(df)
+        self.assertIn(proposed.get("sales"), ("new_cases", "active_cases"))
+        self.assertIsNone(proposed.get("customer"))
+        sales_conf = (meta.get("roles") or {}).get("sales", {}).get("confidence")
+        self.assertIn(sales_conf, ("high", "medium"), msg=f"sales confidence={sales_conf}")
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertIn(agg, ("high", "medium"), msg=f"aggregate={agg}")
+
+    def test_generic_weak_mapping_stays_low_confidence(self) -> None:
+        df = pd.DataFrame(
+            {
+                "value": [1.0, 2.0, 3.0],
+                "type": ["a", "b", "c"],
+                "category": ["x", "y", "z"],
+            }
+        )
+        _proposed, meta, _dash = _bind(df)
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertEqual(agg, "low")
+        product_conf = (meta.get("roles") or {}).get("product", {}).get("confidence")
+        self.assertEqual(product_conf, "low")
+
+    def test_manufacturing_quality_operations_mapping_not_low_confidence(self) -> None:
+        path = DOMAIN_UPLOAD / "manufacturing_quality_10k.csv"
+        df = pd.read_csv(path, nrows=500)
+        df["production_date"] = pd.to_datetime(df["production_date"], errors="coerce")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "operations")
+        self.assertEqual(meta.get("domain"), "manufacturing")
+        self.assertEqual(proposed.get("sales"), "units_produced")
+        self.assertEqual(proposed.get("date"), "production_date")
+        self.assertEqual(proposed.get("product"), "product_family")
+        self.assertEqual(proposed.get("region"), "plant")
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertIn(agg, ("high", "medium"), msg=f"aggregate={agg}")
+        product_conf = (meta.get("roles") or {}).get("product", {}).get("confidence")
+        self.assertIn(product_conf, ("high", "medium"), msg=f"product confidence={product_conf}")
+        self.assertEqual(dash.get("type_label"), "Manufacturing / Operations")
+
+    def test_manufacturing_quality_displays_manufacturing_operations_label(self) -> None:
+        path = DOMAIN_UPLOAD / "manufacturing_quality_10k.csv"
+        df = pd.read_csv(path, nrows=500)
+        df["production_date"] = pd.to_datetime(df["production_date"], errors="coerce")
+        _proposed, meta, dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "manufacturing")
+        self.assertEqual(dash.get("type_label"), "Manufacturing / Operations")
+
+    def test_generic_operations_incidents_stays_operations_label(self) -> None:
+        path = DOMAINS / "operations_incidents_chart_test.csv"
+        df = pd.read_csv(path)
+        for col in df.columns:
+            if "date" in str(col).lower():
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        _proposed, _meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "operations")
+        self.assertEqual(dash.get("type_label"), "Operations")
+        path = DOMAIN_UPLOAD / "ecommerce_orders_10k.csv"
+        df = pd.read_csv(path, nrows=200)
+        df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
+        proposed, meta, _dash = _bind(df)
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertEqual(agg, "high", msg=f"aggregate={agg}")
+        self.assertEqual(proposed.get("sales"), "net_revenue")
+
+    def test_banking_mapping_aggregate_confidence_unchanged(self) -> None:
+        path = DOMAINS / "banking_financial_services.csv"
+        df = pd.read_csv(path)
+        for col in df.columns:
+            if "date" in str(col).lower():
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(meta.get("domain"), "banking")
+        self.assertIn(proposed.get("sales"), ("spend_amount", "loan_balance"))
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertEqual(agg, "medium", msg=f"aggregate={agg}")
+        self.assertEqual(dash.get("type_label"), "Banking / Financial Services")
+
+    def test_marketing_campaigns_mapping_not_low_confidence(self) -> None:
+        path = DOMAIN_UPLOAD / "marketing_campaigns_10k.csv"
+        df = pd.read_csv(path, nrows=500)
+        df["campaign_date"] = pd.to_datetime(df["campaign_date"], errors="coerce")
+        proposed, meta, dash = _bind(df)
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "marketing")
+        self.assertEqual(meta.get("domain"), "marketing")
+        self.assertEqual(proposed.get("sales"), "campaign_revenue")
+        self.assertEqual(proposed.get("date"), "campaign_date")
+        self.assertEqual(proposed.get("product"), "campaign_type")
+        self.assertEqual(proposed.get("region"), "region")
+        self.assertEqual(proposed.get("profit"), "ad_spend")
+        agg = main._aggregate_mapping_confidence_from_meta()
+        self.assertIn(agg, ("high", "medium"), msg=f"aggregate={agg}")
+        profit_conf = (meta.get("roles") or {}).get("profit", {}).get("confidence")
+        self.assertIn(profit_conf, ("high", "medium"), msg=f"profit confidence={profit_conf}")
+        self.assertEqual(dash.get("type_label"), "Marketing")
+
 
 class TestDomainGoldFixturesEdgeCases(unittest.TestCase):
     def tearDown(self) -> None:
@@ -160,8 +420,9 @@ class TestDomainGoldFixturesEdgeCases(unittest.TestCase):
         df = pd.read_csv(GOLDEN / "retail_gold_10000.csv")
         df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
         proposed, meta, dash = _bind(df)
-        self.assertEqual(infer_executive_domain(df.columns.tolist()), "sales")
-        self.assertIn(meta.get("domain"), ("sales", "ecommerce"))
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "retail")
+        self.assertIn(meta.get("domain"), ("sales", "ecommerce", "retail"))
+        self.assertEqual(dash.get("type_label"), "Retail / Ecommerce")
         self.assertEqual(proposed.get("sales"), "sales_amount")
         self.assertEqual(proposed.get("date"), "order_date")
         self.assertGreaterEqual(len(dash.get("charts") or []), 3)

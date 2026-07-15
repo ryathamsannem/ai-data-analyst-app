@@ -63,9 +63,9 @@ class CrossDomainMappingQA(unittest.TestCase):
     # --- Retail ---------------------------------------------------------
     def test_retail_mapping_and_label(self) -> None:
         df, _ = _load(RETAIL)
-        self.assertEqual(infer_executive_domain(df.columns.tolist()), "sales")
+        self.assertEqual(infer_executive_domain(df.columns.tolist()), "retail")
         dash = main.build_auto_dashboard()
-        self.assertEqual(dash.get("type_label"), "Sales")
+        self.assertEqual(dash.get("type_label"), "Retail / Ecommerce")
         m = main.column_mapping
         self.assertEqual(m["sales"], "sales_amount")
         self.assertEqual(m["profit"], "profit")

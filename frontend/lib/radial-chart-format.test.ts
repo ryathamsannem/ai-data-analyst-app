@@ -17,6 +17,7 @@ import {
   radialSliceStableColorIndex,
   resolveRadialPieEdgeProps,
   resolveRadialSharePercentDecimals,
+  resolveRadialSharePercentPoints,
   resolveRadialSliceFill,
   sortRadialDisplayRows,
   truncateRadialLegendLine,
@@ -173,6 +174,38 @@ describe("formatRadialLegendEntry", () => {
       expect(line).toMatch(/\d+%/);
       expect(line.split(RADIAL_LEGEND_SEP).length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it("formats marketing channel revenue share near 17.1% not 171%", () => {
+    const marketingRows: ChartRow[] = [
+      { name: "Social", value: 26_913_755.85 },
+      { name: "Paid Search", value: 26_706_426.93 },
+      { name: "Display", value: 26_601_268.96 },
+      { name: "Video", value: 26_132_596.59 },
+      { name: "Email", value: 25_997_361.03 },
+      { name: "Affiliate", value: 24_903_707.36 },
+    ];
+    const ctx = {
+      metricLabel: "Campaign Revenue",
+      chartTitle: "Marketing Channel Campaign Revenue Share",
+      presentationKind: "donut" as const,
+      chartRows: marketingRows,
+    };
+    const line = formatRadialLegendEntry(marketingRows, "Social", ctx);
+    expect(line).toMatch(/17(\.\d)?%/);
+    expect(line).not.toMatch(/171%/);
+    expect(line).toMatch(/26\.9M/i);
+  });
+
+  it("resolveRadialSharePercentPoints handles fraction and percent inputs", () => {
+    expect(resolveRadialSharePercentPoints({ name: "A", value: 0.171 }, [
+      { name: "A", value: 0.171 },
+      { name: "B", value: 0.829 },
+    ])).toBeCloseTo(17.1, 1);
+    expect(resolveRadialSharePercentPoints({ name: "A", value: 17.1 }, [
+      { name: "A", value: 17.1 },
+      { name: "B", value: 82.9 },
+    ])).toBeCloseTo(17.1, 1);
   });
 
   it("formats downtime minutes share without percent on raw contribution", () => {
