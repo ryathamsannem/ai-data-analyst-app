@@ -16,20 +16,30 @@ class TestCorsConfig(unittest.TestCase):
     def test_single_origin(self) -> None:
         self.assertEqual(
             parse_allowed_origins("https://app.example.com"),
-            ["https://app.example.com"],
+            [*DEFAULT_ALLOWED_ORIGINS, "https://app.example.com"],
         )
 
     def test_comma_separated_origins(self) -> None:
         raw = "https://app.example.com, https://staging.example.com"
         self.assertEqual(
             parse_allowed_origins(raw),
-            ["https://app.example.com", "https://staging.example.com"],
+            [
+                *DEFAULT_ALLOWED_ORIGINS,
+                "https://app.example.com",
+                "https://staging.example.com",
+            ],
         )
 
     def test_ignores_empty_segments(self) -> None:
         self.assertEqual(
             parse_allowed_origins("https://a.com,,https://b.com,"),
-            ["https://a.com", "https://b.com"],
+            [*DEFAULT_ALLOWED_ORIGINS, "https://a.com", "https://b.com"],
+        )
+
+    def test_deduplicates_env_origin_matching_default(self) -> None:
+        self.assertEqual(
+            parse_allowed_origins("https://ai-data-analyst-app.vercel.app"),
+            list(DEFAULT_ALLOWED_ORIGINS),
         )
 
 
