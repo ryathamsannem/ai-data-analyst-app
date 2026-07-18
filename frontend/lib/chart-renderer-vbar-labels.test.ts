@@ -103,6 +103,20 @@ describe("ChartRenderer V-Bar top labels", () => {
     expect(labels[0]).not.toBe(labels[1]);
   });
 
+  it("focused defect-rate tooltip matches top-label precision", () => {
+    const rows = [
+      { name: "Night", value: 0.0247 },
+      { name: "Day", value: 0.0252 },
+      { name: "Swing", value: 0.0266 },
+    ];
+    const ctx = {
+      ...metricCtx,
+      chartRows: rows,
+    };
+    const label = formatOverviewBarTopValueLabel(0.0247, rows, ctx);
+    expect(label).toBe("2.47%");
+  });
+
   it("uses chart axis label token for V-Bar LabelList fill", () => {
     expect(chartRendererSrc).toMatch(
       /showVBarTopLabels[\s\S]*?<LabelList[\s\S]*?fill:\s*CHART_BAR_VALUE_LABEL_CSS/

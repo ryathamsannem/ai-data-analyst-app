@@ -11,7 +11,22 @@ import {
 } from "@/lib/chart-axis-layout";
 import type { PresentationExportSpec } from "@/lib/chart-png-export-layout";
 import type { ChartPresentationContract } from "@/lib/chart-platform/chart-presentation-contract";
-import { resolveOverviewBarValueDomain } from "@/lib/overview-bar-value-domain";
+import {
+  coercePercentDisplayNumber,
+  metricFormatUsesPercent,
+  metricLabelImpliesScoreLike,
+  readChartRowRawValue,
+  resolveMetricValueFormat,
+  type MetricFormatContext,
+} from "@/lib/metric-value-format";
+import {
+  inferBoundedMetricBounds,
+  isLowVarianceOnBoundedScale,
+  resolveFocusedBoundedBarValueAxisTicks,
+  resolveFocusedRateBarValueAxisTicks,
+  resolveOverviewBarValueDomain,
+} from "@/lib/overview-bar-value-domain";
+import { resolveOverviewBarCountValueAxisTicks } from "@/lib/overview-premium-axis-domain";
 
 export type AxisPresentationPlanStatus = "supported" | "unsupported";
 export type AxisScaleKind = "categorical" | "numeric" | "none";
@@ -139,6 +154,81 @@ function resolveExportBarValueDomain(args: {
   return domain ?? null;
 }
 
+function metricFormatContextFromContract(
+  contract: ChartPresentationContract,
+  kind: ChartKind,
+  rows: readonly ChartRow[]
+): MetricFormatContext {
+  return {
+    chartTitle: contract.semantics.title,
+    metricLabel: contract.semantics.metric.label,
+    presentationKind: kind,
+    chartRows: rows as ChartRow[],
+  };
+}
+
+/** Export-plan tick values — mirrors session capture tick policy in cartesian-chart-decisions. */
+function resolveExportBarValueAxisTickValues(args: {
+  domain: readonly [number, number];
+  contract: ChartPresentationContract;
+  kind: ChartKind;
+  rows: readonly ChartRow[];
+}): readonly number[] | null {
+  const { domain, contract, kind, rows } = args;
+  const ctx = metricFormatContextFromContract(contract, kind, rows);
+
+  if (kind !== "histogram" && resolveMetricValueFormat(ctx) === "number") {
+    const countTicks = resolveOverviewBarCountValueAxisTicks(domain);
+    if (countTicks) return countTicks;
+  }
+
+  const rawVals = rows
+    .map((row) => readChartRowRawValue(row))
+    .filter((v) => Number.isFinite(v));
+
+  if (kind === "bar" && metricFormatUsesPercent(ctx) && domain[0] > 0) {
+    if (rawVals.length >= 2) {
+      const maxRaw = Math.max(...rawVals);
+      const displayVals = rawVals.map((v) => coercePercentDisplayNumber(v));
+      const maxDisplay = Math.max(...displayVals);
+      const ticks = resolveFocusedRateBarValueAxisTicks(domain, maxRaw, maxDisplay);
+      if (ticks) return ticks;
+    }
+  }
+
+  if (domain[0] > 0 && rawVals.length >= 2) {
+    const isPercent = metricFormatUsesPercent(ctx);
+    const maxRawAbs = Math.max(...rawVals.map((v) => Math.abs(v)));
+    const displayVals = isPercent
+      ? rawVals.map((v) => coercePercentDisplayNumber(v, undefined, maxRawAbs))
+      : rawVals;
+    const minDisplay = Math.min(...displayVals);
+    const maxDisplay = Math.max(...displayVals);
+    const boundedBounds = inferBoundedMetricBounds({
+      values: displayVals,
+      metricLabel: ctx.metricLabel,
+      chartTitle: ctx.chartTitle,
+      isPercent,
+    });
+    const scoreLike = metricLabelImpliesScoreLike(ctx.metricLabel, ctx.chartTitle);
+    const scaleMax = boundedBounds?.max ?? maxDisplay;
+    if (
+      scoreLike ||
+      (boundedBounds &&
+        isLowVarianceOnBoundedScale(
+          maxDisplay - minDisplay,
+          boundedBounds,
+          rawVals.length
+        ))
+    ) {
+      const ticks = resolveFocusedBoundedBarValueAxisTicks(domain, scaleMax);
+      if (ticks) return ticks;
+    }
+  }
+
+  return null;
+}
+
 function resolveHorizontalBarPlan(args: {
   profileId: string;
   contract: ChartPresentationContract;
@@ -160,6 +250,16 @@ function resolveHorizontalBarPlan(args: {
     marginLeft: hb.marginLeft,
     chartLayoutMode: "export",
   });
+  const valueDomain = resolveExportBarValueDomain(args);
+  const valueTickValues =
+    valueDomain == null
+      ? null
+      : resolveExportBarValueAxisTickValues({
+          domain: valueDomain,
+          contract: args.contract,
+          kind: args.kind,
+          rows,
+        });
 
   return {
     version: 1,
@@ -172,9 +272,9 @@ function resolveHorizontalBarPlan(args: {
       orientation: "x",
       widthPx: null,
       heightPx: null,
-      domain: resolveExportBarValueDomain(args),
+      domain: valueDomain,
       tickCount: null,
-      tickValues: null,
+      tickValues: valueTickValues,
       tickFormatterId: "formatAxisTickFromRows",
     },
     categoryAxis: {
@@ -243,6 +343,16 @@ function resolveVerticalBarPlan(args: {
     tickFontSizePx: categoryPlan.tickFontSizePx,
     chartLayoutMode: "export",
   });
+  const valueDomain = resolveExportBarValueDomain(args);
+  const valueTickValues =
+    valueDomain == null
+      ? null
+      : resolveExportBarValueAxisTickValues({
+          domain: valueDomain,
+          contract: args.contract,
+          kind: args.kind,
+          rows,
+        });
 
   return {
     version: 1,
@@ -255,9 +365,9 @@ function resolveVerticalBarPlan(args: {
       orientation: "y",
       widthPx: verticalValueLayout.yAxisWidth,
       heightPx: null,
-      domain: resolveExportBarValueDomain(args),
+      domain: valueDomain,
       tickCount: null,
-      tickValues: null,
+      tickValues: valueTickValues,
       tickFormatterId: "formatAxisTickFromRows",
     },
     categoryAxis: {
@@ -389,10 +499,14 @@ function propsFromVerticalBarPlan(
 
   if (!plan.valueAxis.domain) return null;
 
-  return {
+  const out: VerticalBarValueAxisProps = {
     domain: plan.valueAxis.domain,
     allowDataOverflow: false,
   };
+  if (plan.valueAxis.tickValues?.length) {
+    out.ticks = plan.valueAxis.tickValues;
+  }
+  return out;
 }
 
 export function resolveVerticalBarValueAxisProps(args: {

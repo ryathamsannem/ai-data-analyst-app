@@ -15,6 +15,7 @@ from intent_engine.reasoning_blocks import (
     build_leader_laggard_gap_blocks,
     build_reasoning_blocks,
     build_trend_movement_blocks,
+    is_rate_percentage_reasoning_metric,
     reasoning_blocks_prompt_block,
 )
 
@@ -185,6 +186,88 @@ class TestReasoningBlocks(unittest.TestCase):
         prompt = reasoning_blocks_prompt_block(blocks)
         self.assertIn("Do not invent causes", prompt)
         self.assertIn("North", prompt)
+
+    def test_rate_metric_detection(self) -> None:
+        self.assertTrue(
+            is_rate_percentage_reasoning_metric(
+                "Average profit margin pct", "profit_margin_pct"
+            )
+        )
+        self.assertTrue(
+            is_rate_percentage_reasoning_metric("utilization pct", "utilization_pct")
+        )
+        self.assertTrue(
+            is_rate_percentage_reasoning_metric("defect rate", "defect_rate")
+        )
+        self.assertTrue(
+            is_rate_percentage_reasoning_metric(
+                "conversion rate", "conversion_rate_pct"
+            )
+        )
+        self.assertFalse(
+            is_rate_percentage_reasoning_metric("sales amount", "revenue")
+        )
+        self.assertFalse(is_rate_percentage_reasoning_metric("profit", "profit"))
+
+    def test_profit_margin_pct_uses_comparison_not_contribution(self) -> None:
+        rows = [
+            {"name": "Enterprise", "value": 14.4},
+            {"name": "Professional", "value": 6.7},
+            {"name": "Starter", "value": 0.1},
+        ]
+        blocks = build_reasoning_blocks(
+            rows,
+            chart_kind="bar",
+            metric_label="Average profit margin pct",
+            metric_column="profit_margin_pct",
+            dimension_label="product",
+            cohort_row_count=500,
+        )
+        claims = " ".join(b["claim"] for b in blocks).lower()
+        self.assertNotIn("contributes", claims)
+        self.assertNotIn("top 3", claims)
+        self.assertNotIn("account for", claims)
+        self.assertIn("highest average profit margin pct", claims)
+        self.assertIn("lowest average profit margin pct", claims)
+        self.assertIn("percentage points", claims)
+        self.assertTrue(all(b["type"] != "contribution" for b in blocks))
+
+    def test_revenue_still_uses_contribution_wording(self) -> None:
+        rows = [
+            {"name": "North", "value": 350_000},
+            {"name": "South", "value": 300_000},
+            {"name": "East", "value": 200_000},
+            {"name": "West", "value": 150_000},
+        ]
+        blocks = build_reasoning_blocks(
+            rows,
+            chart_kind="bar",
+            metric_label="Sales",
+            metric_column="revenue",
+            dimension_label="Region",
+            cohort_row_count=500,
+        )
+        contrib = [b for b in blocks if b["type"] == "contribution"]
+        self.assertGreaterEqual(len(contrib), 1)
+        self.assertIn("contributes", contrib[0]["claim"].lower())
+
+    def test_profit_amount_still_uses_contribution_wording(self) -> None:
+        rows = [
+            {"name": "Widget A", "value": 2400},
+            {"name": "Widget B", "value": 1800},
+            {"name": "Widget C", "value": 900},
+        ]
+        blocks = build_reasoning_blocks(
+            rows,
+            chart_kind="bar",
+            metric_label="Profit",
+            metric_column="profit",
+            dimension_label="product",
+            cohort_row_count=120,
+        )
+        contrib = [b for b in blocks if b["type"] == "contribution"]
+        self.assertGreaterEqual(len(contrib), 1)
+        self.assertIn("contributes", contrib[0]["claim"].lower())
 
 
 if __name__ == "__main__":

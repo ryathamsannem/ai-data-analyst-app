@@ -73,6 +73,12 @@ type VmBalanced = { marginLeft: number; marginRight: number };
 /** Top Recharts margin when vertical bar top value labels are shown (session/detail). */
 export const VBAR_TOP_LABEL_HEADROOM_PX = 28;
 
+/** Top Recharts margin when line point value labels are shown. */
+export const LINE_TOP_LABEL_HEADROOM_PX = 22;
+
+/** Bottom Recharts margin when line labels may render below low points. */
+export const LINE_BOTTOM_LABEL_HEADROOM_PX = 12;
+
 export type ChartPlotMarginOpts = {
   /** AI Insights / PDF insight layout — slightly tighter optical centering. */
   insightUi?: boolean;
@@ -82,6 +88,10 @@ export type ChartPlotMarginOpts = {
   lineChart?: boolean;
   /** Vertical bar `LabelList` at top — needs extra margin so labels are not clipped. */
   vBarTopLabels?: boolean;
+  /** Line point labels above markers — line charts only (not area). */
+  lineTopLabels?: boolean;
+  /** Area point labels above stroke edge — area charts only (not line). */
+  areaTopLabels?: boolean;
 };
 
 function cartesianSideMargin(vmBalanced: VmBalanced, kind: ChartKind): number {
@@ -150,11 +160,19 @@ export function verticalCartesianOuterMargins(
 
   if (kind === "line" || kind === "area") {
     const bottomTrim = insightUi ? 4 : 2;
-    const bottom = Math.max(
+    let bottom = Math.max(
       computedBottom - bottomTrim,
       insightUi ? 48 : computedBottom
     );
-    const top = insightUi ? 6 : 11;
+    let top = insightUi ? 6 : 11;
+    if (kind === "line" && opts?.lineTopLabels) {
+      top = Math.max(top, LINE_TOP_LABEL_HEADROOM_PX);
+      bottom += LINE_BOTTOM_LABEL_HEADROOM_PX;
+    }
+    if (kind === "area" && opts?.areaTopLabels) {
+      top = Math.max(top, LINE_TOP_LABEL_HEADROOM_PX);
+      bottom += LINE_BOTTOM_LABEL_HEADROOM_PX;
+    }
     return { top, left: side, right: side, bottom };
   }
 

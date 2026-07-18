@@ -3,16 +3,21 @@ import type { ChartRow } from "@/app/chart-types";
 import {
   chooseFocusedTrendAxisStep,
   formatOverviewBarValueAxisTick,
+  formatOverviewLineFocusedMegaPointLabel,
   formatOverviewLineYAxisTick,
   formatOverviewScatterAxisTick,
+  normalizeTickStepForMaxCount,
   OVERVIEW_LINE_PREMIUM_PAD_RATIO,
+  PREMIUM_AXIS_MAX_TICK_COUNT,
   OVERVIEW_SCATTER_TARGET_OCCUPANCY,
   resolveOverviewBarCountValueAxisTicks,
+  resolveOverviewMiniTrendAxisScale,
   resolveOverviewPremiumAxisScale,
   resolveOverviewScatterPremiumAxes,
   resolveOverviewScatterPremiumAxisScale,
   resolveScatterValueAxisProps,
   resolveSessionPremiumTrendAxisScale,
+  trendValueSpanUsesFocusedMegaTicks,
   resolveTrendValueAxisProps,
   SESSION_DETAIL_TREND_PREMIUM_PAD_RATIO,
   sessionLineAreaDetailBottomMargin,
@@ -171,6 +176,47 @@ describe("resolveOverviewPremiumAxisScale", () => {
     expect(scale!.ticks.length).toBeGreaterThanOrEqual(4);
     expect(scale!.ticks.length).toBeLessThanOrEqual(6);
   });
+
+  it("caps large-magnitude low-variance trend ticks before materializing arrays", () => {
+    const values = [
+      1_277_752_278.89,
+      1_197_284_771.46,
+      1_263_652_576.87,
+      1_220_068_298.55,
+      1_250_143_018.22,
+      1_232_996_118.4,
+      1_219_885_204.13,
+      1_247_902_331.91,
+      1_238_103_009.02,
+      1_251_220_943.77,
+      1_231_952_378.84,
+      1_220_603_062.46,
+    ];
+    const scale = resolveOverviewMiniTrendAxisScale(values, "line");
+    expect(scale).toBeDefined();
+    expect(scale!.ticks.length).toBeGreaterThanOrEqual(2);
+    expect(scale!.ticks.length).toBeLessThanOrEqual(PREMIUM_AXIS_MAX_TICK_COUNT);
+    expect(scale!.domain[0]).toBeLessThanOrEqual(Math.min(...values));
+    expect(scale!.domain[1]).toBeGreaterThanOrEqual(Math.max(...values));
+  });
+
+  it("normalizes unsafe tiny tick steps arithmetically", () => {
+    const unsafe = normalizeTickStepForMaxCount(
+      1_190_000_000,
+      1_280_000_000,
+      20_000,
+      PREMIUM_AXIS_MAX_TICK_COUNT
+    );
+    expect(unsafe).toBeGreaterThan(20_000);
+    const estimated = Math.floor((1_280_000_000 - 1_190_000_000) / unsafe) + 1;
+    expect(estimated).toBeLessThanOrEqual(PREMIUM_AXIS_MAX_TICK_COUNT);
+  });
+
+  it("leaves invalid or zero tick steps unchanged for caller fallback", () => {
+    expect(normalizeTickStepForMaxCount(0, 100, 0)).toBe(0);
+    expect(normalizeTickStepForMaxCount(Number.NaN, 100, 10)).toBe(10);
+    expect(normalizeTickStepForMaxCount(100, 0, 10)).toBe(10);
+  });
 });
 
 describe("formatOverviewLineYAxisTick", () => {
@@ -190,6 +236,16 @@ describe("formatOverviewLineYAxisTick", () => {
     );
     expect(new Set(labels).size).toBe(4);
     expect(labels.every((l) => l !== "1M")).toBe(true);
+  });
+
+  it("focused mega point labels use two-decimal M in tight million-scale ranges", () => {
+    const tightRange = [
+      1_020_000, 1_030_000, 1_040_000, 1_050_000, 1_054_638,
+    ];
+    expect(trendValueSpanUsesFocusedMegaTicks(tightRange)).toBe(true);
+    expect(formatOverviewLineFocusedMegaPointLabel(1_054_638)).toBe("1.05M");
+    expect(formatOverviewLineFocusedMegaPointLabel(1_026_677)).toBe("1.03M");
+    expect(formatOverviewLineYAxisTick(1_054_638)).toBe("1.1M");
   });
 
   it("keeps percent metrics readable", () => {

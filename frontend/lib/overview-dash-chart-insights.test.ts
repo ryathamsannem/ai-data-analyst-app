@@ -5,7 +5,9 @@ import {
   describeScatterRelationship,
   formatOverviewMiniInsightChips,
   inferTrendPeriodLabelFromTitle,
+  isBinaryCategoricalComparisonLabels,
   resolveChronologicalTrendEndpoints,
+  shouldUseTrendPeriodInsightChips,
   trendPeriodChipLabels,
 } from "@/lib/overview-dash-chart-insights";
 import type { ChartRow } from "@/app/chart-types";
@@ -374,5 +376,87 @@ describe("formatOverviewMiniInsightChips trend wording", () => {
     expect(chips[2]?.text).toMatch(/^Profit Spread: /);
     expect(chips[3]?.text).toMatch(/^Relationship: /);
     expect(chips[0]?.text).not.toContain("340,000 / 82,000");
+  });
+
+  it("uses Top / Lowest / Gap for binary categorical bar charts", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "N", value: 420_000 },
+        { name: "Y", value: 95_000 },
+      ],
+      {
+        chartTitle: "Monthly Payment by Default Flag",
+        presentationKind: "bar",
+        isTrendChart: true,
+      }
+    );
+    expect(chips[0]?.text).toMatch(/^Top: /);
+    expect(chips[1]?.text).toMatch(/^Lowest: /);
+    expect(chips[2]?.text).toMatch(/^Gap: /);
+    expect(chips[0]?.text).not.toMatch(/^Start /);
+    expect(chips[1]?.text).not.toMatch(/^Latest /);
+    expect(chips[2]?.text).not.toMatch(/^Change:/);
+  });
+
+  it("keeps Start / Latest / Change for real line time trends", () => {
+    const chips = formatOverviewMiniInsightChips(trendRows, {
+      chartTitle: "Monthly Revenue Trend",
+      presentationKind: "line",
+    });
+    expect(chips[0]?.text).toMatch(/^Start Month:/);
+    expect(chips[1]?.text).toMatch(/^Latest Month:/);
+    expect(chips[2]?.text).toMatch(/^Change: /);
+  });
+
+  it("keeps Top / Lowest / Gap for non-binary categorical bar charts", () => {
+    const chips = formatOverviewMiniInsightChips(
+      [
+        { name: "Delhi", value: 100 },
+        { name: "Mumbai", value: 50 },
+        { name: "Chennai", value: 75 },
+      ],
+      {
+        chartTitle: "Monthly Revenue by City",
+        presentationKind: "bar",
+        isTrendChart: true,
+      }
+    );
+    expect(chips[0]?.text).toMatch(/^Top: /);
+    expect(chips[1]?.text).toMatch(/^Lowest: /);
+    expect(chips[2]?.text).toMatch(/^Gap: /);
+  });
+});
+
+describe("shouldUseTrendPeriodInsightChips", () => {
+  it("detects binary categorical labels", () => {
+    expect(isBinaryCategoricalComparisonLabels(["Y", "N"])).toBe(true);
+    expect(isBinaryCategoricalComparisonLabels(["Yes", "No"])).toBe(true);
+    expect(isBinaryCategoricalComparisonLabels(["Delhi", "Mumbai"])).toBe(false);
+  });
+
+  it("requires temporal axis labels for bar trend chips", () => {
+    expect(
+      shouldUseTrendPeriodInsightChips(
+        [
+          { name: "N", value: 1 },
+          { name: "Y", value: 2 },
+        ],
+        { presentationKind: "bar", isTrendChart: true }
+      )
+    ).toBe(false);
+    expect(
+      shouldUseTrendPeriodInsightChips(
+        [
+          { name: "2025-01", value: 1 },
+          { name: "2025-02", value: 2 },
+        ],
+        { presentationKind: "bar", isTrendChart: true }
+      )
+    ).toBe(true);
+    expect(
+      shouldUseTrendPeriodInsightChips(trendRows, {
+        presentationKind: "line",
+      })
+    ).toBe(true);
   });
 });

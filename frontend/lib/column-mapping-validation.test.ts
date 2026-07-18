@@ -97,6 +97,14 @@ const FIXTURE_ROLE_META = {
     region: { selected: "school_region", confidence: "high" },
     customer: { selected: null, confidence: "low" },
   },
+  covid_public_health: {
+    sales: { selected: "new_cases", confidence: "high" },
+    product: { selected: "variant", confidence: "high" },
+    date: { selected: "report_date", confidence: "high" },
+    profit: { selected: "active_cases", confidence: "high" },
+    region: { selected: "state", confidence: "medium" },
+    customer: { selected: null, confidence: "low" },
+  },
 } as const;
 
 describe("aggregateMappingConfidenceFromMetadata", () => {
@@ -140,6 +148,14 @@ describe("aggregateMappingConfidenceFromMetadata", () => {
         })
       ).toBe("high");
     }
+  });
+
+  it("returns High or Medium for COVID public-health without customer entity", () => {
+    const level = aggregateMappingConfidenceFromMetadata({
+      roles: FIXTURE_ROLE_META.covid_public_health,
+    });
+    expect(level === "high" || level === "medium").toBe(true);
+    expect(level).not.toBe("low");
   });
 
   it("prefers backend mapping_confidence when provided", () => {

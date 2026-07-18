@@ -93,7 +93,7 @@ import {
   resolveRadialPieEdgeProps,
   truncateRadialLegendLine,
 } from "@/lib/radial-chart-format";
-import { shouldShowOverviewBarValueLabels, shouldShowHBarValueLabels, formatOverviewBarTopValueLabel } from "@/lib/overview-dashboard-export";
+import { shouldShowOverviewBarValueLabels, shouldShowHBarValueLabels, formatOverviewBarTopValueLabel, formatOverviewHBarEndValueLabel } from "@/lib/overview-dashboard-export";
 import {
   HORIZONTAL_BAR_END_RADIUS,
   HORIZONTAL_BAR_STACKED_MAX_SIZE,
@@ -114,11 +114,21 @@ import {
   type AxisPresentationPlan,
 } from "@/lib/chart-platform/axis-presentation-plan";
 import { WrappedCategoryYAxisTick } from "@/app/components/chart-category-axis-tick";
-import { HBarValueLabelListContent } from "@/app/components/home/hbar-value-label-list";
 import {
-  computeHBarOutsideLabelReservePx,
+  buildAreaValueLabelIndexSet,
+  buildLineValueLabelIndexSet,
+  formatLineValueLabel,
+  shouldShowAreaPointLabels,
+  shouldShowLinePointLabels,
+  type LineValueLabelSurface,
+} from "@/lib/line-value-labels";
+import { HBarValueLabelListContent } from "@/app/components/home/hbar-value-label-list";
+import { LineValueLabelListContent } from "@/app/components/home/line-value-label-list";
+import {
+  computeHBarSignedOutsideLabelReservesPx,
   resolveHBarLabelPlacementMode,
 } from "@/lib/hbar-value-label-placement";
+import { barChartRowsHaveNegativeValues } from "@/lib/overview-bar-value-domain";
 import { useDevRenderCount } from "@/lib/dev-render-count";
 import {
   BarChart,
@@ -140,6 +150,7 @@ import {
   ScatterChart,
   Scatter,
   LabelList,
+  ReferenceLine,
 } from "recharts";
 
 /** Disable Recharts enter/exit animation above this point count (main + overview charts). */
@@ -147,6 +158,8 @@ const RECHARTS_ANIMATION_MAX_POINTS = 72;
 
 const GRID_STROKE = "var(--chart-axis-line)";
 const CHART_AXIS_LINE = CHART_AXIS_CSS.line;
+const SIGNED_BAR_ZERO_LINE_OPACITY = 0.72;
+const SIGNED_BAR_ZERO_LINE_WIDTH = 1.25;
 const AXIS_TICK = CHART_AXIS_CSS.tick;
 const CHART_TOOLTIP_FRAME = {
   cursor: false,
@@ -283,8 +296,9 @@ function ChartRendererInner({
       metricLabel: rAxes.valueAxis,
       chartTitle: rViz?.chartTitle?.trim() || rAxes.valueAxis,
       presentationKind: rKind,
+      chartRows: rData,
     }),
-    [rAxes.valueAxis, rViz?.chartTitle, rKind]
+    [rAxes.valueAxis, rViz?.chartTitle, rKind, rData]
   );
 
   // Metric-aware bar value ticks: currency/large numbers compact to K/M and
@@ -298,6 +312,12 @@ function ChartRendererInner({
   const barTopLabelFormatter = useMemo(
     () => (value: number) =>
       formatOverviewBarTopValueLabel(value, rData, metricTooltipCtx),
+    [rData, metricTooltipCtx]
+  );
+
+  const barHBarEndLabelFormatter = useMemo(
+    () => (value: number) =>
+      formatOverviewHBarEndValueLabel(value, rData, metricTooltipCtx),
     [rData, metricTooltipCtx]
   );
 
@@ -459,6 +479,44 @@ function ChartRendererInner({
       metricCtx: metricTooltipCtx,
     });
 
+  const lineLabelSurface: LineValueLabelSurface = pngCaptureMode
+    ? "export"
+    : "live";
+  const lineLabelPlotWidthPx = detailLayout
+    ? getSharedDetailLayoutMetrics("line").planViewportPx
+    : viewportW;
+  const lineLabelOptions = {
+    surface: lineLabelSurface,
+    plotWidthPx: lineLabelPlotWidthPx,
+    fontSizePx: pngCaptureMode ? 11 : detailLayout ? 13 : compact ? 10 : 11,
+    formatLabel: (v: number) => formatLineValueLabel(v, metricTooltipCtx),
+  };
+  const areaLabelPlotWidthPx = detailLayout
+    ? getSharedDetailLayoutMetrics("area").planViewportPx
+    : viewportW;
+  const areaLabelOptions = {
+    surface: lineLabelSurface,
+    plotWidthPx: areaLabelPlotWidthPx,
+    fontSizePx: pngCaptureMode ? 11 : detailLayout ? 13 : compact ? 10 : 11,
+    formatLabel: (v: number) => formatLineValueLabel(v, metricTooltipCtx),
+  };
+  const showLineValueLabels =
+    rKind === "line" &&
+    shouldShowLinePointLabels(rData, lineLabelOptions);
+  const showAreaValueLabels =
+    rKind === "area" &&
+    shouldShowAreaPointLabels(rData, areaLabelOptions);
+  const lineValueLabelIndices = showLineValueLabels
+    ? buildLineValueLabelIndexSet(rData, lineLabelOptions)
+    : null;
+  const areaValueLabelIndices = showAreaValueLabels
+    ? buildAreaValueLabelIndexSet(rData, areaLabelOptions)
+    : null;
+  const lineValueSeries = useMemo(
+    () => rData.map((row) => row.value),
+    [rData]
+  );
+
   const detailLayoutViewportW = detailLayout
     ? getSharedDetailLayoutMetrics(rKind).planViewportPx
     : viewportW;
@@ -473,6 +531,8 @@ function ChartRendererInner({
       pointCount: detailLayout ? rData.length : undefined,
       lineChart: detailLayout && rKind === "line",
       vBarTopLabels: showVBarTopLabels,
+      lineTopLabels: showLineValueLabels,
+      areaTopLabels: showAreaValueLabels,
     });
 
   const insightVBarCatDense =
@@ -1129,17 +1189,20 @@ function ChartRendererInner({
       pngCapture: pngCaptureMode,
       detailLayout,
     });
-    const hBarOutsideLabelReserve =
+    const hBarOutsideLabelReserves =
       showHBarEndLabels && hBarPlacementMode !== "overview-live"
-        ? computeHBarOutsideLabelReservePx(
+        ? computeHBarSignedOutsideLabelReservesPx(
             rData.map((r) => r.value),
-            (v) => barValueTickFormatter(v),
+            (v) => barHBarEndLabelFormatter(v),
             hBarLabelFontSize
           )
-        : 0;
+        : { left: 0, right: 0 };
     const hBarRightMargin = showHBarEndLabels
-      ? Math.max(hmBalanced.marginRight, 52) + hBarOutsideLabelReserve
+      ? Math.max(hmBalanced.marginRight, 52) + hBarOutsideLabelReserves.right
       : hmBalanced.marginRight;
+    const hBarLeftMargin =
+      hmBalanced.marginLeft + hBarOutsideLabelReserves.left;
+    const hBarSigned = barChartRowsHaveNegativeValues(rData);
     const hBarValueAxisProps = resolveCartesianBarValueAxisProps({
       chartKind: "bar_horizontal",
       rows: rData,
@@ -1165,7 +1228,7 @@ function ChartRendererInner({
             detailLayout,
           })}
           margin={{
-            left: hmBalanced.marginLeft,
+            left: hBarLeftMargin,
             right: hBarRightMargin,
             top: 16,
             bottom: Math.max(hb.marginBottom, compact ? 14 : 22),
@@ -1178,6 +1241,14 @@ function ChartRendererInner({
             strokeDasharray="4 12"
             strokeOpacity={0.38}
           />
+          {hBarSigned ? (
+            <ReferenceLine
+              x={0}
+              stroke={CHART_AXIS_LINE}
+              strokeOpacity={SIGNED_BAR_ZERO_LINE_OPACITY}
+              strokeWidth={SIGNED_BAR_ZERO_LINE_WIDTH}
+            />
+          ) : null}
           <XAxis
             type="number"
             {...(hBarValueAxisProps ?? {})}
@@ -1245,12 +1316,13 @@ function ChartRendererInner({
                     height={labelProps.height}
                     value={labelProps.value}
                     viewBox={labelProps.viewBox}
-                    formatter={(v) => barValueTickFormatter(Number(v ?? 0))}
+                    formatter={(v) => barHBarEndLabelFormatter(Number(v ?? 0))}
                     fontSize={hBarLabelFontSize}
                     inlayFill={CHART_BAR_INLAY_LABEL_CSS}
                     outsideFill={CHART_BAR_VALUE_LABEL_CSS}
                     placementMode={hBarPlacementMode}
-                    outsideLabelReservePx={hBarOutsideLabelReserve}
+                    outsideLabelReservePx={hBarOutsideLabelReserves.right}
+                    outsideLabelReserveLeftPx={hBarOutsideLabelReserves.left}
                   />
                 )}
               />
@@ -1322,8 +1394,11 @@ function ChartRendererInner({
             yAxisWidth: trendValueLayout.yAxisWidth,
             pointCount: rData.length,
             lineChart: rKind === "line",
+            lineTopLabels: showLineValueLabels,
+            areaTopLabels: showAreaValueLabels,
           })
         : pickCartesianMargin(lineAreaBottomMargin);
+    const lineLabelFontSize = detailLayout ? (compact ? 11 : 13) : compact ? 10 : 11;
     const detailLineStroke =
       detailLayout && rKind === "line"
         ? OVERVIEW_LINE_LIVE_STROKE_WIDTH_PX
@@ -1434,7 +1509,37 @@ function ChartRendererInner({
               }
               activeDot={{ r: 6 }}
               connectNulls
-            />
+            >
+              {showAreaValueLabels && areaValueLabelIndices ? (
+                <LabelList
+                  dataKey="value"
+                  content={(labelProps) => (
+                    <LineValueLabelListContent
+                      x={labelProps.x}
+                      y={labelProps.y}
+                      value={labelProps.value}
+                      index={labelProps.index}
+                      labelIndices={areaValueLabelIndices}
+                      lineValues={lineValueSeries}
+                      viewBox={
+                        labelProps.viewBox as {
+                          x?: number;
+                          y?: number;
+                          width?: number;
+                          height?: number;
+                        }
+                      }
+                      chartKind="area"
+                      formatter={(v) =>
+                        formatLineValueLabel(v, metricTooltipCtx)
+                      }
+                      fontSize={lineLabelFontSize}
+                      fill={CHART_BAR_VALUE_LABEL_CSS}
+                    />
+                  )}
+                />
+              ) : null}
+            </Area>
           ) : (
             <Line
               type="monotone"
@@ -1455,12 +1560,43 @@ function ChartRendererInner({
               }
               activeDot={{ r: 6 }}
               connectNulls
-            />
+            >
+              {showLineValueLabels && lineValueLabelIndices ? (
+                <LabelList
+                  dataKey="value"
+                  content={(labelProps) => (
+                    <LineValueLabelListContent
+                      x={labelProps.x}
+                      y={labelProps.y}
+                      value={labelProps.value}
+                      index={labelProps.index}
+                      labelIndices={lineValueLabelIndices}
+                      lineValues={lineValueSeries}
+                      viewBox={
+                        labelProps.viewBox as {
+                          x?: number;
+                          y?: number;
+                          width?: number;
+                          height?: number;
+                        }
+                      }
+                      formatter={(v) =>
+                        formatLineValueLabel(v, metricTooltipCtx)
+                      }
+                      fontSize={lineLabelFontSize}
+                      fill={CHART_BAR_VALUE_LABEL_CSS}
+                    />
+                  )}
+                />
+              ) : null}
+            </Line>
           )}
         </ChartBody>
       </ResponsiveContainer>
     );
   }
+
+  const vBarSigned = barChartRowsHaveNegativeValues(rData);
 
   return (
     <ResponsiveContainer
@@ -1490,6 +1626,14 @@ function ChartRendererInner({
           strokeDasharray="4 12"
           strokeOpacity={0.38}
         />
+        {vBarSigned ? (
+          <ReferenceLine
+            y={0}
+            stroke={CHART_AXIS_LINE}
+            strokeOpacity={SIGNED_BAR_ZERO_LINE_OPACITY}
+            strokeWidth={SIGNED_BAR_ZERO_LINE_WIDTH}
+          />
+        ) : null}
         <XAxis
           dataKey="name"
           tick={{

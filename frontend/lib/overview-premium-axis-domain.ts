@@ -1,4 +1,5 @@
 import type { ChartRow } from "@/app/chart-types";
+import { LINE_BOTTOM_LABEL_HEADROOM_PX, LINE_TOP_LABEL_HEADROOM_PX } from "@/lib/chart-layout-config";
 import {
   formatMetricNumber,
   readChartRowRawValue,
@@ -111,12 +112,89 @@ function chooseOverviewPremiumStep(
   return base;
 }
 
-function buildTicks(lo: number, hi: number, step: number): number[] {
+export const PREMIUM_AXIS_MAX_TICK_COUNT = 7;
+
+function estimateTickCount(lo: number, hi: number, step: number): number {
+  if (
+    !Number.isFinite(lo) ||
+    !Number.isFinite(hi) ||
+    !Number.isFinite(step) ||
+    step <= 0 ||
+    hi < lo
+  ) {
+    return 0;
+  }
+  if (hi === lo) return 1;
+  const count = Math.floor((hi - lo) / step + 1e-9) + 1;
+  return Number.isFinite(count) && count > 0 ? count : Number.POSITIVE_INFINITY;
+}
+
+export function normalizeTickStepForMaxCount(
+  lo: number,
+  hi: number,
+  step: number,
+  maxTicks: number = PREMIUM_AXIS_MAX_TICK_COUNT
+): number {
+  if (
+    !Number.isFinite(lo) ||
+    !Number.isFinite(hi) ||
+    !Number.isFinite(step) ||
+    !Number.isFinite(maxTicks) ||
+    step <= 0 ||
+    maxTicks < 2 ||
+    hi <= lo
+  ) {
+    return step;
+  }
+
+  const estimated = estimateTickCount(lo, hi, step);
+  if (estimated <= maxTicks) return step;
+
+  const span = hi - lo;
+  const minStep = span / Math.max(maxTicks - 1, 1);
+  const magnitude = 10 ** Math.floor(Math.log10(Math.max(minStep, 1e-12)));
+  const multipliers = [1, 2, 2.5, 5, 10];
+
+  for (let exp = 0; exp <= 12; exp += 1) {
+    const base = magnitude * 10 ** exp;
+    for (const multiplier of multipliers) {
+      const candidate = base * multiplier;
+      if (candidate < minStep || candidate < step) continue;
+      if (estimateTickCount(snapDown(lo, candidate), snapUp(hi, candidate), candidate) <= maxTicks) {
+        return candidate;
+      }
+    }
+  }
+
+  return Math.max(step, minStep);
+}
+
+function buildTicks(
+  lo: number,
+  hi: number,
+  step: number,
+  maxTicks: number = PREMIUM_AXIS_MAX_TICK_COUNT
+): number[] {
+  if (
+    !Number.isFinite(lo) ||
+    !Number.isFinite(hi) ||
+    !Number.isFinite(step) ||
+    step <= 0
+  ) {
+    return Number.isFinite(lo) && Number.isFinite(hi) && lo !== hi ? [lo, hi] : [];
+  }
+  if (hi < lo) return [hi, lo];
+  if (hi === lo) return [lo];
+
+  const safeStep = normalizeTickStepForMaxCount(lo, hi, step, maxTicks);
+  if (!Number.isFinite(safeStep) || safeStep <= 0) return [lo, hi];
+
   const ticks: number[] = [];
-  for (let t = lo; t <= hi + step * 1e-6; t += step) {
+  for (let t = lo; t <= hi + safeStep * 1e-6 && ticks.length < maxTicks; t += safeStep) {
     ticks.push(Number(t.toFixed(6)));
   }
-  return ticks.length >= 2 ? ticks : [lo, hi];
+  if (ticks.length >= 2) return ticks;
+  return lo !== hi ? [lo, hi] : [lo];
 }
 
 /**
@@ -155,23 +233,33 @@ export function chooseFocusedTrendAxisStep(span: number, maxAbs: number): number
   return inferDomainTickStep(span, maxAbs);
 }
 
-const PREMIUM_AXIS_MAX_TICK_COUNT = 7;
+/** True when line/area values sit in a tight million-scale band (matches focused axis ticks). */
+export function trendValueSpanUsesFocusedMegaTicks(
+  values: readonly number[]
+): boolean {
+  const nums = values.filter((v) => Number.isFinite(v));
+  if (nums.length < 2) return false;
+  const span = Math.max(...nums) - Math.min(...nums);
+  const maxAbs = Math.max(...nums.map((v) => Math.abs(v)));
+  return maxAbs > 100_000 && span <= 100_000;
+}
+
+/** Point-label M suffix with two-decimal precision — mirrors focused axis tick style. */
+export function formatOverviewLineFocusedMegaPointLabel(value: number): string {
+  const m = value / 1_000_000;
+  const label = m.toFixed(2).replace(/\.?0+$/, "");
+  return `${label}M`;
+}
 
 function capPremiumAxisTicks(
   lo: number,
   hi: number,
   step: number
 ): { ticks: number[]; step: number; lo: number; hi: number } {
-  let s = step;
-  let domainLo = lo;
-  let domainHi = hi;
-  let ticks = buildTicks(domainLo, domainHi, s);
-  while (ticks.length > PREMIUM_AXIS_MAX_TICK_COUNT && s < domainHi - domainLo) {
-    s *= 2;
-    domainLo = snapDown(lo, s);
-    domainHi = snapUp(hi, s);
-    ticks = buildTicks(domainLo, domainHi, s);
-  }
+  const s = normalizeTickStepForMaxCount(lo, hi, step, PREMIUM_AXIS_MAX_TICK_COUNT);
+  const domainLo = snapDown(lo, s);
+  const domainHi = snapUp(hi, s);
+  const ticks = buildTicks(domainLo, domainHi, s, PREMIUM_AXIS_MAX_TICK_COUNT);
   return { ticks, step: s, lo: domainLo, hi: domainHi };
 }
 
@@ -327,17 +415,28 @@ export function sessionTrendDetailPlotMargins(args: {
   yAxisWidth: number;
   pointCount?: number;
   lineChart?: boolean;
+  lineTopLabels?: boolean;
+  areaTopLabels?: boolean;
 }): { top: number; right: number; bottom: number; left: number } {
   const side = sessionTrendDetailSideMargins(args.yAxisWidth, {
     lineChart: args.lineChart,
     pointCount: args.pointCount,
   });
-  const bottom = Math.min(
+  let top = SESSION_DETAIL_TREND_MARGIN_TOP_PX;
+  let bottom = Math.min(
     sessionLineAreaDetailBottomMargin(args.computedBottom),
     SESSION_DETAIL_TREND_MARGIN_BOTTOM_CAP_PX
   );
+  if (args.lineTopLabels) {
+    top = Math.max(top, LINE_TOP_LABEL_HEADROOM_PX);
+    bottom += LINE_BOTTOM_LABEL_HEADROOM_PX;
+  }
+  if (args.areaTopLabels) {
+    top = Math.max(top, LINE_TOP_LABEL_HEADROOM_PX);
+    bottom += LINE_BOTTOM_LABEL_HEADROOM_PX;
+  }
   return {
-    top: SESSION_DETAIL_TREND_MARGIN_TOP_PX,
+    top,
     right: side.right,
     bottom,
     left: side.left,
@@ -368,7 +467,14 @@ export function formatOverviewLineYAxisTick(
 
   const format = resolveMetricValueFormat(ctx);
   if (format === "percent") {
-    return formatMetricNumber(tick, "percent");
+    const rows = ctx.chartRows ?? [];
+    const values = rows
+      .map((r) => readChartRowRawValue(r))
+      .filter((v) => Number.isFinite(v))
+      .map((v) => Math.abs(v));
+    const maxAbs = values.length ? Math.max(...values) : Math.abs(tick);
+    const display = maxAbs <= 1.05 ? tick * 100 : tick;
+    return formatMetricNumber(display, "percent");
   }
 
   const abs = Math.abs(tick);

@@ -35,7 +35,7 @@ _ID_TITLE_PATTERNS = (
 
 FIXTURE_EXPECTATIONS: dict[str, dict] = {
     "retail_ecommerce_1k.csv": {
-        "exec_domain": "sales",
+        "exec_domain": "retail",
         "map_domain": "ecommerce",
         "min_aggregate": "high",
         "sales": "sales_amount",

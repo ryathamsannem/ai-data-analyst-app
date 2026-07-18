@@ -4,6 +4,7 @@ import {
   buildRadialExportLegendEntries,
   buildRadialLegendPayload,
   formatRadialLegendEntry,
+  formatRadialShareGapDisplay,
   formatRadialSliceTotalLabel,
   formatRadialTooltipValue,
   formatRadialVisibleLegendLines,
@@ -16,6 +17,7 @@ import {
   radialSliceStableColorIndex,
   resolveRadialPieEdgeProps,
   resolveRadialSharePercentDecimals,
+  resolveRadialSharePercentPoints,
   resolveRadialSliceFill,
   sortRadialDisplayRows,
   truncateRadialLegendLine,
@@ -37,6 +39,73 @@ describe("radialSharePercent", () => {
       { name: "C", value: 25000 },
     ];
     expect(radialSharePercentSum(rows)).toBeCloseTo(100, 5);
+  });
+});
+
+describe("formatRadialShareGapDisplay", () => {
+  const regionAdSpendRows: ChartRow[] = [
+    { name: "East", value: 79_531.88 },
+    { name: "West", value: 98_000 },
+    { name: "South", value: 96_555.01 },
+    { name: "Central", value: 49_858.51 },
+  ];
+
+  it("does not format raw currency gap as a percent for share donuts", () => {
+    const gap = formatRadialShareGapDisplay(
+      regionAdSpendRows,
+      79_531.88,
+      49_858.51,
+      {
+        metricLabel: "Region Ad Spend Share",
+        chartTitle: "Region Ad Spend Share",
+        presentationKind: "donut",
+      }
+    );
+    expect(gap).not.toContain("29673");
+    expect(gap).not.toMatch(/%$/);
+    expect(gap).toMatch(/pp$/);
+  });
+
+  it("shows share gap in percentage points for Region Ad Spend Share", () => {
+    const gap = formatRadialShareGapDisplay(
+      regionAdSpendRows,
+      79_531.88,
+      49_858.51,
+      {
+        metricLabel: "Region Ad Spend Share",
+        chartTitle: "Region Ad Spend Share",
+        presentationKind: "donut",
+      }
+    );
+    expect(gap).toBe("9.16 pp");
+  });
+
+  it("formats raw metric gap for non-share radial metrics", () => {
+    const rateRows: ChartRow[] = [
+      { name: "A", value: 52, displayValue: "52.0%" },
+      { name: "B", value: 45, displayValue: "45.0%" },
+      { name: "C", value: 38, displayValue: "38.0%" },
+    ];
+    const gap = formatRadialShareGapDisplay(rateRows, 52, 38, {
+      metricLabel: "Conversion Rate",
+      chartTitle: "Conversion Rate by Channel",
+      presentationKind: "donut",
+    });
+    expect(gap).toBe("14.0 pp");
+    expect(gap).not.toBe("14.0%");
+  });
+
+  it("keeps largest and smallest segment totals on raw metric formatting", () => {
+    const ctx = {
+      metricLabel: "Region Ad Spend Share",
+      chartTitle: "Region Ad Spend Share",
+      presentationKind: "donut" as const,
+      chartRows: regionAdSpendRows,
+    };
+    const east = formatRadialLegendEntry(regionAdSpendRows, "East", ctx);
+    const central = formatRadialLegendEntry(regionAdSpendRows, "Central", ctx);
+    expect(east).toMatch(/79\.5K|79,532|79532/i);
+    expect(central).toMatch(/49\.9K|49,859|49859/i);
   });
 });
 
@@ -105,6 +174,38 @@ describe("formatRadialLegendEntry", () => {
       expect(line).toMatch(/\d+%/);
       expect(line.split(RADIAL_LEGEND_SEP).length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it("formats marketing channel revenue share near 17.1% not 171%", () => {
+    const marketingRows: ChartRow[] = [
+      { name: "Social", value: 26_913_755.85 },
+      { name: "Paid Search", value: 26_706_426.93 },
+      { name: "Display", value: 26_601_268.96 },
+      { name: "Video", value: 26_132_596.59 },
+      { name: "Email", value: 25_997_361.03 },
+      { name: "Affiliate", value: 24_903_707.36 },
+    ];
+    const ctx = {
+      metricLabel: "Campaign Revenue",
+      chartTitle: "Marketing Channel Campaign Revenue Share",
+      presentationKind: "donut" as const,
+      chartRows: marketingRows,
+    };
+    const line = formatRadialLegendEntry(marketingRows, "Social", ctx);
+    expect(line).toMatch(/17(\.\d)?%/);
+    expect(line).not.toMatch(/171%/);
+    expect(line).toMatch(/26\.9M/i);
+  });
+
+  it("resolveRadialSharePercentPoints handles fraction and percent inputs", () => {
+    expect(resolveRadialSharePercentPoints({ name: "A", value: 0.171 }, [
+      { name: "A", value: 0.171 },
+      { name: "B", value: 0.829 },
+    ])).toBeCloseTo(17.1, 1);
+    expect(resolveRadialSharePercentPoints({ name: "A", value: 17.1 }, [
+      { name: "A", value: 17.1 },
+      { name: "B", value: 82.9 },
+    ])).toBeCloseTo(17.1, 1);
   });
 
   it("formats downtime minutes share without percent on raw contribution", () => {

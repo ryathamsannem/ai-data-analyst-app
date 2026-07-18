@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  LINE_BOTTOM_LABEL_HEADROOM_PX,
+  LINE_TOP_LABEL_HEADROOM_PX,
   VBAR_TOP_LABEL_HEADROOM_PX,
   verticalCartesianOuterMargins,
 } from "@/lib/chart-layout-config";
@@ -61,5 +63,51 @@ describe("verticalCartesianOuterMargins session detail", () => {
       }
     );
     expect(margins.top).toBe(5);
+  });
+
+  it("raises top margin for line charts when lineTopLabels is set", () => {
+    const without = verticalCartesianOuterMargins(
+      "line",
+      { marginLeft: 94, marginRight: 24 },
+      36,
+      { insightUi: false }
+    );
+    const withLabels = verticalCartesianOuterMargins(
+      "line",
+      { marginLeft: 94, marginRight: 24 },
+      36,
+      { insightUi: false, lineTopLabels: true }
+    );
+    expect(without.top).toBe(11);
+    expect(withLabels.top).toBe(LINE_TOP_LABEL_HEADROOM_PX);
+    expect(withLabels.bottom).toBe(without.bottom + LINE_BOTTOM_LABEL_HEADROOM_PX);
+  });
+
+  it("raises top margin for area charts when areaTopLabels is set", () => {
+    const without = verticalCartesianOuterMargins(
+      "area",
+      { marginLeft: 94, marginRight: 24 },
+      36,
+      { insightUi: false }
+    );
+    const withLabels = verticalCartesianOuterMargins(
+      "area",
+      { marginLeft: 94, marginRight: 24 },
+      36,
+      { insightUi: false, areaTopLabels: true }
+    );
+    expect(without.top).toBe(11);
+    expect(withLabels.top).toBe(LINE_TOP_LABEL_HEADROOM_PX);
+    expect(withLabels.bottom).toBe(without.bottom + LINE_BOTTOM_LABEL_HEADROOM_PX);
+  });
+
+  it("does not raise area margins when only lineTopLabels is set", () => {
+    const margins = verticalCartesianOuterMargins(
+      "area",
+      { marginLeft: 94, marginRight: 24 },
+      36,
+      { insightUi: false, lineTopLabels: true }
+    );
+    expect(margins.top).toBe(11);
   });
 });

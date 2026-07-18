@@ -3,6 +3,7 @@ import {
   resolveHBarLabelPlacementFromLayout,
   estimateHBarLabelTextWidthPx,
   computeHBarOutsideLabelReservePx,
+  computeHBarSignedOutsideLabelReservesPx,
   resolveHBarLabelPlacementMode,
   resolveOverviewInlineHBarPlacementMode,
 } from "@/lib/hbar-value-label-placement";
@@ -121,6 +122,78 @@ describe("resolveHBarLabelPlacementFromLayout", () => {
         fontSizePx: fontSize,
       })
     ).toBe("hidden");
+  });
+
+  it("uses insideLeft for wide negative bars", () => {
+    const text = "-12.4K";
+    const labelW = estimateHBarLabelTextWidthPx(text, fontSize);
+    expect(
+      resolveHBarLabelPlacementFromLayout({
+        barWidthPx: labelW + 20,
+        barStartPx: 120,
+        plotValueEndPx: 400,
+        plotValueStartPx: 40,
+        barValue: -12400,
+        labelText: text,
+        fontSizePx: fontSize,
+      })
+    ).toBe("insideLeft");
+  });
+
+  it("uses outsideLeft for short negative bars when left reserve exists", () => {
+    const text = "-127.4K";
+    const labelW = estimateHBarLabelTextWidthPx(text, fontSize);
+    expect(
+      resolveHBarLabelPlacementFromLayout({
+        barWidthPx: 18,
+        barStartPx: 210,
+        plotValueEndPx: 228,
+        plotValueStartPx: 120,
+        barValue: -127400,
+        labelText: text,
+        fontSizePx: fontSize,
+        mode: "detail-live",
+        outsideLabelReserveLeftPx: labelW + 8,
+      })
+    ).toBe("outsideLeft");
+  });
+
+  it("normalizes negative Recharts width for negative bars", () => {
+    const text = "-5.0K";
+    const labelW = estimateHBarLabelTextWidthPx(text, fontSize);
+    expect(
+      resolveHBarLabelPlacementFromLayout({
+        barWidthPx: -(labelW + 12),
+        barStartPx: 220,
+        plotValueEndPx: 220,
+        plotValueStartPx: 80,
+        barValue: -5000,
+        labelText: text,
+        fontSizePx: fontSize,
+      })
+    ).toBe("insideLeft");
+  });
+});
+
+describe("computeHBarSignedOutsideLabelReservesPx", () => {
+  it("reserves left margin for negative values and right for positive", () => {
+    const reserves = computeHBarSignedOutsideLabelReservesPx(
+      [-100_000, 50_000],
+      (v) => `${Math.abs(v / 1000).toFixed(0)}K`,
+      13
+    );
+    expect(reserves.left).toBeGreaterThan(0);
+    expect(reserves.right).toBeGreaterThan(0);
+  });
+
+  it("reserves only left margin for all-negative charts", () => {
+    const reserves = computeHBarSignedOutsideLabelReservesPx(
+      [-100_000, -20_000],
+      (v) => `${Math.abs(v / 1000).toFixed(0)}K`,
+      13
+    );
+    expect(reserves.left).toBeGreaterThan(0);
+    expect(reserves.right).toBe(0);
   });
 });
 

@@ -1,4 +1,5 @@
 import type { ChartKind } from "@/app/chart-types";
+import type { ChartArtifactProfile } from "@/lib/chart-platform/chart-artifact";
 import {
   resolveRadialExportCanvasHeight,
   resolveRadialExportPlotHeight,
@@ -15,6 +16,25 @@ export const PRESENTATION_EXPORT_HORIZONTAL_WIDTH_PX = 1100;
 
 /** Wider horizontal-bar canvas when many categories need vertical room. */
 export const PRESENTATION_EXPORT_HORIZONTAL_WIDE_WIDTH_PX = 1300;
+
+/** Standalone PNG (overview/charts) — vertical bar width tiers by category count. */
+export const STANDALONE_PNG_VBAR_WIDTH_SPARSE_PX = 790;
+export const STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX = 870;
+export const STANDALONE_PNG_VBAR_WIDTH_DENSE_PX = 1050;
+
+/** Standalone PNG (overview/charts) — horizontal bar width tiers by category count. */
+export const STANDALONE_PNG_HBAR_WIDTH_SPARSE_PX = 870;
+export const STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX = 960;
+
+/** Standalone PNG (overview/charts) — line/area width tiers by point count. */
+export const STANDALONE_PNG_TREND_WIDTH_SPARSE_PX = 860;
+export const STANDALONE_PNG_TREND_WIDTH_MODERATE_PX = 1000;
+export const STANDALONE_PNG_TREND_WIDTH_DENSE_PX = 1180;
+
+/** Standalone PNG (overview/charts) — histogram width tiers by bucket count. */
+export const STANDALONE_PNG_HISTOGRAM_WIDTH_SPARSE_PX = 860;
+export const STANDALONE_PNG_HISTOGRAM_WIDTH_MODERATE_PX = 1000;
+export const STANDALONE_PNG_HISTOGRAM_WIDTH_DENSE_PX = 1180;
 
 /** Target total PNG height for line/area exports. */
 export const PRESENTATION_EXPORT_HEIGHT_PX = 900;
@@ -46,7 +66,59 @@ export type PresentationExportSpec = PresentationCaptureLayout & {
 export type PresentationCaptureLayoutOptions = {
   /** Category / time-step count — used to grow horizontal-bar export height. */
   categoryCount?: number;
+  /**
+   * When `overviewPng` or `chartsPng`, bar/trend/histogram exports use
+   * point/category-count-aware widths. PDF and legacy callers omit this.
+   */
+  exportProfile?: ChartArtifactProfile;
 };
+
+function isStandalonePngExportProfile(
+  profile: ChartArtifactProfile | undefined
+): profile is Extract<ChartArtifactProfile, "overviewPng" | "chartsPng"> {
+  return profile === "overviewPng" || profile === "chartsPng";
+}
+
+/** Category-count-aware canvas width for standalone PNG bar exports only. */
+export function resolveStandalonePngBarCanvasWidth(
+  kind: "bar" | "bar_horizontal",
+  categoryCount: number
+): number {
+  const n = Math.max(1, categoryCount);
+  if (kind === "bar") {
+    if (n <= 3) return STANDALONE_PNG_VBAR_WIDTH_SPARSE_PX;
+    if (n <= 6) return STANDALONE_PNG_VBAR_WIDTH_MODERATE_PX;
+    if (n <= 10) return STANDALONE_PNG_VBAR_WIDTH_DENSE_PX;
+    return PRESENTATION_EXPORT_WIDTH_PX;
+  }
+  if (n <= 3) return STANDALONE_PNG_HBAR_WIDTH_SPARSE_PX;
+  if (n <= 6) return STANDALONE_PNG_HBAR_WIDTH_MODERATE_PX;
+  if (n <= 10) return PRESENTATION_EXPORT_HORIZONTAL_WIDTH_PX;
+  return PRESENTATION_EXPORT_HORIZONTAL_WIDE_WIDTH_PX;
+}
+
+/** Point-count-aware canvas width for standalone PNG line/area exports only. */
+export function resolveStandalonePngTrendCanvasWidth(
+  _kind: "line" | "area",
+  pointCount: number
+): number {
+  const n = Math.max(1, pointCount);
+  if (n <= 6) return STANDALONE_PNG_TREND_WIDTH_SPARSE_PX;
+  if (n <= 12) return STANDALONE_PNG_TREND_WIDTH_MODERATE_PX;
+  if (n <= 24) return STANDALONE_PNG_TREND_WIDTH_DENSE_PX;
+  return PRESENTATION_EXPORT_COMPACT_WIDTH_PX;
+}
+
+/** Bucket-count-aware canvas width for standalone PNG histogram exports only. */
+export function resolveStandalonePngHistogramCanvasWidth(
+  bucketCount: number
+): number {
+  const n = Math.max(1, bucketCount);
+  if (n <= 6) return STANDALONE_PNG_HISTOGRAM_WIDTH_SPARSE_PX;
+  if (n <= 10) return STANDALONE_PNG_HISTOGRAM_WIDTH_MODERATE_PX;
+  if (n <= 16) return STANDALONE_PNG_HISTOGRAM_WIDTH_DENSE_PX;
+  return PRESENTATION_EXPORT_WIDTH_PX;
+}
 
 /** Canvas width by chart kind — avoids overly wide empty bar charts. */
 export function resolvePresentationExportCanvasWidth(
@@ -54,6 +126,17 @@ export function resolvePresentationExportCanvasWidth(
   options: PresentationCaptureLayoutOptions = {}
 ): number {
   const categoryCount = Math.max(0, options.categoryCount ?? 0);
+  if (isStandalonePngExportProfile(options.exportProfile)) {
+    if (kind === "bar" || kind === "bar_horizontal") {
+      return resolveStandalonePngBarCanvasWidth(kind, categoryCount);
+    }
+    if (kind === "line" || kind === "area") {
+      return resolveStandalonePngTrendCanvasWidth(kind, categoryCount);
+    }
+    if (kind === "histogram") {
+      return resolveStandalonePngHistogramCanvasWidth(categoryCount);
+    }
+  }
   switch (kind) {
     case "bar_horizontal":
       return categoryCount > 10

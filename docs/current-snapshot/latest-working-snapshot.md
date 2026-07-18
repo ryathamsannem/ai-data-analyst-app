@@ -1,8 +1,10 @@
 # Latest Working Snapshot
 
-**Snapshot date:** June 29, 2026  
-**Purpose:** Final release snapshot — suggested questions, follow-up chips, PDF-1/PDF-2, and mandatory AI Insight/PDF alignment complete  
+**Snapshot date:** July 8, 2026  
+**Purpose:** Post-performance-fix stable snapshot — large dataset upload/dashboard performance restored; PDF/AI/chart polish baseline preserved  
 **Branch:** `DEV`
+
+**Chart polish detail:** [`chart-polish-final-snapshot.md`](./chart-polish-final-snapshot.md)
 
 ---
 
@@ -11,79 +13,124 @@
 | Item | Value |
 |------|-------|
 | **Branch** | `DEV` |
-| **HEAD** | `b66d5d1` — fix(frontend): clean pdf insight section labels |
-| **Working tree** | **Clean** |
-| **Recent commits (newest first)** | `b66d5d1` label cleanup · `cdb1f6d` shared aligned insight model · `042db37` live/PDF narrative alignment · `cf643d9` technical appendix · `5d27fc1` KPI dedupe · `fe6344f` preview formatting · `6e30b8f` domain/branding · `c764f5d` PDF-1 · `c460bcc` follow-up chips · `3ee3e48` suggested questions |
+| **HEAD** | `a9e1e85` — `done charts & Ai Insights, Only performance was pending` |
+| **Remote** | `DEV...origin/DEV` (status at snapshot time) |
+| **Working tree** | **Modified with completed performance fixes + this docs snapshot** |
+| **Performance files changed** | `backend/main.py`, `backend/services/auto_dashboard_opportunities.py`, `backend/tests/test_auto_dashboard_opportunities.py`, `frontend/lib/overview-premium-axis-domain.ts`, `frontend/lib/overview-premium-axis-domain.test.ts` |
+| **Docs changed in snapshot pass** | `docs/current-snapshot/latest-working-snapshot.md`, `current-status.md`, `validation-results.md`, `open-items.md` |
 
 ---
 
 ## Completed work (full arc)
 
+### Large dataset upload/dashboard performance (July 2026 — **restored**)
+
+**Summary:** Large dataset upload/dashboard performance restored. **100k upload now responds quickly and auto-dashboard appears immediately** after the upload response. No lazy rendering or staged dashboard rendering was used.
+
+| Area | Summary |
+|------|---------|
+| Root cause | Frontend Overview trend axis tick generation could materialize huge tick arrays for large-magnitude, low-variance line/area charts (for example monthly revenue around 1.2B–1.3B). |
+| Backend fix | Request-local memoization/reuse in auto-dashboard discovery reduced repeated DataFrame scans without output drift. |
+| Frontend fix | Bounded tick generation in `overview-premium-axis-domain.ts` prevents UI freeze by estimating tick count before materializing arrays and adding a defensive tick cap. |
+| Output safety | Backend golden output matched for 10k / 50k / 75k / 100k; chart selection/scoring/titles/response shape were not intentionally changed. |
+| UX result | 10k, 50k, and 100k uploads respond quickly; KPIs and auto-dashboard charts appear immediately after response. |
+
+### Performance validation (recorded July 8, 2026)
+
+| Check | Result |
+|-------|--------|
+| Backend auto-dashboard discovery tests | **PASS** (`tests/test_auto_dashboard_opportunities.py`) |
+| Frontend axis/domain tests | **PASS** (`lib/overview-premium-axis-domain.test.ts`) |
+| Related chart label/domain tests | **PASS** (`chart-renderer-line-labels`, `line-value-labels`, `cartesian-chart-decisions`) |
+| `npm run build` | **PASS** |
+| Manual upload validation | **PASS** for 10k, 50k, and 100k uploads |
+| Duplicate `/filtered-dashboard` after upload | **Not observed** |
+
+Recorded 50k timing after bounded tick fix: JSON parse → all Recharts wrappers ~338ms (before fix: ~74s). 10k timing after fix: JSON parse → all Recharts wrappers ~342ms.
+
+### Chart polish (June 2026 — **complete**)
+
+| Area | Summary |
+|------|---------|
+| V-Bar / H-Bar labels | Clutter-safe end labels; H-Bar small-bar outside labels across all surfaces |
+| Focused percent / score axes | Close-value readability for rates and bounded scores |
+| Donut/pie | Sorting, legend, small-slice palette |
+| Line / area labels | Value labels when safe; PNG font sizing |
+| PNG density | Standalone tiers for bar, histogram, line, area (`overviewPng` / `chartsPng`) |
+| Signed / negative bars | Zero baseline + reference line at 0 |
+| Odd dashboard centering | Auto-dashboard grid optical centering |
+| Consistency audit | No blocking cross-surface regressions |
+
+Full matrix and shared paths: [`chart-polish-final-snapshot.md`](./chart-polish-final-snapshot.md)
+
+### PDF / AI / product (prior arc)
+
 | Area | Commit(s) | Summary |
 |------|-----------|---------|
-| **Suggested Questions** | `3ee3e48` | Backend quality across 15 domains — domain verticals, metric/dim filters, correlation gating, phrasing |
-| **Follow-up chips** | `c460bcc` | Frontend FU-P1 — generic/duplicate/profit-centric chip suppression |
-| **PDF-1** | `c764f5d` | Narrative/chart alignment, slim AI Insights preset, appendix data preview, embed sizing, metadata chip fix, follow-up export context, viz page-break cohesion |
-| **PDF-2A** | `6e30b8f` | Domain labels (Overview parity), footer/branding polish |
-| **PDF-2B** | `fe6344f` | Preview ID/date formatting; data quality wording (sample vs file-wide) |
-| **PDF-2C-1** | `5d27fc1` | KPI dashboard dedupe / skip when sparse |
-| **PDF-2C-2** | `cf643d9` | Technical appendix title, tone, page-break polish |
-| **Mandatory alignment** | `042db37`, `cdb1f6d` | Shared live/PDF `insightPresentation` model; generic chart-contract guard; structured PDF sections; compact Chart view; PDF bypass fix |
-| **PDF label cleanup** | `b66d5d1` | Strip redundant in-body section labels (Executive takeaway, Evidence, etc.) when PDF headings already present |
+| **Suggested Questions** | `3ee3e48` | Backend quality across 15 domains |
+| **Follow-up chips** | `c460bcc` | Generic/duplicate chip suppression |
+| **PDF-1 / PDF-2** | `c764f5d`–`cf643d9` | Narrative/chart alignment, appendix, KPI dedupe, branding |
+| **Mandatory alignment** | `042db37`, `cdb1f6d` | Shared live/PDF `insightPresentation` model |
+| **PDF label cleanup** | `b66d5d1` | Strip redundant in-body section labels |
 
 Detail: [`suggested-questions-15-domain-quality.md`](./suggested-questions-15-domain-quality.md) · [`pdf-quality-audit.md`](./pdf-quality-audit.md) · [`pdf-export-phase-changelog.md`](./pdf-export-phase-changelog.md)
 
 ---
 
-## Final PDF / AI Insight status
+## Current product status
 
-- Live UI and PDF share **normalized aligned insight presentation model** (`alignInsightPresentationToChart` → `insightPresentation`).
-- PDF AI Insight section includes **Executive takeaway**, **Evidence**, **Why this matters**, and **Supporting detail** where available and aligned.
-- **Chart view** is compact (single rationale line).
-- Root insight, follow-up insight, and Export-tab full PDFs use **correct export context**.
-- Narrative/chart mismatch fixed for **Product Type**, **Room Type**, **Grid Region**, and related category charts.
-- **Visualization** section cohesion fixed (chart + analysis context on same page where applicable).
-- Sample data appendix, data quality wording, and technical appendix flow improved.
-- **No known PDF-2 backlog remains.**
+### Charts (all families)
 
-Live validation artifacts: `docs/pdf-validation-screenshots/pdf-mandatory-fix-*` · `docs/pdf-validation-screenshots/pdf1-*`
+- **Cross-surface parity:** Overview live/PNG, Charts live/PNG, AI Insights live/PNG, PDF embed — **pass** per final audit (see chart polish snapshot).
+- **Shared helpers:** `cartesian-chart-decisions.ts`, `overview-bar-value-domain.ts`, `overview-premium-axis-domain.ts`, `chart-png-export-layout.ts`, `radial-chart-format.ts`.
+- **KPI cards:** Overview live + PDF snapshot only (not cartesian charts).
+
+### PDF / AI Insight
+
+- Live UI and PDF share **normalized aligned insight presentation model**.
+- PDF AI Insight sections, chart view compact mode, export context, and visualization cohesion — **stable**.
+- Chart images in PDF use same capture path as on-screen insight styling (centered, consistent margins).
 
 ---
 
-## Test & build status (recorded)
+## Test & build status (recorded June 29, 2026)
 
 | Suite | Result |
 |-------|--------|
-| Backend Phase 1 (suggested questions) | **492 passed, 0 failed** |
-| Frontend follow-up targeted tests | **37 passed** |
-| PDF/export/alignment targeted suites | **PASS** (resolve context, narrative alignment, build input, export sections, viz layout, insight-section-text) |
-| Latest `npm run build` | **PASS** |
-
-Full-suite counts from June 28 final snapshot (478 backend / 743 frontend) remain valid baseline for non-PDF areas.
+| Chart consistency vitest batch (15 files) | **289 passed, 0 failed** |
+| `npm run build` | **PASS** |
+| Backend Phase 1 (suggested questions) | **492 passed** (prior snapshot) |
+| PDF/export/alignment targeted suites | **PASS** (prior snapshot) |
 
 ---
 
-## Remaining deferred
+## Remaining work
 
 | Item | Notes |
 |------|-------|
-| Final release-readiness validation | Optional browser spot-check; cross-domain AI narrative QA |
+| Optional chart hardening | Export axis plan tick contract; parity validation for domain/ticks — **low risk, not required** |
+| Final release-readiness validation | Optional browser spot-check per chart family |
 | Platform production | Auth, durable storage, metering, optional E2E suite |
+| Donut/scatter auto-dashboard selection | Separate product-selection topic; not part of the performance fix |
+| Monthly revenue flatness | 1.2B–1.3B tight ranges can look visually flat and are mathematically expected unless a future smart variance view is chosen |
 
-**No PDF-2 items remain.**
+**No blocking chart polish or PDF-2 backlog remains.**
 
 ---
 
 ## Explicit constraints (do not reopen without evidence)
 
-1. **H-Bar / V-Bar parity** — frozen unless measured regression.
-2. **Chart axis / domain / bar sizing** — frozen unless test or screenshot proves regression.
-3. **Suggested questions / follow-up chips** — frozen unless new proven issue.
-4. **PDF fixes** — do not reopen unless a generated PDF proves regression.
-5. **Future changes** — audit-first, small scoped fixes, test-backed.
+1. **Chart polish baseline** — frozen at `16526f0` unless measured regression.
+2. **H-Bar / V-Bar policy asymmetry** — focused V-Bar rates vs zero-baseline H-Bar wide rates is intentional.
+3. **Suggested questions / follow-up chips / PDF narrative** — frozen unless new proven issue.
+4. **Future changes** — audit-first, small scoped fixes, test-backed.
+5. **Performance baseline** — do not reintroduce lazy/staged dashboard rendering for this issue.
+6. **Chart selection** — do not change chart selection just for performance without golden-output validation.
+7. **Visual parity** — do not reopen chart visual parity unless screenshot/test proves regression.
+8. **Donut/scatter selection** — treat as product-selection work, not a performance regression.
 
 ---
 
 ## Safe to proceed?
 
-**Yes** for final release-readiness validation. Production code stable at `b66d5d1`. Snapshot docs refreshed; **not committed** until approved.
+**Yes** for release-readiness validation and platform/deployment work. Production code stable at `16526f0`. Chart families consistent across surfaces.

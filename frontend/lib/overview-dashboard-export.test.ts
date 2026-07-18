@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { ChartRow } from "@/app/chart-types";
 import {
+  axisParityDomainsEqual,
+  axisParityTickValuesEqual,
   detectOverviewExportBarOrientation,
   formatExecutiveInsightMetricValue,
   formatExecutiveInsightSpreadGap,
   formatOverviewBarTopValueLabel,
   horizontalBarValueDomain,
+  normalizeAxisParityDomain,
+  normalizeAxisParityTickValues,
   roundExecutiveAxisMaximum,
   resolveOverviewEffectivePresentationKind,
+  shouldShowHBarValueLabels,
   validateOverviewDashboardExportParity,
 } from "./overview-dashboard-export";
 import { formatOverviewBarValueAxisTick } from "./overview-premium-axis-domain";
@@ -264,6 +269,19 @@ describe("horizontalBarValueDomain", () => {
     expect(domain[1]).toBeGreaterThanOrEqual(310_000 / 0.85);
   });
 
+  it("signed fallback domain includes zero for all-negative values", () => {
+    const domain = horizontalBarValueDomain(
+      [{ value: -100_000 }, { value: -20_000 }],
+      undefined,
+      {
+        chartTitle: "Return Amount by Product",
+        metricLabel: "Return Amount",
+      }
+    );
+    expect(domain[0]).toBeLessThan(-100_000);
+    expect(domain[1]).toBeGreaterThan(0);
+  });
+
   it("PNG/export H-Bar loan balance uses the same ~85% utilization cap", () => {
     const maxRaw = 183_916_971;
     const domain = horizontalBarValueDomain(
@@ -343,6 +361,19 @@ describe("horizontalBarValueDomain", () => {
   });
 });
 
+describe("shouldShowHBarValueLabels — signed data", () => {
+  it("allows labels for all-negative compact charts with few categories", () => {
+    const rows = [
+      { value: -100_000 },
+      { value: -80_000 },
+      { value: -60_000 },
+      { value: -40_000 },
+    ];
+    const fmt = (v: number) => `${(v / 1000).toFixed(0)}K`;
+    expect(shouldShowHBarValueLabels(rows, fmt)).toBe(true);
+  });
+});
+
 describe("roundExecutiveAxisMaximum", () => {
   it("rounds padded decimals to clean tick boundaries", () => {
     expect(roundExecutiveAxisMaximum(24.38)).toBe(25);
@@ -404,5 +435,91 @@ describe("validateOverviewDashboardExportParity", () => {
     });
     expect(result.ok).toBe(false);
     expect(result.checks.find((c) => c.id === "orientation")?.ok).toBe(false);
+  });
+
+  const barParityBase = {
+    displayKind: "bar" as const,
+    renderBarAsHorizontal: false,
+    exportKind: "bar" as const,
+    chartTitle: "Revenue by Region",
+  };
+
+  it("passes when live and export value-axis domains match", () => {
+    const result = validateOverviewDashboardExportParity({
+      ...barParityBase,
+      liveValueAxisDomain: [0, 123.2],
+      exportValueAxisDomain: [0, 123.2000000001],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checks.find((c) => c.id === "valueAxisDomain")?.ok).toBe(true);
+    expect(axisParityDomainsEqual([0, 123.2], [0, 123.2000000001])).toBe(true);
+  });
+
+  it("passes when live and export value-axis tick arrays match", () => {
+    const ticks = [4.05, 4.1, 4.15, 4.2];
+    const result = validateOverviewDashboardExportParity({
+      ...barParityBase,
+      displayKind: "bar",
+      exportKind: "bar",
+      liveValueAxisTicks: ticks,
+      exportValueAxisTicks: ticks.map((t) => Number(t.toFixed(6))),
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checks.find((c) => c.id === "valueAxisTicks")?.ok).toBe(true);
+    expect(axisParityTickValuesEqual(ticks, ticks)).toBe(true);
+  });
+
+  it("fails when live and export value-axis domains differ", () => {
+    const result = validateOverviewDashboardExportParity({
+      ...barParityBase,
+      liveValueAxisDomain: [0, 120],
+      exportValueAxisDomain: [0, 130],
+    });
+    expect(result.ok).toBe(false);
+    const domainCheck = result.checks.find((c) => c.id === "valueAxisDomain");
+    expect(domainCheck?.ok).toBe(false);
+    expect(domainCheck?.message).toContain("export value domain");
+  });
+
+  it("fails when live and export value-axis tick arrays differ", () => {
+    const result = validateOverviewDashboardExportParity({
+      ...barParityBase,
+      liveValueAxisTicks: [4.05, 4.1, 4.15, 4.2],
+      exportValueAxisTicks: [4.05, 4.12, 4.15, 4.2],
+    });
+    expect(result.ok).toBe(false);
+    const tickCheck = result.checks.find((c) => c.id === "valueAxisTicks");
+    expect(tickCheck?.ok).toBe(false);
+    expect(tickCheck?.message).toContain("export value ticks");
+  });
+
+  it("skips tick parity when ticks are absent for non-bar chart families", () => {
+    const result = validateOverviewDashboardExportParity({
+      displayKind: "line",
+      renderBarAsHorizontal: false,
+      exportKind: "line",
+      liveValueAxisTicks: [100, 200],
+      exportValueAxisTicks: null,
+    });
+    expect(result.checks.find((c) => c.id === "valueAxisTicks")).toBeUndefined();
+    expect(result.checks.find((c) => c.id === "valueAxisDomain")).toBeUndefined();
+  });
+
+  it("skips tick parity when only one bar side exposes explicit ticks", () => {
+    const result = validateOverviewDashboardExportParity({
+      ...barParityBase,
+      liveValueAxisDomain: [0, 123.2],
+      exportValueAxisDomain: [0, 123.2],
+      liveValueAxisTicks: null,
+      exportValueAxisTicks: [0, 40, 80, 120],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checks.find((c) => c.id === "valueAxisDomain")?.ok).toBe(true);
+    expect(result.checks.find((c) => c.id === "valueAxisTicks")).toBeUndefined();
+  });
+
+  it("normalizes axis parity helpers for harmless float formatting", () => {
+    expect(normalizeAxisParityDomain([0, 123.2000000001])).toEqual([0, 123.2]);
+    expect(normalizeAxisParityTickValues([4.1000000001, 4.2])).toEqual([4.1, 4.2]);
   });
 });

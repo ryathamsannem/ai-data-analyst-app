@@ -3,8 +3,12 @@ import { resolveRadialPalette } from "@/lib/chart-palette";
 import { shareCompositionAllowed } from "@/lib/final-chart-presentation";
 import {
   appendMetricUnitSuffix,
+  coercePercentDisplayNumber,
   formatExecutiveMetricValue,
+  formatExecutivePercentPointGap,
   formatMetricNumber,
+  formatMetricSpreadGap,
+  readChartRowNormalizedValue,
   readChartRowRawValue,
   resolveMetricValueFormat,
   type MetricFormatContext,
@@ -17,11 +21,10 @@ export const RADIAL_LEGEND_SEP = " · ";
 export const RADIAL_SHARE_SUM_TOLERANCE = 1.5;
 
 export function radialSliceTotal(rows: readonly ChartRow[]): number {
-  return rows.reduce(
-    (sum, row) =>
-      sum + (Number.isFinite(row.value) ? Math.abs(Number(row.value)) : 0),
-    0
-  );
+  return rows.reduce((sum, row) => {
+    const v = readChartRowRawValue(row);
+    return sum + (Number.isFinite(v) ? Math.abs(v) : 0);
+  }, 0);
 }
 
 /** share_pct = category_value / total_value * 100 */
@@ -41,6 +44,37 @@ export function radialSharePercents(rows: readonly ChartRow[]): number[] {
 /** Sum of computed share_pct values (should be ~100 for valid composition). */
 export function radialSharePercentSum(rows: readonly ChartRow[]): number {
   return radialSharePercents(rows).reduce((sum, pct) => sum + pct, 0);
+}
+
+/**
+ * Gap label for donut/pie executive signal cards — share charts use percentage-point
+ * spread (largest share minus smallest share); non-share radials use raw metric gap.
+ */
+export function formatRadialShareGapDisplay(
+  rows: readonly ChartRow[],
+  maxValue: number,
+  minValue: number,
+  ctx: MetricFormatContext = {}
+): string {
+  if (!Number.isFinite(maxValue) || !Number.isFinite(minValue)) return "—";
+
+  const total = radialSliceTotal(rows);
+  if (total <= 0) return "—";
+
+  if (radialShouldUseSharePercentDisplay(rows)) {
+    const maxPct = radialSharePercent(maxValue, total);
+    const minPct = radialSharePercent(minValue, total);
+    if (maxPct != null && minPct != null) {
+      const gapPp = maxPct - minPct;
+      return formatExecutivePercentPointGap(gapPp, {
+        skipFractionScale: true,
+        decimals: 2,
+      });
+    }
+  }
+
+  const gap = maxValue - minValue;
+  return formatMetricSpreadGap(gap, { ...ctx, chartRows: [...rows] });
 }
 
 function radialNumericValues(rows: readonly ChartRow[]): number[] {
@@ -157,13 +191,65 @@ function formatRadialContributionValue(
   );
 }
 
+/**
+ * Share percent points for one slice — handles absolute magnitudes, 0–1 fractions,
+ * and 0–100 percent-point rows without double-scaling.
+ */
+export function resolveRadialSharePercentPoints(
+  row: ChartRow,
+  rows: readonly ChartRow[]
+): number | null {
+  const sliceVal = readChartRowRawValue(row);
+  if (!Number.isFinite(sliceVal)) return null;
+  const total = radialSliceTotal(rows);
+  if (total <= 0) return null;
+
+  if (radialRawValuesSumTo100Percent(rows)) {
+    const rawValues = radialNumericValues(rows);
+    const maxCtx = rawValues.length ? Math.max(...rawValues.map(Math.abs)) : undefined;
+    return coercePercentDisplayNumber(
+      sliceVal,
+      readChartRowNormalizedValue(row),
+      maxCtx
+    );
+  }
+
+  let share = radialSharePercent(sliceVal, total);
+  if (share == null) return null;
+
+  if (share > 100.5 && rows.length >= 2) {
+    const normalized = readChartRowNormalizedValue(row);
+    if (typeof normalized === "number" && Number.isFinite(normalized)) {
+      const normTotal = rows.reduce((sum, r) => {
+        const n = readChartRowNormalizedValue(r);
+        return sum + (typeof n === "number" && Number.isFinite(n) ? Math.abs(n) : 0);
+      }, 0);
+      if (normTotal > 0) {
+        const normShare = (Math.abs(normalized) / normTotal) * 100;
+        if (normShare <= 100.5) return normShare;
+      }
+    }
+    const ratio = Math.abs(sliceVal) / total;
+    const asPct = coercePercentDisplayNumber(ratio, undefined, total);
+    if (asPct <= 100.5 && ratio > 0 && ratio <= 1.05) {
+      return asPct;
+    }
+    const scaled = share / 10;
+    if (scaled <= 100.5 && scaled >= 0.05) {
+      return scaled;
+    }
+  }
+
+  return share;
+}
+
 function formatRadialSharePercentDisplay(
-  value: number,
-  total: number,
+  row: ChartRow,
   rows: readonly ChartRow[]
 ): string | null {
-  const share = radialSharePercent(value, total);
+  const share = resolveRadialSharePercentPoints(row, rows);
   if (share == null) return null;
+  const total = radialSliceTotal(rows);
   const decimals = resolveRadialSharePercentDecimals(rows, total);
   if (decimals === 0) return `${Math.round(share)}%`;
   const text = share.toFixed(1);
@@ -232,7 +318,7 @@ export function formatRadialLegendEntry(
     return `${name}${RADIAL_LEGEND_SEP}${formatRadialContributionValue(row, ctx)}`;
   }
 
-  const shareText = formatRadialSharePercentDisplay(row.value, total, rows) ?? "—";
+  const shareText = formatRadialSharePercentDisplay(row, rows) ?? "—";
   if (radialRawValuesSumTo100Percent(rows)) {
     return `${name}${RADIAL_LEGEND_SEP}${shareText}`;
   }
@@ -406,8 +492,8 @@ export function formatRadialTooltipValue(
     return valueText;
   }
 
-  const total = radialSliceTotal(rows);
-  const shareText = formatRadialSharePercentDisplay(num, total, rows);
+  const payloadRow = payload ?? { name: "", value: num };
+  const shareText = formatRadialSharePercentDisplay(payloadRow, rows);
   if (shareText == null) return valueText;
 
   if (radialRawValuesSumTo100Percent(rows)) {

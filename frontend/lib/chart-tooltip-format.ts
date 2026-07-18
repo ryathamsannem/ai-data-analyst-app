@@ -7,9 +7,9 @@ import {
 } from "@/lib/analytics-metadata";
 import { sanitizeExecutiveMeasureLabel } from "@/lib/insight-card-titles";
 import {
-  formatExecutiveMetricValue,
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
+import { formatExecutiveInsightMetricValue } from "@/lib/overview-dashboard-export";
 
 /** Clean measure phrase for tooltip series labels (not axis-truncated). */
 export function chartTooltipMetricLabel(
@@ -53,7 +53,7 @@ export function formatChartTooltipValueLine(
   ctx: MetricFormatContext
 ): [string, string] {
   const name = chartTooltipMetricLabel(metricLabel);
-  const formatted = formatExecutiveMetricValue(row, ctx);
+  const formatted = formatExecutiveInsightMetricValue(row, ctx);
   return [formatted, `${name}:`];
 }
 

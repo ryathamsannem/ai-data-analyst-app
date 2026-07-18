@@ -5,6 +5,7 @@ import {
 import {
   formatExecutiveMetricValue,
   formatExecutivePercentPointGap,
+  formatMetricNumber,
   formatMetricSpreadGap,
   metricLabelImpliesPrecisionBarLabels,
   readChartRowRawValue,
@@ -12,6 +13,7 @@ import {
   type MetricFormatContext,
 } from "@/lib/metric-value-format";
 import {
+  applySignedBarValueDomainPolicy,
   isFocusedVerticalBarRateChart,
   resolveOverviewBarValueDomain,
   roundExecutiveAxisMaximum,
@@ -105,7 +107,14 @@ function barValueLabelMinBarRatioOverlapRisk(
   if (values.length <= 1) return false;
   const maxV = Math.max(...values);
   const minV = Math.min(...values);
-  if (!Number.isFinite(maxV) || maxV <= 0) return true;
+  if (!Number.isFinite(maxV)) return true;
+  if (maxV <= 0) {
+    const magnitudes = values.map((v) => Math.abs(v)).filter((v) => v > 0);
+    if (magnitudes.length <= 1) return false;
+    const maxMag = Math.max(...magnitudes);
+    const minMag = Math.min(...magnitudes);
+    return minMag / maxMag < minRatio;
+  }
   return minV / maxV < minRatio;
 }
 
@@ -185,12 +194,10 @@ export function overviewBarLabelsNeedExtraPrecision(
   return barTopLabelsNeedExtraPrecision(rows, ctx);
 }
 
-function barTopLabelsNeedExtraPrecision(
+function barEndLabelsCollideFromDefaultTicks(
   rows: readonly ChartRow[],
   ctx: MetricFormatContext
 ): boolean {
-  if (!isFocusedVerticalBarRateChart(rows, ctx)) return false;
-
   const rawVals = rows
     .map((r) => readChartRowRawValue(r))
     .filter((v) => Number.isFinite(v));
@@ -207,6 +214,67 @@ function barTopLabelsNeedExtraPrecision(
     }
   }
   return false;
+}
+
+function barTopLabelsNeedExtraPrecision(
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): boolean {
+  if (!isFocusedVerticalBarRateChart(rows, ctx)) return false;
+  return barEndLabelsCollideFromDefaultTicks(rows, ctx);
+}
+
+function formatCompactMagnitudeBarEndLabel(
+  value: number,
+  decimals: number
+): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000) {
+    const text = (abs / 1_000_000).toFixed(decimals).replace(/\.?0+$/, "");
+    return `${sign}${text}M`;
+  }
+  if (abs >= 1_000) {
+    const text = (abs / 1_000).toFixed(decimals).replace(/\.?0+$/, "");
+    return `${sign}${text}K`;
+  }
+  return formatMetricNumber(value, "number");
+}
+
+function formatPercentBarEndLabelWithPrecision(
+  value: number,
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): string {
+  const rawVals = rows
+    .map((r) => readChartRowRawValue(r))
+    .filter((v) => Number.isFinite(v));
+  const maxAbs = rawVals.length
+    ? Math.max(...rawVals.map((v) => Math.abs(v)))
+    : Math.abs(value);
+  const display = maxAbs <= 1.05 ? value * 100 : value;
+
+  let decimals = 2;
+  while (decimals <= 3) {
+    const labels = rawVals.map((v) => {
+      const d = maxAbs <= 1.05 ? v * 100 : v;
+      return formatPercentBarTopLabelDisplay(d, decimals);
+    });
+    if (new Set(labels).size === labels.length) {
+      return formatPercentBarTopLabelDisplay(display, decimals);
+    }
+    decimals += 1;
+  }
+
+  return formatPercentBarTopLabelDisplay(display, 3);
+}
+
+/** True when default compact H-Bar end labels would hide distinct bar values. */
+export function hBarEndLabelsNeedExtraPrecision(
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext
+): boolean {
+  return barEndLabelsCollideFromDefaultTicks(rows, ctx);
 }
 
 /**
@@ -248,6 +316,45 @@ export function formatOverviewBarTopValueLabel(
   }
 
   return formatPercentBarTopLabelDisplay(display, 3);
+}
+
+/**
+ * H-Bar bar-end value labels — may use extra compact precision when default
+ * axis-style rounding would collapse distinct values (e.g. 1.59M vs 1.60M → 1.6M).
+ * Axis tick formatting is unchanged; pass this only to H-Bar LabelList formatters.
+ */
+export function formatOverviewHBarEndValueLabel(
+  value: number,
+  rows: readonly ChartRow[],
+  ctx: MetricFormatContext = {}
+): string {
+  if (!Number.isFinite(value)) return String(value);
+
+  const defaultLabel = formatOverviewBarValueAxisTick(value, rows, ctx);
+  if (!barEndLabelsCollideFromDefaultTicks(rows, ctx)) return defaultLabel;
+
+  const format = resolveMetricValueFormat(ctx);
+  if (format === "percent") {
+    return formatPercentBarEndLabelWithPrecision(value, rows, ctx);
+  }
+
+  const rawVals = rows
+    .map((r) => readChartRowRawValue(r))
+    .filter((v) => Number.isFinite(v));
+  if (rawVals.length < 2) return defaultLabel;
+
+  const maxAbs = Math.max(...rawVals.map((v) => Math.abs(v)));
+  const startDecimals = maxAbs >= 1_000_000 ? 2 : 1;
+  for (let decimals = startDecimals; decimals <= 3; decimals++) {
+    const labels = rawVals.map((v) =>
+      formatCompactMagnitudeBarEndLabel(v, decimals)
+    );
+    if (new Set(labels).size === labels.length) {
+      return formatCompactMagnitudeBarEndLabel(value, decimals);
+    }
+  }
+
+  return formatCompactMagnitudeBarEndLabel(value, 3);
 }
 
 /**
@@ -326,9 +433,16 @@ export function horizontalBarValueDomain(
   if (smart) return smart;
 
   const vals = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
-  const maxV = vals.length ? Math.max(0, ...vals) : 0;
-  if (maxV <= 0) return [0, 1];
-  const padded = maxV * (1 + rightPadRatio);
+  if (vals.length === 0) return [0, 1];
+  const minV = Math.min(...vals);
+  const maxV = Math.max(...vals);
+  const spanV = maxV - minV;
+  if (minV < 0) {
+    return applySignedBarValueDomainPolicy(0, 1, minV, maxV, spanV || 1);
+  }
+  const maxPos = Math.max(0, ...vals);
+  if (maxPos <= 0) return [0, 1];
+  const padded = maxPos * (1 + rightPadRatio);
   return [0, roundExecutiveAxisMaximum(padded)];
 }
 
@@ -364,10 +478,26 @@ export type OverviewDashboardExportParityInput = {
   theme?: "light" | "dark";
   /** When set, export root must include at least this many metadata chips. */
   expectedMetadataChipCount?: number;
+  /** Live Overview value-axis domain (bar family only; compared when export domain is also set). */
+  liveValueAxisDomain?: readonly [number, number] | null;
+  /** Export value-axis domain from axis plan / capture props. */
+  exportValueAxisDomain?: readonly [number, number] | null;
+  /** Live Overview explicit value-axis ticks when applicable. */
+  liveValueAxisTicks?: readonly number[] | null;
+  /** Export explicit value-axis ticks when applicable. */
+  exportValueAxisTicks?: readonly number[] | null;
 };
 
 export type OverviewDashboardExportParityCheck = {
-  id: "chartKind" | "orientation" | "colors" | "labels" | "theme" | "metadataChips";
+  id:
+    | "chartKind"
+    | "orientation"
+    | "colors"
+    | "labels"
+    | "theme"
+    | "metadataChips"
+    | "valueAxisDomain"
+    | "valueAxisTicks";
   ok: boolean;
   message?: string;
 };
@@ -395,6 +525,76 @@ function readPrimaryBarFill(root: HTMLElement | null | undefined): string | null
 
 function normalizeHexColor(color: string): string {
   return color.trim().toLowerCase().replace(/\s/g, "");
+}
+
+const AXIS_PARITY_COMPARE_DECIMALS = 6;
+
+function finiteAxisNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/** Normalize axis scalars for stable parity comparison (float formatting noise). */
+export function normalizeAxisParityScalar(value: number): number {
+  return Number(value.toFixed(AXIS_PARITY_COMPARE_DECIMALS));
+}
+
+export function normalizeAxisParityDomain(
+  domain: readonly [number, number]
+): [number, number] {
+  return [
+    normalizeAxisParityScalar(domain[0]),
+    normalizeAxisParityScalar(domain[1]),
+  ];
+}
+
+export function normalizeAxisParityTickValues(
+  ticks: readonly number[]
+): number[] {
+  return ticks.filter(finiteAxisNumber).map(normalizeAxisParityScalar);
+}
+
+export function axisParityDomainsEqual(
+  a: readonly [number, number],
+  b: readonly [number, number]
+): boolean {
+  const na = normalizeAxisParityDomain(a);
+  const nb = normalizeAxisParityDomain(b);
+  return na[0] === nb[0] && na[1] === nb[1];
+}
+
+export function axisParityTickValuesEqual(
+  a: readonly number[],
+  b: readonly number[]
+): boolean {
+  const na = normalizeAxisParityTickValues(a);
+  const nb = normalizeAxisParityTickValues(b);
+  if (na.length !== nb.length) return false;
+  return na.every((value, index) => value === nb[index]);
+}
+
+function isBarFamilyValueAxisParityKind(kind: ChartKind): boolean {
+  return kind === "bar" || kind === "bar_horizontal" || kind === "histogram";
+}
+
+function hasComparableValueAxisDomain(
+  domain: readonly [number, number] | null | undefined
+): domain is readonly [number, number] {
+  return (
+    Array.isArray(domain) &&
+    domain.length === 2 &&
+    finiteAxisNumber(domain[0]) &&
+    finiteAxisNumber(domain[1])
+  );
+}
+
+function hasComparableValueAxisTicks(
+  ticks: readonly number[] | null | undefined
+): ticks is readonly number[] {
+  return (
+    Array.isArray(ticks) &&
+    ticks.length > 0 &&
+    ticks.every(finiteAxisNumber)
+  );
 }
 
 /** Validate dashboard ↔ PNG export parity before/after offscreen capture. */
@@ -482,6 +682,50 @@ export function validateOverviewDashboardExportParity(
       ? undefined
       : `export metadata chips ${actualChipCount} < expected ${expectedChipCount}`,
   });
+
+  if (isBarFamilyValueAxisParityKind(expectedKind)) {
+    if (
+      hasComparableValueAxisDomain(input.liveValueAxisDomain) &&
+      hasComparableValueAxisDomain(input.exportValueAxisDomain)
+    ) {
+      const domainOk = axisParityDomainsEqual(
+        input.liveValueAxisDomain,
+        input.exportValueAxisDomain
+      );
+      checks.push({
+        id: "valueAxisDomain",
+        ok: domainOk,
+        message: domainOk
+          ? undefined
+          : `export value domain ${JSON.stringify(
+              normalizeAxisParityDomain(input.exportValueAxisDomain)
+            )} !== live ${JSON.stringify(
+              normalizeAxisParityDomain(input.liveValueAxisDomain)
+            )}`,
+      });
+    }
+
+    if (
+      hasComparableValueAxisTicks(input.liveValueAxisTicks) &&
+      hasComparableValueAxisTicks(input.exportValueAxisTicks)
+    ) {
+      const ticksOk = axisParityTickValuesEqual(
+        input.liveValueAxisTicks,
+        input.exportValueAxisTicks
+      );
+      checks.push({
+        id: "valueAxisTicks",
+        ok: ticksOk,
+        message: ticksOk
+          ? undefined
+          : `export value ticks ${JSON.stringify(
+              normalizeAxisParityTickValues(input.exportValueAxisTicks)
+            )} !== live ${JSON.stringify(
+              normalizeAxisParityTickValues(input.liveValueAxisTicks)
+            )}`,
+      });
+    }
+  }
 
   return {
     ok: checks.every((c) => c.ok),
